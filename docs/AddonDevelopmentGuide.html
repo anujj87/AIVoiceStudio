@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Voice Studio - Addon Development Guide</title>
+<style>
+  body { font-family: Verdana, Arial, sans-serif; max-width: 56em; margin: 1.5em auto; padding: 0 1em; line-height: 1.6; color: #222; }
+  h1 { border-bottom: 2px solid #555; padding-bottom: .3em; }
+  h2 { margin-top: 1.8em; border-bottom: 1px solid #ccc; padding-bottom: .2em; color: #333; }
+  h3 { margin-top: 1.2em; color: #444; }
+  code { font-family: Consolas, 'Courier New', monospace; background: #f4f4f4; padding: 0.15em 0.3em; border-radius: 3px; font-size: 0.95em; }
+  pre { background: #f8f8f8; border: 1px solid #ddd; border-radius: 4px; padding: 1em; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.9em; line-height: 1.5; }
+  table { border-collapse: collapse; margin: 1em 0; width: 100%; }
+  th, td { border: 1px solid #999; padding: .4em .7em; text-align: left; }
+  th { background: #eee; }
+  .note { background: #fff8dc; border-left: 4px solid #e0b400; padding: .6em 1em; margin: 1em 0; }
+  .tip { background: #eef7ee; border-left: 4px solid #2e8b57; padding: .6em 1em; margin: 1em 0; }
+  .warning { background: #fff0f0; border-left: 4px solid #cc3333; padding: .6em 1em; margin: 1em 0; }
+  .file-tree { font-family: Consolas, monospace; background: #f0f0f0; padding: .8em 1.2em; border-radius: 4px; line-height: 1.6; }
+  ul, ol { margin: .5em 0; }
+  li { margin: .3em 0; }
+</style>
+</head>
+<body>
+
+<h1>AI Voice Studio &mdash; Addon Development Guide</h1>
+<p>This guide explains how to create addons for AI Voice Studio. Addons let you
+extend the application with new TTS engines, custom voices, additional languages,
+and other capabilities. The addon system is inspired by the NVDA screen reader's
+addon architecture.</p>
+
+<div class="note"><strong>Requirements:</strong> AI Voice Studio 0.1.0 or later
+with <strong>Developer Mode</strong> enabled in Settings. You also need Python
+3.11+ installed on your system (the addon system manages its own pip environment).</div>
+
+<div class="note"><strong>License note:</strong> AI Voice Studio is licensed GPL-3.0
+and allows free commercial use. All examples in this guide use engines that are
+also commercially licensed (MIT or Apache-2.0). When creating your own addon,
+ensure any third-party dependencies you use have compatible licenses for your
+intended use.</div>
+
+<h2>Contents</h2>
+<ul>
+  <li><a href="#overview">Overview</a></li>
+  <li><a href="#quickstart">Quick Start: Your First Addon</a></li>
+  <li><a href="#manifest">The Manifest File</a></li>
+  <li><a href="#structure">Addon Directory Structure</a></li>
+  <li><a href="#tts-engine">Adding a New TTS Engine</a></li>
+  <li><a href="#adding-tts">Adding a New TTS Voice (Step by Step)</a></li>
+  <li><a href="#piper-example">Example 1: Custom Piper Voice Pack</a></li>
+  <li><a href="#kokoro-example">Example 2: Kokoro Custom Voice</a></li>
+  <li><a href="#zip-packaging">Packaging Addons as Distributable ZIPs</a></li>
+  <li><a href="#pip-deps">Managing pip Dependencies</a></li>
+  <li><a href="#voice-cloning">Addon Voice Cloning Support</a></li>
+  <li><a href="#api">API Reference</a></li>
+  <li><a href="#install">Installing and Managing Addons</a></li>
+  <li><a href="#testing">Testing Your Addon</a></li>
+  <li><a href="#troubleshooting">Troubleshooting</a></li>
+</ul>
+
+<!-- ================================================================ -->
+<h2 id="overview">Overview</h2>
+
+<p>AI Voice Studio supports a plugin architecture that lets third-party developers
+add new text-to-speech engines and voices. Each addon is a self-contained directory
+with a manifest file and optional Python code.</p>
+
+<h3>What an Addon Can Do</h3>
+<ul>
+  <li><strong>Register a new TTS engine</strong> &mdash; any engine that produces
+      audio samples can be integrated (local models, cloud APIs, etc.).</li>
+  <li><strong>Add new voices</strong> &mdash; register voices that appear in the
+      Recording window alongside built-in voices.</li>
+  <li><strong>Install pip dependencies</strong> &mdash; the addon system manages
+      its own Python virtual environment; you can install any commercially-licensed
+      PyPI package via the <code>dependencies</code> field in your manifest.</li>
+  <li><strong>Support voice cloning</strong> &mdash; addons can register voice
+      cloning engines that create custom voices from short audio samples.</li>
+</ul>
+
+<h3>How Addons Are Loaded</h3>
+<ol>
+  <li>On startup (or when Developer Mode is toggled), the addon manager scans
+      <code>%APPDATA%/AIVoiceStudio/addons/</code>.</li>
+  <li>Each subdirectory with a valid <code>manifest.json</code> is registered.</li>
+  <li>Enabled addons have their Python modules imported and engines registered.</li>
+  <li>Addon-provided voices appear in the Recording window's voice selector.</li>
+</ol>
+
+<!-- ================================================================ -->
+<h2 id="quickstart">Quick Start: Your First Addon</h2>
+
+<p>Let's create a simple addon that adds a "Hello TTS" engine synthesizing
+basic sine-wave speech.</p>
+
+<h3>Step 1: Create the directory</h3>
+<pre>%APPDATA%\AIVoiceStudio\addons\hello_tts\
+  manifest.json
+  __init__.py
+  engine.py</pre>
+
+<h3>Step 2: Write manifest.json</h3>
+<pre>{
+    "name": "Hello TTS",
+    "version": "1.0.0",
+    "description": "A simple demo TTS engine for AI Voice Studio.",
+    "author": "Your Name",
+    "url": "https://example.com/hello-tts",
+    "min_app_version": "0.1.0",
+    "engine_id": "hello_tts",
+    "engine_name": "Hello TTS Engine",
+    "engine_entry_point": "engine:HelloTtsEngine",
+    "dependencies": [],
+    "voices": [
+        {
+            "id": "hello_english",
+            "name": "Hello English",
+            "language": "en",
+            "data_dir": ""
+        }
+    ],
+    "provides": ["tts_engine", "voice"],
+    "enabled": true
+}</pre>
+
+<h3>Step 3: Write engine.py</h3>
+<pre>import numpy as np
+
+class HelloTtsEngine:
+    """A minimal TTS engine that produces a test tone."""
+
+    sample_rate = 22050
+
+    def __init__(self, voice_entry: dict):
+        self.voice_entry = voice_entry
+
+    def synthesize(self, text: str, sid: int = 0,
+                   speed: float = 1.0, pitch: float = 1.0,
+                   volume: float = 1.0) -> np.ndarray:
+        """Produce a 1-second 440 Hz test tone."""
+        duration = 1.0
+        t = np.linspace(0, duration, int(self.sample_rate * duration),
+                        endpoint=False)
+        freq = 440.0 * pitch
+        samples = np.sin(2 * np.pi * freq * t) * volume * 0.5
+        return (samples * 32767).astype(np.int16)</pre>
+
+<h3>Step 4: Write __init__.py</h3>
+<pre>"""Hello TTS addon for AI Voice Studio."""</pre>
+
+<h3>Step 5: Restart AI Voice Studio</h3>
+<p>The addon should appear in the voice selector with "Hello English" as an
+available voice.</p>
+
+<div class="tip"><strong>Tip:</strong> Enable Developer Mode in Settings first
+(General &rarr; Developer Mode checkbox). Heavy logging will show detailed
+information about addon loading in <code>%APPDATA%/AIVoiceStudio/logs/addons.log</code>.</div>
+
+<!-- ================================================================ -->
+<h2 id="manifest">The Manifest File</h2>
+
+<p>Every addon <strong>must</strong> contain a <code>manifest.json</code> file
+in its root directory.</p>
+
+<table>
+<tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td><code>name</code></td><td>string</td><td>Yes</td><td>Human-readable addon name.</td></tr>
+<tr><td><code>version</code></td><td>string</td><td>Yes</td><td>Semantic version (e.g. <code>"1.0.0"</code>).</td></tr>
+<tr><td><code>description</code></td><td>string</td><td>Yes</td><td>Short description of the addon.</td></tr>
+<tr><td><code>author</code></td><td>string</td><td>Yes</td><td>Addon author name.</td></tr>
+<tr><td><code>url</code></td><td>string</td><td>No</td><td>URL for the addon's homepage/repo.</td></tr>
+<tr><td><code>min_app_version</code></td><td>string</td><td>Yes</td><td>Minimum AI Voice Studio version required.</td></tr>
+<tr><td><code>engine_id</code></td><td>string</td><td>No</td><td>Unique TTS engine identifier (e.g. <code>"my_tts"</code>).</td></tr>
+<tr><td><code>engine_name</code></td><td>string</td><td>No</td><td>Display name for the engine in the UI.</td></tr>
+<tr><td><code>engine_entry_point</code></td><td>string</td><td>No</td><td>Python module:class for the engine (e.g. <code>"engine:MyEngine"</code>).</td></tr>
+<tr><td><code>dependencies</code></td><td>list</td><td>No</td><td>Pip packages to install (e.g. <code>["pyttsx3>=2.90"]</code>).</td></tr>
+<tr><td><code>voices</code></td><td>list</td><td>No</td><td>Voice definitions (see below).</td></tr>
+<tr><td><code>provides</code></td><td>list</td><td>No</td><td>Capabilities: <code>"tts_engine"</code>, <code>"voice"</code>, <code>"voice_cloner"</code>.</td></tr>
+<tr><td><code>enabled</code></td><td>boolean</td><td>No</td><td>Defaults to <code>true</code>. Set <code>false</code> to disable.</td></tr>
+</table>
+
+<h3>Voice Definition Fields</h3>
+<table>
+<tr><th>Field</th><th>Type</th><th>Description</th></tr>
+<tr><td><code>id</code></td><td>string</td><td>Unique voice identifier.</td></tr>
+<tr><td><code>name</code></td><td>string</td><td>Display name in the voice selector.</td></tr>
+<tr><td><code>language</code></td><td>string</td><td>ISO 639 language code (e.g. <code>"en"</code>).</td></tr>
+<tr><td><code>data_dir</code></td><td>string</td><td>Path to voice data directory (relative to addon dir).</td></tr>
+<tr><td><code>engine_id</code></td><td>string</td><td>Which engine this voice uses (must match an <code>engine_id</code>).</td></tr>
+<tr><td><code>sample_rate</code></td><td>integer</td><td>Audio sample rate in Hz (default: 22050).</td></tr>
+<tr><td><code>sid</code></td><td>integer</td><td>Speaker ID for multi-speaker models (default: 0).</td></tr>
+</table>
+
+<!-- ================================================================ -->
+<h2 id="structure">Addon Directory Structure</h2>
+
+<div class="file-tree">
+my_addon/<br>
+&nbsp;&nbsp;manifest.json&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Required: addon metadata<br>
+&nbsp;&nbsp;__init__.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Optional: Python entry point<br>
+&nbsp;&nbsp;engine.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Optional: TTS engine implementation<br>
+&nbsp;&nbsp;voices/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Optional: bundled voice data<br>
+&nbsp;&nbsp;&nbsp;&nbsp;my_voice_1/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Voice data directory<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;model.onnx<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;tokens.txt<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;espeak-ng-data/<br>
+&nbsp;&nbsp;cloner.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Optional: voice cloning engine<br>
+&nbsp;&nbsp;utils.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Optional: helper modules
+</div>
+
+<!-- ================================================================ -->
+<h2 id="tts-engine">Adding a New TTS Engine</h2>
+
+<p>To register a custom TTS engine, implement a class with the standard
+<code>synthesize()</code> interface:</p>
+
+<pre>class MyTtsEngine:
+    """Your custom TTS engine."""
+
+    # Required: output sample rate in Hz
+    sample_rate = 22050
+
+    def __init__(self, voice_entry: dict):
+        self.voice_entry = voice_entry
+        # Load your model / connect to API here
+
+    def synthesize(
+        self,
+        text: str,
+        sid: int = 0,
+        speed: float = 1.0,
+        pitch: float = 1.0,
+        volume: float = 1.0,
+    ) -> "np.ndarray":
+        """Synthesize text into audio.
+        Returns int16 PCM samples at self.sample_rate."""
+        # Your synthesis logic here
+        pass</pre>
+
+<h3>Engine Registration</h3>
+<ol>
+  <li>Set <code>engine_id</code> in your manifest (e.g. <code>"my_tts"</code>).</li>
+  <li>Set <code>engine_entry_point</code> to <code>"module_name:ClassName"</code>.</li>
+  <li>When a voice with <code>"engine_id": "my_tts"</code> is selected for
+      recording, AI Voice Studio instantiates your engine class with the
+      voice entry dict and calls <code>synthesize()</code>.</li>
+</ol>
+
+<h3>Using the Built-in Python Environment</h3>
+<p>If your engine needs extra Python packages (e.g. <code>pyttsx3</code>,
+<code>requests</code>, <code>openai</code>), add them to the
+<code>dependencies</code> field in your manifest:</p>
+<pre>{
+    "dependencies": ["pyttsx3", "requests>=2.31"]
+}</pre>
+<p>AI Voice Studio installs these into its managed Python virtual environment
+when the addon is enabled. No system-wide pip install is needed.</p>
+
+<!-- ================================================================ -->
+<h2 id="adding-tts">Adding a New TTS Voice (Step by Step)</h2>
+
+<p>This section walks through the complete process of adding a new TTS voice
+as an addon, covering all the facilities AI Voice Studio provides.</p>
+
+<h3>Step 1: Choose Your Engine Type</h3>
+<table>
+<tr><th>Type</th><th>Use Case</th><th>Dependencies</th></tr>
+<tr><td>Local ONNX</td><td>Offline, fast, bundled models</td><td>sherpa-onnx (bundled)</td></tr>
+<tr><td>Local PyTorch</td><td>Custom ML models</td><td>torch, transformers (commercially licensed)</td></tr>
+<tr><td>Cloud API</td><td>High quality, requires internet</td><td>requests, aiohttp (must be commercially licensed)</td></tr>
+<tr><td>System TTS</td><td>OS built-in speech (license varies by OS)</td><td>pyttsx3 (optional)</td></tr>
+</table>
+
+<h3>Step 2: Create the Addon</h3>
+<pre># In %APPDATA%/AIVoiceStudio/addons/
+mkdir my_voice_addon
+cd my_voice_addon</pre>
+
+<h3>Step 3: Write manifest.json and engine.py</h3>
+<p>See the complete examples below for manifest and engine code.</p>
+
+<h3>Step 4: Test</h3>
+<ol>
+  <li>Restart AI Voice Studio (or toggle Developer Mode off and on).</li>
+  <li>Create a new project and open the Recording window.</li>
+  <li>Select your addon's engine from the TTS dropdown.</li>
+  <li>Select a voice.</li>
+  <li>Press Preview or Start recording.</li>
+</ol>
+
+<!-- ================================================================ -->
+<h2 id="piper-example">Example 1: Custom Piper Voice Pack</h2>
+
+<p>This example registers a custom Piper voice as an addon. Piper voices use
+the VITS architecture and are licensed under <strong>MIT</strong>. The app
+already includes Piper support &mdash; this example shows how to add a
+<em>new</em> Piper voice that isn't in the built-in catalog (e.g. a
+community-made or custom-trained voice).</p>
+
+<h3>manifest.json</h3>
+<pre>{
+    "name": "Custom Piper Hindi Voice",
+    "version": "1.0.0",
+    "description": "A custom Piper VITS voice for Hindi.",
+    "author": "Your Name",
+    "min_app_version": "0.1.0",
+    "engine_id": "piper_hindi_custom",
+    "engine_name": "Piper Hindi (Custom)",
+    "engine_entry_point": "engine:PiperCustomEngine",
+    "dependencies": [],
+    "voices": [
+        {
+            "id": "hi_hi_IN_female",
+            "name": "Hindi Female (Custom)",
+            "language": "hi",
+            "data_dir": "voices/hi_female"
+        }
+    ],
+    "provides": ["tts_engine", "voice"]
+}</pre>
+
+<h3>engine.py</h3>
+<pre>"""Custom Piper voice addon for AI Voice Studio.
+
+Piper voices are VITS-based ONNX models licensed under MIT.
+This engine wraps sherpa-onnx (bundled with the app) to run them.
+"""
+import os
+import numpy as np
+
+
+class PiperCustomEngine:
+    """Runs a custom Piper voice via the bundled sherpa-onnx."""
+
+    sample_rate = 22050
+
+    def __init__(self, voice_entry: dict):
+        self.voice_entry = voice_entry
+        self._dir = voice_entry.get("dir", "")
+        self._model = None
+
+    def _ensure_model(self):
+        if self._model is not None:
+            return
+        import sherpa_onnx
+
+        model_path = self._find_file(".onnx")
+        tokens_path = os.path.join(self._dir, "tokens.txt")
+        lexicon_path = os.path.join(self._dir, "lexicon.txt")
+        data_dir = os.path.join(self._dir, "espeak-ng-data")
+        if not os.path.isdir(data_dir):
+            data_dir = ""
+
+        vits = sherpa_onnx.OfflineTtsVitsModelConfig(
+            model=model_path,
+            lexicon=lexicon_path if os.path.isfile(lexicon_path) else "",
+            tokens=tokens_path,
+            data_dir=data_dir,
+            dict_dir="",
+            noise_scale=0.667,
+            noise_scale_w=0.8,
+            length_scale=1.0,
+        )
+        cfg = sherpa_onnx.OfflineTtsConfig(
+            model=sherpa_onnx.OfflineTtsModelConfig(
+                vits=vits, num_threads=2, provider="cpu"
+            ),
+            rule_fsts="",
+            max_num_sentences=1,
+        )
+        self._model = sherpa_onnx.OfflineTts(cfg)
+        self.sample_rate = self._model.sample_rate
+
+    def _find_file(self, ext: str) -> str:
+        for f in os.listdir(self._dir):
+            if f.endswith(ext):
+                return os.path.join(self._dir, f)
+        raise FileNotFoundError(
+            f"No {ext} file found in {self._dir}. "
+            "Download the Piper voice model first."
+        )
+
+    def synthesize(self, text, sid=0, speed=1.0, pitch=1.0, volume=1.0):
+        """Synthesize text using the bundled sherpa-onnx + Piper model."""
+        self._ensure_model()
+        audio = self._model.generate(
+            text=text, sid=int(sid), speed=float(speed)
+        )
+        # sherpa-onnx returns float samples in [-1, 1]
+        samples = np.asarray(audio.samples)
+        if np.issubdtype(samples.dtype, np.floating):
+            return (np.clip(samples, -1.0, 1.0) * 32767).astype(np.int16)
+        return samples.astype(np.int16)</pre>
+
+<h3>__init__.py</h3>
+<pre>"""Custom Piper Hindi voice addon for AI Voice Studio."""</pre>
+
+<h3>Voice Directory Structure</h3>
+<div class="file-tree">
+voices/hi_female/<br>
+&nbsp;&nbsp;hi_hi_female.onnx&nbsp;&nbsp;&nbsp;&nbsp;# Piper VITS model<br>
+&nbsp;&nbsp;tokens.txt&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Token list<br>
+&nbsp;&nbsp;lexicon.txt&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Optional lexicon<br>
+&nbsp;&nbsp;espeak-ng-data/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Optional phoneme data
+</div>
+
+<div class="tip"><strong>Tip:</strong> Piper community voices are available at
+<a href="https://rhasspy.github.io/piper-samples/">rhasspy.github.io/piper-samples/</a>.
+Download any voice, place the <code>.onnx</code> + <code>tokens.txt</code> files
+into the <code>voices/</code> directory, and the addon picks them up automatically.</div>
+
+<!-- ================================================================ -->
+<h2 id="kokoro-example">Example 2: Kokoro Custom Voice</h2>
+
+<p>This example registers a custom Kokoro-82M voice as an addon. Kokoro is
+licensed under <strong>Apache-2.0</strong> and produces high-quality speech.
+The app already bundles Kokoro support &mdash; this shows how to add an extra
+voice (e.g. a custom speaker from a fine-tuned model).</p>
+
+<h3>manifest.json</h3>
+<pre>{
+    "name": "Custom Kokoro Spanish Voice",
+    "version": "1.0.0",
+    "description": "A custom Kokoro-82M voice for Spanish.",
+    "author": "Your Name",
+    "min_app_version": "0.1.0",
+    "engine_id": "kokoro_es_custom",
+    "engine_name": "Kokoro Spanish (Custom)",
+    "engine_entry_point": "engine:KokoroCustomEngine",
+    "dependencies": [],
+    "voices": [
+        {
+            "id": "kokoro_es_female_1",
+            "name": "Spanish Female 1 (Kokoro)",
+            "language": "es",
+            "data_dir": "voices/es_female"
+        }
+    ],
+    "provides": ["tts_engine", "voice"]
+}</pre>
+
+<h3>engine.py</h3>
+<pre>"""Custom Kokoro voice addon for AI Voice Studio.
+
+Kokoro-82M is Apache-2.0 licensed and runs via the bundled sherpa-onnx.
+This engine wraps the Kokoro-specific ONNX config.
+"""
+import os
+import numpy as np
+
+
+class KokoroCustomEngine:
+    """Runs a custom Kokoro voice via the bundled sherpa-onnx."""
+
+    sample_rate = 24000
+
+    def __init__(self, voice_entry: dict):
+        self.voice_entry = voice_entry
+        self._dir = voice_entry.get("dir", "")
+        self._model = None
+
+    def _ensure_model(self):
+        if self._model is not None:
+            return
+        import sherpa_onnx
+
+        model = self._find_file("model.onnx")
+        tokens = os.path.join(self._dir, "tokens.txt")
+        voices = os.path.join(self._dir, "voices.bin")
+        data_dir = os.path.join(self._dir, "espeak-ng-data")
+        if not os.path.isdir(data_dir):
+            data_dir = ""
+
+        kokoro = sherpa_onnx.OfflineTtsKokoroModelConfig(
+            model=model,
+            voices=voices if os.path.isfile(voices) else "",
+            tokens=tokens,
+            lexicon="",
+            data_dir=data_dir,
+            dict_dir="",
+            length_scale=1.0,
+            lang="",
+        )
+        cfg = sherpa_onnx.OfflineTtsConfig(
+            model=sherpa_onnx.OfflineTtsModelConfig(
+                kokoro=kokoro, num_threads=2, provider="cpu"
+            ),
+            rule_fsts="",
+            max_num_sentences=1,
+        )
+        self._model = sherpa_onnx.OfflineTts(cfg)
+        self.sample_rate = self._model.sample_rate
+
+    def _find_file(self, name: str) -> str:
+        path = os.path.join(self._dir, name)
+        if not os.path.isfile(path):
+            raise FileNotFoundError(
+                f"{name} not found in {self._dir}. "
+                "Download the Kokoro model first."
+            )
+        return path
+
+    def synthesize(self, text, sid=0, speed=1.0, pitch=1.0, volume=1.0):
+        self._ensure_model()
+        audio = self._model.generate(
+            text=text, sid=int(sid), speed=float(speed)
+        )
+        samples = np.asarray(audio.samples)
+        if np.issubdtype(samples.dtype, np.floating):
+            return (np.clip(samples, -1.0, 1.0) * 32767).astype(np.int16)
+        return samples.astype(np.int16)</pre>
+
+<h3>__init__.py</h3>
+<pre>"""Custom Kokoro Spanish voice addon for AI Voice Studio."""</pre>
+
+<h3>Voice Directory Structure</h3>
+<div class="file-tree">
+voices/es_female/<br>
+&nbsp;&nbsp;model.onnx&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Kokoro model (or model.int8.onnx)<br>
+&nbsp;&nbsp;tokens.txt&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Token list<br>
+&nbsp;&nbsp;voices.bin&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Voice embeddings<br>
+&nbsp;&nbsp;espeak-ng-data/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Phoneme data
+</div>
+
+<div class="tip"><strong>Tip:</strong> The Kokoro multi-lang models contain multiple speakers.
+Use <code>sid</code> (speaker ID) to select a specific voice from the
+<code>voices.bin</code> file. Speaker IDs start at 0.</div>
+
+<!-- ================================================================ -->
+<h2 id="zip-packaging">Packaging Addons as Distributable ZIPs</h2>
+
+<p>Once your addon is tested and ready to share, package it as a ZIP file.</p>
+
+<h3>Directory Layout</h3>
+<p>The ZIP root must contain <code>manifest.json</code> and your Python files:</p>
+<div class="file-tree">
+MyAddon-v1.0.0.zip<br>
+&nbsp;&nbsp;manifest.json&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Required<br>
+&nbsp;&nbsp;__init__.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Entry point<br>
+&nbsp;&nbsp;engine.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# TTS engine<br>
+&nbsp;&nbsp;voices/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Optional voice data
+</div>
+
+<h3>Creating the ZIP</h3>
+<pre># From the addon directory:
+
+# PowerShell (Windows):
+Compress-Archive -Path * -DestinationPath ..\MyAddon-v1.0.0.zip
+
+# Python:
+import zipfile
+with zipfile.ZipFile("MyAddon-v1.0.0.zip", "w", zipfile.ZIP_DEFLATED) as zf:
+    zf.write("manifest.json")
+    zf.write("__init__.py")
+    zf.write("engine.py")
+
+# Command line (Linux/Mac):
+zip -r MyAddon-v1.0.0.zip manifest.json __init__.py engine.py</pre>
+
+<h3>Installing a Packaged Addon</h3>
+<ol>
+  <li>Open Settings &rarr; Developer (Developer Mode must be enabled).</li>
+  <li>Press <strong>Install addon from ZIP...</strong>.</li>
+  <li>Select your <code>MyAddon-v1.0.0.zip</code> file.</li>
+  <li>The addon is extracted to <code>%APPDATA%/AIVoiceStudio/addons/my_addon/</code>.</li>
+  <li>Restart the application. The addon's voices appear in the Recording window.</li>
+</ol>
+
+<div class="tip"><strong>Tip:</strong> The addon directory name is derived from the addon's <code>name</code>
+field in manifest.json (spaces become underscores, lowercased). The ZIP can
+contain a flat structure (all files at the root) or a subdirectory &mdash; the installer
+finds manifest.json either way.</div>
+
+<h3>Version Updates</h3>
+<p>To distribute an update, simply bump the <code>version</code> field in
+manifest.json and create a new ZIP. Users install the update by removing the
+old addon and installing the new ZIP, or by overwriting the addon directory.</p>
+
+<!-- ================================================================ -->
+<h2 id="pip-deps">Managing pip Dependencies</h2>
+
+<p>AI Voice Studio manages its own Python virtual environment at
+<code>%APPDATA%/AIVoiceStudio/addon_env/</code>. All addon dependencies are
+installed here, keeping them isolated from the system Python and from each
+other.</p>
+
+<h3>How It Works</h3>
+<ol>
+  <li>Your addon's <code>dependencies</code> field lists required packages.</li>
+  <li>When the addon is enabled, the addon manager creates the virtualenv
+      (if it doesn't exist) and runs pip install.</li>
+  <li>Packages are available to your addon's Python code at import time.</li>
+  <li>To uninstall, disable the addon and reinstall it, or manually manage
+      the virtualenv.</li>
+</ol>
+
+<h3>Programmatic pip Access</h3>
+<pre>from ai_voice_studio.python_runtime import get_runtime
+
+rt = get_runtime()
+result = rt.pip_install(["pyttsx3", "requests"])
+if result["ok"]:
+    print("Dependencies installed!")
+else:
+    print("Error:", result["error"])
+
+# List installed packages
+packages = rt.pip_list()
+for pkg in packages:
+    print(f"{pkg['name']} {pkg['version']}")</pre>
+
+<h3>The Managed Environment</h3>
+<table>
+<tr><th>Path</th><th>Description</th></tr>
+<tr><td><code>%APPDATA%/AIVoiceStudio/addon_env/</code></td><td>Virtualenv root</td></tr>
+<tr><td><code>addon_env/Scripts/python.exe</code></td><td>Python executable (Windows)</td></tr>
+<tr><td><code>addon_env/Scripts/pip.exe</code></td><td>pip executable (Windows)</td></tr>
+<tr><td><code>addon_env/Lib/site-packages/</code></td><td>Installed packages (Windows)</td></tr>
+</table>
+
+<!-- ================================================================ -->
+<h2 id="voice-cloning">Addon Voice Cloning Support</h2>
+
+<p>Addons can register voice cloning engines that create custom voices from
+short reference recordings. The cloned voice then appears in the Recording
+window alongside downloaded voices.</p>
+
+<h3>Implementing a Cloner</h3>
+<pre>class MyCloner:
+    """Voice cloning engine."""
+
+    def clone_voice(
+        self,
+        name: str,
+        sample_path: str,
+        language: str,
+        model_dir: str = "",
+    ) -> dict:
+        """Create a cloned voice from a reference recording.
+        Returns a voice entry dict."""
+        # Your cloning logic
+        pass</pre>
+
+<h3>Registration</h3>
+<p>Set <code>"provides": ["voice_cloner"]</code> in your manifest and implement
+the cloner class. The Voice Clone tab in Settings will show your cloner
+alongside the built-in Qwen3 and OmniVoice options.</p>
+
+<!-- ================================================================ -->
+<h2 id="api">API Reference</h2>
+
+<h3>Voice Entry Dict</h3>
+<p>This is the standard dictionary passed to engine constructors and used
+throughout the app:</p>
+<pre>{
+    "tts": "my_engine",         # engine ID
+    "tts_name": "My Engine",    # display name
+    "language": "en",           # ISO 639 language code
+    "variant": "default",       # variant ID
+    "voice": "my_voice_1",      # voice ID
+    "voice_name": "My Voice",   # display name
+    "sid": 0,                   # speaker ID
+    "engine": "my_custom",      # engine type identifier
+    "dir": "/path/to/voice",    # voice data directory
+}</pre>
+
+<h3>Key Modules</h3>
+<table>
+<tr><th>Module</th><th>Description</th></tr>
+<tr><td><code>ai_voice_studio.addons</code></td><td>Addon discovery, loading, management</td></tr>
+<tr><td><code>ai_voice_studio.python_runtime</code></td><td>Managed Python/pip environment</td></tr>
+<tr><td><code>ai_voice_studio.heavy_logging</code></td><td>Comprehensive logging system</td></tr>
+<tr><td><code>ai_voice_studio.tts.engine</code></td><td>TTS engine base (get_engine, process_punctuation)</td></tr>
+<tr><td><code>ai_voice_studio.tts.models</code></td><td>ModelStore for voice registration</td></tr>
+<tr><td><code>ai_voice_studio.audio.output</code></td><td>Audio file writing (WAV, MP3, FLAC)</td></tr>
+</table>
+
+<!-- ================================================================ -->
+<h2 id="install">Installing and Managing Addons</h2>
+
+<h3>Manual Installation</h3>
+<ol>
+  <li>Place your addon folder in <code>%APPDATA%/AIVoiceStudio/addons/my_addon/</code>.</li>
+  <li>Restart AI Voice Studio or toggle Developer Mode.</li>
+</ol>
+
+<h3>Via Developer Mode (in-app)</h3>
+<ol>
+  <li>Enable Developer Mode in Settings &rarr; General.</li>
+  <li>Open Settings &rarr; Developer.</li>
+  <li>Press "Install Addon from ZIP..." and choose your addon archive.</li>
+  <li>The addon is extracted and registered automatically.</li>
+</ol>
+
+<h3>Enabling/Disabling</h3>
+<p>In Developer Mode, the Developer settings panel shows all installed addons
+with Enable/Disable buttons. Disabled addons are not loaded at startup but
+remain on disk.</p>
+
+<h3>Removing</h3>
+<p>In Developer Mode, select an addon and press "Remove" to delete it
+completely.</p>
+
+<!-- ================================================================ -->
+<h2 id="testing">Testing Your Addon</h2>
+
+<h3>Check the Logs</h3>
+<p>With Developer Mode enabled, use the <strong>Log Viewer</strong> in the
+Developer settings panel, or check these log files:</p>
+<ul>
+  <li><code>logs/addons.log</code> &mdash; addon discovery, loading, errors</li>
+  <li><code>logs/app.log</code> &mdash; main application log with full tracebacks</li>
+  <li><code>logs/crash.log</code> &mdash; unhandled exception details</li>
+</ul>
+
+<h3>Common Test Steps</h3>
+<ol>
+  <li>Place your addon in the addons directory.</li>
+  <li>Restart the app (or toggle Developer Mode).</li>
+  <li>Check <code>addons.log</code> for "Discovered addon: ..." messages.</li>
+  <li>Create a project and verify your voice appears in the Recording window.</li>
+  <li>Test Preview and recording with your voice.</li>
+  <li>Test with different rate/pitch/volume settings.</li>
+</ol>
+
+<h3>Debug Tips</h3>
+<ul>
+  <li>Use <code>ai_voice_studio.heavy_logging.get_logger("my_addon")</code>
+      in your code for subsystem-specific logging.</li>
+  <li>Check <code>logs/engine.log</code> for engine-specific issues.</li>
+  <li>All caught exceptions in your addon are logged automatically when
+      Developer Mode is on.</li>
+</ul>
+
+<!-- ================================================================ -->
+<h2 id="troubleshooting">Troubleshooting</h2>
+
+<h3>Addon does not appear in the voice list</h3>
+<ul>
+  <li>Verify Developer Mode is enabled.</li>
+  <li>Check <code>addons.log</code> for errors during discovery or loading.</li>
+  <li>Ensure <code>manifest.json</code> is valid JSON.</li>
+  <li>Ensure <code>engine_id</code> matches between manifest and voices.</li>
+</ul>
+
+<h3>Dependencies fail to install</h3>
+<ul>
+  <li>Check that Python 3.11+ is installed and accessible.</li>
+  <li>Check <code>addons.log</code> for pip error output.</li>
+  <li>Try manually: <code>%APPDATA%/AIVoiceStudio/addon_env/Scripts/pip install your-package</code></li>
+</ul>
+
+<h3>Engine crashes during synthesis</h3>
+<ul>
+  <li>Check <code>logs/engine.log</code> and <code>logs/crash.log</code>.</li>
+  <li>Ensure your engine's <code>synthesize()</code> returns <code>np.ndarray</code>
+      of int16 samples at the declared <code>sample_rate</code>.</li>
+  <li>Use <code>ai_voice_studio.heavy_logging.log_exception_with_context()</code>
+      in your except blocks for better diagnostics.</li>
+</ul>
+
+<h3>Pip environment is corrupted</h3>
+<p>Delete the virtualenv and let it be recreated:</p>
+<pre>Remove-Item -Recurse -Force "%APPDATA%\AIVoiceStudio\addon_env"</pre>
+<p>Restart AI Voice Studio. The environment will be recreated on the next
+addon installation.</p>
+
+</body>
+</html>

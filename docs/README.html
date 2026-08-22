@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Voice Studio - Read Me</title>
+<style>
+  body { font-family: Verdana, Arial, sans-serif; max-width: 52em; margin: 1.5em auto; padding: 0 1em; line-height: 1.5; }
+  h1 { border-bottom: 2px solid #888; padding-bottom: .3em; }
+  h2 { margin-top: 1.6em; border-bottom: 1px solid #ccc; padding-bottom: .2em; }
+  code, kbd { font-family: Consolas, monospace; background: #f0f0f0; padding: 0 0.25em; border-radius: 3px; }
+  table { border-collapse: collapse; margin: 1em 0; }
+  th, td { border: 1px solid #999; padding: .35em .6em; text-align: left; }
+  th { background: #eee; }
+  .note { background: #fff8dc; border-left: 4px solid #e0b400; padding: .5em .8em; margin: 1em 0; }
+</style>
+</head>
+<body>
+
+<h1>AI Voice Studio</h1>
+<p>Developed by <strong>Anuj Sharma</strong> &mdash; version 0.1.0 &mdash; licence: GPL-3.0.</p>
+
+<p>AI Voice Studio converts documents (PDF, TXT, DOC/DOCX, HTML, Markdown and
+clipboard text) into spoken audio files using free, offline neural voices. It is
+built with wxPython and sherpa-onnx, and it is designed to work well with
+screen readers such as NVDA, JAWS and Narrator.</p>
+
+<h2>Features at a glance</h2>
+<ul>
+  <li><strong>Offline text to speech</strong> &mdash; Piper, VITS, Kokoro, Matcha and Kitten voices, downloaded once from Settings and reused by all projects.</li>
+  <li><strong>Voice cloning</strong> &mdash; clone a voice from a 4&ndash;5 second WAV sample with Coqui XTTS v2, in 17 languages (optional ~2.5&nbsp;GB engine download).</li>
+  <li><strong>Punctuation control</strong> &mdash; four modes, including &ldquo;All&rdquo;, which speaks every punctuation mark as a word (quote, dot, left paren, tic&hellip;) for voices that cannot pronounce punctuation.</li>
+  <li><strong>Project-based recording</strong> &mdash; each document becomes a project; every segment is saved to disk immediately as WAV, MP3 or FLAC, and recording resumes where it stopped after a crash or close.</li>
+  <li><strong>GPU acceleration</strong> &mdash; optional CUDA runtime (about 1.8&nbsp;GB) downloaded from Settings &rarr; Compute; only an NVIDIA driver is required.</li>
+  <li><strong>Screen-reader friendly</strong> &mdash; labelled controls, NVDA-style settings dialog, keyboard shortcuts throughout.</li>
+</ul>
+
+<h2>Quick start</h2>
+<ol>
+  <li>Open <strong>Settings</strong> (Ctrl+,) and use the <strong>Download and remove</strong> category to install at least one voice (for example Piper, English US, medium).</li>
+  <li>Create a <strong>New Project</strong> (Ctrl+Shift+N), choose a document and how it is split into audio files, and pick the punctuation mode.</li>
+  <li>Press <strong>Start recording</strong> in the Recording window. Each finished segment is saved immediately.</li>
+</ol>
+
+<h2>Keyboard shortcuts</h2>
+<table>
+  <tr><th>Shortcut</th><th>Action</th></tr>
+  <tr><td>Ctrl+Shift+N</td><td>New Project</td></tr>
+  <tr><td>Ctrl+Shift+R</td><td>Record (open the most recent project)</td></tr>
+  <tr><td>Ctrl+,</td><td>Settings</td></tr>
+  <tr><td>Alt+F, Alt+E, Alt+T, Alt+H</td><td>Open the File, Edit, Tools or Help menu</td></tr>
+  <tr><td>Arrow keys</td><td>Move through the Recent projects list and through the Settings categories</td></tr>
+  <tr><td>Ctrl+Tab / Ctrl+Shift+Tab</td><td>Switch Settings category (wrapping)</td></tr>
+  <tr><td>Enter</td><td>Activate the default button (OK in dialogs and wizards)</td></tr>
+  <tr><td>Ctrl+S</td><td>Apply settings without closing the dialog</td></tr>
+</table>
+
+<h2>Computing back-ends</h2>
+<p>The app offers <strong>Auto</strong>, <strong>GPU (CUDA)</strong> and
+<strong>CPU</strong> back-ends in the Recording window.</p>
+<ul>
+  <li><strong>CPU</strong> is always available: the CPU ONNX Runtime ships with the application.</li>
+  <li><strong>GPU (CUDA)</strong> needs the optional GPU runtime, downloaded from Settings &rarr; Compute (about 1.8&nbsp;GB, includes CUDA 12 and cuDNN 9). It activates after the application restarts. Only an NVIDIA driver is needed &mdash; no CUDA toolkit installation.</li>
+</ul>
+
+<h2>Voice cloning (XTTS v2)</h2>
+<p>Some TTS engines can copy a voice from a short recording. AI Voice Studio
+uses <strong>Coqui XTTS v2</strong> for this: give the voice a name, choose the
+language spoken in the sample, and provide a 4&ndash;5 second WAV recording of
+one clear voice. The cloned voice then appears in <strong>Available TTS</strong>
+and the <strong>Recording window</strong> and can speak any of the 17 supported
+languages.</p>
+<p>The cloning engine (about 2.5&nbsp;GB, coqui-tts + PyTorch) is downloaded
+into your user folder from Settings &rarr; Voice clone; the XTTS model itself
+(about 2.1&nbsp;GB) downloads automatically on first use. The XTTS model is
+licensed under the <strong>Coqui Public Model Licence (non-commercial)</strong>.</p>
+
+<h2>Punctuation modes</h2>
+<ul>
+  <li><strong>Default</strong> &mdash; the text is passed to the voice unchanged.</li>
+  <li><strong>None</strong> &mdash; sentence punctuation is removed before recording.</li>
+  <li><strong>Math</strong> &mdash; sentence punctuation is removed, math symbols are kept and spoken.</li>
+  <li><strong>All</strong> &mdash; every punctuation mark is replaced by its spoken word, e.g. <code>my name is "anujsharma".</code> becomes <code>my name is quote anujsharma quote dot</code>, and <code>print('hello')</code> becomes <code>print left paren tic hello tic right paren</code>.</li>
+</ul>
+<p>The mode is chosen per project in the New Project window; the default for
+new projects is set in Settings &rarr; Punctuation, where you can also preview
+any mode through a selected voice.</p>
+
+<h2>Project lifecycle</h2>
+<ul>
+  <li><strong>Resume recording</strong> &mdash; continue where the last recording stopped.</li>
+  <li><strong>Restart project</strong> &mdash; delete all recordings and settings, keep only the project name, and recreate the project.</li>
+  <li><strong>Restart all recording</strong> &mdash; delete all audio files and record every segment again from the beginning.</li>
+  <li><strong>Restart selected recording</strong> &mdash; choose one recorded file (from the files actually on disk) and record it again.</li>
+  <li><strong>Remove project</strong> &mdash; delete the project from the menu and from your hard disk.</li>
+</ul>
+
+<h2>Storage</h2>
+<ul>
+  <li>Projects, recorded audio and <code>processed_text.json</code> (the exact spoken text of every segment) live in the project folder.</li>
+  <li>Downloaded voices and cloned voices live in the model folder (changeable in Settings &rarr; General).</li>
+  <li>Optional runtimes (GPU, cloning engine) live under <code>%APPDATA%\AIVoiceStudio\runtime</code>.</li>
+</ul>
+
+<h2>Licences</h2>
+<p>The application is <strong>GPL-3.0</strong>. The TTS models keep their own
+licences: Piper (MIT), Kokoro (Apache-2.0), Kitten (Apache-2.0), MMS
+(CC-BY-NC), XTTS v2 (Coqui Public Model Licence, non-commercial).</p>
+
+<p>See the <a href="UserGuide.html">User Guide</a> for detailed instructions,
+troubleshooting and the full Settings reference.</p>
+
+</body>
+</html>

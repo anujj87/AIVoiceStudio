@@ -1,0 +1,8 @@
+# AI Voice Studio - core dependencies (bundled with the installer)
+# Windows Python 3.13 x86-64
+wxPython>=4.3.1
+sherpa-onnx>=1.13.0
+numpy>=2.0
+requests>=2.31
+pypdf>=5.0
+python-docx>=1.1

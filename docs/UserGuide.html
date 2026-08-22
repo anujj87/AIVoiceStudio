@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Voice Studio - User Guide</title>
+<style>
+  body { font-family: Verdana, Arial, sans-serif; max-width: 52em; margin: 1.5em auto; padding: 0 1em; line-height: 1.5; }
+  h1 { border-bottom: 2px solid #888; padding-bottom: .3em; }
+  h2 { margin-top: 1.6em; border-bottom: 1px solid #ccc; padding-bottom: .2em; }
+  code, kbd { font-family: Consolas, monospace; background: #f0f0f0; padding: 0 0.25em; border-radius: 3px; }
+  table { border-collapse: collapse; margin: 1em 0; }
+  th, td { border: 1px solid #999; padding: .35em .6em; text-align: left; }
+  th { background: #eee; }
+  .note { background: #fff8dc; border-left: 4px solid #e0b400; padding: .5em .8em; margin: 1em 0; }
+  .tip { background: #eef7ee; border-left: 4px solid #2e8b57; padding: .5em .8em; margin: 1em 0; }
+</style>
+</head>
+<body>
+
+<h1>AI Voice Studio &mdash; User Guide</h1>
+<p>Developed by <strong>Anuj Sharma</strong>. This guide explains installation,
+the first recording, every Settings category, voice cloning, punctuation, the
+compute back-ends and how to solve common problems. The application is designed
+to be fully usable with a screen reader (NVDA, JAWS, Narrator).</p>
+
+<h2>Contents</h2>
+<ul>
+  <li><a href="#installation">Installation</a></li>
+  <li><a href="#firstrecording">Making your first recording</a></li>
+  <li><a href="#mainwindow">The main window</a></li>
+  <li><a href="#projectlifecycle">Project lifecycle (Edit menu)</a></li>
+  <li><a href="#recordingwindow">The Recording window</a></li>
+  <li><a href="#settings">Settings (all categories)</a></li>
+  <li><a href="#voices">Downloading voices</a></li>
+  <li><a href="#cloning">Voice cloning</a></li>
+  <li><a href="#punctuation">Punctuation modes</a></li>
+  <li><a href="#compute">Compute back-ends (CPU / GPU)</a></li>
+  <li><a href="#shortcuts">Keyboard shortcuts</a></li>
+  <li><a href="#developermode">Developer Mode</a></li>
+  <li><a href="#addons">Addon System</a></li>
+  <li><a href="#troubleshooting">Troubleshooting</a></li>
+</ul>
+
+<h2 id="installation">Installation</h2>
+<ol>
+  <li>Run <code>AI-Voice-Studio-Setup-x64.exe</code> and follow the installer.</li>
+  <li>Choose whether to install for all users or only for you.</li>
+  <li>When asked, choose whether to create a desktop icon and whether to launch the application after setup.</li>
+</ol>
+<p>Nothing else needs to be installed: the CPU runtime and the TTS download
+manager are part of the application. GPU support, FFmpeg and the voice-cloning
+engine are downloaded on demand into your user folder.</p>
+
+<h2 id="firstrecording">Making your first recording</h2>
+<ol>
+  <li>Open <strong>Settings</strong> (Ctrl+,). In the <strong>Download and remove</strong> category choose a TTS engine (Piper is a good start), a language and a variant, then press <strong>Download selected variant</strong>. Wait for the download to finish.</li>
+  <li>Close Settings. Press <strong>Ctrl+Shift+N</strong> to create a new project.</li>
+  <li>Type a project name, press <strong>Open document</strong> and choose a PDF, TXT, DOC/DOCX, HTML or Markdown file. Choose the punctuation mode.</li>
+  <li>Press <strong>Next</strong>, choose how the document is split into audio files, then press <strong>Finish</strong>. The Recording window opens.</li>
+  <li>Choose a voice (TTS &rarr; language &rarr; variant &rarr; voice), set rate, pitch and volume if needed, then press <strong>Start recording</strong>.</li>
+</ol>
+<div class="tip">Every finished segment is saved to the project folder immediately. You can close the Recording window at any time and continue later &mdash; reopening the project resumes from the first unsaved segment.</div>
+
+<h2 id="mainwindow">The main window</h2>
+<p>The main window shows a welcome message, three action buttons (Create New
+Project, Record, Settings) and a <strong>Recent projects</strong> list. Select a
+project with the arrow keys and press Enter to open it, or press the
+<strong>Remove selected project</strong> button below the list. Right-click the
+list for the same actions as the Edit menu.</p>
+
+<h2 id="projectlifecycle">Project lifecycle (Edit menu)</h2>
+<table>
+  <tr><th>Action</th><th>What it does</th></tr>
+  <tr><td>Resume Recording</td><td>Opens the selected project; recording continues from the first unsaved segment.</td></tr>
+  <tr><td>Restart Project&hellip;</td><td>Deletes all recordings and settings, keeps only the project name, and opens the New Project window again so you can choose a document and options afresh.</td></tr>
+  <tr><td>Restart All Recording</td><td>Deletes every recorded audio file; every segment is recorded again from the beginning.</td></tr>
+  <tr><td>Restart Selected Recording&hellip;</td><td>Shows a combo box with the recorded files actually present in the project folder; choose one to record it again.</td></tr>
+  <tr><td>Remove Project&hellip;</td><td>Removes the project from the menu and deletes its folder from your hard disk. This cannot be undone.</td></tr>
+</table>
+
+<h2 id="recordingwindow">The Recording window</h2>
+<p>When the window opens, the first control is a read-only <strong>Text to
+record</strong> box that announces what will be spoken. Tab to the
+<strong>Compute back-end</strong> combo box, then the TTS, language, variant
+and voice combo boxes, the rate/pitch/volume sliders, and the output format
+(WAV, MP3 or FLAC).</p>
+<ul>
+  <li><strong>Start recording</strong> begins (or resumes) synthesis.</li>
+  <li><strong>Pause</strong> stops after the current segment; <strong>Resume</strong> continues.</li>
+  <li><strong>Stop</strong> stops after the current segment; finished files stay saved.</li>
+  <li>MP3 and FLAC need FFmpeg; the app offers to download it into your user folder the first time you choose those formats.</li>
+</ul>
+
+<h2 id="settings">Settings (all categories)</h2>
+<p>Settings uses the same layout as the NVDA screen reader's Settings dialog: a
+list of categories on the left, the selected category's panel on the right, and
+OK / Cancel / Apply buttons. Move through the categories with the arrow keys
+(the panel changes as you move), switch with Ctrl+Tab, press Enter for OK and
+Ctrl+S to apply without closing.</p>
+
+<h3>General</h3>
+<p>Theme (System / Light / Dark), the folders where recorded audio files and
+downloaded voice models are saved (each with a Browse&hellip; button), and
+<strong>Developer Mode</strong> which enables heavy logging, addon management,
+and diagnostic tools. Existing files are not moved when you change the folders.</p>
+
+<h3>Download and remove</h3>
+<p>Pick a TTS engine, language and variant, then download or remove it.
+Downloads show a progress bar and can be cancelled.</p>
+
+<h3>Available TTS</h3>
+<p>Lists the voices you have downloaded or cloned, grouped by engine. The fourth
+combo box selects the voice; <strong>Preview selected voice</strong> plays a
+short sample through that voice.</p>
+
+<h3>Voice clone</h3>
+<p>See <a href="#cloning">Voice cloning</a> below.</p>
+
+<h3>Recording settings</h3>
+<p>Default speed, pitch and volume for new projects, plus a preview text box and
+a Preview button that hears the current defaults through a downloaded voice.</p>
+
+<h3>Punctuation</h3>
+<p>The default punctuation mode for new projects, with a voice cascade (TTS
+&rarr; variant &rarr; voice), an example box that shows exactly how text will be
+spoken, and a Preview button that hears the example through the chosen voice.</p>
+
+<h3>Audio file creation</h3>
+<p>How the document is split into audio files (for example one file per page,
+or per heading). Each mode shows a description.</p>
+
+<h3>Compute</h3>
+<p>Shows the current back-end and manages the optional GPU (CUDA) runtime:
+<strong>Download GPU runtime</strong> fetches about 1.8&nbsp;GB into your user
+folder; <strong>Remove GPU runtime</strong> deletes it. Restart the application
+after installing or removing it.</p>
+
+<h3>Reset</h3>
+<p>Restores every setting to its default value. Downloaded voices are not
+deleted.</p>
+
+<h2 id="voices">Downloading voices</h2>
+<p>Voices are downloaded from the official open-source releases
+(k2-fsa/sherpa-onnx and rhasspy/piper). You only download the voices you
+actually use. Engines available: Piper/VITS (many languages), Kokoro, Matcha
+and Kitten TTS. Each engine has several language packs and quality variants;
+the voice list comes from the variant you install.</p>
+<p><strong>Kokoro tip:</strong> the &ldquo;Version 0.19 (English only)&rdquo; variant contains
+exactly 11 English voices. For Hindi, French, Chinese, Japanese, Italian and
+Portuguese voices choose the <strong>Multilingual (53 voices &mdash; all languages)</strong>
+variant instead &mdash; it contains every language voice in one download.
+Selecting a voice that is not in the installed variant plays the first
+English voice, so always match the voice to the variant you downloaded.</p>
+
+<h2 id="cloning">Voice cloning</h2>
+<p>Some TTS engines can copy a voice from a short recording. AI Voice Studio
+uses Coqui XTTS v2 for this &mdash; the standard offline model that clones a
+voice from a 4&ndash;5 second sample and speaks 17 languages.</p>
+<ol>
+  <li>In Settings &rarr; <strong>Voice clone</strong>, section 1, press <strong>Download cloning engine</strong>. This installs coqui-tts and PyTorch (about 2.5&nbsp;GB) into your user folder. The XTTS model itself (about 2.1&nbsp;GB) downloads automatically on the first use.</li>
+  <li>In section 2, type a <strong>voice name</strong>, choose the <strong>language of the sample</strong>, and press <strong>Browse&hellip;</strong> to choose a WAV recording of the person's voice. Four to five seconds of one clear voice with no background noise gives the best result.</li>
+  <li>Press <strong>Create voice</strong>. The voice appears in Available TTS and in the Recording window as &ldquo;Cloned voice: <em>name</em>&rdquo;.</li>
+</ol>
+<p>The first recording or preview with a cloned voice downloads the XTTS model
+and then takes a few seconds per sentence; later sentences are much faster.
+Cloned voices can be removed from the <strong>Cloned voices</strong> list.</p>
+<div class="note">XTTS v2 is licensed under the Coqui Public Model Licence,
+which is non-commercial. It is used for personal, research and educational
+purposes.</div>
+
+<h2 id="punctuation">Punctuation modes</h2>
+<p>Not every TTS voice can pronounce punctuation. The punctuation mode chosen
+when the project is created decides how the text is prepared before it is sent
+to the voice:</p>
+<ul>
+  <li><strong>Default</strong> &mdash; text passes through unchanged.</li>
+  <li><strong>None</strong> &mdash; sentence punctuation is removed.</li>
+  <li><strong>Math</strong> &mdash; sentence punctuation is removed; math symbols such as +, =, &lt;, &gt; are kept and spoken.</li>
+  <li><strong>All</strong> &mdash; every mark is spoken as a word: <code>my name is "anujsharma".</code> becomes <code>my name is quote anujsharma quote dot</code>; <code>print('hello')</code> becomes <code>print left paren tic hello tic right paren</code>.</li>
+</ul>
+<p>The exact spoken text of every recorded segment is saved as
+<code>processed_text.json</code> in the project folder, next to the audio file
+it produced.</p>
+
+<h2 id="compute">Compute back-ends (CPU / GPU)</h2>
+<ul>
+  <li><strong>CPU</strong> &mdash; always available, bundled with the app.</li>
+  <li><strong>GPU (CUDA)</strong> &mdash; needs the optional runtime downloaded from Settings &rarr; Compute. After a restart, the GPU back-end appears in the Recording window (Auto / GPU (CUDA) / CPU). An NVIDIA driver is the only requirement; no CUDA toolkit is needed.</li>
+</ul>
+
+<h2 id="shortcuts">Keyboard shortcuts</h2>
+<table>
+  <tr><th>Shortcut</th><th>Action</th></tr>
+  <tr><td>Ctrl+Shift+N</td><td>New Project</td></tr>
+  <tr><td>Ctrl+Shift+R</td><td>Record (open most recent project)</td></tr>
+  <tr><td>Ctrl+,</td><td>Settings</td></tr>
+  <tr><td>Alt+F / Alt+E / Alt+T / Alt+H</td><td>File / Edit / Tools / Help menus</td></tr>
+  <tr><td>Enter</td><td>Open selected recent project; OK in dialogs; activate the default button</td></tr>
+  <tr><td>Ctrl+Tab / Ctrl+Shift+Tab</td><td>Next / previous Settings category</td></tr>
+  <tr><td>Ctrl+S</td><td>Apply settings</td></tr>
+</table>
+
+<h2 id="developermode">Developer Mode</h2>
+<p>Enable Developer Mode in <strong>Settings &rarr; General &rarr; Enable Developer Mode</strong> to unlock advanced features:</p>
+<ul>
+  <li><strong>Heavy logging</strong> &mdash; detailed diagnostic logs are written to <code>%APPDATA%\AIVoiceStudio\logs\</code> with multiple subsystem files (gui.log, tts.log, engine.log, recording.log, addons.log, download.log) plus a crash log for unhandled exceptions.</li>
+  <li><strong>Addon management</strong> &mdash; install, enable, disable and remove third-party addons from the Developer settings panel.</li>
+  <li><strong>Python environment</strong> &mdash; manage the addon virtualenv, install pip packages, list installed packages.</li>
+  <li><strong>Diagnostics</strong> &mdash; open the log folder, view system information, and access diagnostic tools.</li>
+</ul>
+<div class="note">Developer Mode requires restarting the application for heavy logging to take full effect. Addons are discovered on startup or when toggling Developer Mode.</div>
+
+<h2 id="addons">Addon System</h2>
+<p>AI Voice Studio supports a plugin architecture inspired by the NVDA screen reader. Addons let you add new TTS engines, voices, and capabilities.</p>
+<h3>Installing an Addon</h3>
+<ol>
+  <li>Enable Developer Mode in Settings &rarr; General.</li>
+  <li>Open Settings &rarr; Developer.</li>
+  <li>Press <strong>Install addon from ZIP...</strong> and choose your addon archive.</li>
+  <li>Restart the application to load the addon.</li>
+</ol>
+<h3>Managing Addons</h3>
+<p>In the Developer settings panel you can Enable, Disable or Remove installed addons. The addon list shows each addon's name, version, and status.</p>
+<p>See the <strong>Addon Development Guide</strong> (Help menu) for full details on creating your own addons, adding TTS engines, and managing pip dependencies.</p>
+
+<h2 id="troubleshooting">Troubleshooting</h2>
+
+<h3>The recording produced an empty (silent) WAV file</h3>
+<p>This used to happen when the raw float samples were cast straight to int16.
+The engine now converts samples correctly. If you still hear silence, make sure
+the selected voice was downloaded completely (re-download it from Settings) and
+try the CPU back-end.</p>
+
+<h3>Recording fails with &ldquo;Could not load the TTS model&hellip; graph.h:1997&rdquo;</h3>
+<p>This error came from two different ONNX Runtime copies fighting inside one
+process. The app now ships exactly one ONNX Runtime. If you still see it, close
+the application, open Settings &rarr; Compute, remove and re-download the GPU
+runtime if you use it, and restart the app.</p>
+
+<h3>The GPU (CUDA) option does not appear</h3>
+<p>Download the GPU runtime in Settings &rarr; Compute and restart the
+application. The option only appears when the runtime is installed <em>and</em>
+an NVIDIA GPU is detected.</p>
+
+<h3>My cloned voice cannot be used</h3>
+<p>The cloning engine must be downloaded (Settings &rarr; Voice clone, section
+1). The first use downloads the XTTS model (about 2.1&nbsp;GB) automatically;
+on a slow connection this can take a while &mdash; the status text reports
+progress.</p>
+
+<h3>MP3 / FLAC output asks for FFmpeg every time</h3>
+<p>Accept the download prompt once; FFmpeg is saved to your user folder
+(<code>%APPDATA%\AIVoiceStudio\ffmpeg</code>) and reused afterwards.</p>
+
+<h3>Keyboard shortcuts do nothing while a dialog is open</h3>
+<p>Menu shortcuts (Ctrl+Shift+N and similar) work from the main window. While a
+modal dialog such as Settings or the Recording window is open, they are
+intentionally inactive; close the dialog first.</p>
+
+<h3>Where are my files?</h3>
+<ul>
+  <li>Recorded audio and <code>processed_text.json</code>: the project folder.</li>
+  <li>Downloaded voices and clones: the model folder (Settings &rarr; General).</li>
+  <li>Optional runtimes and FFmpeg: <code>%APPDATA%\AIVoiceStudio</code>.</li>
+</ul>
+
+</body>
+</html>

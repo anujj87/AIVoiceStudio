@@ -1,0 +1,27 @@
+AI Voice Studio
+Copyright (c) 2026 AI Voice Studio contributors
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+this program. If not, see <https://www.gnu.org/licenses/>.
+
+----------------------------------------------------------------------------
+
+Third-party components bundled or downloaded by the application keep their own
+licences:
+
+* sherpa-onnx ......... Apache-2.0
+* ONNX Runtime ....... MIT
+* wxPython ........... wxWindows Library Licence (LGPL-compatible)
+* Piper voices ....... MIT
+* Kokoro-82M ......... Apache-2.0
+* MMS TTS ............ CC-BY-NC-4.0 (non-commercial)
+* FFmpeg (optional) .. LGPL/GPL (downloaded on demand by the user)

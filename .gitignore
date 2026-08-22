@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+.venv32/
+
+# Build output
+build/
+dist/
+*.spec.bak
+
+# Freebuff workspace state (local only)
+.freebuff/
+
+# Downloaded third-party tools (Inno Setup compiler binaries)
+tools/innosetup/
+# Downloaded tool executables (e.g. is.exe)
+tools/*.exe
+
+# Logs
+*.log
+vendor/

@@ -1,0 +1,2980 @@
+{
+  "schema_version": 1,
+  "comment": "Open-source, free, ONNX-based neural TTS models. Artifacts are downloaded from official public releases (k2-fsa/sherpa-onnx 'tts-models' and 'vocoder-models' releases; rhasspy piper converted models; hexgrad Kokoro; Coqui VITS ONNX exports). Each piper artifact is a self-contained tar.bz2 with model.onnx, tokens.txt and espeak-ng-data. Kokoro artifacts contain model.onnx, tokens.txt, voices.bin (multi-lang adds espeak-ng-data + lexicon-*.txt). Matcha needs the shared vocoder vocos-22khz-univ.onnx (kind=file in shared_artifacts). MMS (vits) needs the shared espeak-ng-data tarball. Coqui (vits) models are character-based (model + tokens only; frontend=char, no espeak-ng or lexicon).",
+  "tts": [
+    {
+      "id": "piper",
+      "name": "Piper",
+      "engine": "vits",
+      "license": "MIT",
+      "homepage": "https://github.com/rhasspy/piper",
+      "voice_cloning": true,
+      "voice_cloning_note": "Upload a converted Piper voice model (tar.bz2) or a model.onnx + tokens.txt pair trained from your own voice.",
+      "artifact_base": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/",
+      "languages": [
+        {
+          "code": "en_US",
+          "name": "English (United States)",
+          "variants": [
+            {
+              "id": "medium",
+              "name": "Medium quality",
+              "voices": [
+                {
+                  "id": "lessac",
+                  "name": "Lessac (US female, natural)",
+                  "artifact": "vits-piper-en_US-lessac-medium.tar.bz2"
+                },
+                {
+                  "id": "amy",
+                  "name": "Amy (US female)",
+                  "artifact": "vits-piper-en_US-amy-medium.tar.bz2"
+                },
+                {
+                  "id": "kristin",
+                  "name": "Kristin (US female)",
+                  "artifact": "vits-piper-en_US-kristin-medium.tar.bz2"
+                },
+                {
+                  "id": "ryan",
+                  "name": "Ryan (US male)",
+                  "artifact": "vits-piper-en_US-ryan-medium.tar.bz2"
+                },
+                {
+                  "id": "joe",
+                  "name": "Joe (US male)",
+                  "artifact": "vits-piper-en_US-joe-medium.tar.bz2"
+                },
+                {
+                  "id": "norman",
+                  "name": "Norman (US male)",
+                  "artifact": "vits-piper-en_US-norman-medium.tar.bz2"
+                },
+                {
+                  "id": "hfc_female",
+                  "name": "HFC female",
+                  "artifact": "vits-piper-en_US-hfc_female-medium.tar.bz2"
+                },
+                {
+                  "id": "l2arctic",
+                  "name": "L2 Arctic (multi-speaker)",
+                  "artifact": "vits-piper-en_US-l2arctic-medium.tar.bz2"
+                }
+              ]
+            },
+            {
+              "id": "low",
+              "name": "Low quality (small, fast)",
+              "voices": [
+                {
+                  "id": "amy",
+                  "name": "Amy (US female)",
+                  "artifact": "vits-piper-en_US-amy-low.tar.bz2"
+                },
+                {
+                  "id": "danny",
+                  "name": "Danny (US male)",
+                  "artifact": "vits-piper-en_US-danny-low.tar.bz2"
+                },
+                {
+                  "id": "kathleen",
+                  "name": "Kathleen (US female)",
+                  "artifact": "vits-piper-en_US-kathleen-low.tar.bz2"
+                },
+                {
+                  "id": "ryan",
+                  "name": "Ryan (US male)",
+                  "artifact": "vits-piper-en_US-ryan-low.tar.bz2"
+                }
+              ]
+            },
+            {
+              "id": "high",
+              "name": "High quality (larger)",
+              "voices": [
+                {
+                  "id": "lessac",
+                  "name": "Lessac (US female)",
+                  "artifact": "vits-piper-en_US-lessac-high.tar.bz2"
+                },
+                {
+                  "id": "ryan",
+                  "name": "Ryan (US male)",
+                  "artifact": "vits-piper-en_US-ryan-high.tar.bz2"
+                },
+                {
+                  "id": "ljspeech",
+                  "name": "LJ Speech (US female)",
+                  "artifact": "vits-piper-en_US-ljspeech-high.tar.bz2"
+                },
+                {
+                  "id": "libritts",
+                  "name": "LibriTTS (US female)",
+                  "artifact": "vits-piper-en_US-libritts-high.tar.bz2"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "en_GB",
+          "name": "English (United Kingdom)",
+          "variants": [
+            {
+              "id": "medium",
+              "name": "Medium quality",
+              "voices": [
+                {
+                  "id": "alba",
+                  "name": "Alba (GB female)",
+                  "artifact": "vits-piper-en_GB-alba-medium.tar.bz2"
+                },
+                {
+                  "id": "aru",
+                  "name": "Aru (GB female)",
+                  "artifact": "vits-piper-en_GB-aru-medium.tar.bz2"
+                },
+                {
+                  "id": "northern_english_male",
+                  "name": "Northern English male",
+                  "artifact": "vits-piper-en_GB-northern_english_male-medium.tar.bz2"
+                },
+                {
+                  "id": "southern_english_female",
+                  "name": "Southern English female",
+                  "artifact": "vits-piper-en_GB-southern_english_female-medium.tar.bz2"
+                },
+                {
+                  "id": "vctk",
+                  "name": "VCTK (multi-speaker)",
+                  "artifact": "vits-piper-en_GB-vctk-medium.tar.bz2"
+                }
+              ]
+            },
+            {
+              "id": "high",
+              "name": "High quality (larger)",
+              "voices": [
+                {
+                  "id": "cori",
+                  "name": "Cori (GB female)",
+                  "artifact": "vits-piper-en_GB-cori-high.tar.bz2"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "de_DE",
+          "name": "German",
+          "variants": [
+            {
+              "id": "medium",
+              "name": "Medium quality",
+              "voices": [
+                {
+                  "id": "thorsten",
+                  "name": "Thorsten (DE male)",
+                  "artifact": "vits-piper-de_DE-thorsten-medium.tar.bz2"
+                },
+                {
+                  "id": "glados",
+                  "name": "GLaDOS (DE)",
+                  "artifact": "vits-piper-de_DE-glados-medium.tar.bz2"
+                }
+              ]
+            },
+            {
+              "id": "low",
+              "name": "Low quality (small, fast)",
+              "voices": [
+                {
+                  "id": "kerstin",
+                  "name": "Kerstin (DE female)",
+                  "artifact": "vits-piper-de_DE-kerstin-low.tar.bz2"
+                },
+                {
+                  "id": "pavoque",
+                  "name": "Pavoque (DE male)",
+                  "artifact": "vits-piper-de_DE-pavoque-low.tar.bz2"
+                },
+                {
+                  "id": "karlsson",
+                  "name": "Karlsson (DE male)",
+                  "artifact": "vits-piper-de_DE-karlsson-low.tar.bz2"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "fr_FR",
+          "name": "French",
+          "variants": [
+            {
+              "id": "medium",
+              "name": "Medium quality",
+              "voices": [
+                {
+                  "id": "siwis",
+                  "name": "Siwis (FR female)",
+                  "artifact": "vits-piper-fr_FR-siwis-medium.tar.bz2"
+                },
+                {
+                  "id": "tom",
+                  "name": "Tom (FR male)",
+                  "artifact": "vits-piper-fr_FR-tom-medium.tar.bz2"
+                },
+                {
+                  "id": "upmc",
+                  "name": "UPMC (FR)",
+                  "artifact": "vits-piper-fr_FR-upmc-medium.tar.bz2"
+                }
+              ]
+            },
+            {
+              "id": "low",
+              "name": "Low quality (small, fast)",
+              "voices": [
+                {
+                  "id": "gilles",
+                  "name": "Gilles (FR male)",
+                  "artifact": "vits-piper-fr_FR-gilles-low.tar.bz2"
+                },
+                {
+                  "id": "siwis",
+                  "name": "Siwis (FR female)",
+                  "artifact": "vits-piper-fr_FR-siwis-low.tar.bz2"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "es_ES",
+          "name": "Spanish (Spain)",
+          "variants": [
+            {
+              "id": "medium",
+              "name": "Medium quality",
+              "voices": [
+                {
+                  "id": "davefx",
+                  "name": "Davefx (ES male)",
+                  "artifact": "vits-piper-es_ES-davefx-medium.tar.bz2"
+                },
+                {
+                  "id": "sharvard",
+                  "name": "Sharvard (ES)",
+                  "artifact": "vits-piper-es_ES-sharvard-medium.tar.bz2"
+                }
+              ]
+            },
+            {
+              "id": "x_low",
+              "name": "Extra low (tiny)",
+              "voices": [
+                {
+                  "id": "carlfm",
+                  "name": "Carlfm (ES male)",
+                  "artifact": "vits-piper-es_ES-carlfm-x_low.tar.bz2"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "it_IT",
+          "name": "Italian",
+          "variants": [
+            {
+              "id": "medium",
+              "name": "Medium quality",
+              "voices": [
+                {
+                  "id": "paola",
+                  "name": "Paola (IT female)",
+                  "artifact": "vits-piper-it_IT-paola-medium.tar.bz2"
+                }
+              ]
+            },
+            {
+              "id": "x_low",
+              "name": "Extra low (tiny)",
+              "voices": [
+                {
+                  "id": "riccardo",
+                  "name": "Riccardo (IT male)",
+                  "artifact": "vits-piper-it_IT-riccardo-x_low.tar.bz2"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "pt_BR",
+          "name": "Portuguese (Brazil)",
+          "variants": [
+            {
+              "id": "medium",
+              "name": "Medium quality",
+              "voices": [
+                {
+                  "id": "faber",
+                  "name": "Faber (BR male)",
+                  "artifact": "vits-piper-pt_BR-faber-medium.tar.bz2"
+                },
+                {
+                  "id": "jeff",
+                  "name": "Jeff (BR male)",
+                  "artifact": "vits-piper-pt_BR-jeff-medium.tar.bz2"
+                }
+              ]
+            },
+            {
+              "id": "low",
+              "name": "Low quality (small, fast)",
+              "voices": [
+                {
+                  "id": "edresson",
+                  "name": "Edresson (BR male)",
+                  "artifact": "vits-piper-pt_BR-edresson-low.tar.bz2"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "ru_RU",
+          "name": "Russian",
+          "variants": [
+            {
+              "id": "medium",
+              "name": "Medium quality",
+              "voices": [
+                {
+                  "id": "irina",
+                  "name": "Irina (RU female)",
+                  "artifact": "vits-piper-ru_RU-irina-medium.tar.bz2"
+                },
+                {
+                  "id": "dmitri",
+                  "name": "Dmitri (RU male)",
+                  "artifact": "vits-piper-ru_RU-dmitri-medium.tar.bz2"
+                },
+                {
+                  "id": "ruslan",
+                  "name": "Ruslan (RU male)",
+                  "artifact": "vits-piper-ru_RU-ruslan-medium.tar.bz2"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "uk_UA",
+          "name": "Ukrainian",
+          "variants": [
+            {
+              "id": "medium",
+              "name": "Medium quality",
+              "voices": [
+                {
+                  "id": "ukrainian_tts",
+                  "name": "Ukrainian TTS (UK female)",
+                  "artifact": "vits-piper-uk_UA-ukrainian_tts-medium.tar.bz2"
+                }
+              ]
+            },
+            {
+              "id": "x_low",
+              "name": "Extra low (tiny)",
+              "voices": [
+                {
+                  "id": "lada",
+                  "name": "Lada (UK female)",
+                  "artifact": "vits-piper-uk_UA-lada-x_low.tar.bz2"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "pl_PL",
+          "name": "Polish",
+          "variants": [
+            {
+              "id": "medium",
+              "name": "Medium quality",
+              "voices": [
+                {
+                  "id": "gosia",
+                  "name": "Gosia (PL female)",
+                  "artifact": "vits-piper-pl_PL-gosia-medium.tar.bz2"
+                },
+                {
+                  "id": "darkman",
+                  "name": "Darkman (PL male)",
+                  "artifact": "vits-piper-pl_PL-darkman-medium.tar.bz2"
+                }
+              ]
+            },
+            {
+              "id": "high",
+              "name": "High quality (larger)",
+              "voices": [
+                {
+                  "id": "bass",
+                  "name": "Bass (PL male)",
+                  "artifact": "vits-piper-pl_PL-bass-high.tar.bz2"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "nl_NL",
+          "name": "Dutch",
+          "variants": [
+            {
+              "id": "medium",
+              "name": "Medium quality",
+              "voices": [
+                {
+                  "id": "ronnie",
+                  "name": "Ronnie (NL male)",
+                  "artifact": "vits-piper-nl_NL-ronnie-medium.tar.bz2"
+                },
+                {
+                  "id": "pim",
+                  "name": "Pim (NL male)",
+                  "artifact": "vits-piper-nl_NL-pim-medium.tar.bz2"
+                },
+                {
+                  "id": "alex",
+                  "name": "Alex (NL male)",
+                  "artifact": "vits-piper-nl_NL-alex-medium.tar.bz2"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "sv_SE",
+          "name": "Swedish",
+          "variants": [
+            {
+              "id": "medium",
+              "name": "Medium quality",
+              "voices": [
+                {
+                  "id": "alma",
+                  "name": "Alma (SE female)",
+                  "artifact": "vits-piper-sv_SE-alma-medium.tar.bz2"
+                },
+                {
+                  "id": "nst",
+                  "name": "NST (SE)",
+                  "artifact": "vits-piper-sv_SE-nst-medium.tar.bz2"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "cs_CZ",
+          "name": "Czech",
+          "variants": [
+            {
+              "id": "medium",
+              "name": "Medium quality",
+              "voices": [
+                {
+                  "id": "jirka",
+                  "name": "Jirka (CZ male)",
+                  "artifact": "vits-piper-cs_CZ-jirka-medium.tar.bz2"
+                }
+              ]
+            },
+            {
+              "id": "low",
+              "name": "Low quality (small, fast)",
+              "voices": [
+                {
+                  "id": "jirka",
+                  "name": "Jirka (CZ male)",
+                  "artifact": "vits-piper-cs_CZ-jirka-low.tar.bz2"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "hu_HU",
+          "name": "Hungarian",
+          "variants": [
+            {
+              "id": "medium",
+              "name": "Medium quality",
+              "voices": [
+                {
+                  "id": "anna",
+                  "name": "Anna (HU female)",
+                  "artifact": "vits-piper-hu_HU-anna-medium.tar.bz2"
+                },
+                {
+                  "id": "berta",
+                  "name": "Berta (HU female)",
+                  "artifact": "vits-piper-hu_HU-berta-medium.tar.bz2"
+                },
+                {
+                  "id": "imre",
+                  "name": "Imre (HU male)",
+                  "artifact": "vits-piper-hu_HU-imre-medium.tar.bz2"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "fi_FI",
+          "name": "Finnish",
+          "variants": [
+            {
+              "id": "medium",
+              "name": "Medium quality",
+              "voices": [
+                {
+                  "id": "harri",
+                  "name": "Harri (FI male)",
+                  "artifact": "vits-piper-fi_FI-harri-medium.tar.bz2"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "tr_TR",
+          "name": "Turkish",
+          "variants": [
+            {
+              "id": "medium",
+              "name": "Medium quality",
+              "voices": [
+                {
+                  "id": "dfki",
+                  "name": "DFKI (TR)",
+                  "artifact": "vits-piper-tr_TR-dfki-medium.tar.bz2"
+                },
+                {
+                  "id": "fettah",
+                  "name": "Fettah (TR male)",
+                  "artifact": "vits-piper-tr_TR-fettah-medium.tar.bz2"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "vi_VN",
+          "name": "Vietnamese",
+          "variants": [
+            {
+              "id": "medium",
+              "name": "Medium quality",
+              "voices": [
+                {
+                  "id": "vais1000",
+                  "name": "VAIS1000 (VN)",
+                  "artifact": "vits-piper-vi_VN-vais1000-medium.tar.bz2"
+                }
+              ]
+            },
+            {
+              "id": "x_low",
+              "name": "Extra low (tiny)",
+              "voices": [
+                {
+                  "id": "vivos",
+                  "name": "Vivos (VN)",
+                  "artifact": "vits-piper-vi_VN-vivos-x_low.tar.bz2"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "zh_CN",
+          "name": "Chinese (Simplified)",
+          "variants": [
+            {
+              "id": "medium",
+              "name": "Medium quality",
+              "voices": [
+                {
+                  "id": "huayan",
+                  "name": "Huayan (ZH female)",
+                  "artifact": "vits-piper-zh_CN-huayan-medium.tar.bz2"
+                },
+                {
+                  "id": "xiao_ya",
+                  "name": "Xiao Ya (ZH female)",
+                  "artifact": "vits-piper-zh_CN-xiao_ya-medium.tar.bz2"
+                },
+                {
+                  "id": "chaowen",
+                  "name": "Chaowen (ZH male)",
+                  "artifact": "vits-piper-zh_CN-chaowen-medium.tar.bz2"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "ar_JO",
+          "name": "Arabic (Jordan)",
+          "variants": [
+            {
+              "id": "medium",
+              "name": "Medium quality",
+              "voices": [
+                {
+                  "id": "kareem",
+                  "name": "Kareem (AR male)",
+                  "artifact": "vits-piper-ar_JO-kareem-medium.tar.bz2"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "hi_IN",
+          "name": "Hindi",
+          "variants": [
+            {
+              "id": "medium",
+              "name": "Medium quality",
+              "voices": [
+                {
+                  "id": "pratham",
+                  "name": "Pratham (HI male)",
+                  "artifact": "vits-piper-hi_IN-pratham-medium.tar.bz2"
+                },
+                {
+                  "id": "rohan",
+                  "name": "Rohan (HI male)",
+                  "artifact": "vits-piper-hi_IN-rohan-medium.tar.bz2"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "fa_IR",
+          "name": "Persian (Farsi)",
+          "variants": [
+            {
+              "id": "medium",
+              "name": "Medium quality",
+              "voices": [
+                {
+                  "id": "amir",
+                  "name": "Amir (FA male)",
+                  "artifact": "vits-piper-fa_IR-amir-medium.tar.bz2"
+                },
+                {
+                  "id": "ganji",
+                  "name": "Ganji (FA male)",
+                  "artifact": "vits-piper-fa_IR-ganji-medium.tar.bz2"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "el_GR",
+          "name": "Greek",
+          "variants": [
+            {
+              "id": "low",
+              "name": "Low quality (small, fast)",
+              "voices": [
+                {
+                  "id": "rapunzelina",
+                  "name": "Rapunzelina (EL female)",
+                  "artifact": "vits-piper-el_GR-rapunzelina-low.tar.bz2"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "is_IS",
+          "name": "Icelandic",
+          "variants": [
+            {
+              "id": "medium",
+              "name": "Medium quality",
+              "voices": [
+                {
+                  "id": "bui",
+                  "name": "Bui (IS male)",
+                  "artifact": "vits-piper-is_IS-bui-medium.tar.bz2"
+                },
+                {
+                  "id": "salka",
+                  "name": "Salka (IS female)",
+                  "artifact": "vits-piper-is_IS-salka-medium.tar.bz2"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "ro_RO",
+          "name": "Romanian",
+          "variants": [
+            {
+              "id": "medium",
+              "name": "Medium quality",
+              "voices": [
+                {
+                  "id": "mihai",
+                  "name": "Mihai (RO male)",
+                  "artifact": "vits-piper-ro_RO-mihai-medium.tar.bz2"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "sk_SK",
+          "name": "Slovak",
+          "variants": [
+            {
+              "id": "medium",
+              "name": "Medium quality",
+              "voices": [
+                {
+                  "id": "lili",
+                  "name": "Lili (SK female)",
+                  "artifact": "vits-piper-sk_SK-lili-medium.tar.bz2"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "sl_SI",
+          "name": "Slovenian",
+          "variants": [
+            {
+              "id": "medium",
+              "name": "Medium quality",
+              "voices": [
+                {
+                  "id": "artur",
+                  "name": "Artur (SL male)",
+                  "artifact": "vits-piper-sl_SI-artur-medium.tar.bz2"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "da_DK",
+          "name": "Danish",
+          "variants": [
+            {
+              "id": "medium",
+              "name": "Medium quality",
+              "voices": [
+                {
+                  "id": "talesyntese",
+                  "name": "Talesyntese (DA)",
+                  "artifact": "vits-piper-da_DK-talesyntese-medium.tar.bz2"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "no_NO",
+          "name": "Norwegian",
+          "variants": [
+            {
+              "id": "medium",
+              "name": "Medium quality",
+              "voices": [
+                {
+                  "id": "talesyntese",
+                  "name": "Talesyntese (NO)",
+                  "artifact": "vits-piper-no_NO-talesyntese-medium.tar.bz2"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "id_ID",
+          "name": "Indonesian",
+          "variants": [
+            {
+              "id": "medium",
+              "name": "Medium quality",
+              "voices": [
+                {
+                  "id": "news_tts",
+                  "name": "News TTS (ID)",
+                  "artifact": "vits-piper-id_ID-news_tts-medium.tar.bz2"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "sw_CD",
+          "name": "Swahili",
+          "variants": [
+            {
+              "id": "medium",
+              "name": "Medium quality",
+              "voices": [
+                {
+                  "id": "lanfrica",
+                  "name": "Lanfrica (SW)",
+                  "artifact": "vits-piper-sw_CD-lanfrica-medium.tar.bz2"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kokoro",
+      "name": "Kokoro-82M",
+      "engine": "kokoro",
+      "license": "Apache-2.0",
+      "homepage": "https://huggingface.co/hexgrad/Kokoro-82M",
+      "voice_cloning": false,
+      "artifact_base": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/",
+      "languages": [
+        {
+          "code": "en",
+          "name": "English",
+          "variants": [
+            {
+              "id": "v0_19",
+              "name": "Version 0.19 (English only, 11 voices)",
+              "artifact": "kokoro-en-v0_19.tar.bz2",
+              "note": "This artifact contains 11 English speakers only (sids 0-10); use the multilingual version below for Hindi, French, Chinese and other languages.",
+              "voices": [
+                {
+                  "id": "af",
+                  "name": "American female - af",
+                  "sid": 0
+                },
+                {
+                  "id": "af_bella",
+                  "name": "American female - Bella",
+                  "sid": 1
+                },
+                {
+                  "id": "af_nicole",
+                  "name": "American female - Nicole",
+                  "sid": 2
+                },
+                {
+                  "id": "af_sarah",
+                  "name": "American female - Sarah",
+                  "sid": 3
+                },
+                {
+                  "id": "af_sky",
+                  "name": "American female - Sky",
+                  "sid": 4
+                },
+                {
+                  "id": "am_adam",
+                  "name": "American male - Adam",
+                  "sid": 5
+                },
+                {
+                  "id": "am_michael",
+                  "name": "American male - Michael",
+                  "sid": 6
+                },
+                {
+                  "id": "bf_emma",
+                  "name": "British female - Emma",
+                  "sid": 7
+                },
+                {
+                  "id": "bf_isabella",
+                  "name": "British female - Isabella",
+                  "sid": 8
+                },
+                {
+                  "id": "bm_george",
+                  "name": "British male - George",
+                  "sid": 9
+                },
+                {
+                  "id": "bm_lewis",
+                  "name": "British male - Lewis",
+                  "sid": 10
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "multi",
+          "name": "Multilingual (53 voices - all languages)",
+          "variants": [
+            {
+              "id": "v1_0",
+              "name": "Version 1.0 (53 voices - ALL languages: English, Hindi, French, Chinese, Japanese, Italian, Portuguese)",
+              "artifact": "kokoro-multi-lang-v1_0.tar.bz2",
+              "note": "The full multilingual Kokoro model. Contains every language voice in one download: American/British English, Hindi (Alpha, Beta, Omega, Psi), French, Chinese, Japanese, Italian and Portuguese. Bundles espeak-ng-data and lexicon-*.txt; all lexicon files are passed to the engine automatically.",
+              "voices": [
+                {
+                  "id": "af_alloy",
+                  "name": "American female - Alloy",
+                  "sid": 0
+                },
+                {
+                  "id": "af_aoede",
+                  "name": "American female - Aoede",
+                  "sid": 1
+                },
+                {
+                  "id": "af_bella",
+                  "name": "American female - Bella",
+                  "sid": 2
+                },
+                {
+                  "id": "af_heart",
+                  "name": "American female - Heart",
+                  "sid": 3
+                },
+                {
+                  "id": "af_jessica",
+                  "name": "American female - Jessica",
+                  "sid": 4
+                },
+                {
+                  "id": "af_kore",
+                  "name": "American female - Kore",
+                  "sid": 5
+                },
+                {
+                  "id": "af_nicole",
+                  "name": "American female - Nicole",
+                  "sid": 6
+                },
+                {
+                  "id": "af_nova",
+                  "name": "American female - Nova",
+                  "sid": 7
+                },
+                {
+                  "id": "af_river",
+                  "name": "American female - River",
+                  "sid": 8
+                },
+                {
+                  "id": "af_sarah",
+                  "name": "American female - Sarah",
+                  "sid": 9
+                },
+                {
+                  "id": "af_sky",
+                  "name": "American female - Sky",
+                  "sid": 10
+                },
+                {
+                  "id": "am_adam",
+                  "name": "American male - Adam",
+                  "sid": 11
+                },
+                {
+                  "id": "am_echo",
+                  "name": "American male - Echo",
+                  "sid": 12
+                },
+                {
+                  "id": "am_eric",
+                  "name": "American male - Eric",
+                  "sid": 13
+                },
+                {
+                  "id": "am_fenrir",
+                  "name": "American male - Fenrir",
+                  "sid": 14
+                },
+                {
+                  "id": "am_liam",
+                  "name": "American male - Liam",
+                  "sid": 15
+                },
+                {
+                  "id": "am_michael",
+                  "name": "American male - Michael",
+                  "sid": 16
+                },
+                {
+                  "id": "am_onyx",
+                  "name": "American male - Onyx",
+                  "sid": 17
+                },
+                {
+                  "id": "am_puck",
+                  "name": "American male - Puck",
+                  "sid": 18
+                },
+                {
+                  "id": "am_santa",
+                  "name": "American male - Santa",
+                  "sid": 19
+                },
+                {
+                  "id": "bf_alice",
+                  "name": "British female - Alice",
+                  "sid": 20
+                },
+                {
+                  "id": "bf_emma",
+                  "name": "British female - Emma",
+                  "sid": 21
+                },
+                {
+                  "id": "bf_isabella",
+                  "name": "British female - Isabella",
+                  "sid": 22
+                },
+                {
+                  "id": "bf_lily",
+                  "name": "British female - Lily",
+                  "sid": 23
+                },
+                {
+                  "id": "bm_daniel",
+                  "name": "British male - Daniel",
+                  "sid": 24
+                },
+                {
+                  "id": "bm_fable",
+                  "name": "British male - Fable",
+                  "sid": 25
+                },
+                {
+                  "id": "bm_george",
+                  "name": "British male - George",
+                  "sid": 26
+                },
+                {
+                  "id": "bm_lewis",
+                  "name": "British male - Lewis",
+                  "sid": 27
+                },
+                {
+                  "id": "ef_dora",
+                  "name": "English female - Dora",
+                  "sid": 28
+                },
+                {
+                  "id": "em_alex",
+                  "name": "English male - Alex",
+                  "sid": 29
+                },
+                {
+                  "id": "ff_siwis",
+                  "name": "French female - Siwis",
+                  "sid": 30
+                },
+                {
+                  "id": "hf_alpha",
+                  "name": "Hindi female - Alpha",
+                  "sid": 31
+                },
+                {
+                  "id": "hf_beta",
+                  "name": "Hindi female - Beta",
+                  "sid": 32
+                },
+                {
+                  "id": "hm_omega",
+                  "name": "Hindi male - Omega",
+                  "sid": 33
+                },
+                {
+                  "id": "hm_psi",
+                  "name": "Hindi male - Psi",
+                  "sid": 34
+                },
+                {
+                  "id": "if_sara",
+                  "name": "Italian female - Sara",
+                  "sid": 35
+                },
+                {
+                  "id": "im_nicola",
+                  "name": "Italian male - Nicola",
+                  "sid": 36
+                },
+                {
+                  "id": "jf_alpha",
+                  "name": "Japanese female - Alpha",
+                  "sid": 37
+                },
+                {
+                  "id": "jf_gongitsune",
+                  "name": "Japanese female - Gongitsune",
+                  "sid": 38
+                },
+                {
+                  "id": "jf_nezumi",
+                  "name": "Japanese female - Nezumi",
+                  "sid": 39
+                },
+                {
+                  "id": "jf_tebukuro",
+                  "name": "Japanese female - Tebukuro",
+                  "sid": 40
+                },
+                {
+                  "id": "jm_kumo",
+                  "name": "Japanese male - Kumo",
+                  "sid": 41
+                },
+                {
+                  "id": "pf_dora",
+                  "name": "Portuguese female - Dora",
+                  "sid": 42
+                },
+                {
+                  "id": "pm_alex",
+                  "name": "Portuguese male - Alex",
+                  "sid": 43
+                },
+                {
+                  "id": "pm_santa",
+                  "name": "Portuguese male - Santa",
+                  "sid": 44
+                },
+                {
+                  "id": "zf_xiaobei",
+                  "name": "Chinese female - Xiaobei",
+                  "sid": 45
+                },
+                {
+                  "id": "zf_xiaoni",
+                  "name": "Chinese female - Xiaoni",
+                  "sid": 46
+                },
+                {
+                  "id": "zf_xiaoxiao",
+                  "name": "Chinese female - Xiaoxiao",
+                  "sid": 47
+                },
+                {
+                  "id": "zf_xiaoyi",
+                  "name": "Chinese female - Xiaoyi",
+                  "sid": 48
+                },
+                {
+                  "id": "zm_yunjian",
+                  "name": "Chinese male - Yunjian",
+                  "sid": 49
+                },
+                {
+                  "id": "zm_yunxi",
+                  "name": "Chinese male - Yunxi",
+                  "sid": 50
+                },
+                {
+                  "id": "zm_yunxia",
+                  "name": "Chinese male - Yunxia",
+                  "sid": 51
+                },
+                {
+                  "id": "zm_yunyang",
+                  "name": "Chinese male - Yunyang",
+                  "sid": 52
+                }
+              ]
+            },
+            {
+              "id": "int8_v1_0",
+              "name": "Version 1.0 int8 - ALL languages (quantized, ~62% smaller)",
+              "artifact": "kokoro-int8-multi-lang-v1_0.tar.bz2",
+              "note": "Same 53 multilingual voices as Version 1.0 (English, Hindi, French, Chinese, Japanese, Italian, Portuguese) but int8-quantized: lighter download and faster on CPU.",
+              "voices": [
+                {
+                  "id": "af_alloy",
+                  "name": "American female - Alloy",
+                  "sid": 0
+                },
+                {
+                  "id": "af_aoede",
+                  "name": "American female - Aoede",
+                  "sid": 1
+                },
+                {
+                  "id": "af_bella",
+                  "name": "American female - Bella",
+                  "sid": 2
+                },
+                {
+                  "id": "af_heart",
+                  "name": "American female - Heart",
+                  "sid": 3
+                },
+                {
+                  "id": "af_jessica",
+                  "name": "American female - Jessica",
+                  "sid": 4
+                },
+                {
+                  "id": "af_kore",
+                  "name": "American female - Kore",
+                  "sid": 5
+                },
+                {
+                  "id": "af_nicole",
+                  "name": "American female - Nicole",
+                  "sid": 6
+                },
+                {
+                  "id": "af_nova",
+                  "name": "American female - Nova",
+                  "sid": 7
+                },
+                {
+                  "id": "af_river",
+                  "name": "American female - River",
+                  "sid": 8
+                },
+                {
+                  "id": "af_sarah",
+                  "name": "American female - Sarah",
+                  "sid": 9
+                },
+                {
+                  "id": "af_sky",
+                  "name": "American female - Sky",
+                  "sid": 10
+                },
+                {
+                  "id": "am_adam",
+                  "name": "American male - Adam",
+                  "sid": 11
+                },
+                {
+                  "id": "am_echo",
+                  "name": "American male - Echo",
+                  "sid": 12
+                },
+                {
+                  "id": "am_eric",
+                  "name": "American male - Eric",
+                  "sid": 13
+                },
+                {
+                  "id": "am_fenrir",
+                  "name": "American male - Fenrir",
+                  "sid": 14
+                },
+                {
+                  "id": "am_liam",
+                  "name": "American male - Liam",
+                  "sid": 15
+                },
+                {
+                  "id": "am_michael",
+                  "name": "American male - Michael",
+                  "sid": 16
+                },
+                {
+                  "id": "am_onyx",
+                  "name": "American male - Onyx",
+                  "sid": 17
+                },
+                {
+                  "id": "am_puck",
+                  "name": "American male - Puck",
+                  "sid": 18
+                },
+                {
+                  "id": "am_santa",
+                  "name": "American male - Santa",
+                  "sid": 19
+                },
+                {
+                  "id": "bf_alice",
+                  "name": "British female - Alice",
+                  "sid": 20
+                },
+                {
+                  "id": "bf_emma",
+                  "name": "British female - Emma",
+                  "sid": 21
+                },
+                {
+                  "id": "bf_isabella",
+                  "name": "British female - Isabella",
+                  "sid": 22
+                },
+                {
+                  "id": "bf_lily",
+                  "name": "British female - Lily",
+                  "sid": 23
+                },
+                {
+                  "id": "bm_daniel",
+                  "name": "British male - Daniel",
+                  "sid": 24
+                },
+                {
+                  "id": "bm_fable",
+                  "name": "British male - Fable",
+                  "sid": 25
+                },
+                {
+                  "id": "bm_george",
+                  "name": "British male - George",
+                  "sid": 26
+                },
+                {
+                  "id": "bm_lewis",
+                  "name": "British male - Lewis",
+                  "sid": 27
+                },
+                {
+                  "id": "ef_dora",
+                  "name": "English female - Dora",
+                  "sid": 28
+                },
+                {
+                  "id": "em_alex",
+                  "name": "English male - Alex",
+                  "sid": 29
+                },
+                {
+                  "id": "ff_siwis",
+                  "name": "French female - Siwis",
+                  "sid": 30
+                },
+                {
+                  "id": "hf_alpha",
+                  "name": "Hindi female - Alpha",
+                  "sid": 31
+                },
+                {
+                  "id": "hf_beta",
+                  "name": "Hindi female - Beta",
+                  "sid": 32
+                },
+                {
+                  "id": "hm_omega",
+                  "name": "Hindi male - Omega",
+                  "sid": 33
+                },
+                {
+                  "id": "hm_psi",
+                  "name": "Hindi male - Psi",
+                  "sid": 34
+                },
+                {
+                  "id": "if_sara",
+                  "name": "Italian female - Sara",
+                  "sid": 35
+                },
+                {
+                  "id": "im_nicola",
+                  "name": "Italian male - Nicola",
+                  "sid": 36
+                },
+                {
+                  "id": "jf_alpha",
+                  "name": "Japanese female - Alpha",
+                  "sid": 37
+                },
+                {
+                  "id": "jf_gongitsune",
+                  "name": "Japanese female - Gongitsune",
+                  "sid": 38
+                },
+                {
+                  "id": "jf_nezumi",
+                  "name": "Japanese female - Nezumi",
+                  "sid": 39
+                },
+                {
+                  "id": "jf_tebukuro",
+                  "name": "Japanese female - Tebukuro",
+                  "sid": 40
+                },
+                {
+                  "id": "jm_kumo",
+                  "name": "Japanese male - Kumo",
+                  "sid": 41
+                },
+                {
+                  "id": "pf_dora",
+                  "name": "Portuguese female - Dora",
+                  "sid": 42
+                },
+                {
+                  "id": "pm_alex",
+                  "name": "Portuguese male - Alex",
+                  "sid": 43
+                },
+                {
+                  "id": "pm_santa",
+                  "name": "Portuguese male - Santa",
+                  "sid": 44
+                },
+                {
+                  "id": "zf_xiaobei",
+                  "name": "Chinese female - Xiaobei",
+                  "sid": 45
+                },
+                {
+                  "id": "zf_xiaoni",
+                  "name": "Chinese female - Xiaoni",
+                  "sid": 46
+                },
+                {
+                  "id": "zf_xiaoxiao",
+                  "name": "Chinese female - Xiaoxiao",
+                  "sid": 47
+                },
+                {
+                  "id": "zf_xiaoyi",
+                  "name": "Chinese female - Xiaoyi",
+                  "sid": 48
+                },
+                {
+                  "id": "zm_yunjian",
+                  "name": "Chinese male - Yunjian",
+                  "sid": 49
+                },
+                {
+                  "id": "zm_yunxi",
+                  "name": "Chinese male - Yunxi",
+                  "sid": 50
+                },
+                {
+                  "id": "zm_yunxia",
+                  "name": "Chinese male - Yunxia",
+                  "sid": 51
+                },
+                {
+                  "id": "zm_yunyang",
+                  "name": "Chinese male - Yunyang",
+                  "sid": 52
+                }
+              ]
+            },
+            {
+              "id": "v1_1",
+              "name": "Version 1.1 (103 speakers, Chinese + a few English)",
+              "artifact": "kokoro-multi-lang-v1_1.tar.bz2",
+              "note": "Kokoro v1.1-zh (hexgrad/Kokoro-82M-v1.1-zh): 103 speakers, mostly Chinese with 3 English voices. Use Version 1.0 for Hindi, French, Japanese, Italian and Portuguese.",
+              "voices": [
+                {
+                  "id": "af_maple",
+                  "name": "American female - Maple",
+                  "sid": 0
+                },
+                {
+                  "id": "af_sol",
+                  "name": "American female - Sol",
+                  "sid": 1
+                },
+                {
+                  "id": "bf_vale",
+                  "name": "British female - Vale",
+                  "sid": 2
+                },
+                {
+                  "id": "zf_001",
+                  "name": "Chinese female - zf_001",
+                  "sid": 3
+                },
+                {
+                  "id": "zf_002",
+                  "name": "Chinese female - zf_002",
+                  "sid": 4
+                },
+                {
+                  "id": "zf_003",
+                  "name": "Chinese female - zf_003",
+                  "sid": 5
+                },
+                {
+                  "id": "zf_004",
+                  "name": "Chinese female - zf_004",
+                  "sid": 6
+                },
+                {
+                  "id": "zf_005",
+                  "name": "Chinese female - zf_005",
+                  "sid": 7
+                },
+                {
+                  "id": "zf_006",
+                  "name": "Chinese female - zf_006",
+                  "sid": 8
+                },
+                {
+                  "id": "zf_007",
+                  "name": "Chinese female - zf_007",
+                  "sid": 9
+                },
+                {
+                  "id": "zf_008",
+                  "name": "Chinese female - zf_008",
+                  "sid": 10
+                },
+                {
+                  "id": "zf_017",
+                  "name": "Chinese female - zf_017",
+                  "sid": 11
+                },
+                {
+                  "id": "zf_018",
+                  "name": "Chinese female - zf_018",
+                  "sid": 12
+                },
+                {
+                  "id": "zf_019",
+                  "name": "Chinese female - zf_019",
+                  "sid": 13
+                },
+                {
+                  "id": "zf_021",
+                  "name": "Chinese female - zf_021",
+                  "sid": 14
+                },
+                {
+                  "id": "zf_022",
+                  "name": "Chinese female - zf_022",
+                  "sid": 15
+                },
+                {
+                  "id": "zf_023",
+                  "name": "Chinese female - zf_023",
+                  "sid": 16
+                },
+                {
+                  "id": "zf_024",
+                  "name": "Chinese female - zf_024",
+                  "sid": 17
+                },
+                {
+                  "id": "zf_026",
+                  "name": "Chinese female - zf_026",
+                  "sid": 18
+                },
+                {
+                  "id": "zf_027",
+                  "name": "Chinese female - zf_027",
+                  "sid": 19
+                },
+                {
+                  "id": "zf_028",
+                  "name": "Chinese female - zf_028",
+                  "sid": 20
+                },
+                {
+                  "id": "zf_032",
+                  "name": "Chinese female - zf_032",
+                  "sid": 21
+                },
+                {
+                  "id": "zf_036",
+                  "name": "Chinese female - zf_036",
+                  "sid": 22
+                },
+                {
+                  "id": "zf_038",
+                  "name": "Chinese female - zf_038",
+                  "sid": 23
+                },
+                {
+                  "id": "zf_039",
+                  "name": "Chinese female - zf_039",
+                  "sid": 24
+                },
+                {
+                  "id": "zf_040",
+                  "name": "Chinese female - zf_040",
+                  "sid": 25
+                },
+                {
+                  "id": "zf_042",
+                  "name": "Chinese female - zf_042",
+                  "sid": 26
+                },
+                {
+                  "id": "zf_043",
+                  "name": "Chinese female - zf_043",
+                  "sid": 27
+                },
+                {
+                  "id": "zf_044",
+                  "name": "Chinese female - zf_044",
+                  "sid": 28
+                },
+                {
+                  "id": "zf_046",
+                  "name": "Chinese female - zf_046",
+                  "sid": 29
+                },
+                {
+                  "id": "zf_047",
+                  "name": "Chinese female - zf_047",
+                  "sid": 30
+                },
+                {
+                  "id": "zf_048",
+                  "name": "Chinese female - zf_048",
+                  "sid": 31
+                },
+                {
+                  "id": "zf_049",
+                  "name": "Chinese female - zf_049",
+                  "sid": 32
+                },
+                {
+                  "id": "zf_051",
+                  "name": "Chinese female - zf_051",
+                  "sid": 33
+                },
+                {
+                  "id": "zf_059",
+                  "name": "Chinese female - zf_059",
+                  "sid": 34
+                },
+                {
+                  "id": "zf_060",
+                  "name": "Chinese female - zf_060",
+                  "sid": 35
+                },
+                {
+                  "id": "zf_067",
+                  "name": "Chinese female - zf_067",
+                  "sid": 36
+                },
+                {
+                  "id": "zf_070",
+                  "name": "Chinese female - zf_070",
+                  "sid": 37
+                },
+                {
+                  "id": "zf_071",
+                  "name": "Chinese female - zf_071",
+                  "sid": 38
+                },
+                {
+                  "id": "zf_072",
+                  "name": "Chinese female - zf_072",
+                  "sid": 39
+                },
+                {
+                  "id": "zf_073",
+                  "name": "Chinese female - zf_073",
+                  "sid": 40
+                },
+                {
+                  "id": "zf_074",
+                  "name": "Chinese female - zf_074",
+                  "sid": 41
+                },
+                {
+                  "id": "zf_075",
+                  "name": "Chinese female - zf_075",
+                  "sid": 42
+                },
+                {
+                  "id": "zf_076",
+                  "name": "Chinese female - zf_076",
+                  "sid": 43
+                },
+                {
+                  "id": "zf_077",
+                  "name": "Chinese female - zf_077",
+                  "sid": 44
+                },
+                {
+                  "id": "zf_078",
+                  "name": "Chinese female - zf_078",
+                  "sid": 45
+                },
+                {
+                  "id": "zf_079",
+                  "name": "Chinese female - zf_079",
+                  "sid": 46
+                },
+                {
+                  "id": "zf_083",
+                  "name": "Chinese female - zf_083",
+                  "sid": 47
+                },
+                {
+                  "id": "zf_084",
+                  "name": "Chinese female - zf_084",
+                  "sid": 48
+                },
+                {
+                  "id": "zf_085",
+                  "name": "Chinese female - zf_085",
+                  "sid": 49
+                },
+                {
+                  "id": "zf_086",
+                  "name": "Chinese female - zf_086",
+                  "sid": 50
+                },
+                {
+                  "id": "zf_087",
+                  "name": "Chinese female - zf_087",
+                  "sid": 51
+                },
+                {
+                  "id": "zf_088",
+                  "name": "Chinese female - zf_088",
+                  "sid": 52
+                },
+                {
+                  "id": "zf_090",
+                  "name": "Chinese female - zf_090",
+                  "sid": 53
+                },
+                {
+                  "id": "zf_092",
+                  "name": "Chinese female - zf_092",
+                  "sid": 54
+                },
+                {
+                  "id": "zf_093",
+                  "name": "Chinese female - zf_093",
+                  "sid": 55
+                },
+                {
+                  "id": "zf_094",
+                  "name": "Chinese female - zf_094",
+                  "sid": 56
+                },
+                {
+                  "id": "zf_099",
+                  "name": "Chinese female - zf_099",
+                  "sid": 57
+                },
+                {
+                  "id": "zm_009",
+                  "name": "Chinese male - zm_009",
+                  "sid": 58
+                },
+                {
+                  "id": "zm_010",
+                  "name": "Chinese male - zm_010",
+                  "sid": 59
+                },
+                {
+                  "id": "zm_011",
+                  "name": "Chinese male - zm_011",
+                  "sid": 60
+                },
+                {
+                  "id": "zm_012",
+                  "name": "Chinese male - zm_012",
+                  "sid": 61
+                },
+                {
+                  "id": "zm_013",
+                  "name": "Chinese male - zm_013",
+                  "sid": 62
+                },
+                {
+                  "id": "zm_014",
+                  "name": "Chinese male - zm_014",
+                  "sid": 63
+                },
+                {
+                  "id": "zm_015",
+                  "name": "Chinese male - zm_015",
+                  "sid": 64
+                },
+                {
+                  "id": "zm_016",
+                  "name": "Chinese male - zm_016",
+                  "sid": 65
+                },
+                {
+                  "id": "zm_020",
+                  "name": "Chinese male - zm_020",
+                  "sid": 66
+                },
+                {
+                  "id": "zm_025",
+                  "name": "Chinese male - zm_025",
+                  "sid": 67
+                },
+                {
+                  "id": "zm_029",
+                  "name": "Chinese male - zm_029",
+                  "sid": 68
+                },
+                {
+                  "id": "zm_030",
+                  "name": "Chinese male - zm_030",
+                  "sid": 69
+                },
+                {
+                  "id": "zm_031",
+                  "name": "Chinese male - zm_031",
+                  "sid": 70
+                },
+                {
+                  "id": "zm_033",
+                  "name": "Chinese male - zm_033",
+                  "sid": 71
+                },
+                {
+                  "id": "zm_034",
+                  "name": "Chinese male - zm_034",
+                  "sid": 72
+                },
+                {
+                  "id": "zm_035",
+                  "name": "Chinese male - zm_035",
+                  "sid": 73
+                },
+                {
+                  "id": "zm_037",
+                  "name": "Chinese male - zm_037",
+                  "sid": 74
+                },
+                {
+                  "id": "zm_041",
+                  "name": "Chinese male - zm_041",
+                  "sid": 75
+                },
+                {
+                  "id": "zm_045",
+                  "name": "Chinese male - zm_045",
+                  "sid": 76
+                },
+                {
+                  "id": "zm_050",
+                  "name": "Chinese male - zm_050",
+                  "sid": 77
+                },
+                {
+                  "id": "zm_052",
+                  "name": "Chinese male - zm_052",
+                  "sid": 78
+                },
+                {
+                  "id": "zm_053",
+                  "name": "Chinese male - zm_053",
+                  "sid": 79
+                },
+                {
+                  "id": "zm_054",
+                  "name": "Chinese male - zm_054",
+                  "sid": 80
+                },
+                {
+                  "id": "zm_055",
+                  "name": "Chinese male - zm_055",
+                  "sid": 81
+                },
+                {
+                  "id": "zm_056",
+                  "name": "Chinese male - zm_056",
+                  "sid": 82
+                },
+                {
+                  "id": "zm_057",
+                  "name": "Chinese male - zm_057",
+                  "sid": 83
+                },
+                {
+                  "id": "zm_058",
+                  "name": "Chinese male - zm_058",
+                  "sid": 84
+                },
+                {
+                  "id": "zm_061",
+                  "name": "Chinese male - zm_061",
+                  "sid": 85
+                },
+                {
+                  "id": "zm_062",
+                  "name": "Chinese male - zm_062",
+                  "sid": 86
+                },
+                {
+                  "id": "zm_063",
+                  "name": "Chinese male - zm_063",
+                  "sid": 87
+                },
+                {
+                  "id": "zm_064",
+                  "name": "Chinese male - zm_064",
+                  "sid": 88
+                },
+                {
+                  "id": "zm_065",
+                  "name": "Chinese male - zm_065",
+                  "sid": 89
+                },
+                {
+                  "id": "zm_066",
+                  "name": "Chinese male - zm_066",
+                  "sid": 90
+                },
+                {
+                  "id": "zm_068",
+                  "name": "Chinese male - zm_068",
+                  "sid": 91
+                },
+                {
+                  "id": "zm_069",
+                  "name": "Chinese male - zm_069",
+                  "sid": 92
+                },
+                {
+                  "id": "zm_080",
+                  "name": "Chinese male - zm_080",
+                  "sid": 93
+                },
+                {
+                  "id": "zm_081",
+                  "name": "Chinese male - zm_081",
+                  "sid": 94
+                },
+                {
+                  "id": "zm_082",
+                  "name": "Chinese male - zm_082",
+                  "sid": 95
+                },
+                {
+                  "id": "zm_089",
+                  "name": "Chinese male - zm_089",
+                  "sid": 96
+                },
+                {
+                  "id": "zm_091",
+                  "name": "Chinese male - zm_091",
+                  "sid": 97
+                },
+                {
+                  "id": "zm_095",
+                  "name": "Chinese male - zm_095",
+                  "sid": 98
+                },
+                {
+                  "id": "zm_096",
+                  "name": "Chinese male - zm_096",
+                  "sid": 99
+                },
+                {
+                  "id": "zm_097",
+                  "name": "Chinese male - zm_097",
+                  "sid": 100
+                },
+                {
+                  "id": "zm_098",
+                  "name": "Chinese male - zm_098",
+                  "sid": 101
+                },
+                {
+                  "id": "zm_100",
+                  "name": "Chinese male - zm_100",
+                  "sid": 102
+                }
+              ]
+            },
+            {
+              "id": "int8_v1_1",
+              "name": "Version 1.1 int8 (quantized, ~62% smaller)",
+              "artifact": "kokoro-int8-multi-lang-v1_1.tar.bz2",
+              "note": "Same 103 speakers as Version 1.1 (mostly Chinese + 3 English) but int8-quantized: lighter download and faster on CPU.",
+              "voices": [
+                {
+                  "id": "af_maple",
+                  "name": "American female - Maple",
+                  "sid": 0
+                },
+                {
+                  "id": "af_sol",
+                  "name": "American female - Sol",
+                  "sid": 1
+                },
+                {
+                  "id": "bf_vale",
+                  "name": "British female - Vale",
+                  "sid": 2
+                },
+                {
+                  "id": "zf_001",
+                  "name": "Chinese female - zf_001",
+                  "sid": 3
+                },
+                {
+                  "id": "zf_002",
+                  "name": "Chinese female - zf_002",
+                  "sid": 4
+                },
+                {
+                  "id": "zf_003",
+                  "name": "Chinese female - zf_003",
+                  "sid": 5
+                },
+                {
+                  "id": "zf_004",
+                  "name": "Chinese female - zf_004",
+                  "sid": 6
+                },
+                {
+                  "id": "zf_005",
+                  "name": "Chinese female - zf_005",
+                  "sid": 7
+                },
+                {
+                  "id": "zf_006",
+                  "name": "Chinese female - zf_006",
+                  "sid": 8
+                },
+                {
+                  "id": "zf_007",
+                  "name": "Chinese female - zf_007",
+                  "sid": 9
+                },
+                {
+                  "id": "zf_008",
+                  "name": "Chinese female - zf_008",
+                  "sid": 10
+                },
+                {
+                  "id": "zf_017",
+                  "name": "Chinese female - zf_017",
+                  "sid": 11
+                },
+                {
+                  "id": "zf_018",
+                  "name": "Chinese female - zf_018",
+                  "sid": 12
+                },
+                {
+                  "id": "zf_019",
+                  "name": "Chinese female - zf_019",
+                  "sid": 13
+                },
+                {
+                  "id": "zf_021",
+                  "name": "Chinese female - zf_021",
+                  "sid": 14
+                },
+                {
+                  "id": "zf_022",
+                  "name": "Chinese female - zf_022",
+                  "sid": 15
+                },
+                {
+                  "id": "zf_023",
+                  "name": "Chinese female - zf_023",
+                  "sid": 16
+                },
+                {
+                  "id": "zf_024",
+                  "name": "Chinese female - zf_024",
+                  "sid": 17
+                },
+                {
+                  "id": "zf_026",
+                  "name": "Chinese female - zf_026",
+                  "sid": 18
+                },
+                {
+                  "id": "zf_027",
+                  "name": "Chinese female - zf_027",
+                  "sid": 19
+                },
+                {
+                  "id": "zf_028",
+                  "name": "Chinese female - zf_028",
+                  "sid": 20
+                },
+                {
+                  "id": "zf_032",
+                  "name": "Chinese female - zf_032",
+                  "sid": 21
+                },
+                {
+                  "id": "zf_036",
+                  "name": "Chinese female - zf_036",
+                  "sid": 22
+                },
+                {
+                  "id": "zf_038",
+                  "name": "Chinese female - zf_038",
+                  "sid": 23
+                },
+                {
+                  "id": "zf_039",
+                  "name": "Chinese female - zf_039",
+                  "sid": 24
+                },
+                {
+                  "id": "zf_040",
+                  "name": "Chinese female - zf_040",
+                  "sid": 25
+                },
+                {
+                  "id": "zf_042",
+                  "name": "Chinese female - zf_042",
+                  "sid": 26
+                },
+                {
+                  "id": "zf_043",
+                  "name": "Chinese female - zf_043",
+                  "sid": 27
+                },
+                {
+                  "id": "zf_044",
+                  "name": "Chinese female - zf_044",
+                  "sid": 28
+                },
+                {
+                  "id": "zf_046",
+                  "name": "Chinese female - zf_046",
+                  "sid": 29
+                },
+                {
+                  "id": "zf_047",
+                  "name": "Chinese female - zf_047",
+                  "sid": 30
+                },
+                {
+                  "id": "zf_048",
+                  "name": "Chinese female - zf_048",
+                  "sid": 31
+                },
+                {
+                  "id": "zf_049",
+                  "name": "Chinese female - zf_049",
+                  "sid": 32
+                },
+                {
+                  "id": "zf_051",
+                  "name": "Chinese female - zf_051",
+                  "sid": 33
+                },
+                {
+                  "id": "zf_059",
+                  "name": "Chinese female - zf_059",
+                  "sid": 34
+                },
+                {
+                  "id": "zf_060",
+                  "name": "Chinese female - zf_060",
+                  "sid": 35
+                },
+                {
+                  "id": "zf_067",
+                  "name": "Chinese female - zf_067",
+                  "sid": 36
+                },
+                {
+                  "id": "zf_070",
+                  "name": "Chinese female - zf_070",
+                  "sid": 37
+                },
+                {
+                  "id": "zf_071",
+                  "name": "Chinese female - zf_071",
+                  "sid": 38
+                },
+                {
+                  "id": "zf_072",
+                  "name": "Chinese female - zf_072",
+                  "sid": 39
+                },
+                {
+                  "id": "zf_073",
+                  "name": "Chinese female - zf_073",
+                  "sid": 40
+                },
+                {
+                  "id": "zf_074",
+                  "name": "Chinese female - zf_074",
+                  "sid": 41
+                },
+                {
+                  "id": "zf_075",
+                  "name": "Chinese female - zf_075",
+                  "sid": 42
+                },
+                {
+                  "id": "zf_076",
+                  "name": "Chinese female - zf_076",
+                  "sid": 43
+                },
+                {
+                  "id": "zf_077",
+                  "name": "Chinese female - zf_077",
+                  "sid": 44
+                },
+                {
+                  "id": "zf_078",
+                  "name": "Chinese female - zf_078",
+                  "sid": 45
+                },
+                {
+                  "id": "zf_079",
+                  "name": "Chinese female - zf_079",
+                  "sid": 46
+                },
+                {
+                  "id": "zf_083",
+                  "name": "Chinese female - zf_083",
+                  "sid": 47
+                },
+                {
+                  "id": "zf_084",
+                  "name": "Chinese female - zf_084",
+                  "sid": 48
+                },
+                {
+                  "id": "zf_085",
+                  "name": "Chinese female - zf_085",
+                  "sid": 49
+                },
+                {
+                  "id": "zf_086",
+                  "name": "Chinese female - zf_086",
+                  "sid": 50
+                },
+                {
+                  "id": "zf_087",
+                  "name": "Chinese female - zf_087",
+                  "sid": 51
+                },
+                {
+                  "id": "zf_088",
+                  "name": "Chinese female - zf_088",
+                  "sid": 52
+                },
+                {
+                  "id": "zf_090",
+                  "name": "Chinese female - zf_090",
+                  "sid": 53
+                },
+                {
+                  "id": "zf_092",
+                  "name": "Chinese female - zf_092",
+                  "sid": 54
+                },
+                {
+                  "id": "zf_093",
+                  "name": "Chinese female - zf_093",
+                  "sid": 55
+                },
+                {
+                  "id": "zf_094",
+                  "name": "Chinese female - zf_094",
+                  "sid": 56
+                },
+                {
+                  "id": "zf_099",
+                  "name": "Chinese female - zf_099",
+                  "sid": 57
+                },
+                {
+                  "id": "zm_009",
+                  "name": "Chinese male - zm_009",
+                  "sid": 58
+                },
+                {
+                  "id": "zm_010",
+                  "name": "Chinese male - zm_010",
+                  "sid": 59
+                },
+                {
+                  "id": "zm_011",
+                  "name": "Chinese male - zm_011",
+                  "sid": 60
+                },
+                {
+                  "id": "zm_012",
+                  "name": "Chinese male - zm_012",
+                  "sid": 61
+                },
+                {
+                  "id": "zm_013",
+                  "name": "Chinese male - zm_013",
+                  "sid": 62
+                },
+                {
+                  "id": "zm_014",
+                  "name": "Chinese male - zm_014",
+                  "sid": 63
+                },
+                {
+                  "id": "zm_015",
+                  "name": "Chinese male - zm_015",
+                  "sid": 64
+                },
+                {
+                  "id": "zm_016",
+                  "name": "Chinese male - zm_016",
+                  "sid": 65
+                },
+                {
+                  "id": "zm_020",
+                  "name": "Chinese male - zm_020",
+                  "sid": 66
+                },
+                {
+                  "id": "zm_025",
+                  "name": "Chinese male - zm_025",
+                  "sid": 67
+                },
+                {
+                  "id": "zm_029",
+                  "name": "Chinese male - zm_029",
+                  "sid": 68
+                },
+                {
+                  "id": "zm_030",
+                  "name": "Chinese male - zm_030",
+                  "sid": 69
+                },
+                {
+                  "id": "zm_031",
+                  "name": "Chinese male - zm_031",
+                  "sid": 70
+                },
+                {
+                  "id": "zm_033",
+                  "name": "Chinese male - zm_033",
+                  "sid": 71
+                },
+                {
+                  "id": "zm_034",
+                  "name": "Chinese male - zm_034",
+                  "sid": 72
+                },
+                {
+                  "id": "zm_035",
+                  "name": "Chinese male - zm_035",
+                  "sid": 73
+                },
+                {
+                  "id": "zm_037",
+                  "name": "Chinese male - zm_037",
+                  "sid": 74
+                },
+                {
+                  "id": "zm_041",
+                  "name": "Chinese male - zm_041",
+                  "sid": 75
+                },
+                {
+                  "id": "zm_045",
+                  "name": "Chinese male - zm_045",
+                  "sid": 76
+                },
+                {
+                  "id": "zm_050",
+                  "name": "Chinese male - zm_050",
+                  "sid": 77
+                },
+                {
+                  "id": "zm_052",
+                  "name": "Chinese male - zm_052",
+                  "sid": 78
+                },
+                {
+                  "id": "zm_053",
+                  "name": "Chinese male - zm_053",
+                  "sid": 79
+                },
+                {
+                  "id": "zm_054",
+                  "name": "Chinese male - zm_054",
+                  "sid": 80
+                },
+                {
+                  "id": "zm_055",
+                  "name": "Chinese male - zm_055",
+                  "sid": 81
+                },
+                {
+                  "id": "zm_056",
+                  "name": "Chinese male - zm_056",
+                  "sid": 82
+                },
+                {
+                  "id": "zm_057",
+                  "name": "Chinese male - zm_057",
+                  "sid": 83
+                },
+                {
+                  "id": "zm_058",
+                  "name": "Chinese male - zm_058",
+                  "sid": 84
+                },
+                {
+                  "id": "zm_061",
+                  "name": "Chinese male - zm_061",
+                  "sid": 85
+                },
+                {
+                  "id": "zm_062",
+                  "name": "Chinese male - zm_062",
+                  "sid": 86
+                },
+                {
+                  "id": "zm_063",
+                  "name": "Chinese male - zm_063",
+                  "sid": 87
+                },
+                {
+                  "id": "zm_064",
+                  "name": "Chinese male - zm_064",
+                  "sid": 88
+                },
+                {
+                  "id": "zm_065",
+                  "name": "Chinese male - zm_065",
+                  "sid": 89
+                },
+                {
+                  "id": "zm_066",
+                  "name": "Chinese male - zm_066",
+                  "sid": 90
+                },
+                {
+                  "id": "zm_068",
+                  "name": "Chinese male - zm_068",
+                  "sid": 91
+                },
+                {
+                  "id": "zm_069",
+                  "name": "Chinese male - zm_069",
+                  "sid": 92
+                },
+                {
+                  "id": "zm_080",
+                  "name": "Chinese male - zm_080",
+                  "sid": 93
+                },
+                {
+                  "id": "zm_081",
+                  "name": "Chinese male - zm_081",
+                  "sid": 94
+                },
+                {
+                  "id": "zm_082",
+                  "name": "Chinese male - zm_082",
+                  "sid": 95
+                },
+                {
+                  "id": "zm_089",
+                  "name": "Chinese male - zm_089",
+                  "sid": 96
+                },
+                {
+                  "id": "zm_091",
+                  "name": "Chinese male - zm_091",
+                  "sid": 97
+                },
+                {
+                  "id": "zm_095",
+                  "name": "Chinese male - zm_095",
+                  "sid": 98
+                },
+                {
+                  "id": "zm_096",
+                  "name": "Chinese male - zm_096",
+                  "sid": 99
+                },
+                {
+                  "id": "zm_097",
+                  "name": "Chinese male - zm_097",
+                  "sid": 100
+                },
+                {
+                  "id": "zm_098",
+                  "name": "Chinese male - zm_098",
+                  "sid": 101
+                },
+                {
+                  "id": "zm_100",
+                  "name": "Chinese male - zm_100",
+                  "sid": 102
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kitten",
+      "name": "Kitten TTS",
+      "engine": "kitten",
+      "license": "Apache-2.0",
+      "homepage": "https://github.com/KittenML/KittenTTS",
+      "voice_cloning": false,
+      "artifact_base": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/",
+      "languages": [
+        {
+          "code": "en",
+          "name": "English",
+          "variants": [
+            {
+              "id": "v0_8_nano_int8",
+              "name": "v0.8 Nano (int8, smallest and fastest)",
+              "artifact": "kitten-nano-en-v0_8-int8.tar.bz2",
+              "voices": [
+                {
+                  "id": "bella",
+                  "name": "Bella (female)",
+                  "sid": 0
+                },
+                {
+                  "id": "jasper",
+                  "name": "Jasper (male)",
+                  "sid": 1
+                },
+                {
+                  "id": "luna",
+                  "name": "Luna (female)",
+                  "sid": 2
+                },
+                {
+                  "id": "bruno",
+                  "name": "Bruno (male)",
+                  "sid": 3
+                },
+                {
+                  "id": "rosie",
+                  "name": "Rosie (female)",
+                  "sid": 4
+                },
+                {
+                  "id": "hugo",
+                  "name": "Hugo (male)",
+                  "sid": 5
+                },
+                {
+                  "id": "kiki",
+                  "name": "Kiki (female)",
+                  "sid": 6
+                },
+                {
+                  "id": "leo",
+                  "name": "Leo (male)",
+                  "sid": 7
+                }
+              ]
+            },
+            {
+              "id": "v0_8_nano_fp32",
+              "name": "v0.8 Nano (fp32)",
+              "artifact": "kitten-nano-en-v0_8-fp32.tar.bz2",
+              "voices": [
+                {
+                  "id": "bella",
+                  "name": "Bella (female)",
+                  "sid": 0
+                },
+                {
+                  "id": "jasper",
+                  "name": "Jasper (male)",
+                  "sid": 1
+                },
+                {
+                  "id": "luna",
+                  "name": "Luna (female)",
+                  "sid": 2
+                },
+                {
+                  "id": "bruno",
+                  "name": "Bruno (male)",
+                  "sid": 3
+                },
+                {
+                  "id": "rosie",
+                  "name": "Rosie (female)",
+                  "sid": 4
+                },
+                {
+                  "id": "hugo",
+                  "name": "Hugo (male)",
+                  "sid": 5
+                },
+                {
+                  "id": "kiki",
+                  "name": "Kiki (female)",
+                  "sid": 6
+                },
+                {
+                  "id": "leo",
+                  "name": "Leo (male)",
+                  "sid": 7
+                }
+              ]
+            },
+            {
+              "id": "v0_8_micro",
+              "name": "v0.8 Micro",
+              "artifact": "kitten-micro-en-v0_8.tar.bz2",
+              "voices": [
+                {
+                  "id": "bella",
+                  "name": "Bella (female)",
+                  "sid": 0
+                },
+                {
+                  "id": "jasper",
+                  "name": "Jasper (male)",
+                  "sid": 1
+                },
+                {
+                  "id": "luna",
+                  "name": "Luna (female)",
+                  "sid": 2
+                },
+                {
+                  "id": "bruno",
+                  "name": "Bruno (male)",
+                  "sid": 3
+                },
+                {
+                  "id": "rosie",
+                  "name": "Rosie (female)",
+                  "sid": 4
+                },
+                {
+                  "id": "hugo",
+                  "name": "Hugo (male)",
+                  "sid": 5
+                },
+                {
+                  "id": "kiki",
+                  "name": "Kiki (female)",
+                  "sid": 6
+                },
+                {
+                  "id": "leo",
+                  "name": "Leo (male)",
+                  "sid": 7
+                }
+              ]
+            },
+            {
+              "id": "v0_8_mini",
+              "name": "v0.8 Mini (best quality)",
+              "artifact": "kitten-mini-en-v0_8.tar.bz2",
+              "voices": [
+                {
+                  "id": "bella",
+                  "name": "Bella (female)",
+                  "sid": 0
+                },
+                {
+                  "id": "jasper",
+                  "name": "Jasper (male)",
+                  "sid": 1
+                },
+                {
+                  "id": "luna",
+                  "name": "Luna (female)",
+                  "sid": 2
+                },
+                {
+                  "id": "bruno",
+                  "name": "Bruno (male)",
+                  "sid": 3
+                },
+                {
+                  "id": "rosie",
+                  "name": "Rosie (female)",
+                  "sid": 4
+                },
+                {
+                  "id": "hugo",
+                  "name": "Hugo (male)",
+                  "sid": 5
+                },
+                {
+                  "id": "kiki",
+                  "name": "Kiki (female)",
+                  "sid": 6
+                },
+                {
+                  "id": "leo",
+                  "name": "Leo (male)",
+                  "sid": 7
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "vits_zh",
+      "name": "VITS zh-AISHELL3",
+      "engine": "vits",
+      "license": "Apache-2.0",
+      "homepage": "https://github.com/k2-fsa/icefall",
+      "voice_cloning": false,
+      "note": "Multi-speaker VITS model (174 speakers, 8 kHz) trained on the AISHELL-3 dataset. The voice list shows one entry; the default speaker (sid 0) is used.",
+      "artifact_base": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/",
+      "languages": [
+        {
+          "code": "zh",
+          "name": "Chinese (Simplified)",
+          "variants": [
+            {
+              "id": "aishell3",
+              "name": "AISHELL3 (multi-speaker)",
+              "voices": [
+                {
+                  "id": "aishell3",
+                  "name": "AISHELL3 (174 speakers)",
+                  "artifact": "vits-icefall-zh-aishell3.tar.bz2"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "matcha",
+      "name": "Matcha-TTS",
+      "engine": "matcha",
+      "license": "CC-BY-4.0 (icefall conversion); LJSpeech/other datasets may have their own terms",
+      "homepage": "https://github.com/shivammehta25/Matcha-TTS",
+      "voice_cloning": false,
+      "note": "Matcha-TTS uses a separate neural vocoder (vocos-22khz-univ.onnx, ~51 MB) which is downloaded once and shared by every Matcha voice.",
+      "artifact_base": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/",
+      "shared_artifacts": [
+        {
+          "artifact": "vocos-22khz-univ.onnx",
+          "base": "https://github.com/k2-fsa/sherpa-onnx/releases/download/vocoder-models/",
+          "kind": "file",
+          "dest": "shared/vocoders",
+          "filename": "vocos-22khz-univ.onnx"
+        }
+      ],
+      "languages": [
+        {
+          "code": "en_US",
+          "name": "English (United States)",
+          "variants": [
+            {
+              "id": "ljspeech",
+              "name": "LJSpeech (US female)",
+              "voices": [
+                {
+                  "id": "default",
+                  "name": "LJSpeech (US female)",
+                  "artifact": "matcha-icefall-en_US-ljspeech.tar.bz2"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "zh",
+          "name": "Chinese (Simplified)",
+          "variants": [
+            {
+              "id": "baker",
+              "name": "Baker (ZH female, non-commercial data)",
+              "voices": [
+                {
+                  "id": "default",
+                  "name": "Baker (ZH female)",
+                  "artifact": "matcha-icefall-zh-baker.tar.bz2"
+                }
+              ]
+            },
+            {
+              "id": "zh_en",
+              "name": "Chinese-English bilingual",
+              "voices": [
+                {
+                  "id": "default",
+                  "name": "Bilingual ZH+EN",
+                  "artifact": "matcha-icefall-zh-en.tar.bz2"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "fa_en",
+          "name": "Persian + English",
+          "variants": [
+            {
+              "id": "khadijah",
+              "name": "Khadijah (FA female)",
+              "voices": [
+                {
+                  "id": "default",
+                  "name": "Khadijah (FA female)",
+                  "artifact": "matcha-tts-fa_en-khadijah.tar.bz2"
+                }
+              ]
+            },
+            {
+              "id": "musa",
+              "name": "Musa (FA male)",
+              "voices": [
+                {
+                  "id": "default",
+                  "name": "Musa (FA male)",
+                  "artifact": "matcha-tts-fa_en-musa.tar.bz2"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "qwen3",
+      "name": "Qwen3-TTS",
+      "engine": "qwen3",
+      "license": "Apache-2.0",
+      "homepage": "https://github.com/QwenLM/Qwen3-TTS",
+      "voice_cloning": true,
+      "note": "Qwen3-TTS is Alibaba's open-source multilingual TTS (Apache-2.0) exported to pure ONNX. One model covers 10 languages and supports voice cloning from a short reference recording (Settings -> Voice clone). Requires the Qwen3 engine runtime (Settings -> Voice clone -> Qwen3 engine) and an NVIDIA GPU for usable speed (CPU is very slow).",
+      "languages": [
+        {
+          "code": "multi",
+          "name": "Multilingual (10 languages: English, Chinese, Japanese, Korean, German, French, Russian, Portuguese, Spanish, Italian)",
+          "variants": [
+            {
+              "id": "v1_7b_fp16",
+              "name": "Version 1.7B FP16 (all 10 languages, voice cloning)",
+              "hf_repo": "xkos/Qwen3-TTS-12Hz-1.7B-ONNX",
+              "hf_prefixes": [
+                "fp16/voice_clone/",
+                "fp16/shared/",
+                "tokenizer/"
+              ],
+              "hf_files": [
+                "config.json",
+                "voice_clone_config.json"
+              ],
+              "note": "~5.6 GB fp16 voice-clone subset. Voice cloning: give it a 4-5 second WAV reference and it speaks in that voice in all 10 languages. Requires the Qwen3 engine from the Voice clone tab. CPU synthesis is very slow; an NVIDIA GPU (CUDA runtime installed in Settings) is strongly recommended.",
+              "voices": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "omnivoice",
+      "name": "OmniVoice",
+      "engine": "omnivoice",
+      "license": "Apache-2.0",
+      "homepage": "https://github.com/k2-fsa/OmniVoice",
+      "voice_cloning": true,
+      "note": "OmniVoice is k2-fsa's state-of-the-art massively multilingual zero-shot TTS (Apache-2.0) supporting 600+ languages. It clones a voice from a short reference recording and speaks in that voice. Two variants: GPU (PyTorch, requires NVIDIA GPU) and ONNX (onnxruntime-genai, CPU-capable). Both require downloading the engine runtime from Settings -> Voice clone.",
+      "gpu_warning": "⚠️ The GPU variant requires an NVIDIA GPU with CUDA 12. CPU-only systems should use the ONNX variant.",
+      "languages": [
+        {
+          "code": "multi",
+          "name": "Multilingual (600+ languages: English, Chinese, Hindi, Japanese, Korean, French, German, Spanish, Arabic, Portuguese, and 590+ more)",
+          "variants": [
+            {
+              "id": "gpu",
+              "name": "GPU version (PyTorch + CUDA, highest quality)",
+              "hf_repo": "k2-fsa/OmniVoice",
+              "hf_prefixes": [],
+              "hf_files": [],
+              "note": "⚠️ REQUIRES NVIDIA GPU with CUDA 12. Downloads PyTorch (~2.5 GB) + omnivoice package. Supports voice cloning from a short reference audio and voice design via text instructions. 600+ languages. RTF as low as 0.025 (40x faster than real-time on GPU).",
+              "voices": [
+                {
+                  "id": "clone",
+                  "name": "Voice cloning (provide reference audio)",
+                  "sid": 0
+                },
+                {
+                  "id": "design",
+                  "name": "Voice design (describe voice with text)",
+                  "sid": 0
+                },
+                {
+                  "id": "auto",
+                  "name": "Auto voice (model chooses)",
+                  "sid": 0
+                }
+              ]
+            },
+            {
+              "id": "onnx",
+              "name": "ONNX version (CPU-capable, via onnxruntime-genai)",
+              "hf_repo": "Prince-1/OmniVoice-Onnx",
+              "hf_prefixes": [
+                "audio_tokenizer/",
+                "codes/",
+                "cuda/",
+                "int4/"
+              ],
+              "hf_files": [
+                "config.json",
+                "genai_config.json",
+                "model_config.json",
+                "omnivoice_manifest.json",
+                "tokenizer.json",
+                "tokenizer_config.json",
+                "chat_template.jinja",
+                "audio_embeddings_encoder.onnx",
+                "audio_embeddings_encoder.onnx.data",
+                "audio_heads_decoder.onnx",
+                "llm_decoder.onnx",
+                "llm_decoder.onnx.data"
+              ],
+              "note": "ONNX-converted OmniVoice (~1.3 GB). Runs on CPU via onnxruntime-genai; GPU acceleration optional. Supports voice cloning and voice design. 600+ languages. Requires the OmniVoice ONNX engine from the Voice clone tab.",
+              "voices": [
+                {
+                  "id": "clone",
+                  "name": "Voice cloning (provide reference audio)",
+                  "sid": 0
+                },
+                {
+                  "id": "design",
+                  "name": "Voice design (describe voice with text)",
+                  "sid": 0
+                },
+                {
+                  "id": "auto",
+                  "name": "Auto voice (model chooses)",
+                  "sid": 0
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

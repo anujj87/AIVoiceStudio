@@ -1,0 +1,3 @@
+# GPU back-end (CUDA). Replaces the CPU onnxruntime.
+# Requires an NVIDIA driver + CUDA runtime. The app detects CUDA automatically.
+onnxruntime-gpu>=1.20.0

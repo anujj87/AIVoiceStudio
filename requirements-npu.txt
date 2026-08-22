@@ -1,0 +1,3 @@
+# NPU back-end (DirectML) for Windows (Intel/AMD/Qualcomm NPU via DirectML).
+# The app offers this as a downloadable dependency when an NPU is detected.
+onnxruntime-directml>=1.20.0

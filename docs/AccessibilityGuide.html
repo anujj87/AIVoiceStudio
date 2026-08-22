@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Voice Studio - Accessibility Guidelines</title>
+<style>
+  body { font-family: Verdana, Arial, sans-serif; max-width: 56em; margin: 1.5em auto; padding: 0 1em; line-height: 1.6; color: #222; }
+  h1 { border-bottom: 2px solid #555; padding-bottom: .3em; }
+  h2 { margin-top: 1.8em; border-bottom: 1px solid #ccc; padding-bottom: .2em; color: #333; }
+  h3 { margin-top: 1.2em; color: #444; }
+  code { font-family: Consolas, monospace; background: #f4f4f4; padding: 0.15em 0.3em; border-radius: 3px; }
+  pre { background: #f8f8f8; border: 1px solid #ddd; border-radius: 4px; padding: 1em; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.9em; }
+  table { border-collapse: collapse; margin: 1em 0; width: 100%; }
+  th, td { border: 1px solid #999; padding: .4em .7em; text-align: left; }
+  th { background: #eee; }
+  .note { background: #fff8dc; border-left: 4px solid #e0b400; padding: .6em 1em; margin: 1em 0; }
+  .tip { background: #eef7ee; border-left: 4px solid #2e8b57; padding: .6em 1em; margin: 1em 0; }
+  .rule { background: #f0f0ff; border-left: 4px solid #4444cc; padding: .6em 1em; margin: 1em 0; }
+  .bad { background: #fff0f0; border-left: 4px solid #cc3333; padding: .4em 1em; margin: .5em 0; font-family: Consolas, monospace; }
+  .good { background: #f0fff0; border-left: 4px solid #2e8b57; padding: .4em 1em; margin: .5em 0; font-family: Consolas, monospace; }
+</style>
+</head>
+<body>
+
+<h1>AI Voice Studio &mdash; Accessibility Guidelines</h1>
+<p>This document defines the accessibility standards that all code in AI Voice Studio
+must follow. The application is designed from the ground up to be fully usable with
+screen readers (NVDA, JAWS, Narrator) and keyboard-only navigation.</p>
+
+<h2>Contents</h2>
+<ul>
+  <li><a href="#principles">Core Principles</a></li>
+  <li><a href="#names">Accessible Names</a></li>
+  <li><a href="#labels">Label Association</a></li>
+  <li><a href="#keyboard">Keyboard Navigation</a></li>
+  <li><a href="#focus">Focus Management</a></li>
+  <li><a href="#announcements">Screen Reader Announcements</a></li>
+  <li><a href="#contrast">Color and Contrast</a></li>
+  <li><a href="#dialogs">Dialogs and Windows</a></li>
+  <li><a href="#menus">Menus and Shortcuts</a></li>
+  <li><a href="#errors">Error Handling</a></li>
+  <li><a href="#checklist">Developer Checklist</a></li>
+</ul>
+
+<!-- ================================================================ -->
+<h2 id="principles">Core Principles</h2>
+
+<p>These principles are derived from WCAG 2.1 (Level AA), Microsoft Active
+Accessibility (MSAA), UI Automation (UIA), and the requirements of the
+NVDA, JAWS, and Narrator screen readers.</p>
+
+<div class="rule"><strong>Rule 1: Every interactive control must have an accessible name.</strong>
+Screen readers announce controls by their accessible name. Without one, the
+control is silent or reads its raw class name.</div>
+
+<div class="rule"><strong>Rule 2: Every control must have a visible label or an accessible
+description.</strong> Both sighted users and screen reader users must understand
+what each control does.</div>
+
+<div class="rule"><strong>Rule 3: All functionality must be available via keyboard.</strong>
+No mouse-only interactions. Tab through controls, use Enter/Space to activate,
+Escape to cancel, arrow keys for lists and combos.</div>
+
+<div class="rule"><strong>Rule 4: Focus must be visible and managed.</strong> The focused
+control must have a visible indicator. Focus must move logically through the UI.
+When a dialog opens, focus must land on the first interactive control.</div>
+
+<div class="rule"><strong>Rule 5: Dynamic content changes must be announced.</strong>
+When content changes (progress, status, errors), screen readers must be
+notified via accessible name updates or live regions.</div>
+
+<!-- ================================================================ -->
+<h2 id="names">Accessible Names</h2>
+
+<p>On Windows, wxPython's <code>SetName()</code> sets the MSAA/UIA accessible
+name. This is what NVDA, JAWS, and Narrator announce.</p>
+
+<h3>Rules</h3>
+<ul>
+  <li>Every <code>wx.Button</code>, <code>wx.TextCtrl</code>,
+      <code>wx.ComboBox</code>, <code>wx.CheckBox</code>,
+      <code>wx.RadioButton</code>, <code>wx.ListBox</code>,
+      <code>wx.ListCtrl</code>, <code>wx.Gauge</code>, and
+      <code>wx.StaticText</code> that conveys information must have
+      <code>SetName()</code> called.</li>
+  <li>The accessible name should be concise but descriptive.</li>
+  <li>Avoid redundant names like "button" in button names &mdash; screen
+      readers already announce the role.</li>
+</ul>
+
+<div class="bad">BAD: <code>btn.SetName("Button1")</code> &mdash; meaningless</div>
+<div class="good">GOOD: <code>btn.SetName("Start recording")</code> &mdash; clear purpose</div>
+
+<div class="bad">BAD: <code>combo.SetName("Combo")</code> &mdash; redundant role</div>
+<div class="good">GOOD: <code>combo.SetName("Select TTS engine")</code> &mdash; describes purpose</div>
+
+<h3>Tooltips</h3>
+<p>Every control that might need explanation should have a tooltip via
+<code>SetToolTip()</code>. Tooltips provide extra context for sighted users
+and are announced by some screen readers when the control is focused.</p>
+
+<div class="good">GOOD: <code>btn.SetToolTip("Download the optional CUDA GPU runtime (~1.8 GB)")</code></div>
+
+<!-- ================================================================ -->
+<h2 id="labels">Label Association</h2>
+
+<p>Labels (<code>wx.StaticText</code>) must be associated with their controls
+both visually (placed next to the control in the layout) and programmatically
+(via <code>SetName()</code> on the control matching the label text).</p>
+
+<h3>Using add_labeled()</h3>
+<p>The <code>a11y.add_labeled()</code> helper creates both the visual label and
+sets the accessible name in one call:</p>
+
+<pre>from ai_voice_studio.gui.a11y import add_labeled
+
+add_labeled(parent, grid, "Select TTS", self.tts_combo,
+            flag=wx.LEFT | wx.RIGHT, border=2)
+# This creates:
+#   - A StaticText with "Select TTS:" label
+#   - Sets tts_combo.SetName("Select TTS")</pre>
+
+<h3>Manual Labeling</h3>
+<p>For controls not using <code>add_labeled()</code>, always call
+<code>SetName()</code> with the same text as the visual label:</p>
+
+<pre># The label text must match what the screen reader announces
+self.btn = wx.Button(parent, label="Start recording")
+self.btn.SetName("Start recording")
+self.btn.SetToolTip("Begin synthesizing audio for all pending segments")</pre>
+
+<!-- ================================================================ -->
+<h2 id="keyboard">Keyboard Navigation</h2>
+
+<h3>Tab Order</h3>
+<ul>
+  <li>Controls must be added to sizers in logical tab order (top-to-bottom,
+      left-to-right).</li>
+  <li>The first interactive control in a dialog should receive focus when
+      the dialog opens.</li>
+  <li>Use <code>wx.CallAfter(control.SetFocus)</code> for post-construction
+      focus.</li>
+</ul>
+
+<h3>Keyboard Shortcuts</h3>
+<table>
+<tr><th>Shortcut</th><th>Action</th></tr>
+<tr><td>Tab / Shift+Tab</td><td>Move between controls</td></tr>
+<tr><td>Enter</td><td>Activate the focused button; confirm dialog</td></tr>
+<tr><td>Escape</td><td>Cancel dialog</td></tr>
+<tr><td>Arrow keys</td><td>Navigate within lists, combos, radio groups</td></tr>
+<tr><td>Ctrl+Tab / Ctrl+Shift+Tab</td><td>Switch settings categories</td></tr>
+<tr><td>Ctrl+S</td><td>Apply settings (in Settings dialog)</td></tr>
+<tr><td>F5</td><td>Refresh (Log Viewer)</td></tr>
+</table>
+
+<h3>Enter Key Handling</h3>
+<p>In the Settings dialog, Enter activates OK (NVDA convention). Inside
+multi-line text boxes, Enter inserts a new line instead. Inside buttons,
+combo boxes, and list boxes, Enter is passed through to the control.</p>
+
+<!-- ================================================================ -->
+<h2 id="focus">Focus Management</h2>
+
+<ul>
+  <li>When a modal dialog opens, focus must land on the first interactive
+      control (or the category list in Settings).</li>
+  <li>When a wizard page changes, focus must move to the new page's first
+      control.</li>
+  <li>After an action completes (download, recording), focus should return
+      to a logical position.</li>
+  <li>Focus must never be lost &mdash; every screen must have at least one
+      focusable control.</li>
+</ul>
+
+<!-- ================================================================ -->
+<h2 id="announcements">Screen Reader Announcements</h2>
+
+<p>When dynamic content changes, screen readers must be notified. In wxPython,
+the primary mechanism is updating the accessible name of a status control:</p>
+
+<pre># When recording progress changes:
+self.status.SetLabel("Recording segment 3 of 10")
+self.status.SetName("Recording status: segment 3 of 10")
+# Screen reader announces the updated name
+
+# When log content loads:
+self.log_text.SetName(f"Log file {filename}: showing last 200 of 1500 lines")
+# Screen reader announces how many lines are shown</pre>
+
+<h3>Patterns</h3>
+<ul>
+  <li><strong>Progress updates</strong>: Update both <code>SetLabel()</code> and
+      <code>SetName()</code> on the status text.</li>
+  <li><strong>Error messages</strong>: Use <code>wx.MessageBox</code> which is
+      natively accessible, or update an accessible name.</li>
+  <li><strong>Completion</strong>: Announce "Recording complete" or "Download
+      finished" via accessible name.</li>
+  <li><strong>Content loading</strong>: When loading logs, files, or lists,
+      update the accessible name to describe what was loaded.</li>
+</ul>
+
+<!-- ================================================================ -->
+<h2 id="contrast">Color and Contrast</h2>
+
+<ul>
+  <li>Text must have sufficient contrast against its background (WCAG AA:
+      4.5:1 for normal text, 3:1 for large text).</li>
+  <li>Never rely on color alone to convey information (e.g. red for error,
+      green for success &mdash; also use text or icons).</li>
+  <li>The theme system must preserve contrast ratios in both Light and Dark
+      modes.</li>
+  <li>Focus indicators must be visible in all themes.</li>
+</ul>
+
+<h3>Current Theme Colors</h3>
+<table>
+<tr><th>Theme</th><th>Background</th><th>Foreground</th><th>Ratio</th></tr>
+<tr><td>Light</td><td>#ffffff</td><td>#1a1a1a</td><td>16.1:1</td></tr>
+<tr><td>Dark</td><td>#1e1e1e</td><td>#e8e8e8</td><td>13.3:1</td></tr>
+</table>
+<p>Both exceed WCAG AAA requirements (7:1).</p>
+
+<!-- ================================================================ -->
+<h2 id="dialogs">Dialogs and Windows</h2>
+
+<ul>
+  <li>Every dialog must have a descriptive title set in the constructor.</li>
+  <li>Use <code>wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER</code> for resizable
+      dialogs that work at different DPI settings.</li>
+  <li>Use <code>CreateSeparatedButtonSizer(wx.OK | wx.CANCEL | wx.APPLY)</code>
+      for standard button layout &mdash; these are natively accessible.</li>
+  <li>Category panels in Settings use the NVDA <code>SettingsPanel</code>
+      pattern with <code>_SettingsPanelAccessible</code>.</li>
+</ul>
+
+<!-- ================================================================ -->
+<h2 id="menus">Menus and Shortcuts</h2>
+
+<ul>
+  <li>All menu items must have mnemonics (the &amp; character in labels).</li>
+  <li>Frequently used actions must have keyboard accelerators.</li>
+  <li>The menu bar must be navigable with Alt+letter keys.</li>
+</ul>
+
+<h3>Current Shortcuts</h3>
+<table>
+<tr><th>Shortcut</th><th>Menu</th><th>Action</th></tr>
+<tr><td>Ctrl+Shift+N</td><td>File</td><td>New Project</td></tr>
+<tr><td>Ctrl+Shift+R</td><td>Tools</td><td>Record</td></tr>
+<tr><td>Ctrl+,</td><td>Tools</td><td>Settings</td></tr>
+</table>
+
+<!-- ================================================================ -->
+<h2 id="errors">Error Handling</h2>
+
+<ul>
+  <li>All error messages must be presented in accessible dialogs
+      (<code>wx.MessageBox</code> with <code>wx.ICON_ERROR</code>).</li>
+  <li>Error messages must be clear and actionable ("What went wrong" +
+      "What to do about it").</li>
+  <li>Errors in background threads must be posted to the UI thread via
+      <code>wx.CallAfter()</code> or <code>wx.PostEvent()</code>.</li>
+  <li>When heavy logging is enabled, all caught exceptions are logged
+      automatically via <code>exc_info=True</code>.</li>
+</ul>
+
+<!-- ================================================================ -->
+<h2 id="checklist">Developer Checklist</h2>
+
+<p>Before submitting code, verify every item:</p>
+
+<table>
+<tr><th>#</th><th>Check</th><th>How to verify</th></tr>
+<tr><td>1</td><td>Every interactive control has <code>SetName()</code></td><td>Search for <code>wx.Button</code>, <code>wx.TextCtrl</code>, etc. and confirm <code>SetName()</code> is called</td></tr>
+<tr><td>2</td><td>Tooltips on non-obvious controls</td><td>Hover over each button/control and verify tooltip appears</td></tr>
+<tr><td>3</td><td>Label association via <code>add_labeled()</code> or manual <code>SetName()</code></td><td>Check that label text matches the accessible name</td></tr>
+<tr><td>4</td><td>Tab order is logical</td><td>Tab through the dialog and verify focus moves correctly</td></tr>
+<tr><td>5</td><td>Dialog has a descriptive title</td><td>Check the constructor call</td></tr>
+<tr><td>6</td><td>Dynamic content announces changes</td><td>Enable NVDA, trigger the action, verify announcement</td></tr>
+<tr><td>7</td><td>Error messages are accessible</td><td>Trigger an error and verify wx.MessageBox appears</td></tr>
+<tr><td>8</td><td>Keyboard shortcuts work</td><td>Test all listed shortcuts</td></tr>
+<tr><td>9</td><td>Theme contrast is maintained</td><td>Switch to Dark mode and verify readability</td></tr>
+<tr><td>10</td><td>Focus is managed on dialog open/close</td><td>Open/close dialogs and verify focus position</td></tr>
+</table>
+
+<div class="tip"><strong>Testing tip:</strong> Enable NVDA or Narrator and navigate
+the entire application using only the keyboard. Every control should be reachable
+and announce its purpose clearly.</div>
+
+</body>
+</html>
