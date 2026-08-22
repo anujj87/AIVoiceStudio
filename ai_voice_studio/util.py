@@ -52,11 +52,20 @@ def find_python() -> str:
     """Return a Python executable that has pip available.
 
     In a PyInstaller bundle ``sys.executable`` is the bundled EXE which
-    does not contain pip.  We fall back to the system Python found via
-    ``shutil.which``.
+    does not contain pip.  We first try the managed PythonRuntime
+    virtualenv (already has pip), then fall back to a system Python.
     """
     if not getattr(sys, "frozen", False):
         return sys.executable
+    # 1. Prefer the managed virtualenv (has pip pre-installed).
+    try:
+        from .python_runtime import get_runtime
+        rt = get_runtime()
+        if rt.is_created and os.path.isfile(rt.python_exe):
+            return rt.python_exe
+    except Exception:  # noqa: BLE001
+        pass
+    # 2. Fall back to any system Python on PATH.
     for name in ("python", "python3", "py"):
         path = shutil.which(name)
         if path:

@@ -53,6 +53,10 @@ class _ManagerPanel(wx.Panel):
     def apply_to_settings(self):
         pass
 
+    def isValid(self) -> bool:
+        """Validate this panel (NVDA SettingsPanel.isValid). Always OK for model panels."""
+        return True
+
 
 # ---------------------------------------------------------------------------
 # Combo-box helpers (cascading TTS -> language -> variant -> voice)
@@ -162,6 +166,7 @@ class DownloadPanel(_ManagerPanel):
 
         self.tts_combo.Bind(wx.EVT_COMBOBOX, self._on_tts)
         self.lang_combo.Bind(wx.EVT_COMBOBOX, self._on_lang)
+        self.variant_combo.Bind(wx.EVT_COMBOBOX, lambda _: self._refresh_buttons())
         self.download_btn.Bind(wx.EVT_BUTTON, self._on_download)
         self.remove_btn.Bind(wx.EVT_BUTTON, self._on_remove)
         self.cancel_btn.Bind(wx.EVT_BUTTON, self._on_cancel)
@@ -986,7 +991,7 @@ class VoiceClonePanel(_ManagerPanel):
             status_parts.append(" Download the OmniVoice model first (Settings > Download and remove).")
         self.omni_status.SetLabel(" ".join(status_parts))
         self.omni_gpu_dl_btn.Enable(not gpu_engine and not busy)
-        self.omni_engine_rm_btn.Enable(gpu_engine and not busy)
+        self.omni_engine_rm_btn.Enable(not busy)  # Always allow remove
         self.omni_engine_cancel_btn.Enable(busy)
         self.omni_create_btn.Enable((onnx_ok or gpu_ok))
 
@@ -1028,10 +1033,12 @@ class VoiceClonePanel(_ManagerPanel):
             wx.PostEvent(self, DownloadProgressEvent(name, done, total))
 
         try:
+            log.info("OmniVoice GPU install: starting ensure_engine(%s)", variant)
             omnivoice.ensure_engine(
                 variant=variant, progress=progress,
                 cancel_event=self._cancel_event,
             )
+            log.info("OmniVoice GPU install: ensure_engine(%s) succeeded", variant)
             wx.PostEvent(self, DownloadFinishedEvent(
                 True,
                 f"OmniVoice {variant.upper()} dependency installed. Download the "
@@ -1039,8 +1046,10 @@ class VoiceClonePanel(_ManagerPanel):
                 "create a voice below.",
             ))
         except omnivoice.OmniVoiceError as exc:
+            log.error("OmniVoice GPU install failed: %s", exc)
             wx.PostEvent(self, DownloadFinishedEvent(False, str(exc)))
         except Exception as exc:  # noqa: BLE001
+            log.exception("OmniVoice GPU install: unexpected error")
             wx.PostEvent(self, DownloadFinishedEvent(False, f"Download failed: {exc}"))
 
     def _on_cancel_omni_engine(self, _):
@@ -1051,16 +1060,28 @@ class VoiceClonePanel(_ManagerPanel):
     def _on_remove_omni_engine(self, _):
         from .. import omnivoice  # noqa: PLC0415
 
+        gpu_engine = omnivoice.engine_installed("gpu")
+        if not gpu_engine:
+            wx.MessageBox(
+                "No GPU dependency is currently installed.\n\n"
+                "To install the GPU dependency later, click \"Install GPU dependency\" "
+                "in the Voice Clone tab. Note: this requires downloading ~2.5 GB.",
+                "GPU dependency not installed",
+                style=wx.OK | wx.ICON_INFORMATION,
+            )
+            return
+
         if wx.MessageBox(
-            "Remove the OmniVoice runtime dependency? Its files will be deleted from your "
-            "user folder. Existing OmniVoice voices are kept, but they cannot be "
-            "used until the dependency is installed again.",
-            "Remove OmniVoice dependency",
+            "Remove the OmniVoice GPU dependency? Its files (~2.5 GB) will be deleted "
+            "from your user folder. Existing OmniVoice voices are kept, but they "
+            "cannot be used with GPU until the dependency is installed again.\n\n"
+            "To reinstall later, click \"Install GPU dependency\" in the Voice Clone tab.",
+            "Remove OmniVoice GPU dependency",
             style=wx.YES_NO | wx.ICON_QUESTION,
         ) == wx.YES:
-            omnivoice.remove_engine("onnx")
             omnivoice.remove_engine("gpu")
-            self.status.SetLabel("OmniVoice dependency removed.")
+            log.info("OmniVoice GPU dependency removed by user")
+            self.status.SetLabel("OmniVoice GPU dependency removed.")
             self._refresh_omni_state()
 
     def _on_omni_browse(self, _):
@@ -1211,6 +1232,7 @@ class VoiceClonePanel(_ManagerPanel):
             dlg.Pulse(evt.name)
 
     def _on_download_finished(self, evt: DownloadFinishedEvent):
+        log.info("Download finished: success=%s message=%s", evt.success, evt.message)
         self._thread = None
         self.qwen_engine_cancel_btn.Disable()
         self.omni_engine_cancel_btn.Disable()

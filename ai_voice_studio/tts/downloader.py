@@ -207,13 +207,22 @@ class ModelDownloader:
             if cancel_event and cancel_event.is_set():
                 raise DownloadCancelled()
             url = self._artifact_url(tts, artifact)
-            download_file(
+            tarball = download_file(
                 url,
                 dest,
                 filename=os.path.basename(artifact),
                 progress=progress,
                 cancel_event=cancel_event,
             )
+
+            # Extract .tar.bz2 archives so model.onnx / tokens.txt are
+            # available immediately (not just the raw archive).
+            if tarball.endswith(".tar.bz2") or tarball.endswith(".tar.gz"):
+                if progress:
+                    progress(f"Extracting {os.path.basename(tarball)}", 0, 0)
+                safe_extract_tarball(tarball, dest)
+                # Keep the archive so future calls can skip re-download
+                # (the _variant_artifacts check already handles this).
 
         # Download shared artifacts (espeak-ng-data, vocoders, etc.)
         self._download_extras(tts, tts.get("shared_artifacts", []), progress, cancel_event)

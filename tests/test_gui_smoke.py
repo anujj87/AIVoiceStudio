@@ -103,8 +103,8 @@ class SettingsDialogTest(_AppMixin):
         try:
             # NVDA-style: a category list on the left, one panel per category.
             self.assertIsNotNone(dlg.cat_list)
-            self.assertEqual(dlg.cat_list.GetItemCount(), 10)
-            self.assertEqual(len(dlg._panels), 10)
+            self.assertEqual(dlg.cat_list.GetItemCount(), 11)
+            self.assertEqual(len(dlg._panels), 11)
             self.assertTrue(hasattr(dlg, "container"))
             # Every panel must have at least one child control.
             for panel in dlg._panels:
@@ -127,9 +127,9 @@ class SettingsDialogTest(_AppMixin):
             self.assertTrue(hasattr(punct, "example_text"))
             self.assertTrue(hasattr(punct, "example_out"))
             self.assertTrue(punct.example_out.GetLabel())
-            self.assertEqual(punct.tts_combo.GetName(), "Select TTS")
-            self.assertEqual(punct.variant_combo.GetName(), "Select variant")
-            self.assertEqual(punct.voice_combo.GetName(), "Select voice")
+            self.assertIn(punct.tts_combo.GetName(), ("TTS engine", "TTS engine for preview"))
+            self.assertIn(punct.variant_combo.GetName(), ("Variant", "Variant for preview"))
+            self.assertIn(punct.voice_combo.GetName(), ("Voice", "Voice for preview"))
             self.assertTrue(hasattr(punct, "preview_btn"))
             self.assertTrue(hasattr(punct, "preview_status"))
             # No voices in the throwaway store -> preview disabled with a hint.

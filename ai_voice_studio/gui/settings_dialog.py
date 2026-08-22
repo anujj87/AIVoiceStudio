@@ -268,10 +268,8 @@ class SettingsDialog(wx.Dialog):
         evt.Skip()
 
     def _on_close(self, evt):
-        """Handle the window close button (X) and Alt+F4.
-        NVDA pattern: DestroyLater + SetReturnCode."""
+        """Handle the window close button (X) and Alt+F4."""
         self._on_cancel(None)
-        evt.Skip()  # allow default destroy
 
     def _show_category(self, index: int, *, focus_panel: bool = True):
         """Show the panel for ``index`` and hide every other (NVDA pattern).
@@ -395,6 +393,9 @@ class SettingsDialog(wx.Dialog):
         """Check all panels are valid before saving (NVDA _validateAllPanels)."""
         for panel in self._panels:
             try:
+                if not hasattr(panel, "isValid"):
+                    log.warning("Panel %s has no isValid() method — skipping validation", panel.title)
+                    continue
                 if panel.isValid() is False:
                     log.warning("Panel %s failed validation", panel.title)
                     return False
@@ -416,21 +417,29 @@ class SettingsDialog(wx.Dialog):
         return True
 
     def _on_apply(self, _):
+        log.info("Settings dialog: Apply button clicked")
         if self._save_from_ui():
+            log.info("Settings dialog: Apply succeeded")
             apply_theme(self, self.settings.theme)
-            # Re-run postInit for the current panel (NVDA pattern).
-            self._show_category(self._current, focus_panel=True)
+            # Stay open — move focus back to the category list so the
+            # user can continue configuring (matches NVDA pattern).
+            wx.CallAfter(self.cat_list.SetFocus)
+        else:
+            log.warning("Settings dialog: Apply failed (validation or save error)")
 
     def _on_ok(self, _):
+        log.info("Settings dialog: OK button clicked")
         if self._save_from_ui():
-            self.DestroyLater()
-            self.SetReturnCode(wx.ID_OK)
+            log.info("Settings dialog: OK succeeded — closing")
+            self.EndModal(wx.ID_OK)
+        else:
+            log.warning("Settings dialog: OK failed (validation or save error)")
 
     def _on_cancel(self, _):
+        log.info("Settings dialog: Cancel button clicked — discarding changes")
         # Discard any in-flight changes by restoring the pre-open snapshot.
         self.settings.set_many({k: v for k, v in self._orig.items()})
-        self.DestroyLater()
-        self.SetReturnCode(wx.ID_CANCEL)
+        self.EndModal(wx.ID_CANCEL)
 
     # Convenience attributes kept for tests / external code.
     @property

@@ -132,7 +132,20 @@ def ensure_engine(
 
 
 def _install_gpu_engine(target, progress, cancel_event):
-    """Install PyTorch + omnivoice for GPU inference."""
+    """Install PyTorch + omnivoice for GPU inference.
+
+    Uses the managed PythonRuntime virtualenv when available so pip
+    operations stay within the application's Python environment.
+    """
+    # Ensure the PythonRuntime virtualenv exists and has pip.
+    try:
+        from ..python_runtime import get_runtime
+        rt = get_runtime()
+        rt.ensure_env()
+        rt.ensure_pip()
+    except Exception:  # noqa: BLE001
+        log.debug("PythonRuntime not available, falling back to system Python")
+
     python = find_python()
     cmd = [
         python, "-m", "pip", "install",
@@ -204,7 +217,10 @@ def _run_pip(cmd, label, progress, cancel_event):
         if cancel_event and cancel_event.is_set():
             proc.terminate()
             raise OmniVoiceError("Installation cancelled.")
-        proc.wait(timeout=2)
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            pass  # Process still running; loop back and check cancel_event
 
     reader.join(timeout=10)
 
