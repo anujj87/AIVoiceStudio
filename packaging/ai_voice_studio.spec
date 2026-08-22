@@ -13,7 +13,18 @@ TTS models are NOT (they are downloaded in-app to the user folder).
 """
 
 import os
+import sys
 from PyInstaller.utils.hooks import collect_submodules, copy_metadata
+
+# Safety check: wx must be importable so collect_submodules can find wx.adv etc.
+# If this fails, you're running PyInstaller with the wrong Python (not the .venv).
+try:
+    import wx
+except ImportError:
+    raise SystemExit(
+        "FATAL: wx is not installed in this Python environment.\n"
+        "Run PyInstaller with the project venv: .venv/Scripts/python.exe -m PyInstaller ..."
+    )
 
 # sherpa-onnx ships its native libraries inside the wheel; keep them.
 hiddenimports = [

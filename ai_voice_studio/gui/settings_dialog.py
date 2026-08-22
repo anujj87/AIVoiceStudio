@@ -29,6 +29,7 @@ import os
 import sys
 import threading
 import wx
+from wx.lib import scrolledpanel
 
 from .. import paths, runtime
 from ..constants import (
@@ -75,46 +76,36 @@ _THEME_CHOICES = [
 class _SettingsPanel(wx.Panel):
     """Base class for a settings category (NVDA ``SettingsPanel`` pattern).
 
-    Each category is a panel with a ``title`` (shown in the category list), an
-    optional spoken ``description``, and an ``apply_to_settings`` hook invoked
-    when the user presses OK or Apply.
-
-    Navigation pattern:
-      1. Panel opens → focus lands on the first interactive control.
-      2. Tab moves through controls top-to-bottom, left-to-right.
-      3. The panel description is available via the accessible description
-         so screen readers announce it when the panel is focused.
+    Mirrors NVDA's ``SettingsPanel`` interface:
+    - ``title``: shown in the category list.
+    - ``panelDescription``: spoken description for screen readers.
+    - ``on_activated()`` / ``on_deactivated()``: called on category switch.
+    - ``apply_to_settings()``: called on OK / Apply.
+    - ``isValid()``: validation hook (return False to block save).
     """
 
     title = ""
     description = ""
+    panelDescription = ""
 
     def on_activated(self):
+        """Called when this category is selected (NVDA onPanelActivated)."""
         self.Show()
-        # Focus the first enabled interactive control so the screen reader
-        # announces the panel's purpose immediately.
-        first = self._first_focusable()
-        if first:
-            wx.CallAfter(first.SetFocus)
+        self.Layout()
 
     def on_deactivated(self):
+        """Called when another category is selected (NVDA onPanelDeactivated)."""
         self.Hide()
 
     def apply_to_settings(self):
+        """Save this panel's settings (NVDA onSave)."""
         pass
 
-    def _first_focusable(self) -> wx.Window | None:
-        """Find the first enabled, visible interactive child control."""
-        _INTERACTIVE = (wx.TextCtrl, wx.ComboBox, wx.CheckBox,
-                        wx.RadioButton, wx.ListBox, wx.Button, wx.Slider)
-        stack = list(self.GetChildren())
-        while stack:
-            child = stack.pop(0)
-            if (isinstance(child, _INTERACTIVE)
-                    and child.IsShown() and child.IsEnabled()):
-                return child
-            stack.extend(child.GetChildren())
-        return None
+    def isValid(self) -> bool:
+        """Validate this panel's settings (NVDA isValid).
+        Return False to block saving.
+        """
+        return True
 
 
 class _SettingsPanelAccessible(wx.Accessible):
@@ -184,24 +175,29 @@ class SettingsDialog(wx.Dialog):
 
     # -- construction -------------------------------------------------------
     def _build_ui(self):
+        """Build the dialog using NVDA's layout patterns:
+        - GridBagSizer for the 2-column layout (list left, panel right)
+        - ScrolledPanel for the settings panel (handles overflow)
+        - Freeze/Thaw during category changes (prevents flicker)
+        """
         main = wx.BoxSizer(wx.VERTICAL)
 
-        body = wx.BoxSizer(wx.HORIZONTAL)
-        # Categories label spans both columns (NVDA layout).
-        body.Add(
-            wx.StaticText(self, label="&Categories:"),
-            0, wx.LEFT | wx.TOP | wx.RIGHT, 6,
-        )
-        # The list and the panel are placed on separate rows below.
+        # Category list (NVDA uses AutoWidthColumnListCtrl; we use ListCtrl
+        # with the same style flags).
         self.cat_list = wx.ListCtrl(
             self, style=wx.LC_REPORT | wx.LC_SINGLE_SEL | wx.LC_NO_HEADER,
-            size=(200, 380),
+            size=(200, 10),  # minimal height; grid grows it
         )
         self.cat_list.InsertColumn(0, "Categories:")
         self.cat_list.SetName("Settings categories")
 
-        self.container = wx.Panel(self)
+        # ScrolledPanel: content scrolls when it exceeds the visible area
+        # (NVDA pattern — prevents controls from being clipped).
+        self.container = scrolledpanel.ScrolledPanel(
+            self, style=wx.TAB_TRAVERSAL | wx.BORDER_THEME,
+        )
         self.container.SetName("Settings panel")
+        self.container.SetMinSize((1, 1))
         self.container_sizer = wx.BoxSizer(wx.VERTICAL)
         self.container.SetSizer(self.container_sizer)
 
@@ -214,21 +210,34 @@ class SettingsDialog(wx.Dialog):
                 panel.SetAccessible(_SettingsPanelAccessible(panel))
             except Exception:  # noqa: BLE001
                 pass
-            self.container_sizer.Add(panel, 1, wx.EXPAND | wx.ALL, 6)
+            self.container_sizer.Add(
+                panel, 1, wx.ALL | wx.EXPAND,
+                border=10,  # NVDA BORDER_FOR_DIALOGS
+            )
             self._panels.append(panel)
 
-        grid = wx.FlexGridSizer(cols=2, vgap=4, hgap=8)
+        # NVDA uses GridBagSizer with 1:3 proportion (list:panel).
+        grid = wx.GridBagSizer(
+            hgap=7,   # SPACE_BETWEEN_BUTTONS_HORIZONTAL
+            vgap=5,   # SPACE_BETWEEN_BUTTONS_VERTICAL
+        )
+        categories_label = wx.StaticText(self, label="&Categories:")
+        grid.Add(categories_label, pos=(0, 0), span=(1, 2))
+        grid.Add(self.cat_list, pos=(1, 0), flag=wx.EXPAND)
+        grid.Add(self.container, pos=(1, 1), flag=wx.EXPAND)
         grid.AddGrowableRow(1)
         grid.AddGrowableCol(0, proportion=1)
         grid.AddGrowableCol(1, proportion=3)
-        grid.Add(self.cat_list, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 6)
-        grid.Add(self.container, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 6)
-        main.Add(grid, 1, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, 6)
+        main.Add(grid, 1, wx.EXPAND | wx.ALL, border=10)
 
-        buttons = self.CreateSeparatedButtonSizer(wx.OK | wx.CANCEL | wx.APPLY)
-        main.Add(buttons, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 6)
+        # Separated button sizer (NVDA pattern).
+        main.Add(
+            self.CreateSeparatedButtonSizer(wx.OK | wx.CANCEL | wx.APPLY),
+            0, wx.EXPAND | wx.ALL, border=10,
+        )
         self.SetSizer(main)
         self.SetMinSize((700, 420))
+        self.container.SetupScrolling()
 
     def _panel_args(self, cls):
         """Extra constructor arguments per panel class (NVDA panels take a
@@ -252,42 +261,95 @@ class SettingsDialog(wx.Dialog):
         self.Bind(wx.EVT_BUTTON, self._on_ok, id=wx.ID_OK)
         self.Bind(wx.EVT_BUTTON, self._on_cancel, id=wx.ID_CANCEL)
         self.Bind(wx.EVT_CHAR_HOOK, self._on_char_hook)
+        self.Bind(wx.EVT_CLOSE, self._on_close)
 
     def _on_category_focus(self, evt):
-        self._show_category(evt.GetIndex())
+        self._show_category(evt.GetIndex(), focus_panel=False)
         evt.Skip()
 
-    def _show_category(self, index: int):
+    def _on_close(self, evt):
+        """Handle the window close button (X) and Alt+F4.
+        NVDA pattern: DestroyLater + SetReturnCode."""
+        self._on_cancel(None)
+        evt.Skip()  # allow default destroy
+
+    def _show_category(self, index: int, *, focus_panel: bool = True):
         """Show the panel for ``index`` and hide every other (NVDA pattern).
 
-        After switching, focus lands on the first interactive control in the
-        panel so the screen reader announces the panel's purpose immediately.
+        NVDA's ``MultiCategorySettingsDialog._doCategoryChange`` uses
+        Freeze/Thaw to prevent visual artifacts during the switch.
+
+        When *focus_panel* is True (Ctrl+Tab or initial open) focus moves
+        into the panel so the screen reader announces the first control.
+        When False (arrow keys in the category list) focus stays in the
+        list so subsequent Up/Down keys keep navigating categories.
         """
         if not (0 <= index < len(self._panels)):
             return
-        for i, panel in enumerate(self._panels):
-            if i == index:
-                panel.on_activated()
+        # NVDA pattern: Freeze the container during the switch to prevent
+        # controls from briefly appearing in wrong positions.
+        self.container.Freeze()
+        try:
+            for i, panel in enumerate(self._panels):
+                if i == index:
+                    panel.on_activated()
+                else:
+                    panel.on_deactivated()
+            self._current = index
+            self.container.Layout()
+            self.container.SetupScrolling()
+            self.container.Refresh()
+        finally:
+            self.container.Thaw()
+        if focus_panel:
+            # Move focus into the panel so NVDA/JAWS announce the first control.
+            panel = self._panels[index]
+            first = self._find_first_focusable(panel)
+            if first:
+                def _focus():
+                    first.SetFocus()
+                    # Ensure the focused control is visible in the scrolled panel.
+                    self.container.ScrollIntoView(first.GetId())
+                wx.CallAfter(_focus)
             else:
-                panel.on_deactivated()
-        self._current = index
-        self.container.Layout()
-        self.container.Refresh()
-        # Move focus into the panel so NVDA/JAWS announce the first control.
-        panel = self._panels[index]
-        first = panel.FindWindowInDirection(wx.NavigationEnabled.NavigateDirection, wx.NavigationEnabled.NavigateDirection, False)
-        if first and first.IsShown() and first.IsEnabled():
-            wx.CallAfter(first.SetFocus)
-        else:
-            wx.CallAfter(panel.SetFocus)
+                wx.CallAfter(panel.SetFocus)
+
+    @staticmethod
+    def _find_first_focusable(panel: wx.Window) -> wx.Window | None:
+        """Find the first enabled, visible interactive child control
+        (NVDA-style depth-first search)."""
+        _INTERACTIVE = (wx.TextCtrl, wx.ComboBox, wx.Choice, wx.CheckBox,
+                        wx.RadioButton, wx.ListBox, wx.Button, wx.Slider,
+                        wx.SpinCtrl)
+        stack = list(panel.GetChildren())
+        while stack:
+            child = stack.pop(0)
+            if (isinstance(child, _INTERACTIVE)
+                    and child.IsShown() and child.IsEnabled()):
+                return child
+            stack.extend(child.GetChildren())
+        return None
 
     def _on_char_hook(self, evt):
-        """NVDA-style keyboard: Ctrl+Tab switches category, Enter activates OK,
-        Ctrl+S activates Apply. Enter is left alone inside multi-line text
-        boxes (e.g. the Punctuation example) so it still inserts a new line."""
+        """NVDA-style keyboard handling.
+
+        Mirrors NVDA's ``_enterActivatesOk_ctrlSActivatesApply`` plus
+        category switching.  Escape and Alt+F4 are handled by wx's default
+        dialog close mechanism (``evt.Skip()``).
+
+        - Ctrl+Tab / Ctrl+Shift+Tab: switch category (wraps around).
+        - Enter: activate OK (but skip if a button/combo has focus).
+        - Ctrl+S: activate Apply.
+        - Escape / Alt+F4: handled by ``EVT_CLOSE`` binding.
+        """
         key = evt.GetKeyCode()
         control = self.FindFocus()
         if evt.ControlDown() and key == wx.WXK_TAB:
+            # NVDA pattern: focus the category list first so the panel
+            # hides correctly, then switch.
+            list_had_focus = self.cat_list.HasFocus()
+            if not list_had_focus:
+                self.cat_list.SetFocus()
             index = self.cat_list.GetFirstSelected()
             if index < 0:
                 index = self._current
@@ -295,9 +357,12 @@ class SettingsDialog(wx.Dialog):
             new_index = (index + step) % len(self._panels)
             self.cat_list.Select(new_index)
             self.cat_list.Focus(new_index)
-            self._show_category(new_index)
-            # _show_category moves focus into the panel; no need to
-            # return focus to the category list.
+            # NVDA pattern: restore focus to panel after category switch
+            # if the list didn't originally have focus.
+            if not list_had_focus and self._panels[new_index].IsShown():
+                self._show_category(new_index, focus_panel=True)
+            else:
+                self._show_category(new_index, focus_panel=False)
             return
         multiline = isinstance(control, wx.TextCtrl) and (
             control.GetWindowStyle() & wx.TE_MULTILINE
@@ -317,6 +382,8 @@ class SettingsDialog(wx.Dialog):
                 wx.CommandEvent(wx.wxEVT_COMMAND_BUTTON_CLICKED, wx.ID_APPLY)
             )
         else:
+            # NVDA pattern: let wx handle Escape, Alt+F4, and all other keys
+            # via its default dialog behaviour.
             evt.Skip()
 
     # -- callbacks ----------------------------------------------------------
@@ -324,26 +391,46 @@ class SettingsDialog(wx.Dialog):
         self.available_panel.refresh()
         self.download_panel._refresh_buttons()
 
+    def _validate_all(self) -> bool:
+        """Check all panels are valid before saving (NVDA _validateAllPanels)."""
+        for panel in self._panels:
+            try:
+                if panel.isValid() is False:
+                    log.warning("Panel %s failed validation", panel.title)
+                    return False
+            except Exception:  # noqa: BLE001
+                log.exception("Panel %s raised during validation", panel.title)
+                return False
+        return True
+
     def _save_from_ui(self):
+        """Validate all panels, then save (NVDA _doSave pattern)."""
+        if not self._validate_all():
+            return False
         for panel in self._panels:
             try:
                 panel.apply_to_settings()
             except Exception:  # noqa: BLE001
                 log.exception("Panel %s failed to save", panel.title)
         self.settings.save()
+        return True
 
     def _on_apply(self, _):
-        self._save_from_ui()
-        apply_theme(self, self.settings.theme)
+        if self._save_from_ui():
+            apply_theme(self, self.settings.theme)
+            # Re-run postInit for the current panel (NVDA pattern).
+            self._show_category(self._current, focus_panel=True)
 
     def _on_ok(self, _):
-        self._save_from_ui()
-        self.EndModal(wx.ID_OK)
+        if self._save_from_ui():
+            self.DestroyLater()
+            self.SetReturnCode(wx.ID_OK)
 
     def _on_cancel(self, _):
         # Discard any in-flight changes by restoring the pre-open snapshot.
         self.settings.set_many({k: v for k, v in self._orig.items()})
-        self.EndModal(wx.ID_CANCEL)
+        self.DestroyLater()
+        self.SetReturnCode(wx.ID_CANCEL)
 
     # Convenience attributes kept for tests / external code.
     @property
