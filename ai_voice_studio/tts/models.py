@@ -202,6 +202,24 @@ class ModelStore:
                             "requires_package": "omnivoice-triton",
                         }
                     )
+            elif engine == "omnivoice_server":
+                # OmniVoice Server: HTTP API, GPU-required, no local files.
+                for voice in variant.get("voices", []):
+                    voices.append(
+                        {
+                            "tts": entry["tts"],
+                            "tts_name": tts["name"],
+                            "language": entry["language"],
+                            "variant": entry["variant"],
+                            "voice": voice["id"],
+                            "voice_name": voice.get("name", voice["id"]),
+                            "sid": voice.get("sid", 0),
+                            "engine": engine,
+                            "dir": "",
+                            "requires_gpu": True,
+                            "requires_package": "omnivoice-server",
+                        }
+                    )
             else:
                 for voice in variant.get("voices", []):
                     voices.append(
@@ -293,6 +311,15 @@ def resolve_voice_files(voice_entry: Dict[str, Any]) -> Dict[str, Any]:
     # OmniVoice has no local model files; the model is downloaded on first use
     # by the worker subprocess via omnivoice-triton / HuggingFace.
     if engine == "omnivoice":
+        files.update({
+            "model": None,
+            "tokens": None,
+            "sid": voice_entry.get("sid", 0),
+        })
+        return files
+
+    # OmniVoice Server: HTTP API, no local model files.
+    if engine == "omnivoice_server":
         files.update({
             "model": None,
             "tokens": None,

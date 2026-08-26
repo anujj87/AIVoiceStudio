@@ -103,8 +103,8 @@ class SettingsDialogTest(_AppMixin):
         try:
             # NVDA-style: a category list on the left, one panel per category.
             self.assertIsNotNone(dlg.cat_list)
-            self.assertEqual(dlg.cat_list.GetItemCount(), 11)
-            self.assertEqual(len(dlg._panels), 11)
+            self.assertEqual(dlg.cat_list.GetItemCount(), 12)
+            self.assertEqual(len(dlg._panels), 12)
             self.assertTrue(hasattr(dlg, "container"))
             # Every panel must have at least one child control.
             for panel in dlg._panels:

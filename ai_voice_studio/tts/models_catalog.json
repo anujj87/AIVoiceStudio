@@ -2938,6 +2938,74 @@
           ]
         }
       ]
+    },
+    {
+      "id": "omnivoice_server",
+      "name": "OmniVoice Server",
+      "engine": "omnivoice_server",
+      "license": "Apache-2.0 / MIT",
+      "homepage": "https://github.com/maemreyo/omnivoice-server",
+      "voice_cloning": true,
+      "voice_cloning_note": "OmniVoice Server provides an OpenAI-compatible HTTP API for TTS with voice design, cloning, streaming, and concurrent requests. Other apps on the same network can also use it. Requires NVIDIA GPU and the omnivoice-server package.",
+      "requires_gpu": true,
+      "requires_package": "omnivoice-server",
+      "languages": [
+        {
+          "code": "auto",
+          "name": "Auto-detect (600+ languages)",
+          "variants": [
+            {
+              "id": "server",
+              "name": "Server mode (OpenAI-compatible HTTP API)",
+              "note": "Runs as an HTTP server. Other apps on the network can use it too.",
+              "voices": [
+                {
+                  "id": "alloy",
+                  "name": "Alloy (female, young adult, moderate pitch, american accent)",
+                  "sid": 0
+                },
+                {
+                  "id": "echo",
+                  "name": "Echo (male, young adult, moderate pitch, american accent)",
+                  "sid": 1
+                },
+                {
+                  "id": "fable",
+                  "name": "Fable (male, middle-aged, low pitch, british accent)",
+                  "sid": 2
+                },
+                {
+                  "id": "onyx",
+                  "name": "Onyx (male, middle-aged, low pitch, deep)",
+                  "sid": 3
+                },
+                {
+                  "id": "nova",
+                  "name": "Nova (female, young adult, high pitch, american accent)",
+                  "sid": 4
+                },
+                {
+                  "id": "shimmer",
+                  "name": "Shimmer (female, young adult, moderate pitch, australian accent)",
+                  "sid": 5
+                }
+              ]
+            },
+            {
+              "id": "server_clone",
+              "name": "Server mode - Voice Clone (use reference audio)",
+              "note": "Clone any voice from 3-15 seconds of reference audio.",
+              "voices": [
+                {
+                  "id": "auto",
+                  "name": "Cloned voice (provide reference audio)",
+                  "sid": 0
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   ]
 }

@@ -67,6 +67,19 @@ _DEFAULTS: Dict[str, Any] = {
     "recent_projects": [],
     # addon management
     "addons_enabled": {},
+    # OmniVoice Server settings
+    "omnivoice_server": {
+        "enabled": False,
+        "auto_start": False,
+        "host": "127.0.0.1",
+        "port": 8881,
+        "device": "cuda",
+        "num_steps": 32,
+        "max_concurrent": 2,
+        "api_key": "",
+        "cors_origins": "",
+        "allow_network": False,
+    },
 }
 
 

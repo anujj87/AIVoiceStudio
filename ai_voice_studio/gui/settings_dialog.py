@@ -21,7 +21,8 @@ Categories:
 8. DAISY settings         -- DAISY 2.02 audio book defaults
 9. Compute                -- optional GPU (CUDA) runtime + OmniVoice
 10. Developer             -- addon management, pip, diagnostics
-11. Reset                 -- restore defaults
+11. OmniVoice Server      -- network TTS server configuration
+12. Reset                 -- restore defaults
 """
 
 from __future__ import annotations
@@ -160,6 +161,7 @@ class SettingsDialog(wx.Dialog):
             DownloadPanel,
             AvailablePanel,
             _VoiceClonePanel,
+            _OmniVoiceServerPanel,
             _RecordingSettingsPanel,
             _PunctuationPanel,
             _AudioModePanel,
@@ -254,6 +256,8 @@ class SettingsDialog(wx.Dialog):
             return (self.store,)
         if cls in (_VoiceClonePanel,):
             return (self.settings, self.store)
+        if cls in (_OmniVoiceServerPanel,):
+            return (self.settings,)
         if cls in (_PunctuationPanel,):
             return (self.settings, self.store)
         return (self.settings,)
@@ -464,32 +468,36 @@ class SettingsDialog(wx.Dialog):
         return self._panels[3]
 
     @property
-    def recording_panel(self):
+    def omnivoice_server_panel(self):
         return self._panels[4]
 
     @property
-    def punctuation_panel(self):
+    def recording_panel(self):
         return self._panels[5]
 
     @property
-    def audio_mode_panel(self):
+    def punctuation_panel(self):
         return self._panels[6]
 
     @property
-    def daisy_panel(self):
+    def audio_mode_panel(self):
         return self._panels[7]
 
     @property
-    def compute_panel(self):
+    def daisy_panel(self):
         return self._panels[8]
 
     @property
-    def developer_panel(self):
+    def compute_panel(self):
         return self._panels[9]
 
     @property
-    def reset_panel(self):
+    def developer_panel(self):
         return self._panels[10]
+
+    @property
+    def reset_panel(self):
+        return self._panels[11]
 
 
 # ---------------------------------------------------------------------------
@@ -1428,6 +1436,350 @@ class _VoiceClonePanel(_SettingsPanel):
 
 
 # ---------------------------------------------------------------------------
+# OmniVoice Server category (network TTS server)
+# ---------------------------------------------------------------------------
+class _OmniVoiceServerPanel(_SettingsPanel):
+    title = "OmniVoice Server"
+    description = (
+        "Configure the OmniVoice HTTP server for network TTS access. "
+        "Other apps on the same network can also use the server."
+    )
+
+    """OmniVoice Server settings panel.
+
+    Configures the omnivoice-server HTTP server:
+    - Enable/disable the server
+    - Host/port binding (localhost vs network)
+    - API key authentication
+    - CORS origins for browser frontends
+    - Inference quality settings
+    - Auto-start on app launch
+    """
+
+    def __init__(self, parent, settings: Settings):
+        super().__init__(parent)
+        self.settings = settings
+        self._thread: threading.Thread | None = None
+
+        sizer = wx.BoxSizer(wx.VERTICAL)
+
+        # -- Overview ----------------------------------------------------
+        sizer.Add(
+            wx.StaticText(
+                self,
+                label="OmniVoice Server provides an OpenAI-compatible HTTP API "
+                      "for TTS. Other applications on the same network can use "
+                      "it as a drop-in replacement for the OpenAI TTS endpoint."
+            ),
+            0, wx.ALL, 6,
+        )
+
+        # -- Enable / Auto-start ----------------------------------------
+        ov_cfg = settings.get("omnivoice_server", {})
+        self.enable_cb = wx.CheckBox(self, label="Enable OmniVoice Server")
+        self.enable_cb.SetName("Enable server")
+        self.enable_cb.SetValue(ov_cfg.get("enabled", False))
+        self.enable_cb.SetToolTip(
+            "Start the OmniVoice HTTP server when the app launches. "
+            "Requires omnivoice-server to be installed (see Compute tab)."
+        )
+        sizer.Add(self.enable_cb, 0, wx.ALL, 4)
+
+        self.auto_start_cb = wx.CheckBox(self, label="Auto-start on app launch")
+        self.auto_start_cb.SetName("Auto-start server")
+        self.auto_start_cb.SetValue(ov_cfg.get("auto_start", False))
+        self.auto_start_cb.SetToolTip(
+            "Automatically start the server when AI Voice Studio starts."
+        )
+        sizer.Add(self.auto_start_cb, 0, wx.ALL, 4)
+
+        # -- Server status -----------------------------------------------
+        sizer.Add(wx.StaticLine(self), 0, wx.EXPAND | wx.ALL, 6)
+        self.status_label = wx.StaticText(self, label="Server status: Not running")
+        self.status_label.SetName("Server status")
+        sizer.Add(self.status_label, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 6)
+
+        status_btns = wx.BoxSizer(wx.HORIZONTAL)
+        self.start_btn = wx.Button(self, label="Start server")
+        self.start_btn.SetName("Start server")
+        self.start_btn.SetToolTip("Start the OmniVoice HTTP server now")
+        self.stop_btn = wx.Button(self, label="Stop server")
+        self.stop_btn.SetName("Stop server")
+        self.stop_btn.SetToolTip("Stop the running OmniVoice HTTP server")
+        self.stop_btn.Disable()
+        self.test_btn = wx.Button(self, label="Test connection")
+        self.test_btn.SetName("Test server connection")
+        self.test_btn.SetToolTip("Send a test request to the server")
+        status_btns.Add(self.start_btn, 0, wx.ALL, 4)
+        status_btns.Add(self.stop_btn, 0, wx.ALL, 4)
+        status_btns.Add(self.test_btn, 0, wx.ALL, 4)
+        sizer.Add(status_btns, 0, wx.LEFT, 2)
+
+        sizer.AddSpacer(4)
+
+        # -- Network settings --------------------------------------------
+        sizer.Add(
+            wx.StaticText(self, label="Network settings"),
+            0, wx.LEFT | wx.RIGHT | wx.TOP, 6,
+        )
+        grid = wx.FlexGridSizer(cols=2, vgap=6, hgap=8)
+        grid.AddGrowableCol(1)
+
+        self.host_ctrl = wx.TextCtrl(self, size=(-1, 28))
+        self.host_ctrl.SetName("Server host")
+        self.host_ctrl.SetValue(ov_cfg.get("host", "127.0.0.1"))
+        self.host_ctrl.SetToolTip(
+            "Bind address. Use 127.0.0.1 for local only, "
+            "0.0.0.0 to allow network access."
+        )
+        add_labeled(self, grid, "Host", self.host_ctrl,
+                    flag=wx.LEFT | wx.RIGHT, border=2)
+
+        self.port_ctrl = wx.SpinCtrl(self, min=1024, max=65535,
+                                      name="Server port")
+        self.port_ctrl.SetValue(ov_cfg.get("port", 8881))
+        self.port_ctrl.SetToolTip(
+            "Port number (1024-65535). Default: 8880."
+        )
+        add_labeled(self, grid, "Port", self.port_ctrl,
+                    flag=wx.LEFT | wx.RIGHT, border=2)
+
+        self.network_cb = wx.CheckBox(
+            self, label="Allow access from other devices on the network"
+        )
+        self.network_cb.SetName("Allow network access")
+        self.network_cb.SetValue(ov_cfg.get("allow_network", False))
+        self.network_cb.SetToolTip(
+            "When checked, sets host to 0.0.0.0 so other devices "
+            "on the same network can use the server. "
+            "Uncheck for localhost-only."
+        )
+        grid.Add((1, 1))
+        grid.Add(self.network_cb, 0, wx.ALL, 2)
+
+        sizer.Add(grid, 0, wx.EXPAND | wx.ALL, 6)
+
+        # -- Authentication ----------------------------------------------
+        sizer.Add(
+            wx.StaticText(self, label="Security"),
+            0, wx.LEFT | wx.RIGHT | wx.TOP, 6,
+        )
+        sec_grid = wx.FlexGridSizer(cols=2, vgap=6, hgap=8)
+        sec_grid.AddGrowableCol(1)
+
+        self.api_key_ctrl = wx.TextCtrl(self, size=(-1, 28))
+        self.api_key_ctrl.SetName("API key")
+        self.api_key_ctrl.SetValue(ov_cfg.get("api_key", ""))
+        self.api_key_ctrl.SetToolTip(
+            "Bearer token for API authentication. Leave empty for no auth."
+        )
+        add_labeled(self, sec_grid, "API key", self.api_key_ctrl,
+                    flag=wx.LEFT | wx.RIGHT, border=2)
+
+        self.cors_ctrl = wx.TextCtrl(self, size=(-1, 28))
+        self.cors_ctrl.SetName("CORS origins")
+        self.cors_ctrl.SetValue(ov_cfg.get("cors_origins", ""))
+        self.cors_ctrl.SetToolTip(
+            "Comma-separated allowed browser origins for CORS. "
+            "Example: http://localhost:5173,http://127.0.0.1:5173"
+        )
+        add_labeled(self, sec_grid, "CORS origins", self.cors_ctrl,
+                    flag=wx.LEFT | wx.RIGHT, border=2)
+
+        sizer.Add(sec_grid, 0, wx.EXPAND | wx.ALL, 6)
+
+        # -- Quality settings --------------------------------------------
+        sizer.Add(
+            wx.StaticText(self, label="Quality settings"),
+            0, wx.LEFT | wx.RIGHT | wx.TOP, 6,
+        )
+        q_grid = wx.FlexGridSizer(cols=2, vgap=6, hgap=8)
+        q_grid.AddGrowableCol(1)
+
+        self.steps_ctrl = wx.SpinCtrl(self, min=1, max=64,
+                                       name="Inference steps")
+        self.steps_ctrl.SetValue(ov_cfg.get("num_steps", 32))
+        self.steps_ctrl.SetToolTip(
+            "Inference steps (1-64). Higher = better quality but slower. "
+            "Default: 32. Use 16 for faster output."
+        )
+        add_labeled(self, q_grid, "Inference steps", self.steps_ctrl,
+                    flag=wx.LEFT | wx.RIGHT, border=2)
+
+        self.concurrent_ctrl = wx.SpinCtrl(self, min=1, max=16,
+                                            name="Max concurrent requests")
+        self.concurrent_ctrl.SetValue(ov_cfg.get("max_concurrent", 2))
+        self.concurrent_ctrl.SetToolTip(
+            "Maximum concurrent synthesis requests. Default: 2. "
+            "Increase for batch processing."
+        )
+        add_labeled(self, q_grid, "Max concurrent", self.concurrent_ctrl,
+                    flag=wx.LEFT | wx.RIGHT, border=2)
+
+        self.device_combo = wx.ComboBox(self, style=wx.CB_READONLY,
+                                         name="Compute device")
+        self.device_combo.Append("CUDA (GPU)", "cuda")
+        self.device_combo.Append("CPU", "cpu")
+        device_val = ov_cfg.get("device", "cuda")
+        idx = 0 if device_val == "cuda" else 1
+        self.device_combo.SetSelection(idx)
+        self.device_combo.SetToolTip(
+            "Compute device. CUDA requires NVIDIA GPU."
+        )
+        add_labeled(self, q_grid, "Device", self.device_combo,
+                    flag=wx.LEFT | wx.RIGHT, border=2)
+
+        sizer.Add(q_grid, 0, wx.EXPAND | wx.ALL, 6)
+
+        # -- Info --------------------------------------------------------
+        sizer.Add(wx.StaticLine(self), 0, wx.EXPAND | wx.ALL, 6)
+        sizer.Add(
+            wx.StaticText(
+                self,
+                label="Server API: http://host:port/v1/audio/speech\n"
+                      "Voice list: http://host:port/v1/voices\n"
+                      "Health check: http://host:port/health\n"
+                      "Metrics: http://host:port/metrics",
+            ),
+            0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 6,
+        )
+
+        self.SetSizer(sizer)
+
+        self.start_btn.Bind(wx.EVT_BUTTON, self._on_start)
+        self.stop_btn.Bind(wx.EVT_BUTTON, self._on_stop)
+        self.test_btn.Bind(wx.EVT_BUTTON, self._on_test)
+        self.network_cb.Bind(wx.EVT_CHECKBOX, self._on_network_toggle)
+
+    def on_activated(self):
+        super().on_activated()
+        self._refresh_status()
+
+    def _on_network_toggle(self, _):
+        """When network access is checked, suggest 0.0.0.0 as host."""
+        if self.network_cb.GetValue():
+            self.host_ctrl.SetValue("0.0.0.0")
+        else:
+            self.host_ctrl.SetValue("127.0.0.1")
+
+    def _refresh_status(self):
+        """Check if the server is running and update the status label."""
+        try:
+            from ..omnivoice_server import OmniVoiceServerManager  # noqa: PLC0415
+            host = self.host_ctrl.GetValue().strip() or "127.0.0.1"
+            port = self.port_ctrl.GetValue()
+            mgr = OmniVoiceServerManager(host=host, port=port)
+            if mgr.health_check():
+                self.status_label.SetLabel(f"Server status: Running at http://{host}:{port}")
+                self.start_btn.Disable()
+                self.stop_btn.Enable()
+            else:
+                self.status_label.SetLabel("Server status: Not running")
+                self.start_btn.Enable()
+                self.stop_btn.Disable()
+        except Exception:  # noqa: BLE001
+            self.status_label.SetLabel("Server status: Not running")
+            self.start_btn.Enable()
+            self.stop_btn.Disable()
+
+    def _on_start(self, _):
+        """Start the OmniVoice server in a background thread."""
+        self.start_btn.Disable()
+        self.stop_btn.Disable()
+        self.status_label.SetLabel("Starting server...")
+        self._thread = threading.Thread(target=self._start_job, daemon=True)
+        self._thread.start()
+
+    def _start_job(self):
+        from ..omnivoice_server import OmniVoiceServerManager  # noqa: PLC0415
+        host = self.host_ctrl.GetValue().strip() or "127.0.0.1"
+        port = self.port_ctrl.GetValue()
+        device_sel = self.device_combo.GetSelection()
+        device = self.device_combo.GetClientData(device_sel) if device_sel >= 0 else "cuda"
+        try:
+            mgr = OmniVoiceServerManager(
+                host=host, port=port, device=device,
+                num_steps=self.steps_ctrl.GetValue(),
+                max_concurrent=self.concurrent_ctrl.GetValue(),
+                api_key=self.api_key_ctrl.GetValue().strip(),
+                cors_origins=self.cors_ctrl.GetValue().strip(),
+            )
+            mgr.start(timeout=180.0)
+            wx.CallAfter(self._start_done, True, f"Server started at http://{host}:{port}")
+        except Exception as exc:  # noqa: BLE001
+            wx.CallAfter(self._start_done, False, f"Failed to start server: {exc}")
+
+    def _start_done(self, success, message):
+        self._thread = None
+        self.status_label.SetLabel(f"Server status: {message}")
+        self.start_btn.Enable(not success)
+        self.stop_btn.Enable(success)
+        if not success:
+            wx.MessageBox(message, "OmniVoice Server",
+                          style=wx.OK | wx.ICON_ERROR)
+
+    def _on_stop(self, _):
+        """Stop the OmniVoice server."""
+        try:
+            from ..omnivoice_server import OmniVoiceServerManager  # noqa: PLC0415
+            host = self.host_ctrl.GetValue().strip() or "127.0.0.1"
+            port = self.port_ctrl.GetValue()
+            mgr = OmniVoiceServerManager(host=host, port=port)
+            mgr.stop()
+            self.status_label.SetLabel("Server status: Stopped")
+            self.start_btn.Enable()
+            self.stop_btn.Disable()
+        except Exception as exc:  # noqa: BLE001
+            self.status_label.SetLabel(f"Server status: Error stopping: {exc}")
+
+    def _on_test(self, _):
+        """Test the server connection."""
+        try:
+            from ..omnivoice_server import OmniVoiceServerManager  # noqa: PLC0415
+            host = self.host_ctrl.GetValue().strip() or "127.0.0.1"
+            port = self.port_ctrl.GetValue()
+            mgr = OmniVoiceServerManager(host=host, port=port)
+            if mgr.health_check():
+                voices = mgr.get_voices()
+                wx.MessageBox(
+                    f"Server is running at http://{host}:{port}\n\n"
+                    f"Available voices: {len(voices)}\n"
+                    f"API: POST http://{host}:{port}/v1/audio/speech\n"
+                    f"Health: GET http://{host}:{port}/health",
+                    "Server test successful",
+                    style=wx.OK | wx.ICON_INFORMATION,
+                )
+            else:
+                wx.MessageBox(
+                    f"Server at http://{host}:{port} is not responding.\n"
+                    "Make sure the server is started.",
+                    "Server test failed",
+                    style=wx.OK | wx.ICON_ERROR,
+                )
+        except Exception as exc:  # noqa: BLE001
+            wx.MessageBox(
+                f"Connection test failed: {exc}",
+                "Server test failed",
+                style=wx.OK | wx.ICON_ERROR,
+            )
+
+    def apply_to_settings(self):
+        """Save server settings."""
+        self.settings.set("omnivoice_server.enabled", self.enable_cb.GetValue())
+        self.settings.set("omnivoice_server.auto_start", self.auto_start_cb.GetValue())
+        self.settings.set("omnivoice_server.host", self.host_ctrl.GetValue().strip() or "127.0.0.1")
+        self.settings.set("omnivoice_server.port", self.port_ctrl.GetValue())
+        device_sel = self.device_combo.GetSelection()
+        device = self.device_combo.GetClientData(device_sel) if device_sel >= 0 else "cuda"
+        self.settings.set("omnivoice_server.device", device)
+        self.settings.set("omnivoice_server.num_steps", self.steps_ctrl.GetValue())
+        self.settings.set("omnivoice_server.max_concurrent", self.concurrent_ctrl.GetValue())
+        self.settings.set("omnivoice_server.api_key", self.api_key_ctrl.GetValue().strip())
+        self.settings.set("omnivoice_server.cors_origins", self.cors_ctrl.GetValue().strip())
+        self.settings.set("omnivoice_server.allow_network", self.network_cb.GetValue())
+
+
+# ---------------------------------------------------------------------------
 # Compute category (optional runtimes / GPU dependency)
 # ---------------------------------------------------------------------------
 class _ComputePanel(_SettingsPanel):
@@ -1544,11 +1896,16 @@ class _ComputePanel(_SettingsPanel):
         self.omnivoice_remove_btn.Bind(wx.EVT_BUTTON, self._on_omnivoice_remove)
         self.Bind(EVT_DOWNLOAD_PROGRESS, self._on_progress)
         self.Bind(EVT_DOWNLOAD_FINISHED, self._on_finished)
+
+        # OmniVoice Server section
+        self._init_omnivoice_server_ui()
+
         self._refresh()
 
     def on_activated(self):
         super().on_activated()
         self._refresh_omnivoice()
+        self._refresh_omnivoice_server()
 
     def _refresh_omnivoice(self):
         """Check if omnivoice-triton is installed in the managed venv."""
@@ -1833,6 +2190,269 @@ class _ComputePanel(_SettingsPanel):
         wx.MessageBox(
             message,
             "OmniVoice",
+            style=(wx.OK | wx.ICON_INFORMATION) if success else (wx.OK | wx.ICON_ERROR),
+        )
+
+    # -- OmniVoice Server (omnivoice-server) ------------------------------
+    def _init_omnivoice_server_ui(self):
+        """Build the OmniVoice Server section in the Compute panel."""
+        sizer = self.GetSizer()
+        sizer.Add(wx.StaticLine(self), 0, wx.EXPAND | wx.ALL, 4)
+        sizer.Add(
+            wx.StaticText(self, label="OmniVoice Server (OpenAI-compatible HTTP API)"),
+            0, wx.LEFT | wx.RIGHT | wx.TOP, 6,
+        )
+        sizer.Add(
+            wx.StaticText(self, label=
+                "HTTP server for OmniVoice TTS. Other apps on the same "
+                "network can also use it. Package: omnivoice-server."),
+            0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 6,
+        )
+
+        ov_grid = wx.FlexGridSizer(cols=2, vgap=6, hgap=8)
+        ov_grid.AddGrowableCol(1)
+        self.server_status = wx.StaticText(self, label="Checking...")
+        self.server_status.SetName("OmniVoice Server status")
+        add_labeled(self, ov_grid, "OmniVoice Server", self.server_status,
+                    flag=wx.LEFT | wx.RIGHT, border=2)
+        sizer.Add(ov_grid, 0, wx.EXPAND | wx.ALL, 6)
+
+        server_btns = wx.BoxSizer(wx.HORIZONTAL)
+        self.server_install_btn = wx.Button(self, label="Install OmniVoice Server")
+        self.server_install_btn.SetName("Install OmniVoice Server")
+        self.server_install_btn.SetToolTip(
+            "Install omnivoice-server via pip (includes PyTorch, omnivoice, etc.)"
+        )
+        self.server_remove_btn = wx.Button(self, label="Remove OmniVoice Server")
+        self.server_remove_btn.SetName("Remove OmniVoice Server")
+        self.server_remove_btn.SetToolTip(
+            "Uninstall omnivoice-server and its dependencies"
+        )
+        server_btns.Add(self.server_install_btn, 0, wx.ALL, 4)
+        server_btns.Add(self.server_remove_btn, 0, wx.ALL, 4)
+        sizer.Add(server_btns, 0, wx.LEFT, 2)
+
+        sizer.AddSpacer(6)
+
+        self.server_install_btn.Bind(wx.EVT_BUTTON, self._on_server_install)
+        self.server_remove_btn.Bind(wx.EVT_BUTTON, self._on_server_remove)
+
+    def _refresh_omnivoice_server(self):
+        """Check if omnivoice-server is installed in the managed venv."""
+        from ..python_runtime import get_runtime  # noqa: PLC0415
+        rt = get_runtime()
+        if not rt.is_created:
+            self.server_status.SetLabel("Not installed. OmniVoice Server is unavailable.")
+            self.server_install_btn.Enable()
+            self.server_remove_btn.Disable()
+            return
+        try:
+            result = rt.run_in_env(
+                "import importlib.metadata; "
+                "print(importlib.metadata.version('omnivoice-server'))"
+            )
+            version = result.stdout.strip()
+            if result.returncode == 0 and version:
+                self.server_status.SetLabel(
+                    f"Installed (v{version}). OmniVoice Server is available."
+                )
+                self.server_install_btn.Disable()
+                self.server_remove_btn.Enable()
+            else:
+                self.server_status.SetLabel("Not installed. OmniVoice Server is unavailable.")
+                self.server_install_btn.Enable()
+                self.server_remove_btn.Disable()
+        except Exception:  # noqa: BLE001
+            self.server_status.SetLabel("Not installed. OmniVoice Server is unavailable.")
+            self.server_install_btn.Enable()
+            self.server_remove_btn.Disable()
+
+    def _on_server_install(self, _):
+        """Install omnivoice-server via pip with a progress dialog."""
+        self.server_install_btn.Disable()
+        self.server_remove_btn.Disable()
+
+        self._srv_install_dlg = wx.Dialog(
+            self, title="Installing OmniVoice Server",
+            style=wx.DEFAULT_DIALOG_STYLE,
+            size=(420, 120),
+        )
+        dlg_sizer = wx.BoxSizer(wx.VERTICAL)
+        self._srv_install_label = wx.StaticText(
+            self._srv_install_dlg,
+            label="Installing omnivoice-server package...",
+        )
+        dlg_sizer.Add(self._srv_install_label, 0, wx.ALL | wx.EXPAND, 10)
+        self._srv_install_gauge = wx.Gauge(
+            self._srv_install_dlg, range=0, size=(-1, 24),
+            style=wx.GA_HORIZONTAL | wx.GA_SMOOTH,
+        )
+        dlg_sizer.Add(self._srv_install_gauge, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+        self._srv_install_dlg.SetSizer(dlg_sizer)
+        self._srv_install_dlg.Centre()
+        self._srv_install_dlg.Show()
+
+        self._srv_install_thread = threading.Thread(
+            target=self._server_install_job, daemon=True,
+        )
+        self._srv_install_thread.start()
+
+    def _server_install_job(self):
+        """Background thread: install omnivoice-server into the managed venv."""
+        from ..python_runtime import get_runtime  # noqa: PLC0415
+        import sys as _sys  # noqa: PLC0415
+        rt = get_runtime()
+        try:
+            def _progress(msg, _done, _total):
+                wx.CallAfter(self._srv_update_label, msg)
+
+            if _sys.platform == "win32":
+                _progress("Preparing Python environment...", 0, 0)
+                rt.ensure_pip()
+
+                # Step 1: PyTorch with CUDA
+                _progress(
+                    "Step 1/3: Installing PyTorch with CUDA (~2 GB)...",
+                    0, 0,
+                )
+                r = self._pip_install_raw(
+                    rt.pip_exe,
+                    ["torch", "torchaudio",
+                     "--index-url",
+                     "https://download.pytorch.org/whl/cu128"],
+                )
+                if not r["ok"]:
+                    wx.CallAfter(self._server_install_done, False,
+                                 f"Step 1 failed: {r.get('error', '')}")
+                    return
+
+                # Step 2: omnivoice (base)
+                _progress("Step 2/3: Installing omnivoice (base package)...", 0, 0)
+                res = rt.pip_install(["omnivoice"], progress=_progress)
+                if not res["ok"]:
+                    wx.CallAfter(
+                        self._server_install_done, False,
+                        f"Step 2 failed: {res.get('error', 'Install failed.')}",
+                    )
+                    return
+
+                # Step 3: omnivoice-server
+                _progress("Step 3/3: Installing omnivoice-server...", 0, 0)
+                res = rt.pip_install(["omnivoice-server"], progress=_progress)
+                if not res["ok"]:
+                    wx.CallAfter(
+                        self._server_install_done, False,
+                        f"Step 3 failed: {res.get('error', 'Install failed.')}",
+                    )
+                    return
+            else:
+                _progress("Installing omnivoice-server...", 0, 0)
+                result = rt.pip_install(
+                    "omnivoice-server", progress=_progress,
+                )
+                if not result["ok"]:
+                    wx.CallAfter(
+                        self._server_install_done, False,
+                        result.get("error") or "Installation failed.",
+                    )
+                    return
+
+            wx.CallAfter(self._server_install_done, True,
+                         "OmniVoice Server installed successfully.")
+        except Exception as exc:  # noqa: BLE001
+            wx.CallAfter(self._server_install_done, False, f"Installation failed: {exc}")
+
+    def _srv_update_label(self, msg: str):
+        """Update the server progress dialog label from a background thread."""
+        try:
+            if self._srv_install_dlg and self._srv_install_label:
+                self._srv_install_label.SetLabel(msg)
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _server_install_done(self, success, message):
+        """Called on the GUI thread when pip install finishes."""
+        try:
+            if self._srv_install_dlg:
+                self._srv_install_dlg.Hide()
+                self._srv_install_dlg.Destroy()
+                self._srv_install_dlg = None
+        except Exception:  # noqa: BLE001
+            pass
+        self._refresh_omnivoice_server()
+        wx.MessageBox(
+            message,
+            "OmniVoice Server",
+            style=(wx.OK | wx.ICON_INFORMATION) if success else (wx.OK | wx.ICON_ERROR),
+        )
+
+    def _on_server_remove(self, _):
+        """Uninstall omnivoice-server via pip with a progress dialog."""
+        if wx.MessageBox(
+            "Remove the OmniVoice Server (omnivoice-server)?\n\n"
+            "This will uninstall omnivoice-server and its dependencies.\n"
+            "The HTTP server and server-mode voices will no longer be available.",
+            "Remove OmniVoice Server",
+            style=wx.YES_NO | wx.ICON_QUESTION,
+        ) != wx.YES:
+            return
+        self.server_install_btn.Disable()
+        self.server_remove_btn.Disable()
+
+        self._srv_install_dlg = wx.Dialog(
+            self, title="Removing OmniVoice Server",
+            style=wx.DEFAULT_DIALOG_STYLE,
+            size=(420, 120),
+        )
+        dlg_sizer = wx.BoxSizer(wx.VERTICAL)
+        self._srv_install_label = wx.StaticText(
+            self._srv_install_dlg,
+            label="Uninstalling omnivoice-server package...",
+        )
+        dlg_sizer.Add(self._srv_install_label, 0, wx.ALL | wx.EXPAND, 10)
+        self._srv_install_gauge = wx.Gauge(
+            self._srv_install_dlg, range=0, size=(-1, 24),
+            style=wx.GA_HORIZONTAL | wx.GA_SMOOTH,
+        )
+        dlg_sizer.Add(self._srv_install_gauge, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+        self._srv_install_dlg.SetSizer(dlg_sizer)
+        self._srv_install_dlg.Centre()
+        self._srv_install_dlg.Show()
+
+        self._srv_install_thread = threading.Thread(
+            target=self._server_remove_job, daemon=True,
+        )
+        self._srv_install_thread.start()
+
+    def _server_remove_job(self):
+        """Background thread: uninstall omnivoice-server from the managed venv."""
+        from ..python_runtime import get_runtime  # noqa: PLC0415
+        rt = get_runtime()
+        try:
+            packages = ["omnivoice-server"]
+            result = rt.pip_uninstall(packages)
+            if result["ok"]:
+                wx.CallAfter(self._server_remove_done, True,
+                             "OmniVoice Server removed.")
+            else:
+                error = result.get("error") or "Removal failed."
+                wx.CallAfter(self._server_remove_done, False, error)
+        except Exception as exc:  # noqa: BLE001
+            wx.CallAfter(self._server_remove_done, False, f"Removal failed: {exc}")
+
+    def _server_remove_done(self, success, message):
+        """Called on the GUI thread when pip uninstall finishes."""
+        try:
+            if self._srv_install_dlg:
+                self._srv_install_dlg.Hide()
+                self._srv_install_dlg.Destroy()
+                self._srv_install_dlg = None
+        except Exception:  # noqa: BLE001
+            pass
+        self._refresh_omnivoice_server()
+        wx.MessageBox(
+            message,
+            "OmniVoice Server",
             style=(wx.OK | wx.ICON_INFORMATION) if success else (wx.OK | wx.ICON_ERROR),
         )
 

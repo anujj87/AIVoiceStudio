@@ -255,6 +255,14 @@ def get_engine(
             return OmniVoiceEngine(voice_entry)
         except Exception as exc:  # noqa: BLE001
             raise EngineUnavailableError(str(exc)) from exc
+    # OmniVoice Server runs as an HTTP server (OpenAI-compatible API).
+    if voice_entry.get("engine") == "omnivoice_server":
+        from ..omnivoice_server import OmniVoiceServerEngine  # noqa: PLC0415
+
+        try:
+            return OmniVoiceServerEngine(voice_entry)
+        except Exception as exc:  # noqa: BLE001
+            raise EngineUnavailableError(str(exc)) from exc
     # sid is a per-call generate() argument, not part of the engine's
     # identity: multi-speaker models (e.g. Kokoro multi-lang with 53 speakers)
     # must share one loaded engine, otherwise each speaker would reload the
