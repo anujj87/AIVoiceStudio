@@ -48,10 +48,17 @@ log = logging.getLogger(__name__)
 
 _COMPUTE_LABELS = {
     compute.COMPUTE_AUTO: "Auto (best available)",
-    compute.COMPUTE_CPU: "CPU",
-    compute.COMPUTE_CUDA: "GPU (CUDA)",
+    compute.COMPUTE_CPU: "CPU (ONNX)",
+    compute.COMPUTE_CUDA: "GPU (ONNX)",
     compute.COMPUTE_DML: "NPU (DirectML)",
+    "cuda_gpu": "CUDA GPU (OmniVoice)",
 }
+
+# TTS engines available for each compute mode.
+# ONNX engines (Piper, Kokoro, Kitten, etc.) work with CPU/GPU compute.
+# OmniVoice engines (Server, Triton, Hybrid) require CUDA GPU.
+_ONNX_TTS_ENGINES = {"piper", "kokoro", "kitten", "matcha", "pocket"}
+_OMNIVOICE_ENGINES = {"omnivoice", "omnivoice_server"}
 
 
 class RecordingDialog(wx.Dialog):
@@ -116,6 +123,10 @@ class RecordingDialog(wx.Dialog):
                                          name="Compute back-end")
         for value in compute.available_compute():
             self.compute_combo.Append(_COMPUTE_LABELS.get(value, value), value)
+        # Add CUDA GPU (OmniVoice) option if NVIDIA GPU is detected
+        self._add_cuda_gpu_option()
+        if self.compute_combo.GetCount():
+            self.compute_combo.SetSelection(0)
         self.tts_combo = wx.ComboBox(self, style=wx.CB_READONLY,
                                      name="Select TTS engine")
         self.lang_combo = wx.ComboBox(self, style=wx.CB_READONLY,
@@ -217,6 +228,31 @@ class RecordingDialog(wx.Dialog):
         self.Bind(EVT_SYNTH_FINISHED, self._on_finished)
         self.Bind(EVT_SYNTH_ERROR, self._on_error)
 
+    def _add_cuda_gpu_option(self):
+        """Add CUDA GPU (OmniVoice) option if NVIDIA GPU is available."""
+        try:
+            import subprocess as _sp  # noqa: PLC0415
+            result = _sp.run(
+                ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
+                capture_output=True, text=True, timeout=10,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                self.compute_combo.Append("CUDA GPU (OmniVoice)", "cuda_gpu")
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _selected_compute(self) -> str:
+        """Return the selected compute mode key (resolves auto)."""
+        sel = self.compute_combo.GetSelection()
+        raw = self.compute_combo.GetClientData(sel) if sel >= 0 else "auto"
+        if raw == compute.COMPUTE_AUTO:
+            return compute.resolve_compute(raw)
+        return raw
+
+    def _is_omnivoice_compute(self) -> bool:
+        """True when CUDA GPU (OmniVoice) compute mode is selected."""
+        return self._selected_compute() == "cuda_gpu"
+
     def _slider(self, grid, name: str, lo: float, hi: float) -> wx.Slider:
         label = wx.StaticText(self, label=name + ":")
         label.SetName(name + " label")
@@ -253,9 +289,10 @@ class RecordingDialog(wx.Dialog):
             )
 
     def _populate_voices(self):
-        self._voices = self.store.installed_voices()
+        """Load voices and group by TTS engine, filtering by compute mode."""
+        self._all_voices = self.store.installed_voices()
         for voice in self.store.custom_voices():
-            self._voices.append(
+            self._all_voices.append(
                 {
                     "tts": voice["tts"],
                     "tts_name": voice["tts"],
@@ -275,9 +312,68 @@ class RecordingDialog(wx.Dialog):
                     "instruct": voice.get("instruct", ""),
                 }
             )
-        # Group by TTS engine id so installed and cloned voices of the same
-        # engine share one entry, and preselect the first one so the cascading
-        # language/variant/voice combo boxes are populated right away.
+        # Inject pip-installed OmniVoice voices (not in artifact system)
+        self._inject_omnivoice_voices()
+        # Bind compute combo change to refresh TTS list
+        self.compute_combo.Bind(wx.EVT_COMBOBOX, self._on_compute_change)
+        self._refresh_tts_for_compute()
+
+    def _inject_omnivoice_voices(self):
+        """Add OmniVoice voices from catalog if pip package is installed."""
+        try:
+            from ..python_runtime import get_runtime  # noqa: PLC0415
+            rt = get_runtime()
+            if not rt.is_created:
+                return
+            for tts_entry in catalog.get_tts_list():
+                pkg = tts_entry.get("requires_package")
+                if not pkg:
+                    continue
+                result = rt.run_in_env(
+                    f"import importlib.metadata; "
+                    f"print(importlib.metadata.version('{pkg}'))"
+                )
+                if result.returncode != 0 or not result.stdout.strip():
+                    continue
+                for lang in tts_entry.get("languages", []):
+                    for variant in lang.get("variants", []):
+                        for voice in variant.get("voices", []):
+                            self._all_voices.append(
+                                {
+                                    "tts": tts_entry["id"],
+                                    "tts_name": tts_entry["name"],
+                                    "language": lang["code"],
+                                    "variant": variant["id"],
+                                    "voice": voice["id"],
+                                    "voice_name": voice.get("name", voice["id"]),
+                                    "sid": voice.get("sid", 0),
+                                    "engine": tts_entry.get("engine", "vits"),
+                                    "dir": "",
+                                    "requires_gpu": tts_entry.get("requires_gpu", False),
+                                    "requires_package": pkg,
+                                }
+                            )
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _on_compute_change(self, _):
+        """Refresh TTS engine list when compute mode changes."""
+        self._refresh_tts_for_compute()
+
+    def _refresh_tts_for_compute(self):
+        """Show only TTS engines compatible with the selected compute mode."""
+        is_omni = self._is_omnivoice_compute()
+        self._voices = []
+        for v in self._all_voices:
+            engine = v.get("engine", "vits")
+            if is_omni:
+                # CUDA GPU mode: show OmniVoice engines only
+                if engine in _OMNIVOICE_ENGINES:
+                    self._voices.append(v)
+            else:
+                # CPU/GPU ONNX mode: show ONNX engines only
+                if engine in _ONNX_TTS_ENGINES:
+                    self._voices.append(v)
         tts_ids = sorted({v["tts"] for v in self._voices})
         self.tts_combo.Clear()
         for tts_id in tts_ids:
@@ -289,8 +385,9 @@ class RecordingDialog(wx.Dialog):
         else:
             self.start_btn.Disable()
             self.status.SetLabel(
-                "No voices downloaded. Close this window, open Settings and use "
-                "the 'Download and remove' tab first."
+                "No voices available for this compute mode. "
+                + ("Install OmniVoice from the Compute tab." if is_omni
+                   else "Download voices from Settings > Download and remove.")
             )
             for combo in (self.lang_combo, self.variant_combo, self.voice_combo):
                 combo.Clear()
@@ -360,8 +457,16 @@ class RecordingDialog(wx.Dialog):
     def _apply_project_tts(self):
         tts = self.data.get("tts", {})
         if tts.get("compute") and self.compute_combo.GetCount():
+            # Map stored "cuda" compute to "cuda_gpu" combo value if present
+            target = tts["compute"]
+            if target == "cuda":
+                # Check if cuda_gpu option exists in the combo
+                for i in range(self.compute_combo.GetCount()):
+                    if self.compute_combo.GetClientData(i) == "cuda_gpu":
+                        target = "cuda_gpu"
+                        break
             idx = next((i for i in range(self.compute_combo.GetCount())
-                        if self.compute_combo.GetClientData(i) == tts["compute"]), 0)
+                        if self.compute_combo.GetClientData(i) == target), 0)
             self.compute_combo.SetSelection(idx)
         # best-effort preselect the voice the project used
         self._select_project_voice(tts)
@@ -386,12 +491,9 @@ class RecordingDialog(wx.Dialog):
 
     # ------------------------------------------------------------- actions
     def _current_params(self):
-        compute_sel = self.compute_combo.GetSelection()
-        compute_choice = (
-            self.compute_combo.GetClientData(compute_sel)
-            if compute_sel >= 0
-            else "auto"
-        )
+        compute_choice = self._selected_compute()
+        # Map "cuda_gpu" back to "cuda" for the engine (OmniVoice uses CUDA)
+        engine_compute = "cuda" if compute_choice == "cuda_gpu" else compute_choice
         # Punctuation is chosen when the project is created (New Project
         # wizard) and stored in the project file; the Recording window no
         # longer shows or changes it.
@@ -399,7 +501,7 @@ class RecordingDialog(wx.Dialog):
         fmt_sel = self.format_combo.GetSelection()
         fmt = self.format_combo.GetClientData(fmt_sel) if fmt_sel >= 0 else "wav"
         return {
-            "compute": compute_choice,
+            "compute": engine_compute,
             "rate": self.rate.GetValue() / 100.0,
             "pitch": self.pitch.GetValue() / 100.0,
             "volume": self.volume.GetValue() / 100.0,

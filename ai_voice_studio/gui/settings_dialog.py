@@ -14,7 +14,7 @@ Categories:
 1. General                -- theme (System / Light / Dark)
 2. Download and remove    -- model manager (DownloadPanel)
 3. Available TTS          -- downloaded voices (AvailablePanel)
-4. Voice clone            -- clone a voice from a short audio sample (XTTS v2)
+4. OmniVoice engines      -- GPU TTS engine variants (Server, Triton, Hybrid)
 5. Recording settings     -- speed, pitch, volume, preview
 6. Punctuation            -- default punctuation mode (spoken-word expansion)
 7. Audio file creation    -- 4 radio modes with descriptions
@@ -54,7 +54,6 @@ from ..constants import (
     VOLUME_MAX,
     VOLUME_MIN,
 )
-from ..clone import XTTS_LANGUAGES
 from ..settings import Settings
 from ..tts import catalog
 from ..tts.downloader import ModelDownloader
@@ -160,7 +159,7 @@ class SettingsDialog(wx.Dialog):
             _GeneralPanel,
             DownloadPanel,
             AvailablePanel,
-            _VoiceClonePanel,
+            _OmniVoiceEnginesPanel,
             _OmniVoiceServerPanel,
             _RecordingSettingsPanel,
             _PunctuationPanel,
@@ -254,7 +253,7 @@ class SettingsDialog(wx.Dialog):
             return (self.store, self.downloader)
         if cls in (AvailablePanel,):
             return (self.store,)
-        if cls in (_VoiceClonePanel,):
+        if cls in (_OmniVoiceEnginesPanel,):
             return (self.settings, self.store)
         if cls in (_OmniVoiceServerPanel,):
             return (self.settings,)
@@ -882,6 +881,8 @@ class _PunctuationPanel(_SettingsPanel):
     # -- voice cascade ------------------------------------------------------
     def _populate_voices(self):
         self._voices = self.store.installed_voices()
+        # Inject pip-installed OmniVoice voices (not in artifact system)
+        self._inject_pip_installed_voices()
         for voice in self.store.custom_voices():
             self._voices.append({
                 "tts": voice["tts"], "tts_name": voice["tts"],
@@ -907,6 +908,50 @@ class _PunctuationPanel(_SettingsPanel):
             self.preview_status.SetLabel(
                 "No voices downloaded. Use the 'Download and remove' tab first."
             )
+
+    def _inject_pip_installed_voices(self):
+        """Inject voices for TTS engines installed via pip (e.g. OmniVoice).
+
+        These engines don't use the artifact download system, so their
+        voices never appear in ``store.installed_voices()``.  We check if
+        the package is installed in the *managed venv* (not the main
+        process) and, if so, create voice entries from the catalog.
+        """
+        try:
+            from ..python_runtime import get_runtime  # noqa: PLC0415
+            rt = get_runtime()
+            if not rt.is_created:
+                return
+            for tts_entry in catalog.get_tts_list():
+                pkg = tts_entry.get("requires_package")
+                if not pkg:
+                    continue
+                result = rt.run_in_env(
+                    f"import importlib.metadata; "
+                    f"print(importlib.metadata.version('{pkg}'))"
+                )
+                if result.returncode != 0 or not result.stdout.strip():
+                    continue
+                for lang in tts_entry.get("languages", []):
+                    for variant in lang.get("variants", []):
+                        for voice in variant.get("voices", []):
+                            self._voices.append(
+                                {
+                                    "tts": tts_entry["id"],
+                                    "tts_name": tts_entry["name"],
+                                    "language": lang["code"],
+                                    "variant": variant["id"],
+                                    "voice": voice["id"],
+                                    "voice_name": voice.get("name", voice["id"]),
+                                    "sid": voice.get("sid", 0),
+                                    "engine": tts_entry.get("engine", "vits"),
+                                    "dir": "",
+                                    "requires_gpu": tts_entry.get("requires_gpu", False),
+                                    "requires_package": pkg,
+                                }
+                            )
+        except Exception:  # noqa: BLE001
+            pass
 
     def _on_tts(self, _):
         tts_sel = self.tts_combo.GetSelection()
@@ -1145,14 +1190,22 @@ class _DaisySettingsPanel(_SettingsPanel):
 
 
 # ---------------------------------------------------------------------------
-# Voice clone category (XTTS v2)
+# OmniVoice Engines category (GPU TTS variants)
 # ---------------------------------------------------------------------------
-class _VoiceClonePanel(_SettingsPanel):
-    title = "Voice clone"
+class _OmniVoiceEnginesPanel(_SettingsPanel):
+    title = "OmniVoice engines"
     description = (
-        "Clone a voice from a short audio sample using XTTS v2. "
-        "Requires downloading the cloning engine (coqui-tts, ~2.5 GB)."
+        "GPU-accelerated TTS engines: OmniVoice Server (HTTP API), "
+        "Triton (stable), and Hybrid (fast). "
+        "Requires NVIDIA GPU and pip packages installed in Compute tab."
     )
+
+    """OmniVoice Engines panel.
+
+    Shows all OmniVoice engine variants (Server, Triton, Hybrid) with
+    their features, install status, and preview capability.  Replaces
+    the old XTTS voice clone panel.
+    """
 
     def __init__(self, parent, settings: Settings, store: ModelStore):
         super().__init__(parent)
@@ -1164,275 +1217,169 @@ class _VoiceClonePanel(_SettingsPanel):
         sizer.Add(
             wx.StaticText(
                 self,
-                label="Clone a voice from a short audio sample (4-5 seconds). "
-                      "The XTTS v2 engine synthesises new speech in the cloned "
-                      "voice. 17 languages supported.",
+                label="GPU-accelerated TTS engines for high-quality voice synthesis."
+                      " OmniVoice supports 600+ languages with voice design."
             ),
             0, wx.ALL, 6,
         )
-
-        # -- Engine status ------------------------------------------------
-        grid = wx.FlexGridSizer(cols=2, vgap=6, hgap=8)
-        grid.AddGrowableCol(1)
-        self.engine_status = wx.StaticText(self, label="Checking...")
-        self.engine_status.SetName("Clone engine status")
-        add_labeled(self, grid, "Cloning engine (XTTS v2)", self.engine_status,
-                    flag=wx.LEFT | wx.RIGHT, border=2)
-        sizer.Add(grid, 0, wx.EXPAND | wx.ALL, 6)
-
-        self.engine_gauge = wx.Gauge(self, range=100, size=(-1, 22))
-        self.engine_gauge.SetName("Clone engine download progress")
-        sizer.Add(self.engine_gauge, 0, wx.EXPAND | wx.ALL, 6)
-        self.engine_progress = wx.StaticText(self, label="")
-        sizer.Add(self.engine_progress, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 6)
-
-        eng_btns = wx.BoxSizer(wx.HORIZONTAL)
-        self.engine_download_btn = wx.Button(self, label="Download cloning engine")
-        self.engine_download_btn.SetName("Download cloning engine")
-        self.engine_download_btn.SetToolTip(
-            "Download and install the XTTS v2 cloning engine (~2.5 GB, one-time)"
+        sizer.Add(
+            wx.StaticText(
+                self,
+                label="Install engines from the Compute tab. Each engine variant "
+                      "has different speed/quality trade-offs."
+            ),
+            0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 6,
         )
-        self.engine_remove_btn = wx.Button(self, label="Remove cloning engine")
-        self.engine_remove_btn.SetName("Remove cloning engine")
-        self.engine_remove_btn.SetToolTip(
-            "Remove the XTTS v2 cloning engine to free disk space"
-        )
-        self.engine_cancel_btn = wx.Button(self, label="Cancel")
-        self.engine_cancel_btn.SetName("Cancel clone engine download")
-        self.engine_cancel_btn.Disable()
-        eng_btns.Add(self.engine_download_btn, 0, wx.ALL, 4)
-        eng_btns.Add(self.engine_remove_btn, 0, wx.ALL, 4)
-        eng_btns.Add(self.engine_cancel_btn, 0, wx.ALL, 4)
-        sizer.Add(eng_btns, 0, wx.LEFT, 2)
 
-        # -- Create a cloned voice ----------------------------------------
+        # -- Engine cards -------------------------------------------------
+        self._engines = []  # list of dicts for each engine variant
+        self._build_engine_cards(sizer)
+
+        # -- Features overview --------------------------------------------
         sizer.Add(wx.StaticLine(self), 0, wx.EXPAND | wx.ALL, 6)
         sizer.Add(
-            wx.StaticText(self, label="Create a new cloned voice:"),
+            wx.StaticText(self, label="Engine features"),
             0, wx.LEFT | wx.RIGHT | wx.TOP, 6,
         )
-
-        clone_grid = wx.FlexGridSizer(cols=2, vgap=6, hgap=8)
-        clone_grid.AddGrowableCol(1)
-        self.clone_name = wx.TextCtrl(self)
-        self.clone_name.SetName("Clone voice name")
-        self.clone_name.SetToolTip("A unique name for the cloned voice")
-        self.clone_lang = wx.ComboBox(self, style=wx.CB_READONLY,
-                                       name="Clone language")
-        for code, name in XTTS_LANGUAGES:
-            self.clone_lang.Append(name, code)
-        if self.clone_lang.GetCount():
-            self.clone_lang.SetSelection(0)
-        self.clone_sample = wx.TextCtrl(self, style=wx.TE_READONLY)
-        self.clone_sample.SetName("Clone sample WAV file")
-        self.clone_sample.SetToolTip("Path to a 4-5 second WAV recording of the voice")
-        self.clone_browse_btn = wx.Button(self, label="Browse...")
-        self.clone_browse_btn.SetName("Browse for sample WAV")
-        add_labeled(self, clone_grid, "Voice name", self.clone_name,
-                    flag=wx.LEFT | wx.RIGHT, border=2)
-        add_labeled(self, clone_grid, "Language", self.clone_lang,
-                    flag=wx.LEFT | wx.RIGHT, border=2)
-        clone_grid.Add(
-            wx.StaticText(self, label="Sample WAV:"), 0,
-            wx.LEFT | wx.RIGHT | wx.ALIGN_CENTER_VERTICAL, 2,
-        )
-        sample_row = wx.BoxSizer(wx.HORIZONTAL)
-        sample_row.Add(self.clone_sample, 1, wx.EXPAND)
-        sample_row.Add(self.clone_browse_btn, 0, wx.LEFT | wx.ALIGN_CENTER_VERTICAL, 6)
-        clone_grid.Add(sample_row, 1, wx.EXPAND | wx.LEFT | wx.RIGHT, 2)
-        sizer.Add(clone_grid, 0, wx.EXPAND | wx.ALL, 6)
-
-        self.clone_btn = wx.Button(self, label="Create cloned voice")
-        self.clone_btn.SetName("Create cloned voice")
-        self.clone_btn.SetToolTip(
-            "Create a new cloned voice from the selected sample WAV"
-        )
-        self.clone_btn.Disable()
-        sizer.Add(self.clone_btn, 0, wx.ALL | wx.LEFT, 6)
-
-        self.clone_status = wx.StaticText(self, label="")
-        sizer.Add(self.clone_status, 0, wx.ALL | wx.LEFT, 6)
-
-        # -- Existing cloned voices ----------------------------------------
-        sizer.Add(wx.StaticLine(self), 0, wx.EXPAND | wx.ALL, 6)
-        sizer.Add(
-            wx.StaticText(self, label="Existing cloned voices:"),
-            0, wx.LEFT | wx.RIGHT | wx.TOP, 6,
-        )
-        self.clone_list = wx.ListBox(self, style=wx.LB_SINGLE,
-                                     name="Cloned voices list")
-        self.clone_list.SetMinSize((-1, 100))
-        sizer.Add(self.clone_list, 1, wx.EXPAND | wx.ALL, 6)
-
-        self.clone_remove_btn = wx.Button(self, label="Remove selected voice")
-        self.clone_remove_btn.SetName("Remove cloned voice")
-        self.clone_remove_btn.Disable()
-        sizer.Add(self.clone_remove_btn, 0, wx.ALL | wx.LEFT, 6)
+        features = [
+            "• 600+ languages with auto-detection",
+            "• Voice design from text descriptions",
+            "• Zero-shot voice cloning (3-15 seconds reference audio)",
+            "• OpenAI-compatible API (Server mode)",
+            "• Streaming audio output",
+            "• Network access for other apps (Server mode)",
+        ]
+        for feat in features:
+            sizer.Add(
+                wx.StaticText(self, label=feat),
+                0, wx.LEFT | wx.RIGHT | wx.TOP, 12,
+            )
 
         self.SetSizer(sizer)
 
-        self.engine_download_btn.Bind(wx.EVT_BUTTON, self._on_engine_download)
-        self.engine_remove_btn.Bind(wx.EVT_BUTTON, self._on_engine_remove)
-        self.engine_cancel_btn.Bind(wx.EVT_BUTTON, self._on_engine_cancel)
-        self.clone_browse_btn.Bind(wx.EVT_BUTTON, self._on_browse_sample)
-        self.clone_btn.Bind(wx.EVT_BUTTON, self._on_create_clone)
-        self.clone_remove_btn.Bind(wx.EVT_BUTTON, self._on_remove_clone)
-        self.clone_list.Bind(wx.EVT_LISTBOX, self._on_clone_select)
+    def _build_engine_cards(self, sizer):
+        """Build status cards for each OmniVoice engine variant."""
+        from ..python_runtime import get_runtime  # noqa: PLC0415
 
-        self._refresh_engine()
-        self._refresh_clone_list()
+        rt = get_runtime()
+
+        engines = [
+            {
+                "id": "omnivoice_server",
+                "name": "OmniVoice Server",
+                "package": "omnivoice-server",
+                "description": "OpenAI-compatible HTTP API. Other apps on the network can use it.",
+                "speed": "Fastest (persistent server, model stays hot)",
+                "quality": "High (32 inference steps default)",
+                "features": "HTTP API, streaming, concurrent requests, network access",
+            },
+            {
+                "id": "omnivoice_triton",
+                "name": "OmniVoice Triton",
+                "package": "omnivoice-triton",
+                "description": "Stable GPU mode via Triton kernel fusion.",
+                "speed": "Good (~1.5x faster than hybrid)",
+                "quality": "High",
+                "features": "Per-request inference, lowest VRAM usage",
+            },
+            {
+                "id": "omnivoice_hybrid",
+                "name": "OmniVoice Hybrid",
+                "package": "omnivoice-triton",
+                "description": "Fast GPU mode combining ONNX and CUDA kernels.",
+                "speed": "Fastest per-request (~3.4x faster)",
+                "quality": "High",
+                "features": "Fastest single-request, may leak VRAM",
+            },
+        ]
+
+        for eng in engines:
+            card_sizer = wx.StaticBoxSizer(
+                wx.StaticBox(self, label=eng["name"]), wx.VERTICAL
+            )
+            card_box = card_sizer.GetStaticBox()
+
+            # Status
+            status_grid = wx.FlexGridSizer(cols=2, vgap=4, hgap=8)
+            status_grid.AddGrowableCol(1)
+            status_label = wx.StaticText(card_box, label="Checking...")
+            status_label.SetName(f"{eng['name']} status")
+            add_labeled(card_box, status_grid, "Status", status_label,
+                        flag=wx.LEFT | wx.RIGHT, border=2)
+
+            # Package check
+            pkg_installed = False
+            if rt.is_created:
+                try:
+                    result = rt.run_in_env(
+                        f"import importlib.metadata; "
+                        f"print(importlib.metadata.version('{eng['package']}'))"
+                    )
+                    pkg_installed = result.returncode == 0 and bool(result.stdout.strip())
+                    if pkg_installed:
+                        version = result.stdout.strip()
+                        status_label.SetLabel(f"Installed (v{version}) — ready to use")
+                    else:
+                        status_label.SetLabel("Not installed — install from Compute tab")
+                except Exception:  # noqa: BLE001
+                    status_label.SetLabel("Not installed — install from Compute tab")
+            else:
+                status_label.SetLabel("Not installed — install from Compute tab")
+
+            card_sizer.Add(status_grid, 0, wx.EXPAND | wx.ALL, 4)
+
+            # Features
+            feat_items = [
+                ("Description", eng["description"]),
+                ("Speed", eng["speed"]),
+                ("Quality", eng["quality"]),
+                ("Features", eng["features"]),
+            ]
+            for label, value in feat_items:
+                feat_sizer = wx.BoxSizer(wx.HORIZONTAL)
+                feat_label = wx.StaticText(card_box, label=f"{label}: ")
+                feat_label.SetFont(feat_label.GetFont().Bold())
+                feat_val = wx.StaticText(card_box, label=value)
+                feat_sizer.Add(feat_label, 0, wx.RIGHT, 4)
+                feat_sizer.Add(feat_val, 1, wx.EXPAND)
+                card_sizer.Add(feat_sizer, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 4)
+
+            sizer.Add(card_sizer, 0, wx.EXPAND | wx.ALL, 6)
+            self._engines.append({
+                "id": eng["id"],
+                "package": eng["package"],
+                "status_label": status_label,
+                "installed": pkg_installed,
+            })
 
     def on_activated(self):
         super().on_activated()
-        self._refresh_engine()
-        self._refresh_clone_list()
+        # Refresh install status
+        from ..python_runtime import get_runtime  # noqa: PLC0415
+        rt = get_runtime()
+        for eng in self._engines:
+            if rt.is_created:
+                try:
+                    result = rt.run_in_env(
+                        f"import importlib.metadata; "
+                        f"print(importlib.metadata.version('{eng['package']}'))"
+                    )
+                    installed = result.returncode == 0 and bool(result.stdout.strip())
+                    if installed:
+                        version = result.stdout.strip()
+                        eng["status_label"].SetLabel(f"Installed (v{version}) — ready to use")
+                    else:
+                        eng["status_label"].SetLabel("Not installed — install from Compute tab")
+                    eng["installed"] = installed
+                except Exception:  # noqa: BLE001
+                    eng["status_label"].SetLabel("Not installed — install from Compute tab")
+                    eng["installed"] = False
+            else:
+                eng["status_label"].SetLabel("Not installed — install from Compute tab")
+                eng["installed"] = False
 
-    # -- engine status ----------------------------------------------------
-    def _refresh_engine(self):
-        from .. import clone as clone_mod  # noqa: PLC0415
-        if clone_mod.engine_installed():
-            self.engine_status.SetLabel("Installed. Cloning is ready.")
-            self.engine_download_btn.Disable()
-            self.engine_remove_btn.Enable()
-            self.clone_btn.Enable()
-        else:
-            self.engine_status.SetLabel(
-                "Not installed. Download the cloning engine first."
-            )
-            self.engine_download_btn.Enable()
-            self.engine_remove_btn.Disable()
-            self.clone_btn.Disable()
-
-    def _on_engine_download(self, _):
-        from .. import clone as clone_mod  # noqa: PLC0415
-        self.engine_download_btn.Disable()
-        self.engine_remove_btn.Disable()
-        self.engine_cancel_btn.Enable()
-        self.engine_gauge.SetValue(0)
-        self.engine_progress.SetLabel("Installing cloning engine (~2.5 GB)...")
-        self._cancel_event = threading.Event()
-        self._thread = threading.Thread(
-            target=self._engine_download_job, daemon=True,
-        )
-        self._thread.start()
-
-    def _engine_download_job(self):
-        from .. import clone as clone_mod  # noqa: PLC0415
-        def progress(name, done, total):
-            wx.CallAfter(self._engine_progress_update, name, done, total)
-        try:
-            clone_mod.ensure_engine(
-                progress=progress, cancel_event=getattr(self, '_cancel_event', None),
-            )
-            wx.CallAfter(self._engine_download_done, True, "Cloning engine installed.")
-        except clone_mod.CloneEngineError as exc:
-            wx.CallAfter(self._engine_download_done, False, f"Failed: {exc}")
-        except Exception as exc:  # noqa: BLE001
-            wx.CallAfter(self._engine_download_done, False, f"Failed: {exc}")
-
-    def _engine_progress_update(self, name, done, total):
-        if total > 0:
-            self.engine_gauge.SetValue(int(min(100, done * 100 / total)))
-        self.engine_progress.SetLabel(f"{name}")
-
-    def _engine_download_done(self, success, message):
-        self._thread = None
-        self.engine_cancel_btn.Disable()
-        self.engine_progress.SetLabel(message)
-        self.engine_gauge.SetValue(100 if success else 0)
-        self._refresh_engine()
-        if success:
-            wx.MessageBox(message, "Cloning engine",
-                          style=wx.OK | wx.ICON_INFORMATION)
-        else:
-            wx.MessageBox(message, "Cloning engine",
-                          style=wx.OK | wx.ICON_ERROR)
-
-    def _on_engine_remove(self, _):
-        from .. import clone as clone_mod  # noqa: PLC0415
-        if wx.MessageBox(
-            "Remove the cloning engine? Its files (~2.5 GB) will be deleted.",
-            "Remove cloning engine",
-            style=wx.YES_NO | wx.ICON_QUESTION,
-        ) == wx.YES:
-            clone_mod.remove_engine()
-            self.engine_progress.SetLabel("Cloning engine removed.")
-            self._refresh_engine()
-
-    def _on_engine_cancel(self, _):
-        if hasattr(self, '_cancel_event') and self._cancel_event:
-            self._cancel_event.set()
-        self.engine_cancel_btn.Disable()
-        self.engine_progress.SetLabel("Cancelling...")
-
-    # -- clone voice ------------------------------------------------------
-    def _on_browse_sample(self, _):
-        with wx.FileDialog(
-            self, "Choose a 4-5 second WAV sample",
-            wildcard="WAV files (*.wav)|*.wav",
-            style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST,
-        ) as dlg:
-            if dlg.ShowModal() == wx.ID_OK:
-                self.clone_sample.SetValue(dlg.GetPath())
-
-    def _on_create_clone(self, _):
-        from .. import clone as clone_mod  # noqa: PLC0415
-        name = self.clone_name.GetValue().strip()
-        if not name:
-            wx.MessageBox("Enter a voice name.", "Clone voice",
-                          style=wx.OK | wx.ICON_INFORMATION)
-            return
-        sample = self.clone_sample.GetValue().strip()
-        if not sample or not os.path.isfile(sample):
-            wx.MessageBox("Choose a valid WAV sample file.", "Clone voice",
-                          style=wx.OK | wx.ICON_INFORMATION)
-            return
-        lang_sel = self.clone_lang.GetSelection()
-        lang = self.clone_lang.GetClientData(lang_sel) if lang_sel >= 0 else "en"
-        self.clone_btn.Disable()
-        self.clone_status.SetLabel("Creating cloned voice...")
-        try:
-            clone_mod.create_cloned_voice(name, sample, lang, self.store)
-            self.clone_status.SetLabel(f"Cloned voice '{name}' created.")
-            self.clone_name.SetValue("")
-            self.clone_sample.SetValue("")
-            self._refresh_clone_list()
-            wx.MessageBox(
-                f"Cloned voice '{name}' created. It will appear in Available TTS.",
-                "Voice cloned",
-                style=wx.OK | wx.ICON_INFORMATION,
-            )
-        except Exception as exc:  # noqa: BLE001
-            self.clone_status.SetLabel(f"Failed: {exc}")
-            wx.MessageBox(f"Failed to create cloned voice: {exc}", "Clone failed",
-                          style=wx.OK | wx.ICON_ERROR)
-        finally:
-            self.clone_btn.Enable()
-
-    def _refresh_clone_list(self):
-        self.clone_list.Clear()
-        custom = self.store.custom_voices()
-        for voice in custom:
-            self.clone_list.Append(voice["name"], voice)
-        self.clone_remove_btn.Disable()
-
-    def _on_clone_select(self, _):
-        self.clone_remove_btn.Enable(self.clone_list.GetSelection() >= 0)
-
-    def _on_remove_clone(self, _):
-        sel = self.clone_list.GetSelection()
-        if sel < 0:
-            return
-        voice = self.clone_list.GetClientData(sel)
-        if not voice:
-            return
-        if wx.MessageBox(
-            f"Remove the cloned voice '{voice['name']}'?",
-            "Remove cloned voice",
-            style=wx.YES_NO | wx.ICON_QUESTION,
-        ) == wx.YES:
-            self.store.remove_custom_voice(voice["name"])
-            self._refresh_clone_list()
+    def apply_to_settings(self):
+        pass  # No settings to save for this panel
 
 
 # ---------------------------------------------------------------------------
@@ -1665,11 +1612,11 @@ class _OmniVoiceServerPanel(_SettingsPanel):
     def _refresh_status(self):
         """Check if the server is running and update the status label."""
         try:
-            from ..omnivoice_server import OmniVoiceServerManager  # noqa: PLC0415
+            from ..omnivoice_server import get_server_manager  # noqa: PLC0415
             host = self.host_ctrl.GetValue().strip() or "127.0.0.1"
             port = self.port_ctrl.GetValue()
-            mgr = OmniVoiceServerManager(host=host, port=port)
-            if mgr.health_check():
+            mgr = get_server_manager(host=host, port=port)
+            if mgr.is_running:
                 self.status_label.SetLabel(f"Server status: Running at http://{host}:{port}")
                 self.start_btn.Disable()
                 self.stop_btn.Enable()
@@ -1691,13 +1638,13 @@ class _OmniVoiceServerPanel(_SettingsPanel):
         self._thread.start()
 
     def _start_job(self):
-        from ..omnivoice_server import OmniVoiceServerManager  # noqa: PLC0415
+        from ..omnivoice_server import get_server_manager  # noqa: PLC0415
         host = self.host_ctrl.GetValue().strip() or "127.0.0.1"
         port = self.port_ctrl.GetValue()
         device_sel = self.device_combo.GetSelection()
         device = self.device_combo.GetClientData(device_sel) if device_sel >= 0 else "cuda"
         try:
-            mgr = OmniVoiceServerManager(
+            mgr = get_server_manager(
                 host=host, port=port, device=device,
                 num_steps=self.steps_ctrl.GetValue(),
                 max_concurrent=self.concurrent_ctrl.GetValue(),
@@ -1721,10 +1668,8 @@ class _OmniVoiceServerPanel(_SettingsPanel):
     def _on_stop(self, _):
         """Stop the OmniVoice server."""
         try:
-            from ..omnivoice_server import OmniVoiceServerManager  # noqa: PLC0415
-            host = self.host_ctrl.GetValue().strip() or "127.0.0.1"
-            port = self.port_ctrl.GetValue()
-            mgr = OmniVoiceServerManager(host=host, port=port)
+            from ..omnivoice_server import get_server_manager  # noqa: PLC0415
+            mgr = get_server_manager()
             mgr.stop()
             self.status_label.SetLabel("Server status: Stopped")
             self.start_btn.Enable()
@@ -1735,10 +1680,10 @@ class _OmniVoiceServerPanel(_SettingsPanel):
     def _on_test(self, _):
         """Test the server connection."""
         try:
-            from ..omnivoice_server import OmniVoiceServerManager  # noqa: PLC0415
+            from ..omnivoice_server import get_server_manager  # noqa: PLC0415
             host = self.host_ctrl.GetValue().strip() or "127.0.0.1"
             port = self.port_ctrl.GetValue()
-            mgr = OmniVoiceServerManager(host=host, port=port)
+            mgr = get_server_manager(host=host, port=port)
             if mgr.health_check():
                 voices = mgr.get_voices()
                 wx.MessageBox(

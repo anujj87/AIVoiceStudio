@@ -47,6 +47,20 @@ log = logging.getLogger(__name__)
 
 _SAMPLE_RATE = 24000  # OmniVoice output sample rate
 
+
+def _read_server_config() -> dict:
+    """Read OmniVoice Server settings from the app's settings.json.
+
+    Returns the ``omnivoice_server`` section as a dict.  Falls back to
+    empty dict so callers can use ``.get()`` with defaults.
+    """
+    try:
+        from ..settings import Settings  # noqa: PLC0415
+        s = Settings()
+        return s.get("omnivoice_server", {})
+    except Exception:  # noqa: BLE001
+        return {}
+
 # Default server settings
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8881
@@ -141,14 +155,36 @@ class OmniVoiceServerManager:
 
     @property
     def is_running(self) -> bool:
-        return self._proc is not None and self._proc.poll() is None
+        """True when we started a subprocess that is still alive,
+        OR when a server is reachable via health check (started externally)."""
+        if self._proc is not None and self._proc.poll() is None:
+            return True
+        # Another manager instance may have started the server, or it
+        # was started externally.  Verify with a health check.
+        return self.health_check()
 
     def start(self, timeout: float = 120.0) -> None:
-        """Start the server subprocess and wait until it's ready."""
+        """Start the server subprocess and wait until it's ready.
+
+        If a server is already running on the configured host:port
+        (started by another manager instance or externally), we detect
+        it via health check and skip starting a new subprocess.
+        """
         with self._lock:
             if self.is_running:
                 return
             self._ready.clear()
+
+        # Before starting a new process, check if a server is already
+        # listening on this host:port (e.g. started from Settings panel
+        # or another thread).  This avoids port conflicts.
+        if self.health_check():
+            self._ready.set()
+            log.info(
+                "OmniVoice server already running at %s (detected via health check)",
+                self.base_url,
+            )
+            return
 
         from ..python_runtime import get_runtime  # noqa: PLC0415
         rt = get_runtime()
@@ -314,7 +350,7 @@ class OmniVoiceServerManager:
             req.add_header("Authorization", f"Bearer {self._api_key}")
 
         try:
-            with urllib.request.urlopen(req, timeout=600) as resp:
+            with urllib.request.urlopen(req, timeout=120) as resp:
                 wav_bytes = resp.read()
         except Exception as exc:
             raise OmniVoiceServerError(
@@ -382,7 +418,7 @@ class OmniVoiceServerManager:
             req.add_header("Authorization", f"Bearer {self._api_key}")
 
         try:
-            with urllib.request.urlopen(req, timeout=600) as resp:
+            with urllib.request.urlopen(req, timeout=120) as resp:
                 wav_bytes = resp.read()
         except Exception as exc:
             raise OmniVoiceServerError(
@@ -452,7 +488,13 @@ class OmniVoiceServerEngine:
 
     def __init__(self, voice_entry: dict):
         self.voice_entry = voice_entry
-        self._server = get_server_manager()
+        # Read the user's configured server settings so we connect
+        # to the same server the user started from Settings.
+        cfg = _read_server_config()
+        self._server = get_server_manager(
+            host=cfg.get("host", DEFAULT_HOST),
+            port=cfg.get("port", DEFAULT_PORT),
+        )
         if not self._server.is_running:
             self._server.start()
 
@@ -467,6 +509,13 @@ class OmniVoiceServerEngine:
         """Synthesize text; returns int16 samples at 24 kHz."""
         if not text.strip():
             raise ValueError("Nothing to synthesize")
+
+        # Quick health check — avoid hanging on a stuck server.
+        if not self._server.health_check():
+            raise OmniVoiceServerError(
+                f"OmniVoice server at {self._server.base_url} is not responding. "
+                "Try restarting it from Settings > OmniVoice Server."
+            )
 
         instruct = self.voice_entry.get("instruct", "")
         ref_audio = self.voice_entry.get("ref_audio", "")

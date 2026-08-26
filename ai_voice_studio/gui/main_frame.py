@@ -395,7 +395,7 @@ class MainFrame(wx.Frame):
             return
         for idx, recent in enumerate(recents):
             item = self._recent_menu.Append(
-                ID_RECENT_BASE + idx,
+                int(ID_RECENT_BASE) + idx,
                 f"{recent['name']}  ({os.path.dirname(recent['path'])})",
             )
             self.Bind(

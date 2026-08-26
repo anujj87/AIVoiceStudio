@@ -81,6 +81,8 @@ class SynthesisWorker(threading.Thread):
     def run(self) -> None:  # noqa: C901
         provider = compute.provider_for(self.params.get("compute", "cpu"))
         fmt = self.params.get("output_format", "wav")
+        if self.on_status:
+            self.on_status("Loading TTS engine...")
         try:
             self._engine = get_engine(
                 self.voice_entry, provider=provider, num_threads=2
@@ -94,6 +96,8 @@ class SynthesisWorker(threading.Thread):
                 self.on_error(f"Could not start the TTS engine: {exc}")
             return
 
+        if self.on_status:
+            self.on_status("TTS engine ready. Starting synthesis...")
         total = len(self.segments)
         processed: Dict[int, Dict[str, str]] = {}
         for idx in range(self.start_index, total):
