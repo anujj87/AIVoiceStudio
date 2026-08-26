@@ -197,6 +197,18 @@ class PythonRuntime:
         """
         if isinstance(packages, str):
             packages = [packages]
+        # Users often type a full command like "pip install numpy" or
+        # "install numpy" into the developer panel; strip those tokens so the
+        # command does not become "pip install ... pip install numpy".
+        cleaned: List[str] = []
+        for entry in packages:
+            for token in str(entry).split():
+                if token.lower() in ("pip", "install", "--user"):
+                    continue
+                if token.startswith("-") and token not in ("-U", "--upgrade", "--no-deps"):
+                    continue
+                cleaned.append(token)
+        packages = cleaned or []
         pip = self.ensure_pip()
         cmd = [pip, "install", "--no-warn-script-location"] + packages
         log.info("Running pip install: %s", " ".join(cmd))

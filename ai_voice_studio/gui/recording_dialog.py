@@ -270,11 +270,8 @@ class RecordingDialog(wx.Dialog):
                     "sample": voice.get("sample", ""),
                     "reference": voice.get("reference", ""),
                     "xtts_lang": voice.get("language", "en"),
-                    "qwen_lang": voice.get("qwen_lang") or voice.get("language", "english"),
                     "ref_text": voice.get("ref_text", ""),
                     "model_dir": voice.get("model_dir", ""),
-                    "omnivoice_lang": voice.get("omnivoice_lang") or voice.get("language", "en"),
-                    "omnivoice_variant": voice.get("omnivoice_variant", "onnx"),
                     "instruct": voice.get("instruct", ""),
                 }
             )

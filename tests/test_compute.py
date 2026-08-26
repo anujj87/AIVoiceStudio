@@ -76,6 +76,5 @@ class CudaDetectionTest(unittest.TestCase):
         self.assertEqual(compute.provider_for("cpu"), "cpu")
         self.assertEqual(compute.provider_for("auto"), "cpu")
 
-
 if __name__ == "__main__":
     unittest.main()

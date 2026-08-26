@@ -183,6 +183,25 @@ class ModelStore:
                             "dir": variant_dir,
                         }
                     )
+            elif engine == "omnivoice":
+                # OmniVoice: GPU-required, no local model files to scan.
+                # The model is downloaded on first use by the worker.
+                for voice in variant.get("voices", []):
+                    voices.append(
+                        {
+                            "tts": entry["tts"],
+                            "tts_name": tts["name"],
+                            "language": entry["language"],
+                            "variant": entry["variant"],
+                            "voice": voice["id"],
+                            "voice_name": voice.get("name", voice["id"]),
+                            "sid": voice.get("sid", 0),
+                            "engine": engine,
+                            "dir": "",
+                            "requires_gpu": True,
+                            "requires_package": "omnivoice-triton",
+                        }
+                    )
             else:
                 for voice in variant.get("voices", []):
                     voices.append(
@@ -214,8 +233,6 @@ class ModelStore:
         # Determine engine from kind
         engine_map = {
             "xtts": "xtts",
-            "qwen3": "qwen3",
-            "omnivoice": "omnivoice",
         }
         entry: Dict[str, Any] = {
             "name": name,
@@ -272,6 +289,16 @@ def resolve_voice_files(voice_entry: Dict[str, Any]) -> Dict[str, Any]:
     directory = voice_entry["dir"]
     engine = voice_entry.get("engine", "vits")
     files: Dict[str, Any] = {"engine": engine, "dir": directory}
+
+    # OmniVoice has no local model files; the model is downloaded on first use
+    # by the worker subprocess via omnivoice-triton / HuggingFace.
+    if engine == "omnivoice":
+        files.update({
+            "model": None,
+            "tokens": None,
+            "sid": voice_entry.get("sid", 0),
+        })
+        return files
 
     def find(*names: str) -> Optional[str]:
         for name in names:

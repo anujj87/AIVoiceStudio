@@ -36,11 +36,6 @@ hiddenimports = [
     "requests",
     "numpy",
     # Subpackages not directly imported from main.py
-    "ai_voice_studio.qwen",
-    "ai_voice_studio.qwen.worker",
-    "ai_voice_studio.qwen.tts_engine",
-    "ai_voice_studio.omnivoice",
-    "ai_voice_studio.omnivoice.worker",
     "ai_voice_studio.addons",
     "ai_voice_studio.python_runtime",
     "ai_voice_studio.heavy_logging",
@@ -56,11 +51,8 @@ datas = [
     ("../docs/UserGuide.html", "docs"),
     ("../docs/AddonDevelopmentGuide.html", "docs"),
     ("../docs/AccessibilityGuide.html", "docs"),
-    # Bundled OmniVoice ONNX runtime (onnxruntime-genai + deps).
-    # The worker subprocess adds this to sys.path so the OmniVoice ONNX
-    # engine works out of the box without any download.
-    ("../vendor/omnivoice-onnx", "vendor/omnivoice-onnx"),
 ]
+
 
 
 binaries = []

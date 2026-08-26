@@ -30,12 +30,19 @@ function Build-Arch {
         if (-not (Test-Path $py)) {
             throw "Python venv not found: $py (create it and install requirements.txt)"
         }
+        $distArch = if ($a -eq "x64") { "64" } else { "32" }
         & $py -m PyInstaller packaging\ai_voice_studio.spec --noconfirm `
-            --distpath "dist\AIVS-$a" --workpath "build\pyinstaller-$a"
+            --distpath "dist\AIVS-$distArch" --workpath "build\pyinstaller-$a"
         if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed for $a" }
 
         Write-Host "== Compiling $a installer ==" -ForegroundColor Cyan
-        & iscc $iss
+        $iscc = (Get-Command iscc -ErrorAction SilentlyContinue).Source
+        if (-not $iscc) {
+            $knownPath = "C:\Program Files\Inno Setup 7\ISCC.exe"
+            if (Test-Path $knownPath) { $iscc = $knownPath }
+        }
+        if (-not $iscc) { throw "Inno Setup ISCC.exe was not found." }
+        & $iscc $iss
         if ($LASTEXITCODE -ne 0) { throw "ISCC failed for $a" }
     } finally {
         Pop-Location

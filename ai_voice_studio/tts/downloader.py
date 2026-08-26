@@ -99,7 +99,7 @@ def hf_file_list(
 ) -> List[str]:
     """List files of a HuggingFace model repo matching ``prefixes``/``exact``.
 
-    Used for raw-file model variants (e.g. Qwen3-TTS ONNX) that are served
+    Used for raw-file model variants that are served
     as loose files on the Hub instead of a tar.bz2 archive. Returns relative
     paths (e.g. ``fp16/voice_clone/talker_decode.onnx``).
     """
@@ -230,7 +230,7 @@ class ModelDownloader:
         # Organize per-voice files
         self._organize_voice(dest, variant, artifacts)
 
-        # Download HF files for raw-file variants (e.g. Qwen3)
+        # Download HF files for raw-file variants
         hf_files = variant.get("hf_files")
         if hf_files:
             hf_prefixes = variant.get("hf_prefixes", [])
@@ -244,9 +244,12 @@ class ModelDownloader:
                 if cancel_event and cancel_event.is_set():
                     raise DownloadCancelled()
                 hf_base = f"https://huggingface.co/{variant.get('hf_repo', '')}/resolve/main/"
+                relative_dir = os.path.dirname(fname)
+                target_dir = os.path.join(dest, relative_dir) if relative_dir else dest
+                os.makedirs(target_dir, exist_ok=True)
                 download_file(
                     hf_base + fname,
-                    dest,
+                    target_dir,
                     filename=os.path.basename(fname),
                     progress=progress,
                     cancel_event=cancel_event,

@@ -10,7 +10,27 @@ For packaged builds the PyInstaller spec in ``packaging/`` points here.
 from __future__ import annotations
 
 import logging
+import os
 import sys
+
+
+def _run_frozen_worker() -> bool:
+    """Run a worker inside the frozen executable when requested."""
+    if not getattr(sys, "frozen", False) or len(sys.argv) < 2:
+        return False
+    try:
+        worker_index = sys.argv.index("--aivs-worker")
+    except ValueError:
+        return False
+    if worker_index + 1 >= len(sys.argv):
+        raise SystemExit("Missing AI Voice Studio worker name")
+    worker_name = sys.argv[worker_index + 1]
+    sys.argv[:] = [sys.argv[0]] + sys.argv[worker_index + 2:]
+    raise SystemExit(f"Unknown AI Voice Studio worker: {worker_name}")
+
+
+if _run_frozen_worker():
+    raise SystemExit(0)
 
 import wx
 

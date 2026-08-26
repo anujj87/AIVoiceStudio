@@ -1,20 +1,26 @@
-"""OmniVoice TTS engine (k2-fsa/OmniVoice) — rewritten.
+"""OmniVoice TTS engine (omnivoice-triton).
 
-OmniVoice is a state-of-the-art massively multilingual zero-shot TTS model
-supporting 600+ languages with voice cloning and voice design. Two variants:
+OmniVoice is a massively multilingual zero-shot text-to-speech (TTS) model
+supporting over 600 languages, with voice cloning and voice design.  It runs
+in a separate worker subprocess so its PyTorch/CUDA runtime never conflicts
+with the main app's sherpa-onnx.
 
-* **omnivoice-gpu**  -- Full PyTorch model (k2-fsa/OmniVoice). Requires an
-  NVIDIA GPU with CUDA. Higher quality, voice cloning from a reference audio,
-  and voice design via text instructions.
-* **omnivoice-onnx** -- ONNX-converted model (Prince-1/OmniVoice-Onnx). Runs
-  on CPU (GPU optional via onnxruntime-genai CUDA provider). Uses the full
-  OmniVoice pipeline: text encoder → language model → audio decoder →
-  vocoder.
+The ``omnivoice-triton`` package must be installed separately::
 
-Both run in a worker subprocess (like Qwen3) so their runtimes never share a
-process with sherpa-onnx.
+    pip install omnivoice-triton
 
-License: Apache-2.0 (both models).
+The worker supports two inference modes (selected at model load time):
+
+* ``triton``  – Stable, ~1.5x faster than stock OmniVoice.  Uses Triton
+  kernel fusion only.  Recommended for production use.
+* ``hybrid``  – ~3.4x faster than stock.  Triton kernels + CUDA Graph.
+  Has a known VRAM-leak bug (memory grows per request until OOM); use with
+  caution or unload the model between synthesis batches.
+
+Flow (Settings -> OmniVoice):
+1. Check that ``omnivoice-triton`` is importable (``pip install``).
+2. First synthesis triggers model download (~2 GB from HuggingFace).
+3. The model stays loaded in the worker subprocess for fast subsequent calls.
 """
 
 from __future__ import annotations
@@ -23,242 +29,234 @@ import base64
 import json
 import logging
 import os
-import shutil
 import subprocess
 import sys
-import tempfile
 import threading
+from typing import Dict, Optional
 
 import numpy as np
 
-from .. import paths
-from ..util import find_python, sanitize_filename
-
 log = logging.getLogger(__name__)
 
-_SAMPLE_RATE = 24000
+_SAMPLE_RATE = 24000  # OmniVoice output sample rate
 
-# Supported languages for OmniVoice (common subset; full list is 600+)
-OMNIVOICE_LANGUAGES = [
-    ("en", "English"),
-    ("zh", "Chinese"),
-    ("ja", "Japanese"),
-    ("ko", "Korean"),
-    ("hi", "Hindi"),
-    ("de", "German"),
-    ("fr", "French"),
-    ("es", "Spanish"),
-    ("pt", "Portuguese"),
-    ("it", "Italian"),
-    ("ru", "Russian"),
-    ("ar", "Arabic"),
-    ("bn", "Bengali"),
-    ("nl", "Dutch"),
-    ("pl", "Polish"),
-    ("tr", "Turkish"),
-    ("vi", "Vietnamese"),
-    ("th", "Thai"),
-    ("id", "Indonesian"),
-    ("ms", "Malay"),
-]
+
+# ---------------------------------------------------------------------------
+# Embedded worker source (standalone script, no ai_voice_studio imports).
+# Used in frozen apps where PyInstaller compiles .py into a PYZ archive
+# that the managed venv's Python cannot read.
+# ---------------------------------------------------------------------------
+_WORKER_SOURCE = r'''"""OmniVoice TTS worker subprocess (standalone).
+
+Protocol (JSON lines on stdin/stdout):
+  {"cmd": "ping"}                        -> {"ok": true, "engine": true}
+  {"cmd": "synthesize", "text": "..."}    -> {"ok": true, "wav": "<base64>", ...}
+  {"cmd": "quit"}                         -> (process exits)
+'''
+_WORKER_SOURCE += r'''"""
+import base64
+import json
+import sys
+import numpy as np
+
+
+def main() -> int:
+    out = sys.stdout
+    err = sys.stderr
+    runner = None
+
+    def respond(obj):
+        out.write(json.dumps(obj) + "\n")
+        out.flush()
+
+    for line in sys.stdin:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            req = json.loads(line)
+        except json.JSONDecodeError:
+            respond({"ok": False, "error": "Invalid request."})
+            continue
+        cmd = req.get("cmd")
+
+        if cmd == "quit":
+            break
+
+        if cmd == "ping":
+            try:
+                from omnivoice_triton import create_runner  # noqa: PLC0415
+                respond({"ok": True, "engine": True})
+            except ImportError as exc:
+                respond({
+                    "ok": True, "engine": False,
+                    "error": "OmniVoice engine not installed.\n" + str(exc),
+                })
+            continue
+
+        if cmd == "synthesize":
+            try:
+                if runner is None:
+                    from omnivoice_triton import create_runner  # noqa: PLC0415
+                    mode = req.get("mode", "triton")
+                    runner = create_runner(mode)
+                    runner.load_model()
+
+                text = req["text"]
+                ref_audio = req.get("ref_audio", "")
+                ref_text = req.get("ref_text", "")
+                instruct = req.get("instruct", "")
+                language = req.get("language", "auto")
+
+                saved_stdout = sys.stdout
+                sys.stdout = err
+                try:
+                    if ref_audio:
+                        result = runner.generate_voice_clone(
+                            text=text, ref_audio=ref_audio, ref_text=ref_text)
+                    elif instruct:
+                        result = runner.generate_voice_design(
+                            text=text, instruct=instruct)
+                    else:
+                        result = runner.generate(
+                            text=text, language=language)
+                finally:
+                    sys.stdout = saved_stdout
+
+                audio = result["audio"]
+                arr = np.asarray(audio, dtype=np.float32).reshape(-1)
+                if arr.size == 0:
+                    raise ValueError("The engine returned no audio.")
+                clipped = np.clip(arr, -1.0, 1.0) * 32767.0
+                wav_b64 = base64.b64encode(
+                    clipped.astype(np.int16).tobytes()).decode("ascii")
+                respond({
+                    "ok": True,
+                    "wav": wav_b64,
+                    "sample_rate": result.get("sample_rate", 24000),
+                    "time_ms": result.get("time_ms", 0),
+                    "peak_vram_gb": result.get("peak_vram_gb", 0),
+                })
+            except Exception as exc:
+                respond({"ok": False, "error": f"{type(exc).__name__}: {exc}"})
+            continue
+
+        respond({"ok": False, "error": f"Unknown command: {cmd}"})
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+'''
+
+
+def _read_worker_source() -> str:
+    """Return the worker script source.
+
+    In development mode, reads ``worker.py`` from disk.  In a frozen
+    app, returns the embedded ``_WORKER_SOURCE`` string (PyInstaller
+    compiles .py into the PYZ archive which the venv Python can't read).
+    """
+    if getattr(sys, "frozen", False):
+        return _WORKER_SOURCE
+    worker_py = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "worker.py",
+    )
+    with open(worker_py, encoding="utf-8") as fh:
+        return fh.read()
 
 
 class OmniVoiceError(Exception):
-    """Raised when the OmniVoice engine/runtime is missing or fails."""
+    """Raised when the OmniVoice engine is not installed or fails."""
 
 
 # ---------------------------------------------------------------------------
-# Engine directory management (per-variant: gpu vs onnx)
+# CUDA detection (lightweight -- does NOT import torch)
 # ---------------------------------------------------------------------------
-
-def _bundled_onnx_dir() -> str | None:
-    """Return the path to the bundled ONNX runtime, or None."""
-    meipass = getattr(sys, "_MEIPASS", None)
-    if meipass:
-        d = os.path.join(meipass, "vendor", "omnivoice-onnx")
-        if os.path.isdir(d):
-            return d
-    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    d = os.path.join(root, "vendor", "omnivoice-onnx")
-    if os.path.isdir(d):
-        return d
-    return None
-
-
-def engine_dir(variant: str = "onnx") -> str:
-    """Return the runtime install directory for the given variant."""
-    if variant == "onnx":
-        bundled = _bundled_onnx_dir()
-        if bundled:
-            return bundled
-    return os.path.join(paths.user_data_dir(), "runtime", f"omnivoice-{variant}")
-
-
-def engine_installed(variant: str = "onnx") -> bool:
-    """True when the OmniVoice runtime for *variant* is importable."""
-    if variant == "onnx":
-        return _bundled_onnx_dir() is not None
-    d = engine_dir(variant)
-    return os.path.isdir(os.path.join(d, "omnivoice"))
-
-
-def cuda_available() -> bool:
-    """True when the app's CUDA runtime is installed."""
-    cuda_dir = os.path.join(paths.user_data_dir(), "runtime", "cuda")
-    return os.path.isfile(os.path.join(cuda_dir, "onnxruntime.dll"))
-
-
-def ensure_engine(
-    variant: str = "onnx",
-    progress=None,
-    cancel_event: threading.Event | None = None,
-) -> None:
-    """Install the OmniVoice runtime into the user folder."""
-    if variant == "onnx":
-        if not _bundled_onnx_dir():
-            raise OmniVoiceError(
-                "The bundled OmniVoice ONNX runtime was not found. "
-                "Please reinstall the application."
-            )
-        if progress:
-            progress("OmniVoice ONNX runtime is bundled (ready to use).", 1, 1)
-        return
-
-    target = engine_dir(variant)
-    os.makedirs(target, exist_ok=True)
-    _install_gpu_engine(target, progress, cancel_event)
-    if progress:
-        progress("OmniVoice GPU engine installed.", 1, 1)
-
-
-def _install_gpu_engine(target, progress, cancel_event):
-    """Install PyTorch + omnivoice for GPU inference.
-
-    Uses the managed PythonRuntime virtualenv when available so pip
-    operations stay within the application's Python environment.
-    """
-    # Ensure the PythonRuntime virtualenv exists and has pip.
+def has_nvidia_gpu() -> bool:
+    """Return True when an NVIDIA GPU with a working driver is detected."""
     try:
-        from ..python_runtime import get_runtime
-        rt = get_runtime()
-        rt.ensure_env()
-        rt.ensure_pip()
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
+            capture_output=True, text=True, timeout=10,
+        )
+        return result.returncode == 0 and bool(result.stdout.strip())
     except Exception:  # noqa: BLE001
-        log.debug("PythonRuntime not available, falling back to system Python")
-
-    python = find_python()
-    cmd = [
-        python, "-m", "pip", "install",
-        "--target", target, "--upgrade",
-        "torch", "torchaudio",
-        "--extra-index-url", "https://download.pytorch.org/whl/cu128",
-    ]
-    if progress:
-        progress("Installing PyTorch with CUDA (~2.5 GB)...", 0, 0)
-    _run_pip(cmd, "PyTorch+CUDA", progress, cancel_event)
-
-    cmd2 = [
-        python, "-m", "pip", "install",
-        "--target", target, "--upgrade",
-        "omnivoice",
-    ]
-    if progress:
-        progress("Installing omnivoice package...", 0, 0)
-    _run_pip(cmd2, "omnivoice", progress, cancel_event)
+        return False
 
 
-def _run_pip(cmd, label, progress, cancel_event):
-    """Run a pip command with real-time progress streaming."""
-    import io
-
-    creationflags = 0
-    if sys.platform == "win32":
-        creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-    safe_cwd = tempfile.gettempdir()
-
-    if cancel_event and cancel_event.is_set():
-        raise OmniVoiceError("Installation cancelled.")
-
+def is_available() -> bool:
+    """True when the ``omnivoice_triton`` package is importable from the
+    managed venv (checked by the worker subprocess, not in-process)."""
     try:
-        proc = subprocess.Popen(
-            cmd,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-            cwd=safe_cwd,
-            creationflags=creationflags,
+        from ..python_runtime import get_runtime  # noqa: PLC0415
+        rt = get_runtime()
+        if not rt.is_created:
+            return False
+        result = rt.run_in_env(
+            "import importlib.metadata; "
+            "print(importlib.metadata.version('omnivoice-triton'))"
         )
-    except OSError as exc:
-        raise OmniVoiceError(f"Could not start pip: {exc}") from exc
-
-    stderr_chunks: list[str] = []
-    last_line = [""]
-
-    def _reader():
-        try:
-            while True:
-                chunk = proc.stderr.read(4096)
-                if not chunk:
-                    break
-                text = chunk.decode("utf-8", errors="replace")
-                stderr_chunks.append(text)
-                for part in text.replace("\r", "\n").split("\n"):
-                    part = part.strip()
-                    if part:
-                        last_line[0] = part
-                        if progress:
-                            progress(part, 0, 0)
-        except Exception:  # noqa: BLE001
-            pass
-
-    reader = threading.Thread(target=_reader, daemon=True)
-    reader.start()
-
-    while proc.poll() is None:
-        if cancel_event and cancel_event.is_set():
-            proc.terminate()
-            raise OmniVoiceError("Installation cancelled.")
-        try:
-            proc.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            pass  # Process still running; loop back and check cancel_event
-
-    reader.join(timeout=10)
-
-    if cancel_event and cancel_event.is_set():
-        raise OmniVoiceError("Installation cancelled.")
-
-    if proc.returncode != 0:
-        combined = "".join(stderr_chunks)
-        tail = combined.strip().splitlines()[-10:]
-        raise OmniVoiceError(
-            f"pip install {label} failed (exit {proc.returncode}):\n"
-            + "\n".join(tail)
-        )
-
-
-def remove_engine(variant: str = "onnx") -> None:
-    shutil.rmtree(engine_dir(variant), ignore_errors=True)
+        return result.returncode == 0 and bool(result.stdout.strip())
+    except Exception:  # noqa: BLE001
+        return False
 
 
 # ---------------------------------------------------------------------------
-# Worker subprocess client (JSON protocol over stdin/stdout)
+# Worker subprocess management (mirrors clone/__init__.py CloneClient)
 # ---------------------------------------------------------------------------
+class OmniVoiceWorker:
+    """Manages the persistent OmniVoice worker subprocess.
 
-class OmniVoiceClient:
-    """Manages the persistent OmniVoice worker subprocess."""
+    The worker loads the OmniVoice model once (via omnivoice-triton) and
+    answers ``synthesize`` / ``clone`` / ``design`` requests over a
+    JSON-lines pipe.  PyTorch/CUDA stay isolated in the subprocess.
+    """
 
-    def __init__(self, variant: str = "onnx", timeout: float = 3600.0):
-        self._variant = variant
+    def __init__(self, mode: str = "triton", timeout: float = 600.0):
+        """
+        Parameters
+        ----------
+        mode : str
+            Inference mode: ``"triton"`` (stable) or ``"hybrid"`` (fastest
+            but may leak VRAM).
+        timeout : float
+            Seconds to wait for a single worker response.
+        """
         self._proc: subprocess.Popen | None = None
         self._lock = threading.RLock()
+        self._mode = mode
         self._timeout = timeout
         self._next_id = 0
 
-    def _ensure_proc(self):
+    # -- lifecycle ----------------------------------------------------------
+
+    def _ensure_proc(self) -> None:
         if self._proc is not None and self._proc.poll() is None:
             return
-        cmd = [sys.executable, "-m", "ai_voice_studio.omnivoice.worker",
-               "--variant", self._variant]
+        # In a frozen app, sys.executable is the .exe -- use the managed
+        # venv's Python instead so it can find omnivoice-triton.
+        if getattr(sys, "frozen", False):
+            from ..python_runtime import get_runtime  # noqa: PLC0415
+            rt = get_runtime()
+            worker_python = rt.python_exe
+            # The worker.py source is inside PyInstaller's PYZ archive
+            # and invisible to the venv Python.  Write it as a standalone
+            # script so the venv Python can run it directly.
+            worker_script = os.path.join(rt.env_dir, "_omnivoice_worker.py")
+            if not os.path.isfile(worker_script):
+                src = _read_worker_source()
+                with open(worker_script, "w", encoding="utf-8") as fh:
+                    fh.write(src)
+            cmd = [worker_python, worker_script]
+        else:
+            worker_python = sys.executable
+            # In dev mode, point at the actual worker.py file.
+            worker_script = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), "worker.py",
+            )
+            cmd = [worker_python, worker_script]
         self._proc = subprocess.Popen(
             cmd,
             stdin=subprocess.PIPE,
@@ -266,7 +264,6 @@ class OmniVoiceClient:
             stderr=subprocess.DEVNULL,
             text=True,
             bufsize=1,
-            cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
         )
         resp = self._request({"cmd": "ping"})
         if not resp.get("ok"):
@@ -274,7 +271,7 @@ class OmniVoiceClient:
                 resp.get("error", "The OmniVoice worker failed to start.")
             )
 
-    def close(self):
+    def close(self) -> None:
         with self._lock:
             if self._proc is not None:
                 try:
@@ -289,11 +286,13 @@ class OmniVoiceClient:
                     self._proc.kill()
                 self._proc = None
 
-    def __del__(self):
+    def __del__(self) -> None:
         try:
             self.close()
         except Exception:  # noqa: BLE001
             pass
+
+    # -- protocol -----------------------------------------------------------
 
     def _request(self, req: dict) -> dict:
         with self._lock:
@@ -311,7 +310,8 @@ class OmniVoiceClient:
                 raise OmniVoiceError(f"The OmniVoice worker failed: {exc}") from exc
             if not line:
                 raise OmniVoiceError(
-                    "The OmniVoice worker stopped. Is the engine downloaded?"
+                    "The OmniVoice worker stopped. "
+                    "Is omnivoice-triton installed? (pip install omnivoice-triton)"
                 )
             try:
                 resp = json.loads(line)
@@ -319,10 +319,6 @@ class OmniVoiceClient:
                 raise OmniVoiceError(
                     "Invalid response from the OmniVoice worker."
                 ) from exc
-            if resp.get("id") != req["id"]:
-                raise OmniVoiceError(
-                    "The OmniVoice worker returned an out-of-order response."
-                )
             return resp
 
     # -- public API ---------------------------------------------------------
@@ -330,25 +326,49 @@ class OmniVoiceClient:
     def synthesize(
         self,
         text: str,
-        model_dir: str,
-        ref_wav: str = "",
+        *,
+        speed: float = 1.0,
+        ref_audio: str = "",
         ref_text: str = "",
         instruct: str = "",
-        language: str = "en",
-        speed: float = 1.0,
+        language: str = "auto",
+        num_steps: int = 32,
     ) -> np.ndarray:
-        """Synthesize speech. Supports voice cloning, voice design, or auto."""
-        self._ensure_proc()
-        resp = self._request({
+        """Synthesize text; returns int16 samples at 24 kHz.
+
+        Parameters
+        ----------
+        text : str
+            Text to synthesize.
+        speed : float
+            Speaking speed (0.5-2.0).
+        ref_audio : str
+            Path to reference audio for voice cloning (3-15 s optimal).
+        ref_text : str
+            Transcript of reference audio (for cloning).
+        instruct : str
+            Voice design instruction, e.g. ``"female, low pitch, british accent"``.
+        language : str
+            Language hint (``"auto"``, ``"en"``, ``"zh"``, etc.).
+        num_steps : int
+            Diffusion steps (16 = faster, 32 = balanced, 64 = best).
+        """
+        if not text.strip():
+            raise ValueError("Nothing to synthesize")
+        req: Dict = {
             "cmd": "synthesize",
             "text": text,
-            "model_dir": model_dir,
-            "ref_wav": ref_wav,
-            "ref_text": ref_text,
-            "instruct": instruct,
-            "language": language,
+            "mode": self._mode,
             "speed": float(speed),
-        })
+            "language": language,
+            "num_steps": num_steps,
+        }
+        if ref_audio:
+            req["ref_audio"] = ref_audio
+            req["ref_text"] = ref_text
+        if instruct:
+            req["instruct"] = instruct
+        resp = self._request(req)
         if not resp.get("ok"):
             raise OmniVoiceError(resp.get("error", "Synthesis failed."))
         raw = base64.b64decode(resp["wav"])
@@ -356,29 +376,32 @@ class OmniVoiceClient:
         return samples
 
 
+# ---------------------------------------------------------------------------
+# Engine wrapper (drops into the app's get_engine interface)
+# ---------------------------------------------------------------------------
 class OmniVoiceEngine:
-    """Drops into the app's engine interface (``get_engine``) for OmniVoice voices.
+    """Wraps the OmniVoice worker so it plugs into the TTS engine cache.
 
     Implements the same ``synthesize`` contract as ``TtsEngine`` so the
-    recording worker and preview buttons need no changes.
+    recording worker and preview buttons need no changes: returns int16
+    samples at ``sample_rate`` (24 kHz).
     """
 
     sample_rate = _SAMPLE_RATE
 
-    def __init__(self, voice_entry: dict, client: OmniVoiceClient | None = None):
+    def __init__(
+        self,
+        voice_entry: dict,
+        worker: OmniVoiceWorker | None = None,
+    ):
         self.voice_entry = voice_entry
-        variant = voice_entry.get("omnivoice_variant", "onnx")
-        self._client = client or OmniVoiceClient(variant=variant)
-        self.model_dir = voice_entry.get("model_dir") or voice_entry.get("dir")
-        self.ref_wav = voice_entry.get("reference") or voice_entry.get("sample") or ""
-        self.ref_text = voice_entry.get("ref_text") or ""
-        self.instruct = voice_entry.get("instruct") or ""
-        self.language = voice_entry.get("omnivoice_lang") or "en"
-        if not self.model_dir or not os.path.isdir(self.model_dir):
-            raise OmniVoiceError(
-                "The OmniVoice model is missing. Download it in Settings -> "
-                "Download and remove first."
-            )
+        variant = voice_entry.get("variant", "triton")
+        self._worker = worker or OmniVoiceWorker(mode=variant)
+        self._worker._ensure_proc()
+        self.language = voice_entry.get("language", "auto")
+        self.instruct = voice_entry.get("instruct", "")
+        self.ref_audio = voice_entry.get("ref_audio", "")
+        self.ref_text = voice_entry.get("ref_text", "")
 
     def synthesize(
         self,
@@ -388,69 +411,26 @@ class OmniVoiceEngine:
         pitch: float = 1.0,
         volume: float = 1.0,
     ) -> np.ndarray:
+        """Synthesize text; returns int16 samples at 24 kHz."""
         if not text.strip():
             raise ValueError("Nothing to synthesize")
-        try:
-            samples = self._client.synthesize(
-                text=text,
-                model_dir=self.model_dir,
-                ref_wav=self.ref_wav,
-                ref_text=self.ref_text,
-                instruct=self.instruct,
-                language=self.language,
-                speed=float(speed),
-            )
-        except OmniVoiceError:
-            raise
-        except Exception as exc:  # noqa: BLE001
-            raise OmniVoiceError(f"OmniVoice synthesis failed: {exc}") from exc
+        samples = self._worker.synthesize(
+            text=text,
+            speed=float(speed),
+            ref_audio=self.ref_audio,
+            ref_text=self.ref_text,
+            instruct=self.instruct,
+            language=self.language,
+        )
         if pitch != 1.0:
             from ..tts.engine import _shift_pitch  # noqa: PLC0415
+
             samples = _shift_pitch(samples, pitch)
         if volume != 1.0:
             from ..tts.engine import _apply_volume  # noqa: PLC0415
+
             samples = _apply_volume(samples, volume)
         return samples
 
-    def close(self):
-        self._client.close()
-
-
-# ---------------------------------------------------------------------------
-# Voice creation helpers
-# ---------------------------------------------------------------------------
-
-def create_omnivoice_voice(
-    name: str,
-    sample_path: str,
-    language: str,
-    model_dir: str,
-    ref_text: str,
-    instruct: str,
-    variant: str,
-    store,
-) -> dict:
-    """Copy sample into models folder and register an OmniVoice voice."""
-    name = sanitize_filename(name.strip(), 40) or "omnivoice_voice"
-    dest = store.custom_dir(name)
-    sample = os.path.join(dest, "sample.wav")
-    shutil.copy2(sample_path, sample)
-    store.add_custom_voice(
-        name, "omnivoice", dest, "omnivoice",
-        extra={
-            "sample": sample,
-            "reference": sample,
-            "language": language,
-            "omnivoice_lang": language,
-            "ref_text": ref_text,
-            "instruct": instruct,
-            "model_dir": model_dir,
-            "omnivoice_variant": variant,
-        },
-    )
-    return {
-        "name": name, "tts": "omnivoice", "dir": dest, "kind": "omnivoice",
-        "sample": sample, "reference": sample, "language": language,
-        "omnivoice_lang": language, "ref_text": ref_text, "instruct": instruct,
-        "model_dir": model_dir, "omnivoice_variant": variant,
-    }
+    def close(self) -> None:
+        self._worker.close()

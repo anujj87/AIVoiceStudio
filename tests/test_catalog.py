@@ -18,7 +18,7 @@ class CatalogStructureTest(unittest.TestCase):
 
     def test_required_tts_present(self):
         ids = {t["id"] for t in catalog.get_tts_list()}
-        for expected in ("piper", "kokoro", "matcha", "vits_zh", "qwen3"):
+        for expected in ("piper", "kokoro", "matcha", "vits_zh"):
             self.assertIn(expected, ids, f"missing catalog entry {expected}")
         # Non-commercial TTS engines must be removed
         for removed in ("vits_mms", "pocket-tts", "coqui"):
@@ -38,6 +38,9 @@ class CatalogStructureTest(unittest.TestCase):
                 for variant in lang.get("variants", []):
                     if variant.get("files") or variant.get("hf_files") or variant.get("hf_repo"):
                         continue  # raw-file variant or HuggingFace variant
+                    # pip-installed variants (e.g. omnivoice-triton) have no artifact.
+                    if tts.get("requires_package"):
+                        continue
                     artifacts = []
                     if variant.get("artifact"):
                         artifacts.append(variant["artifact"])
@@ -128,26 +131,6 @@ class CatalogStructureTest(unittest.TestCase):
         }
         for sid, name in spot.items():
             self.assertEqual(by_sid[sid], name, f"sid {sid}")
-
-    def test_qwen3_entry(self):
-        qwen3 = catalog.find_tts("qwen3")
-        self.assertIsNotNone(qwen3)
-        self.assertEqual(qwen3["engine"], "qwen3")
-        self.assertTrue(qwen3["voice_cloning"])
-        self.assertIn("Apache-2.0", qwen3["license"])
-
-    def test_omnivoice_entry(self):
-        omni = catalog.find_tts("omnivoice")
-        self.assertIsNotNone(omni, "omnivoice entry missing from catalog")
-        self.assertEqual(omni["engine"], "omnivoice")
-        self.assertTrue(omni["voice_cloning"])
-        self.assertEqual(omni["license"], "Apache-2.0")
-        # Should have both GPU and ONNX variants
-        lang = catalog.find_language(omni, "multi")
-        self.assertIsNotNone(lang)
-        variant_ids = [v["id"] for v in lang["variants"]]
-        self.assertIn("gpu", variant_ids)
-        self.assertIn("onnx", variant_ids)
 
     def test_kitten_entry(self):
         kitten = catalog.find_tts("kitten")

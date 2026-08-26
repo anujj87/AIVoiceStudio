@@ -154,18 +154,10 @@ class SettingsDialogTest(_AppMixin):
             self.assertTrue(hasattr(compute, "gauge"))
             self.assertEqual(compute.gpu_download_btn.GetName(), "Download GPU runtime")
             self.assertEqual(compute.gpu_remove_btn.GetName(), "Remove GPU runtime")
-            # Voice clone category exposes Qwen3-TTS cloning workflow.
-            clone = dlg.clone_panel
-            for attr in ("qwen_engine_dl_btn", "qwen_engine_rm_btn", "qwen_name_ctrl",
-                         "qwen_lang_combo", "qwen_browse_btn", "qwen_create_btn",
-                         "clones_list", "remove_btn"):
-                self.assertTrue(hasattr(clone, attr), f"clone panel missing {attr}")
-            self.assertIn(clone.qwen_name_ctrl.GetName(), ("Voice name", "Qwen3 voice name"))
-            self.assertGreater(clone.qwen_lang_combo.GetCount(), 0)
             # Switching category shows the right panel (NVDA pattern).
-            dlg._show_category(4)
+            dlg._show_category(3)
             self.assertFalse(dlg._panels[0].IsShown())
-            self.assertTrue(dlg._panels[4].IsShown())
+            self.assertTrue(dlg._panels[3].IsShown())
         finally:
             dlg.Destroy()
 
@@ -194,13 +186,13 @@ class SettingsDialogTest(_AppMixin):
             fired = []
             dlg.Bind(wx.EVT_BUTTON, lambda evt: fired.append(True), id=wx.ID_OK)
             # Enter on a button -> button keeps the key (no OK click).
-            dlg.clone_panel.qwen_engine_dl_btn.SetFocus()
+            dlg.compute_panel.gpu_download_btn.SetFocus()
             evt = wx.KeyEvent(wx.wxEVT_CHAR_HOOK)
             evt.SetKeyCode(wx.WXK_RETURN)
             dlg._on_char_hook(evt)
             self.assertEqual(fired, [], "Enter on a button must not trigger OK")
             # Enter on a plain text field still means OK (NVDA pattern).
-            dlg.clone_panel.qwen_name_ctrl.SetFocus()
+            dlg.general_panel.recordings_ctrl.SetFocus()
             evt = wx.KeyEvent(wx.wxEVT_CHAR_HOOK)
             evt.SetKeyCode(wx.WXK_RETURN)
             dlg._on_char_hook(evt)

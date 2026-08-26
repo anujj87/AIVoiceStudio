@@ -384,7 +384,10 @@ class MainFrame(wx.Frame):
     def _rebuild_recent(self):
         if not self._recent_menu:
             return
-        self._recent_menu.Clear()
+        # wx.Menu has no Clear(); delete items individually (crash fix:
+        # "AttributeError: 'Menu' object has no attribute 'Clear'").
+        for item in list(self._recent_menu.GetMenuItems()):
+            self._recent_menu.Delete(item)
         recents = self.settings.get("recent_projects", [])
         if not recents:
             item = self._recent_menu.Append(wx.ID_ANY, "No recent projects")

@@ -2858,117 +2858,80 @@
       ]
     },
     {
-      "id": "qwen3",
-      "name": "Qwen3-TTS",
-      "engine": "qwen3",
-      "license": "Apache-2.0",
-      "homepage": "https://github.com/QwenLM/Qwen3-TTS",
-      "voice_cloning": true,
-      "note": "Qwen3-TTS is Alibaba's open-source multilingual TTS (Apache-2.0) exported to pure ONNX. One model covers 10 languages and supports voice cloning from a short reference recording (Settings -> Voice clone). Requires the Qwen3 engine runtime (Settings -> Voice clone -> Qwen3 engine) and an NVIDIA GPU for usable speed (CPU is very slow).",
-      "languages": [
-        {
-          "code": "multi",
-          "name": "Multilingual (10 languages: English, Chinese, Japanese, Korean, German, French, Russian, Portuguese, Spanish, Italian)",
-          "variants": [
-            {
-              "id": "v1_7b_fp16",
-              "name": "Version 1.7B FP16 (all 10 languages, voice cloning)",
-              "hf_repo": "xkos/Qwen3-TTS-12Hz-1.7B-ONNX",
-              "hf_prefixes": [
-                "fp16/voice_clone/",
-                "fp16/shared/",
-                "tokenizer/"
-              ],
-              "hf_files": [
-                "config.json",
-                "voice_clone_config.json"
-              ],
-              "note": "~5.6 GB fp16 voice-clone subset. Voice cloning: give it a 4-5 second WAV reference and it speaks in that voice in all 10 languages. Requires the Qwen3 engine from the Voice clone tab. CPU synthesis is very slow; an NVIDIA GPU (CUDA runtime installed in Settings) is strongly recommended.",
-              "voices": []
-            }
-          ]
-        }
-      ]
-    },
-    {
       "id": "omnivoice",
       "name": "OmniVoice",
       "engine": "omnivoice",
       "license": "Apache-2.0",
       "homepage": "https://github.com/k2-fsa/OmniVoice",
       "voice_cloning": true,
-      "note": "OmniVoice is k2-fsa's state-of-the-art massively multilingual zero-shot TTS (Apache-2.0) supporting 600+ languages. It clones a voice from a short reference recording and speaks in that voice. Two variants: GPU (PyTorch, requires NVIDIA GPU) and ONNX (onnxruntime-genai, CPU-capable). Both require downloading the engine runtime from Settings -> Voice clone.",
-      "gpu_warning": "⚠️ The GPU variant requires an NVIDIA GPU with CUDA 12. CPU-only systems should use the ONNX variant.",
+      "voice_cloning_note": "OmniVoice supports zero-shot voice cloning from 3-15 seconds of reference audio, plus voice design from text descriptions. Requires NVIDIA GPU and the omnivoice-triton package (pip install omnivoice-triton).",
+      "requires_gpu": true,
+      "requires_package": "omnivoice-triton",
       "languages": [
         {
-          "code": "multi",
-          "name": "Multilingual (600+ languages: English, Chinese, Hindi, Japanese, Korean, French, German, Spanish, Arabic, Portuguese, and 590+ more)",
+          "code": "auto",
+          "name": "Auto-detect (600+ languages)",
           "variants": [
             {
-              "id": "gpu",
-              "name": "GPU version (PyTorch + CUDA, highest quality)",
-              "hf_repo": "k2-fsa/OmniVoice",
-              "hf_prefixes": [],
-              "hf_files": [],
-              "note": "⚠️ REQUIRES NVIDIA GPU with CUDA 12. Downloads PyTorch (~2.5 GB) + omnivoice package. Supports voice cloning from a short reference audio and voice design via text instructions. 600+ languages. RTF as low as 0.025 (40x faster than real-time on GPU).",
+              "id": "triton",
+              "name": "Triton mode (stable, ~1.5x faster)",
               "voices": [
                 {
-                  "id": "clone",
-                  "name": "Voice cloning (provide reference audio)",
-                  "sid": 0
-                },
-                {
-                  "id": "design",
-                  "name": "Voice design (describe voice with text)",
-                  "sid": 0
-                },
-                {
                   "id": "auto",
-                  "name": "Auto voice (model chooses)",
+                  "name": "Auto voice",
                   "sid": 0
+                },
+                {
+                  "id": "female",
+                  "name": "Female voice",
+                  "sid": 1
+                },
+                {
+                  "id": "male",
+                  "name": "Male voice",
+                  "sid": 2
+                },
+                {
+                  "id": "child",
+                  "name": "Child voice",
+                  "sid": 3
+                },
+                {
+                  "id": "elderly",
+                  "name": "Elderly voice",
+                  "sid": 4
                 }
               ]
             },
             {
-              "id": "onnx",
-              "name": "ONNX version (CPU-capable, via onnxruntime-genai)",
-              "hf_repo": "Prince-1/OmniVoice-Onnx",
-              "hf_prefixes": [
-                "audio_tokenizer/",
-                "codes/",
-                "cuda/",
-                "int4/"
-              ],
-              "hf_files": [
-                "config.json",
-                "genai_config.json",
-                "model_config.json",
-                "omnivoice_manifest.json",
-                "tokenizer.json",
-                "tokenizer_config.json",
-                "chat_template.jinja",
-                "audio_embeddings_encoder.onnx",
-                "audio_embeddings_encoder.onnx.data",
-                "audio_heads_decoder.onnx",
-                "llm_decoder.onnx",
-                "llm_decoder.onnx.data"
-              ],
-              "note": "ONNX-converted OmniVoice (~1.3 GB). Runs on CPU via onnxruntime-genai; GPU acceleration optional. Supports voice cloning and voice design. 600+ languages. Requires the OmniVoice ONNX engine from the Voice clone tab.",
+              "id": "hybrid",
+              "name": "Hybrid mode (~3.4x faster, may leak VRAM)",
+              "note": "WARNING: Hybrid mode has a known VRAM leak bug. Memory grows per request until OOM. Use triton mode for production.",
               "voices": [
                 {
-                  "id": "clone",
-                  "name": "Voice cloning (provide reference audio)",
-                  "sid": 0
-                },
-                {
-                  "id": "design",
-                  "name": "Voice design (describe voice with text)",
-                  "sid": 0
-                },
-                {
                   "id": "auto",
-                  "name": "Auto voice (model chooses)",
+                  "name": "Auto voice",
                   "sid": 0
+                },
+                {
+                  "id": "female",
+                  "name": "Female voice",
+                  "sid": 1
+                },
+                {
+                  "id": "male",
+                  "name": "Male voice",
+                  "sid": 2
+                },
+                {
+                  "id": "child",
+                  "name": "Child voice",
+                  "sid": 3
+                },
+                {
+                  "id": "elderly",
+                  "name": "Elderly voice",
+                  "sid": 4
                 }
               ]
             }

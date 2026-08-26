@@ -246,16 +246,8 @@ def get_engine(
             return XtTsCloneEngine(voice_entry)
         except Exception as exc:  # noqa: BLE001
             raise EngineUnavailableError(str(exc)) from exc
-    # Qwen3-TTS cloned voices run in their own worker subprocess too (its
-    # onnxruntime must never share a process with sherpa-onnx).
-    if voice_entry.get("engine") == "qwen3":
-        from ..qwen import Qwen3Engine  # noqa: PLC0415
-
-        try:
-            return Qwen3Engine(voice_entry)
-        except Exception as exc:  # noqa: BLE001
-            raise EngineUnavailableError(str(exc)) from exc
-    # OmniVoice (k2-fsa/OmniVoice) runs in its own worker subprocess.
+    # OmniVoice runs in a separate worker process through the
+    # omnivoice-triton runtime; it requires an NVIDIA GPU.
     if voice_entry.get("engine") == "omnivoice":
         from ..omnivoice import OmniVoiceEngine  # noqa: PLC0415
 
