@@ -126,7 +126,7 @@ AUDIO_MODE_CHOICES = [
     (MODE_PAGE_WITH_H1, "Page by page with heading style 1"),
     (MODE_PAGE_ONLY, "Page by page only"),
     (MODE_H1_ONLY, "Heading style 1 only"),
-    (MODE_ALL_HEADINGS, "All headings only"),
+    (MODE_ALL_HEADINGS, "Break on every heading"),
     (MODE_ONE_FILE, "One audio file (whole document, no separation)"),
 ]
 AUDIO_MODE_DESCRIPTIONS = {
@@ -150,8 +150,10 @@ AUDIO_MODE_DESCRIPTIONS = {
         "'01 <heading>', '02 <heading>', ..."
     ),
     MODE_ALL_HEADINGS: (
-        "Each heading (style 1 to 6) is spoken as its own short audio file. Files "
-        "are named '01 <heading>', '02 <heading>', ..."
+        "Audio files are created per heading of any style (1 to 6), each containing "
+        "the heading and the text that follows it up to the next heading - the same "
+        "pattern as 'Heading style 1 only', but breaking on every heading level. "
+        "Files are named '01 <heading>', '02 <heading>', ..."
     ),
     MODE_ONE_FILE: (
         "The whole document is synthesized into one single audio file with no "

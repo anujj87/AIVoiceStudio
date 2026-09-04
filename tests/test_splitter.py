@@ -149,18 +149,51 @@ class TestH1Only(unittest.TestCase):
 
 
 class TestAllHeadings(unittest.TestCase):
-    def test_every_heading(self):
+    def test_break_on_every_heading(self):
         doc = doc_from(
             [
                 Block(kind="text", text="plain", page=0),
                 Block(kind="heading", level=1, text="One", page=0),
+                Block(kind="text", text="content under one", page=0),
                 Block(kind="heading", level=2, text="Two", page=0),
+                Block(kind="text", text="content under two", page=0),
                 Block(kind="heading", level=3, text="Three", page=1),
+                Block(kind="text", text="content under three", page=1),
             ]
         )
         segs = split_document(doc, MODE_ALL_HEADINGS)
-        self.assertEqual([s.title for s in segs], ["01 One", "02 Two", "03 Three"])
-        self.assertEqual(segs[0].text, "One")
+        self.assertEqual(
+            [s.title for s in segs], ["01 page 1", "02 One", "03 Two", "04 Three"]
+        )
+        # Leading text keeps its own page-1 file.
+        self.assertEqual(segs[0].text, "plain")
+        # Each heading keeps its content up to the next heading of any level.
+        self.assertIn("One", segs[1].text)
+        self.assertIn("content under one", segs[1].text)
+        self.assertNotIn("content under two", segs[1].text)
+        self.assertIn("Two", segs[2].text)
+        self.assertIn("content under two", segs[2].text)
+        self.assertIn("Three", segs[3].text)
+        self.assertIn("content under three", segs[3].text)
+
+    def test_no_heading_level_dropped(self):
+        # A level-1 heading followed by deeper headings must not swallow the
+        # deeper headings into its own file.
+        doc = doc_from(
+            [
+                Block(kind="heading", level=1, text="Top", page=0),
+                Block(kind="text", text="intro", page=0),
+                Block(kind="heading", level=2, text="Sub A", page=0),
+                Block(kind="heading", level=2, text="Sub B", page=0),
+                Block(kind="heading", level=6, text="Deep", page=0),
+            ]
+        )
+        segs = split_document(doc, MODE_ALL_HEADINGS)
+        self.assertEqual(
+            [s.title for s in segs], ["01 Top", "02 Sub A", "03 Sub B", "04 Deep"]
+        )
+        self.assertIn("intro", segs[0].text)
+        self.assertNotIn("Sub A", segs[0].text)
 
 
 class TestUniqueTitles(unittest.TestCase):

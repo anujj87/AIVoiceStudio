@@ -98,7 +98,7 @@ A tabbed dialog with **OK / Cancel / Apply** buttons. Tabs:
    - Edit box prefilled with sample text + **Preview** button (plays a short synthesis).
 6. **Audio file creation**:
    - Radio group (single choice): **Page by page with heading style 1**,
-     **Page by page only**, **Heading style 1 only**, **All headings only**.
+     **Page by page only**, **Heading style 1 only**, **Break on every heading**.
    - Description text for each mode (see §3.4).
 7. **Reset** — **Reset to default** button; shows confirmation "All settings will go back to
    their default values." and clears models cache info.
@@ -130,7 +130,9 @@ Input document is prepared (parsed) and split according to the selected mode:
    remaining text of its section (so the heading is spoken at the start of its own section).
 2. **Page by page only** — pages are sent one by one.
 3. **Heading style 1 only** — pages are grouped by Heading-1 (each heading + its content).
-4. **All headings only** — send heading by heading (any heading level 1–6).
+4. **Break on every heading** — same grouping as mode 3, but a new file starts at
+   every heading (any level 1–6); each heading is joined with the content that
+   follows it up to the next heading of any level.
 
 Naming convention (both modes 1 & 2): `01 page 1`, `02 page 2`, … ; if a Heading-1 is found in
 mode 1, the file containing the heading is named after it, e.g.

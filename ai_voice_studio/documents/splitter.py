@@ -15,7 +15,9 @@ Modes:
   ``pages_per_file`` > 1, used by the New Project wizard).
 * ``h1_only``       -- each Heading-1 together with the text up to the next
   Heading-1; text before the first Heading-1 becomes a leading "page 1" file.
-* ``all_headings``  -- every heading (levels 1-6) as its own short segment.
+* ``all_headings``  -- break on every heading (levels 1-6): each heading together
+  with the text up to the next heading of any level; text before the first
+  heading becomes a leading "page 1" file.
 * ``one_file``      -- the whole document as a single segment (no resume in
   the middle of the one audio file).
 """
@@ -221,20 +223,59 @@ def split_h1_only(blocks: List[Block]) -> List[Segment]:
 
 
 def split_all_headings(blocks: List[Block]) -> List[Segment]:
-    """Every heading (1-6) as its own segment (SPEC 3.4 mode 4)."""
+    """Break on every heading (levels 1-6) (SPEC 3.4 mode 4).
+
+    Works exactly like :func:`split_h1_only`, except that a new segment starts
+    at *any* heading level (1 to 6), not just level 1.  Each heading is joined
+    with the text that follows it up to the next heading of any level, so no
+    content is lost.  Text before the first heading becomes a leading "01 page 1"
+    segment.
+    """
+    sections: List[tuple[str | None, List[Block]]] = []  # (heading_text, blocks)
+    leading: List[Block] = []
+    current_heading: str | None = None
+    current: List[Block] = []
+
+    for block in blocks:
+        if block.kind == "heading" and 1 <= block.level <= 6:
+            if current_heading is not None or current:
+                sections.append((current_heading, current))
+            current_heading = block.text
+            current = [block]
+        else:
+            if current_heading is None:
+                leading.append(block)
+            else:
+                current.append(block)
+    if current_heading is not None or current:
+        sections.append((current_heading, current))
+
     segments: List[Segment] = []
     counter = 0
-    for block in blocks:
-        if block.kind == "heading" and 1 <= block.level <= 6 and block.text.strip():
-            counter += 1
-            segments.append(
-                Segment(
-                    index=counter,
-                    title=_heading_title(counter, block.text),
-                    text=block.text,
-                    page=block.page,
-                )
+
+    if leading and any(b.text.strip() for b in leading):
+        counter += 1
+        segments.append(
+            Segment(
+                index=counter,
+                title=_page_title(counter, 1),
+                text="\n\n".join(b.text for b in leading),
+                page=leading[0].page,
             )
+        )
+
+    for heading_text, blocks_ in sections:
+        if not any(b.text.strip() for b in blocks_):
+            continue
+        counter += 1
+        segments.append(
+            Segment(
+                index=counter,
+                title=_heading_title(counter, heading_text or "untitled section"),
+                text="\n\n".join(b.text for b in blocks_),
+                page=blocks_[0].page,
+            )
+        )
     return segments
 
 

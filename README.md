@@ -50,7 +50,7 @@ screen readers** (NVDA, JAWS, Narrator).
   | Page by page with heading style 1 | `01 page 1`, `02 <heading>`, `03 page 2`, … |
   | Page by page only | `01 page 1`, `02 page 2`, … |
   | Heading style 1 only | `01 <heading>`, `02 <heading>`, … |
-  | All headings only | one short file per heading level 1–6 |
+  | Break on every heading | one file per heading level 1–6, each with its content up to the next heading |
 - **Recording window** (`Ctrl+Shift+R`): shows the text to record first, then
   per-project TTS, language, variant, voice, rate, pitch, volume and output
   format. Every segment is **saved to disk immediately**; if the app stops,
