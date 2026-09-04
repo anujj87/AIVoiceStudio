@@ -5,7 +5,7 @@
 [Setup]
 AppId={{D9B4E3A0-7A1E-4E8B-9C2F-AIVOICESTUDIO01}
 AppName=AI Voice Studio
-AppVersion=2026.2.0
+AppVersion=2026.2.1
 AppPublisher=Anuj Sharma
 AppPublisherURL=https://github.com/anujj87
 AppSupportURL=https://github.com/
@@ -22,12 +22,12 @@ LicenseFile=..\LICENSE
 Compression=lzma2
 SolidCompression=yes
 OutputDir=..\dist
-OutputBaseFilename=AI-Voice-Studio-v-2026-2-0-Setup-{#MyAppArch}
+OutputBaseFilename=AI-Voice-Studio-v-2026-2-1-Setup-{#MyAppArch}
 UninstallDisplayName=AI Voice Studio
 UninstallDisplayIcon={app}\AI-Voice-Studio.exe
 WizardStyle=modern
 DisableProgramGroupPage=no
-VersionInfoVersion=2026.2.0
+VersionInfoVersion=2026.2.1
 VersionInfoCompany=Anuj Sharma
 VersionInfoDescription=AI Voice Studio installer
 VersionInfoProductName=AI Voice Studio

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 66: CI/CD &amp; Release - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part VII</div><ul class="chapters"><li><a href="ch61_unit_testing.html">Ch 61</a></li><li><a href="ch62_mocking.html">Ch 62</a></li><li><a href="ch63_integration.html">Ch 63</a></li><li><a href="ch64_pyinstaller.html">Ch 64</a></li><li><a href="ch65_inno_setup.html">Ch 65</a></li><li><a href="ch66_ci_cd.html" class="active">Ch 66: CI/CD</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 66</div>
+<h1>CI/CD &amp; Release</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand continuous integration concepts</li>
+  <li>Set up GitHub Actions for automated testing</li>
+  <li>Plan the release workflow</li>
+</ul>
+
+<hr>
+
+<h2>66.1 GitHub Actions Workflow</h2>
+
+<pre><code><span class="cm"># .github/workflows/test.yml</span>
+name: Tests
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install -r requirements.txt pytest
+      - run: python -m pytest tests/ -v</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># .github/workflows/test.yml</code>
+        <br><span class="desc">A comment: <em>.github/workflows/test.yml</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>name: Tests</code>
+        <br><span class="desc"><code>name: Tests</code></span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>on: [push, pull_request]</code>
+        <br><span class="desc"><code>on: [push, pull_request]</code></span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>jobs:</code>
+        <br><span class="desc"><code>jobs:</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>test:</code>
+        <br><span class="desc"><code>test:</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>runs-on: windows-latest</code>
+        <br><span class="desc"><code>runs-on: windows-latest</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>steps:</code>
+        <br><span class="desc"><code>steps:</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>- uses: actions/checkout@v4</code>
+        <br><span class="desc"><code>- uses: actions/checkout@v4</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>- uses: actions/setup-python@v5</code>
+        <br><span class="desc"><code>- uses: actions/setup-python@v5</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>with:</code>
+        <br><span class="desc"><code>with:</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>python-version: &#x27;3.13&#x27;</code>
+        <br><span class="desc"><code>python-version: &#x27;3.13&#x27;</code></span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>- run: pip install -r requirements.txt pytest</code>
+        <br><span class="desc">The testing framework used by AIVS. Discovers test files named test_*.py.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>- run: python -m pytest tests/ -v</code>
+        <br><span class="desc">The testing framework used by AIVS. Discovers test files named test_*.py.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>66.2 Release Process</h2>
+
+<ol>
+  <li>Update version in <code>constants.py</code></li>
+  <li>Run full test suite</li>
+  <li>Run PyInstaller build</li>
+  <li>Compile Inno Setup installer</li>
+  <li>Test installer on clean Windows VM</li>
+  <li>Create GitHub release with installer</li>
+</ol>
+
+<hr>
+
+<h2>66.3 Key Takeaways</h2>
+<ul>
+  <li><strong>GitHub Actions</strong> provides automated testing on every push</li>
+  <li>The release pipeline: <strong>Test → Build → Package → Test → Release</strong></li>
+  <li>Always test the installer on a <strong>clean machine</strong> before releasing</li>
+</ul>
+
+<hr>
+
+<p style="text-align: center;">
+  <a href="ch65_inno_setup.html">← Ch 65</a> &nbsp;|&nbsp;
+  <strong>End of Part VII</strong> &nbsp;|&nbsp;
+  <a href="ch67_python_runtime.html">Part VIII — Ch 67: Runtime →</a>
+</p>
+
+</div></div></body>
+</html>

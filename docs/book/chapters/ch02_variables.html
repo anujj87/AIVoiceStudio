@@ -1,0 +1,2243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 2: Variables &amp; Data Types - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar">
+  <h2>📖 Table of Contents</h2>
+  <div class="part-header">Part I — Python Fundamentals</div>
+  <ul class="chapters">
+    <li><a href="ch01_introduction.html">Ch 1: Introduction &amp; Setup</a></li>
+    <li><a href="ch02_variables.html" class="active">Ch 2: Variables &amp; Data Types</a></li>
+    <li><a href="ch03_control_flow.html">Ch 3: Control Flow</a></li>
+    <li><a href="ch04_functions.html">Ch 4: Functions</a></li>
+    <li><a href="ch05_strings.html">Ch 5: Strings &amp; Formatting</a></li>
+    <li><a href="ch06_collections.html">Ch 6: Lists, Tuples, Sets &amp; Dicts</a></li>
+    <li><a href="ch07_file_io.html">Ch 7: File I/O</a></li>
+    <li><a href="ch08_error_handling.html">Ch 8: Error Handling</a></li>
+    <li><a href="ch09_modules.html">Ch 9: Modules &amp; Packages</a></li>
+    <li><a href="ch10_oop_basics.html">Ch 10: OOP Basics</a></li>
+  </ul>
+</nav>
+
+<div class="main-content">
+
+<div class="chapter-number">Chapter 2</div>
+<h1>Variables &amp; Data Types</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand Python's dynamic typing system</li>
+  <li>Master all primitive data types: int, float, bool, str, None</li>
+  <li>Learn variable naming conventions and best practices</li>
+  <li>Understand type checking and type conversion</li>
+  <li>See how AI Voice Studio uses variables and constants</li>
+</ul>
+
+<hr>
+
+<h2>2.1 Python Is Dynamically Typed</h2>
+
+<p>
+  Unlike languages such as C, Java, or Go, Python does not require you to declare
+  the type of a variable. The type is determined at runtime based on the value
+  assigned:
+</p>
+
+<pre><code><span class="cm"># Python figures out the type automatically</span>
+name = <span class="str">"AI Voice Studio"</span>      <span class="cm"># str</span>
+version = <span class="num">2.0</span>                  <span class="cm"># float</span>
+year = <span class="num">2026</span>                     <span class="cm"># int</span>
+is_released = <span class="kw">True</span>              <span class="cm"># bool</span>
+nothing = <span class="kw">None</span>                  <span class="cm"># NoneType</span>
+
+<span class="cm"># You can reassign to a different type (though you usually shouldn't)</span>
+x = <span class="num">42</span>       <span class="cm"># int</span>
+x = <span class="str">"hello"</span>  <span class="cm"># now str — Python doesn't care</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Python figures out the type automatically</code>
+        <br><span class="desc">A comment: <em>Python figures out the type automatically</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>name = &quot;AI Voice Studio&quot;      # str</code>
+        <br><span class="desc">Assigns <code>&quot;AI Voice Studio&quot;      # str</code> to <code>name</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>version = 2.0                  # float</code>
+        <br><span class="desc">Assigns <code>2.0                  # float</code> to <code>version</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>year = 2026                     # int</code>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>is_released = True              # bool</code>
+        <br><span class="desc">Assigns <code>True              # bool</code> to <code>is_released</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>nothing = None                  # NoneType</code>
+        <br><span class="desc">Assigns <code>None                  # NoneType</code> to <code>nothing</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># You can reassign to a different type (though you usually shouldn&#x27;t)</code>
+        <br><span class="desc">A comment: <em>You can reassign to a different type (though you usually shouldn&#x27;t)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>x = 42       # int</code>
+        <br><span class="desc">Assigns <code>42       # int</code> to <code>x</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>x = &quot;hello&quot;  # now str — Python doesn&#x27;t care</code>
+        <br><span class="desc">Assigns <code>&quot;hello&quot;  # now str — Python doesn&#x27;t care</code> to <code>x</code>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<p>
+  This flexibility makes Python fast to write but requires discipline. The project
+  uses <strong>type hints</strong> (Chapter 22) to document expected types without
+  enforcing them at runtime.
+</p>
+
+<h3>The <code>type()</code> Function</h3>
+
+<p>Use <code>type()</code> to check a variable's type at any time:</p>
+
+<pre><code>>>> type(<span class="num">42</span>)
+&lt;class 'int'&gt;
+>>> type(<span class="num">3.14</span>)
+&lt;class 'float'&gt;
+>>> type(<span class="str">"hello"</span>)
+&lt;class 'str'&gt;
+>>> type(<span class="kw">True</span>)
+&lt;class 'bool'&gt;
+>>> type(<span class="kw">None</span>)
+&lt;class 'NoneType'&gt;</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>&gt;&gt;&gt; type(42)</code>
+        <br><span class="desc">Returns the type/class of an object. Used for debugging and type checking.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>&lt;class &#x27;int&#x27;&gt;</code>
+        <br><span class="desc"><code>&lt;class &#x27;int&#x27;&gt;</code></span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&gt;&gt;&gt; type(3.14)</code>
+        <br><span class="desc">Returns the type/class of an object. Used for debugging and type checking.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>&lt;class &#x27;float&#x27;&gt;</code>
+        <br><span class="desc"><code>&lt;class &#x27;float&#x27;&gt;</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>&gt;&gt;&gt; type(&quot;hello&quot;)</code>
+        <br><span class="desc">Returns the type/class of an object. Used for debugging and type checking.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>&lt;class &#x27;str&#x27;&gt;</code>
+        <br><span class="desc"><code>&lt;class &#x27;str&#x27;&gt;</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>&gt;&gt;&gt; type(True)</code>
+        <br><span class="desc">Returns the type/class of an object. Used for debugging and type checking.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>&lt;class &#x27;bool&#x27;&gt;</code>
+        <br><span class="desc"><code>&lt;class &#x27;bool&#x27;&gt;</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>&gt;&gt;&gt; type(None)</code>
+        <br><span class="desc">Returns the type/class of an object. Used for debugging and type checking.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>&lt;class &#x27;NoneType&#x27;&gt;</code>
+        <br><span class="desc"><code>&lt;class &#x27;NoneType&#x27;&gt;</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>The <code>isinstance()</code> Function</h3>
+
+<p>
+  More Pythonic than <code>type() == SomeType</code> is using <code>isinstance()</code>,
+  which also works with inheritance:
+</p>
+
+<pre><code>x = <span class="num">42</span>
+<span class="kw">print</span>(isinstance(x, int))        <span class="cm"># True</span>
+<span class="kw">print</span>(isinstance(x, (int, float))) <span class="cm"># True — can check multiple types</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>x = 42</code>
+        <br><span class="desc">Assigns <code>42</code> to <code>x</code>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>print(isinstance(x, int))        # True</code>
+        <br><span class="desc">Checks if an object is an instance of a class. Preferred over type() for type checking.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>print(isinstance(x, (int, float))) # True — can check multiple types</code>
+        <br><span class="desc">Checks if an object is an instance of a class. Preferred over type() for type checking.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>2.2 Numeric Types</h2>
+
+<h3>Integers (<code>int</code>)</h3>
+
+<p>
+  Python integers have <strong>arbitrary precision</strong> — they can be as large
+  as your memory allows. No overflow:
+</p>
+
+<pre><code><span class="cm"># Normal integers</span>
+segments = <span class="num">42</span>
+sample_rate = <span class="num">24000</span>
+
+<span class="cm"># Very large integers (no overflow!)</span>
+huge = <span class="num">10</span> ** <span class="num">100</span>  <span class="cm"># a googol</span>
+
+<span class="cm"># Different bases</span>
+binary = <span class="num">0b1010</span>    <span class="cm"># = 10 in decimal</span>
+octal = <span class="num">0o17</span>       <span class="cm"># = 15 in decimal</span>
+hexadecimal = <span class="num">0xFF</span>  <span class="cm"># = 255 in decimal</span>
+
+<span class="cm"># Underscores for readability (Python 3.6+)</span>
+max_concurrent = <span class="num">1_000_000</span>  <span class="cm"># same as 1000000</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 4)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Normal integers</code>
+        <br><span class="desc">A comment: <em>Normal integers</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>segments = 42</code>
+        <br><span class="desc">Assigns <code>42</code> to <code>segments</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>sample_rate = 24000</code>
+        <br><span class="desc">Assigns <code>24000</code> to <code>sample_rate</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># Very large integers (no overflow!)</code>
+        <br><span class="desc">A comment: <em>Very large integers (no overflow!)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>huge = 10 ** 100  # a googol</code>
+        <br><span class="desc">Assigns <code>10 ** 100  # a googol</code> to <code>huge</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># Different bases</code>
+        <br><span class="desc">A comment: <em>Different bases</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>binary = 0b1010    # = 10 in decimal</code>
+        <br><span class="desc">Assigns <code>0b1010    # = 10 in decimal</code> to <code>binary</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>octal = 0o17       # = 15 in decimal</code>
+        <br><span class="desc">Assigns <code>0o17       # = 15 in decimal</code> to <code>octal</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>hexadecimal = 0xFF  # = 255 in decimal</code>
+        <br><span class="desc">Assigns <code>0xFF  # = 255 in decimal</code> to <code>hexadecimal</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code># Underscores for readability (Python 3.6+)</code>
+        <br><span class="desc">A comment: <em>Underscores for readability (Python 3.6+)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>max_concurrent = 1_000_000  # same as 1000000</code>
+        <br><span class="desc">Assigns <code>1_000_000  # same as 1000000</code> to <code>max_concurrent</code>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>Floats (<code>float</code>)</h3>
+
+<pre><code><span class="cm"># Floats (64-bit double precision)</span>
+pitch = <span class="num">1.0</span>
+volume = <span class="num">0.75</span>
+speed_factor = <span class="num">1.5</span>
+
+<span class="cm"># Scientific notation</span>
+sample_size = <span class="num">1.6e-19</span>   <span class="cm"># 1.6 × 10^-19</span>
+
+<span class="cm"># ⚠️ Float precision is limited</span>
+<span class="kw">print</span>(<span class="num">0.1</span> + <span class="num">0.2</span>)        <span class="cm"># 0.30000000000000004</span>
+<span class="kw">print</span>(<span class="num">0.1</span> + <span class="num">0.2</span> == <span class="num">0.3</span>)  <span class="cm"># False!</span>
+
+<span class="cm"># For precise decimal arithmetic, use the decimal module</span>
+<span class="kw">from</span> decimal <span class="kw">import</span> Decimal
+<span class="kw">print</span>(Decimal(<span class="str">"0.1"</span>) + Decimal(<span class="str">"0.2"</span>) == Decimal(<span class="str">"0.3"</span>))  <span class="cm"># True</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 5)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Floats (64-bit double precision)</code>
+        <br><span class="desc">A comment: <em>Floats (64-bit double precision)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>pitch = 1.0</code>
+        <br><span class="desc">Assigns <code>1.0</code> to <code>pitch</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>volume = 0.75</code>
+        <br><span class="desc">Assigns <code>0.75</code> to <code>volume</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>speed_factor = 1.5</code>
+        <br><span class="desc">Assigns <code>1.5</code> to <code>speed_factor</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># Scientific notation</code>
+        <br><span class="desc">A comment: <em>Scientific notation</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>sample_size = 1.6e-19   # 1.6 × 10^-19</code>
+        <br><span class="desc">Assigns <code>1.6e-19   # 1.6 × 10^-19</code> to <code>sample_size</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># ⚠️ Float precision is limited</code>
+        <br><span class="desc">A comment: <em>⚠️ Float precision is limited</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>print(0.1 + 0.2)        # 0.30000000000000004</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>print(0.1 + 0.2 == 0.3)  # False!</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code># For precise decimal arithmetic, use the decimal module</code>
+        <br><span class="desc">A comment: <em>For precise decimal arithmetic, use the decimal module</em>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>from decimal import Decimal</code>
+        <br><span class="desc">Imports <code>Decimal</code> from <code>decimal</code>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>print(Decimal(&quot;0.1&quot;) + Decimal(&quot;0.2&quot;) == Decimal(&quot;0.3&quot;))  # True</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<div class="warning">
+  Float comparison is a classic Python gotcha. Never use <code>==</code> to compare
+  floats for equality. Instead, check if they are close enough:
+  <code>abs(a - b) < 1e-9</code> or use <code>math.isclose(a, b)</code>.
+</div>
+
+<h3>Complex Numbers</h3>
+
+<pre><code><span class="cm"># Complex numbers (used in signal processing / audio)</span>
+z = <span class="num">3</span> + <span class="num">4j</span>
+<span class="kw">print</span>(z.real)    <span class="cm"># 3.0</span>
+<span class="kw">print</span>(z.imag)    <span class="cm"># 4.0</span>
+<span class="kw">print</span>(abs(z))     <span class="cm"># 5.0 (magnitude)</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 6)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Complex numbers (used in signal processing / audio)</code>
+        <br><span class="desc">A comment: <em>Complex numbers (used in signal processing / audio)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>z = 3 + 4j</code>
+        <br><span class="desc">Assigns <code>3 + 4j</code> to <code>z</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>print(z.real)    # 3.0</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>print(z.imag)    # 4.0</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>print(abs(z))     # 5.0 (magnitude)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>2.3 Booleans</h2>
+
+<p>
+  <code>bool</code> is a subclass of <code>int</code> — <code>True</code> is 1,
+  <code>False</code> is 0:
+</p>
+
+<pre><code>is_running = <span class="kw">True</span>
+has_gpu = <span class="kw">False</span>
+
+<span class="cm"># Booleans participate in arithmetic</span>
+<span class="kw">print</span>(<span class="kw">True</span> + <span class="kw">True</span> + <span class="kw">False</span>)  <span class="cm"># 2</span>
+<span class="kw">print</span>(<span class="kw">True</span> * <span class="num">10</span>)              <span class="cm"># 10</span>
+
+<span class="cm"># Truthiness: many values are "truthy" or "falsy"</span>
+<span class="kw">print</span>(bool(<span class="num">1</span>))        <span class="cm"># True</span>
+<span class="kw">print</span>(bool(<span class="num">0</span>))        <span class="cm"># False</span>
+<span class="kw">print</span>(bool(<span class="str">"hello"</span>))  <span class="cm"># True (non-empty string)</span>
+<span class="kw">print</span>(bool(<span class="str">""</span>))       <span class="cm"># False (empty string)</span>
+<span class="kw">print</span>(bool([]))       <span class="cm"># False (empty list)</span>
+<span class="kw">print</span>(bool([<span class="num">1</span>]))     <span class="cm"># True (non-empty list)</span>
+<span class="kw">print</span>(bool(<span class="kw">None</span>))     <span class="cm"># False</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 7)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>is_running = True</code>
+        <br><span class="desc">Assigns <code>True</code> to <code>is_running</code>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>has_gpu = False</code>
+        <br><span class="desc">Assigns <code>False</code> to <code>has_gpu</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># Booleans participate in arithmetic</code>
+        <br><span class="desc">A comment: <em>Booleans participate in arithmetic</em>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>print(True + True + False)  # 2</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>print(True * 10)              # 10</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># Truthiness: many values are &quot;truthy&quot; or &quot;falsy&quot;</code>
+        <br><span class="desc">A comment: <em>Truthiness: many values are &quot;truthy&quot; or &quot;falsy&quot;</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>print(bool(1))        # True</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>print(bool(0))        # False</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>print(bool(&quot;hello&quot;))  # True (non-empty string)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>print(bool(&quot;&quot;))       # False (empty string)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>print(bool([]))       # False (empty list)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>print(bool([1]))     # True (non-empty list)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>print(bool(None))     # False</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>Boolean Operators</h3>
+
+<pre><code><span class="cm"># and, or, not</span>
+has_gpu = <span class="kw">True</span>
+runtime_installed = <span class="kw">False</span>
+
+can_use_cuda = has_gpu <span class="kw">and</span> runtime_installed   <span class="cm"># False</span>
+use_cpu = <span class="kw">not</span> has_gpu <span class="kw">or</span> runtime_installed   <span class="cm"># False</span>
+
+<span class="cm"># Short-circuit evaluation (important for performance)</span>
+<span class="cm"># "and" stops at the first False, "or" stops at the first True</span>
+result = <span class="kw">False</span> <span class="kw">and</span> expensive_function()  <span class="cm"># expensive_function() never called!</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 8)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># and, or, not</code>
+        <br><span class="desc">A comment: <em>and, or, not</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>has_gpu = True</code>
+        <br><span class="desc">Assigns <code>True</code> to <code>has_gpu</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>runtime_installed = False</code>
+        <br><span class="desc">Assigns <code>False</code> to <code>runtime_installed</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>can_use_cuda = has_gpu and runtime_installed   # False</code>
+        <br><span class="desc">Assigns <code>has_gpu and runtime_installed   # False</code> to <code>can_use_cuda</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>use_cpu = not has_gpu or runtime_installed   # False</code>
+        <br><span class="desc">Assigns <code>not has_gpu or runtime_installed   # False</code> to <code>use_cpu</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># Short-circuit evaluation (important for performance)</code>
+        <br><span class="desc">A comment: <em>Short-circuit evaluation (important for performance)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># &quot;and&quot; stops at the first False, &quot;or&quot; stops at the first True</code>
+        <br><span class="desc">A comment: <em>&quot;and&quot; stops at the first False, &quot;or&quot; stops at the first True</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>result = False and expensive_function()  # expensive_function() never called!</code>
+        <br><span class="desc">Assigns <code>False and expensive_function()  # expensive_function() never called!</code> to <code>result</code>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>2.4 Strings</h2>
+
+<p>
+  Strings in Python are <strong>immutable sequences of Unicode characters</strong>.
+  They are one of the most commonly used types:
+</p>
+
+<pre><code><span class="cm"># String creation (three ways)</span>
+name = <span class="str">"AI Voice Studio"</span>       <span class="cm"># double quotes</span>
+name = <span class="str">'AI Voice Studio'</span>       <span class="cm"># single quotes (same thing)</span>
+doc = <span class="str">"""This is a
+multi-line string."""</span>         <span class="cm"># triple quotes</span>
+
+<span class="cm"># Strings are immutable</span>
+s = <span class="str">"hello"</span>
+<span class="cm"># s[0] = "H"  # TypeError! Can't change characters</span>
+
+<span class="cm"># Must create a new string</span>
+s = <span class="str">"H"</span> + s[<span class="num">1</span>:]   <span class="cm"># "Hello"</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 9)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># String creation (three ways)</code>
+        <br><span class="desc">A comment: <em>String creation (three ways)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>name = &quot;AI Voice Studio&quot;       # double quotes</code>
+        <br><span class="desc">Assigns <code>&quot;AI Voice Studio&quot;       # double quotes</code> to <code>name</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>name = &#x27;AI Voice Studio&#x27;       # single quotes (same thing)</code>
+        <br><span class="desc">Assigns <code>&#x27;AI Voice Studio&#x27;       # single quotes (same thing)</code> to <code>name</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>doc = &quot;&quot;&quot;This is a</code>
+        <br><span class="desc">Assigns <code>&quot;&quot;&quot;This is a</code> to <code>doc</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>multi-line string.&quot;&quot;&quot;         # triple quotes</code>
+        <br><span class="desc"><code>multi-line string.&quot;&quot;&quot;         # triple quotes</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># Strings are immutable</code>
+        <br><span class="desc">A comment: <em>Strings are immutable</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>s = &quot;hello&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;hello&quot;</code> to <code>s</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># s[0] = &quot;H&quot;  # TypeError! Can&#x27;t change characters</code>
+        <br><span class="desc">A comment: <em>s[0] = &quot;H&quot;  # TypeError! Can&#x27;t change characters</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code># Must create a new string</code>
+        <br><span class="desc">A comment: <em>Must create a new string</em>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>s = &quot;H&quot; + s[1:]   # &quot;Hello&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;H&quot; + s[1:]   # &quot;Hello&quot;</code> to <code>s</code>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>Common String Operations</h3>
+
+<pre><code>text = <span class="str">"Hello, AI Voice Studio!"</span>
+
+<span class="cm"># Length</span>
+<span class="kw">print</span>(len(text))            <span class="cm"># 23</span>
+
+<span class="cm"># Indexing (0-based)</span>
+<span class="kw">print</span>(text[<span class="num">0</span>])              <span class="cm"># "H"</span>
+<span class="kw">print</span>(text[-<span class="num">1</span>])             <span class="cm"># "!" (last character)</span>
+
+<span class="cm"># Slicing [start:stop:step]</span>
+<span class="kw">print</span>(text[<span class="num">7</span>:<span class="num">19</span>])           <span class="cm"># "AI Voice Stud"</span>
+<span class="kw">print</span>(text[::<span class="num">2</span>])             <span class="cm"># "HloAVcsad!" (every other char)</span>
+
+<span class="cm"># Methods</span>
+<span class="kw">print</span>(text.upper())          <span class="cm"># "HELLO, AI VOICE STUDIO!"</span>
+<span class="kw">print</span>(text.lower())          <span class="cm"># "hello, ai voice studio!"</span>
+<span class="kw">print</span>(text.replace(<span class="str">"AI"</span>, <span class="str">"ML"</span>))  <span class="cm"># "Hello, ML Voice Studio!"</span>
+<span class="kw">print</span>(text.split(<span class="str">", "</span>))       <span class="cm"># ["Hello", "AI Voice Studio!"]</span>
+<span class="kw">print</span>(text.find(<span class="str">"Voice"</span>))     <span class="cm"># 7 (index of first match)</span>
+<span class="kw">print</span>(text.startswith(<span class="str">"Hello"</span>))  <span class="cm"># True</span>
+<span class="kw">print</span>(text.endswith(<span class="str">"!"</span>))      <span class="cm"># True</span>
+
+<span class="cm"># Stripping whitespace</span>
+padded = <span class="str">"  hello  "</span>
+<span class="kw">print</span>(padded.strip())        <span class="cm"># "hello"</span>
+<span class="kw">print</span>(padded.lstrip())       <span class="cm"># "hello  "</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 10)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>text = &quot;Hello, AI Voice Studio!&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;Hello, AI Voice Studio!&quot;</code> to <code>text</code>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Length</code>
+        <br><span class="desc">A comment: <em>Length</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>print(len(text))            # 23</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># Indexing (0-based)</code>
+        <br><span class="desc">A comment: <em>Indexing (0-based)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>print(text[0])              # &quot;H&quot;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>print(text[-1])             # &quot;!&quot; (last character)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># Slicing [start:stop:step]</code>
+        <br><span class="desc">A comment: <em>Slicing [start:stop:step]</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>print(text[7:19])           # &quot;AI Voice Stud&quot;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>print(text[::2])             # &quot;HloAVcsad!&quot; (every other char)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code># Methods</code>
+        <br><span class="desc">A comment: <em>Methods</em>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>print(text.upper())          # &quot;HELLO, AI VOICE STUDIO!&quot;</code>
+        <br><span class="desc">Converts all characters to uppercase. Returns a new string (strings are immutable).</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>print(text.lower())          # &quot;hello, ai voice studio!&quot;</code>
+        <br><span class="desc">Converts all characters to lowercase. Returns a new string.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>print(text.replace(&quot;AI&quot;, &quot;ML&quot;))  # &quot;Hello, ML Voice Studio!&quot;</code>
+        <br><span class="desc">Returns a copy with all occurrences of old replaced by new. Strings are immutable.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>print(text.split(&quot;, &quot;))       # [&quot;Hello&quot;, &quot;AI Voice Studio!&quot;]</code>
+        <br><span class="desc">Splits a string into a list by the given delimiter. Without arguments, splits on whitespace.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>print(text.find(&quot;Voice&quot;))     # 7 (index of first match)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>print(text.startswith(&quot;Hello&quot;))  # True</code>
+        <br><span class="desc">Returns True if the string starts with the given prefix.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>print(text.endswith(&quot;!&quot;))      # True</code>
+        <br><span class="desc">Returns True if the string ends with the given suffix.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code># Stripping whitespace</code>
+        <br><span class="desc">A comment: <em>Stripping whitespace</em>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>padded = &quot;  hello  &quot;</code>
+        <br><span class="desc">Assigns <code>&quot;  hello  &quot;</code> to <code>padded</code>.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>print(padded.strip())        # &quot;hello&quot;</code>
+        <br><span class="desc">Removes leading and trailing whitespace (or specified characters). Returns a new string.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>print(padded.lstrip())       # &quot;hello  &quot;</code>
+        <br><span class="desc">Removes leading whitespace only.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>String Formatting (f-strings)</h3>
+
+<p>F-strings (Python 3.6+) are the preferred way to embed expressions in strings:</p>
+
+<pre><code>name = <span class="str">"Piper"</span>
+voices = <span class="num">153</span>
+
+<span class="cm"># Basic interpolation</span>
+<span class="kw">print</span>(<span class="str">f"TTS engine: <span class="op">{</span>name<span class="op">}</span>"</span>)
+
+<span class="cm"># Expressions inside braces</span>
+<span class="kw">print</span>(<span class="str">f"<span class="op">{</span>name.upper()<span class="op">}</span> has <span class="op">{</span>voices * 2<span class="op">}</span> total voice files"</span>)
+
+<span class="cm"># Format specifiers</span>
+pi = <span class="num">3.14159</span>
+<span class="kw">print</span>(<span class="str">f"Pi to 2 decimal places: <span class="op">{</span>pi:<span class="num">.2f</span><span class="op">}</span>"</span>)   <span class="cm"># 3.14</span>
+<span class="kw">print</span>(<span class="str">f"Right-aligned: '<span class="op">{</span>42:<span class="num">10</span><span class="op">}</span>'"</span>)         <span class="cm"># '        42'</span>
+<span class="kw">print</span>(<span class="str">f"Zero-padded: <span class="op">{</span>42:<span class="num">05d</span><span class="op">}</span>"</span>)             <span class="cm"># 00042</span>
+<span class="kw">print</span>(<span class="str">f"Percentage: <span class="op">{</span><span class="num">0.857</span>:<span class="num">.1%</span><span class="op">}</span>"</span>)          <span class="cm"># 85.7%</span>
+<span class="kw">print</span>(<span class="str">f"Bytes: <span class="op">{</span><span class="num">1048576</span>:<span class="num">,.0f</span><span class="op">}</span>"</span>)             <span class="cm"># 1,048,576</span>
+
+<span class="cm"># Debugging: = shows expression AND result</span>
+voices = <span class="num">153</span>
+<span class="kw">print</span>(<span class="str">f"<span class="op">{</span>voices = <span class="op">}</span>"</span>)                      <span class="cm"># voices = 153</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 11)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>name = &quot;Piper&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;Piper&quot;</code> to <code>name</code>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>voices = 153</code>
+        <br><span class="desc">Assigns <code>153</code> to <code>voices</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># Basic interpolation</code>
+        <br><span class="desc">A comment: <em>Basic interpolation</em>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>print(f&quot;TTS engine: {name}&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># Expressions inside braces</code>
+        <br><span class="desc">A comment: <em>Expressions inside braces</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>print(f&quot;{name.upper()} has {voices * 2} total voice files&quot;)</code>
+        <br><span class="desc">Converts all characters to uppercase. Returns a new string (strings are immutable).</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># Format specifiers</code>
+        <br><span class="desc">A comment: <em>Format specifiers</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>pi = 3.14159</code>
+        <br><span class="desc">Assigns <code>3.14159</code> to <code>pi</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>print(f&quot;Pi to 2 decimal places: {pi:.2f}&quot;)   # 3.14</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>print(f&quot;Right-aligned: &#x27;{42:10}&#x27;&quot;)         # &#x27;        42&#x27;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>print(f&quot;Zero-padded: {42:05d}&quot;)             # 00042</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>print(f&quot;Percentage: {0.857:.1%}&quot;)          # 85.7%</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>print(f&quot;Bytes: {1048576:,.0f}&quot;)             # 1,048,576</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code># Debugging: = shows expression AND result</code>
+        <br><span class="desc">A comment: <em>Debugging: = shows expression AND result</em>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>voices = 153</code>
+        <br><span class="desc">Assigns <code>153</code> to <code>voices</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>print(f&quot;{voices = }&quot;)                      # voices = 153</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>Strings in AI Voice Studio</h3>
+
+<p>String processing is central to text-to-speech. Here are real examples from the project:</p>
+
+<pre><code><span class="cm"># From ai_voice_studio/util.py</span>
+<span class="kw">import</span> re
+
+<span class="kw">def</span> <span class="fn">sanitize_filename</span>(name: str, max_length: int = <span class="num">80</span>) -> str:
+    <span class="str">"""Remove or replace characters that are unsafe in filenames."""</span>
+    <span class="cm"># Replace characters illegal on Windows</span>
+    name = re.sub(r'[&lt;&gt;:"/\\|?*]', <span class="str">'_'</span>, name)
+    <span class="cm"># Collapse whitespace</span>
+    name = re.sub(r'\s+', <span class="str">' '</span>, name).strip()
+    <span class="cm"># Truncate to max length</span>
+    <span class="kw">if</span> len(name) > max_length:
+        name = name[:max_length].rstrip()
+    <span class="kw">return</span> name
+
+<span class="cm"># Usage:</span>
+safe = sanitize_filename(<span class="str">"My Book: Chapter 1? Yes!"</span>)
+<span class="kw">print</span>(safe)  <span class="cm"># "My Book_ Chapter 1_ Yes!"</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 12)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From ai_voice_studio/util.py</code>
+        <br><span class="desc">A comment: <em>From ai_voice_studio/util.py</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>import re</code>
+        <br><span class="desc">Imports the <code>re</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>def sanitize_filename(name: str, max_length: int = 80) -&gt; str:</code>
+        <br><span class="desc">Defines function <code>sanitize_filename</code> accepting (name, max_length), returning <code>str</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>&quot;&quot;&quot;Remove or replace characters that are unsafe in filenames.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Remove or replace characters that are unsafe in filenames.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># Replace characters illegal on Windows</code>
+        <br><span class="desc">A comment: <em>Replace characters illegal on Windows</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>name = re.sub(r&#x27;[&lt;&gt;:&quot;/\\|?*]&#x27;, &#x27;_&#x27;, name)</code>
+        <br><span class="desc">Replaces all matches with the replacement string.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># Collapse whitespace</code>
+        <br><span class="desc">A comment: <em>Collapse whitespace</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>name = re.sub(r&#x27;\s+&#x27;, &#x27; &#x27;, name).strip()</code>
+        <br><span class="desc">Removes leading and trailing whitespace (or specified characters). Returns a new string.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code># Truncate to max length</code>
+        <br><span class="desc">A comment: <em>Truncate to max length</em>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>if len(name) &gt; max_length:</code>
+        <br><span class="desc">Returns the number of items in a sequence (string, list, dict, tuple). Essential for loop bounds and validation.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>name = name[:max_length].rstrip()</code>
+        <br><span class="desc">Removes trailing whitespace only.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>return name</code>
+        <br><span class="desc">Returns <code>name</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code># Usage:</code>
+        <br><span class="desc">A comment: <em>Usage:</em>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>safe = sanitize_filename(&quot;My Book: Chapter 1? Yes!&quot;)</code>
+        <br><span class="desc">Assigns <code>sanitize_filename(&quot;My Book: Chapter 1? Yes!&quot;)</code> to <code>safe</code>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>print(safe)  # &quot;My Book_ Chapter 1_ Yes!&quot;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>2.5 The None Type</h2>
+
+<p>
+  <code>None</code> is Python's way of representing "nothing" or "no value."
+  It is a singleton — there is exactly one <code>None</code> object in the entire
+  Python runtime:
+</p>
+
+<pre><code>result = <span class="kw">None</span>
+
+<span class="cm"># Always compare with "is", not "=="</span>
+<span class="kw">if</span> result <span class="kw">is</span> <span class="kw">None</span>:
+    <span class="kw">print</span>(<span class="str">"No result yet"</span>)
+
+<span class="cm"># ⚠️ Wrong:</span>
+<span class="kw">if</span> result == <span class="kw">None</span>:  <span class="cm"># Works but un-Pythonic; can be overridden</span>
+    <span class="kw">pass</span>
+
+<span class="cm"># None has a falsy boolean value</span>
+<span class="kw">print</span>(bool(<span class="kw">None</span>))  <span class="cm"># False</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 13)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>result = None</code>
+        <br><span class="desc">Assigns <code>None</code> to <code>result</code>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Always compare with &quot;is&quot;, not &quot;==&quot;</code>
+        <br><span class="desc">A comment: <em>Always compare with &quot;is&quot;, not &quot;==&quot;</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>if result is None:</code>
+        <br><span class="desc">Checks condition: <code>result is None</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>print(&quot;No result yet&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># ⚠️ Wrong:</code>
+        <br><span class="desc">A comment: <em>⚠️ Wrong:</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>if result == None:  # Works but un-Pythonic; can be overridden</code>
+        <br><span class="desc">Checks condition: <code>result == None</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>pass</code>
+        <br><span class="desc">Placeholder: does nothing.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># None has a falsy boolean value</code>
+        <br><span class="desc">A comment: <em>None has a falsy boolean value</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>print(bool(None))  # False</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<p>In AI Voice Studio, <code>None</code> is used extensively for "not set" values:</p>
+
+<pre><code><span class="cm"># From ai_voice_studio/clone/__init__.py</span>
+<span class="kw">class</span> <span class="cls">CloneClient</span>:
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, timeout: float = <span class="num">600.0</span>):
+        self._proc: subprocess.Popen | <span class="kw">None</span> = <span class="kw">None</span>  <span class="cm"># No process yet</span>
+
+    <span class="kw">def</span> <span class="fn">_ensure_proc</span>(self):
+        <span class="kw">if</span> self._proc <span class="kw">is not</span> <span class="kw">None</span> <span class="kw">and</span> self._proc.poll() <span class="kw">is</span> <span class="kw">None</span>:
+            <span class="kw">return</span>  <span class="cm"># Process already running</span>
+        <span class="cm"># ... start new process</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 14)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From ai_voice_studio/clone/__init__.py</code>
+        <br><span class="desc">A comment: <em>From ai_voice_studio/clone/__init__.py</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>class CloneClient:</code>
+        <br><span class="desc">Defines class <code>CloneClient</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>def __init__(self, timeout: float = 600.0):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>self._proc: subprocess.Popen | None = None  # No process yet</code>
+        <br><span class="desc">Starts a process. More control than run() — can read stdout/stderr asynchronously.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>def _ensure_proc(self):</code>
+        <br><span class="desc">Defines function <code>_ensure_proc</code> accepting (self).</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>if self._proc is not None and self._proc.poll() is None:</code>
+        <br><span class="desc">Checks condition: <code>self._proc is not None and self._proc.poll() is None</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>return  # Process already running</code>
+        <br><span class="desc">Returns <code># Process already running</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># ... start new process</code>
+        <br><span class="desc">A comment: <em>... start new process</em>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>2.6 Variable Naming Conventions</h2>
+
+<p>Python has clear conventions for naming:</p>
+
+<pre><code><span class="cm"># Variables and functions: snake_case</span>
+sample_rate = <span class="num">24000</span>
+output_dir = <span class="str">"/tmp/audio"</span>
+
+<span class="kw">def</span> <span class="fn">get_engine</span>(engine_id: str):
+    <span class="kw">pass</span>
+
+<span class="cm"># Classes: PascalCase</span>
+<span class="kw">class</span> <span class="cls">TtsEngine</span>:
+    <span class="kw">pass</span>
+
+<span class="kw">class</span> <span class="cls">RecordingDialog</span>:
+    <span class="kw">pass</span>
+
+<span class="cm"># Constants: UPPER_SNAKE_CASE</span>
+SAMPLE_RATE = <span class="num">24000</span>
+PITCH_MIN = <span class="num">0.5</span>
+PITCH_MAX = <span class="num">2.0</span>
+DEFAULT_FORMAT = <span class="str">"wav"</span>
+
+<span class="cm"># Private attributes: leading underscore</span>
+<span class="kw">class</span> <span class="cls">Settings</span>:
+    <span class="kw">def</span> <span class="fn">__init__</span>(self):
+        self._data = {}    <span class="cm"># Convention: "don't touch from outside"</span>
+        self.__secret = <span class="num">42</span>  <span class="cm"># Name mangling (different from _)</span>
+
+<span class="cm"># Dunder/magic methods: double underscores</span>
+<span class="kw">def</span> <span class="fn">__init__</span>(self):
+    <span class="kw">pass</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 15)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Variables and functions: snake_case</code>
+        <br><span class="desc">A comment: <em>Variables and functions: snake_case</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>sample_rate = 24000</code>
+        <br><span class="desc">Assigns <code>24000</code> to <code>sample_rate</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>output_dir = &quot;/tmp/audio&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;/tmp/audio&quot;</code> to <code>output_dir</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>def get_engine(engine_id: str):</code>
+        <br><span class="desc">Defines function <code>get_engine</code> accepting (engine_id).</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>pass</code>
+        <br><span class="desc">Placeholder: does nothing.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># Classes: PascalCase</code>
+        <br><span class="desc">A comment: <em>Classes: PascalCase</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>class TtsEngine:</code>
+        <br><span class="desc">Defines class <code>TtsEngine</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>pass</code>
+        <br><span class="desc">Placeholder: does nothing.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>class RecordingDialog:</code>
+        <br><span class="desc">Defines class <code>RecordingDialog</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>pass</code>
+        <br><span class="desc">Placeholder: does nothing.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># Constants: UPPER_SNAKE_CASE</code>
+        <br><span class="desc">A comment: <em>Constants: UPPER_SNAKE_CASE</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>SAMPLE_RATE = 24000</code>
+        <br><span class="desc">Assigns <code>24000</code> to <code>SAMPLE_RATE</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>PITCH_MIN = 0.5</code>
+        <br><span class="desc">Assigns <code>0.5</code> to <code>PITCH_MIN</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>PITCH_MAX = 2.0</code>
+        <br><span class="desc">Assigns <code>2.0</code> to <code>PITCH_MAX</code>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>DEFAULT_FORMAT = &quot;wav&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;wav&quot;</code> to <code>DEFAULT_FORMAT</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code># Private attributes: leading underscore</code>
+        <br><span class="desc">A comment: <em>Private attributes: leading underscore</em>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>class Settings:</code>
+        <br><span class="desc">Defines class <code>Settings</code>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>def __init__(self):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>self._data = {}    # Convention: &quot;don&#x27;t touch from outside&quot;</code>
+        <br><span class="desc">Stores <code>{}    # Convention: &quot;don&#x27;t touch from outside&quot;</code> in instance attribute <code>_data</code>.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>self.__secret = 42  # Name mangling (different from _)</code>
+        <br><span class="desc">Stores <code>42  # Name mangling (different from _)</code> in instance attribute <code>__secret</code>.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code># Dunder/magic methods: double underscores</code>
+        <br><span class="desc">A comment: <em>Dunder/magic methods: double underscores</em>.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>def __init__(self):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>pass</code>
+        <br><span class="desc">Placeholder: does nothing.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>Reserved Words (Keywords)</h3>
+
+<p>You cannot use Python keywords as variable names:</p>
+
+<pre><code><span class="kw">import</span> keyword
+<span class="kw">print</span>(keyword.kwlist)
+<span class="cm"># ['False', 'None', 'True', 'and', 'as', 'assert', 'async',</span>
+<span class="cm">#  'await', 'break', 'class', 'continue', 'def', 'del', 'elif',</span>
+<span class="cm">#  'else', 'except', 'finally', 'for', 'from', 'global', 'if',</span>
+<span class="cm">#  'import', 'in', 'is', 'lambda', 'nonlocal', 'not', 'or',</span>
+<span class="cm">#  'pass', 'raise', 'return', 'try', 'while', 'with', 'yield']</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 16)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>import keyword</code>
+        <br><span class="desc">Imports the <code>keyword</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>print(keyword.kwlist)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># [&#x27;False&#x27;, &#x27;None&#x27;, &#x27;True&#x27;, &#x27;and&#x27;, &#x27;as&#x27;, &#x27;assert&#x27;, &#x27;async&#x27;,</code>
+        <br><span class="desc">A comment: <em>[&#x27;False&#x27;, &#x27;None&#x27;, &#x27;True&#x27;, &#x27;and&#x27;, &#x27;as&#x27;, &#x27;assert&#x27;, &#x27;async&#x27;,</em>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>#  &#x27;await&#x27;, &#x27;break&#x27;, &#x27;class&#x27;, &#x27;continue&#x27;, &#x27;def&#x27;, &#x27;del&#x27;, &#x27;elif&#x27;,</code>
+        <br><span class="desc">A comment: <em>&#x27;await&#x27;, &#x27;break&#x27;, &#x27;class&#x27;, &#x27;continue&#x27;, &#x27;def&#x27;, &#x27;del&#x27;, &#x27;elif&#x27;,</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>#  &#x27;else&#x27;, &#x27;except&#x27;, &#x27;finally&#x27;, &#x27;for&#x27;, &#x27;from&#x27;, &#x27;global&#x27;, &#x27;if&#x27;,</code>
+        <br><span class="desc">A comment: <em>&#x27;else&#x27;, &#x27;except&#x27;, &#x27;finally&#x27;, &#x27;for&#x27;, &#x27;from&#x27;, &#x27;global&#x27;, &#x27;if&#x27;,</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>#  &#x27;import&#x27;, &#x27;in&#x27;, &#x27;is&#x27;, &#x27;lambda&#x27;, &#x27;nonlocal&#x27;, &#x27;not&#x27;, &#x27;or&#x27;,</code>
+        <br><span class="desc">A comment: <em>&#x27;import&#x27;, &#x27;in&#x27;, &#x27;is&#x27;, &#x27;lambda&#x27;, &#x27;nonlocal&#x27;, &#x27;not&#x27;, &#x27;or&#x27;,</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>#  &#x27;pass&#x27;, &#x27;raise&#x27;, &#x27;return&#x27;, &#x27;try&#x27;, &#x27;while&#x27;, &#x27;with&#x27;, &#x27;yield&#x27;]</code>
+        <br><span class="desc">A comment: <em>&#x27;pass&#x27;, &#x27;raise&#x27;, &#x27;return&#x27;, &#x27;try&#x27;, &#x27;while&#x27;, &#x27;with&#x27;, &#x27;yield&#x27;]</em>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<div class="tip">
+  Good variable names are <strong>self-documenting</strong>. In the AI Voice Studio
+  codebase, <code>variant_id</code> is immediately understandable, while
+  <code>vid</code> requires you to look up what it means. Always choose clarity
+  over brevity.
+</div>
+
+<hr>
+
+<h2>2.7 Type Conversion (Casting)</h2>
+
+<p>Python does not automatically convert between types, but you can do it explicitly:</p>
+
+<pre><code><span class="cm"># int → float</span>
+x = <span class="kw">float</span>(<span class="num">42</span>)     <span class="cm"># 42.0</span>
+
+<span class="cm"># float → int (truncates toward zero)</span>
+x = <span class="kw">int</span>(<span class="num">3.9</span>)      <span class="cm"># 3 (NOT 4!)</span>
+x = <span class="kw">int</span>(-<span class="num">3.9</span>)     <span class="cm"># -3</span>
+
+<span class="cm"># int/float → str</span>
+s = <span class="kw">str</span>(<span class="num">42</span>)       <span class="cm"># "42"</span>
+s = <span class="kw">str</span>(<span class="num">3.14</span>)     <span class="cm"># "3.14"</span>
+
+<span class="cm"># str → int</span>
+n = <span class="kw">int</span>(<span class="str">"42"</span>)     <span class="cm"># 42</span>
+<span class="cm"># int("hello")  # ValueError!</span>
+
+<span class="cm"># str → float</span>
+f = <span class="kw">float</span>(<span class="str">"3.14"</span>) <span class="cm"># 3.14</span>
+
+<span class="cm"># int → bool</span>
+<span class="kw">print</span>(bool(<span class="num">0</span>))    <span class="cm"># False</span>
+<span class="kw">print</span>(bool(<span class="num">1</span>))    <span class="cm"># True</span>
+<span class="kw">print</span>(bool(<span class="num">42</span>))   <span class="cm"># True (any non-zero is True)</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 17)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># int → float</code>
+        <br><span class="desc">A comment: <em>int → float</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>x = float(42)     # 42.0</code>
+        <br><span class="desc">Converts a value to a floating-point number. Used for decimal arithmetic.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># float → int (truncates toward zero)</code>
+        <br><span class="desc">A comment: <em>float → int (truncates toward zero)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>x = int(3.9)      # 3 (NOT 4!)</code>
+        <br><span class="desc">Converts a value to an integer. Truncates floats toward zero. Raises ValueError for invalid strings.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>x = int(-3.9)     # -3</code>
+        <br><span class="desc">Converts a value to an integer. Truncates floats toward zero. Raises ValueError for invalid strings.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># int/float → str</code>
+        <br><span class="desc">A comment: <em>int/float → str</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>s = str(42)       # &quot;42&quot;</code>
+        <br><span class="desc">Converts a value to its string representation. Essential for string concatenation and formatting.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>s = str(3.14)     # &quot;3.14&quot;</code>
+        <br><span class="desc">Converts a value to its string representation. Essential for string concatenation and formatting.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code># str → int</code>
+        <br><span class="desc">A comment: <em>str → int</em>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>n = int(&quot;42&quot;)     # 42</code>
+        <br><span class="desc">Converts a value to an integer. Truncates floats toward zero. Raises ValueError for invalid strings.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># int(&quot;hello&quot;)  # ValueError!</code>
+        <br><span class="desc">A comment: <em>int(&quot;hello&quot;)  # ValueError!</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code># str → float</code>
+        <br><span class="desc">A comment: <em>str → float</em>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>f = float(&quot;3.14&quot;) # 3.14</code>
+        <br><span class="desc">Converts a value to a floating-point number. Used for decimal arithmetic.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code># int → bool</code>
+        <br><span class="desc">A comment: <em>int → bool</em>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>print(bool(0))    # False</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>print(bool(1))    # True</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>print(bool(42))   # True (any non-zero is True)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>Type Conversion in AIVS</h3>
+
+<p>The project frequently converts slider values (integers) to float parameters:</p>
+
+<pre><code><span class="cm"># From recording_dialog.py — slider values are ints, params are floats</span>
+<span class="kw">def</span> <span class="fn">_current_params</span>(self):
+    <span class="kw">return</span> {
+        <span class="str">"rate"</span>: self.rate.GetValue() / <span class="num">100.0</span>,    <span class="cm"># int → float</span>
+        <span class="str">"pitch"</span>: self.pitch.GetValue() / <span class="num">100.0</span>,
+        <span class="str">"volume"</span>: self.volume.GetValue() / <span class="num">100.0</span>,
+    }
+
+<span class="cm"># The slider holds 100 = 1.00, 150 = 1.50, etc.</span>
+<span class="cm"># This avoids floating-point slider precision issues.</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 18)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From recording_dialog.py — slider values are ints, params are floats</code>
+        <br><span class="desc">A comment: <em>From recording_dialog.py — slider values are ints, params are floats</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def _current_params(self):</code>
+        <br><span class="desc">Defines function <code>_current_params</code> accepting (self).</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>return {</code>
+        <br><span class="desc">Returns <code>{</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>&quot;rate&quot;: self.rate.GetValue() / 100.0,    # int → float</code>
+        <br><span class="desc"><code>&quot;rate&quot;: self.rate.GetValue() / 100.0,    # int → float</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>&quot;pitch&quot;: self.pitch.GetValue() / 100.0,</code>
+        <br><span class="desc"><code>&quot;pitch&quot;: self.pitch.GetValue() / 100.0,</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>&quot;volume&quot;: self.volume.GetValue() / 100.0,</code>
+        <br><span class="desc"><code>&quot;volume&quot;: self.volume.GetValue() / 100.0,</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>}</code>
+        <br><span class="desc"><code>}</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># The slider holds 100 = 1.00, 150 = 1.50, etc.</code>
+        <br><span class="desc">A comment: <em>The slider holds 100 = 1.00, 150 = 1.50, etc.</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code># This avoids floating-point slider precision issues.</code>
+        <br><span class="desc">A comment: <em>This avoids floating-point slider precision issues.</em>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>2.8 Mutable vs. Immutable</h2>
+
+<p>
+  This distinction is crucial in Python. <strong>Immutable</strong> objects cannot
+  be changed after creation; <strong>mutable</strong> objects can:
+</p>
+
+<table>
+  <thead>
+    <tr><th>Immutable</th><th>Mutable</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>int</code>, <code>float</code>, <code>complex</code></td><td><code>list</code></td></tr>
+    <tr><td><code>str</code></td><td><code>dict</code></td></tr>
+    <tr><td><code>tuple</code></td><td><code>set</code></td></tr>
+    <tr><td><code>frozenset</code></td><td><code>bytearray</code></td></tr>
+    <tr><td><code>bytes</code></td><td>Objects (instances of classes)</td></tr>
+    <tr><td><code>NoneType</code></td><td></td></tr>
+  </tbody>
+</table>
+
+<pre><code><span class="cm"># Immutable: assignment creates a new object</span>
+a = <span class="str">"hello"</span>
+b = a          <span class="cm"># b points to the SAME string</span>
+a = <span class="str">"world"</span>   <span class="cm"># Now a points to a NEW string</span>
+<span class="kw">print</span>(b)       <span class="cm"># "hello" — b is unchanged!</span>
+
+<span class="cm"># Mutable: assignment creates a reference</span>
+a = [<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>]
+b = a          <span class="cm"># b points to the SAME list</span>
+a.append(<span class="num">4</span>)    <span class="cm"># Modifies the shared list</span>
+<span class="kw">print</span>(b)       <span class="cm"># [1, 2, 3, 4] — b is also changed!</span>
+
+<span class="cm"># To make an independent copy:</span>
+b = a.copy()   <span class="cm"># or b = list(a) or b = a[:]</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 19)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Immutable: assignment creates a new object</code>
+        <br><span class="desc">A comment: <em>Immutable: assignment creates a new object</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>a = &quot;hello&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;hello&quot;</code> to <code>a</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>b = a          # b points to the SAME string</code>
+        <br><span class="desc">Assigns <code>a          # b points to the SAME string</code> to <code>b</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>a = &quot;world&quot;   # Now a points to a NEW string</code>
+        <br><span class="desc">Assigns <code>&quot;world&quot;   # Now a points to a NEW string</code> to <code>a</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>print(b)       # &quot;hello&quot; — b is unchanged!</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># Mutable: assignment creates a reference</code>
+        <br><span class="desc">A comment: <em>Mutable: assignment creates a reference</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>a = [1, 2, 3]</code>
+        <br><span class="desc">Assigns <code>[1, 2, 3]</code> to <code>a</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>b = a          # b points to the SAME list</code>
+        <br><span class="desc">Assigns <code>a          # b points to the SAME list</code> to <code>b</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>a.append(4)    # Modifies the shared list</code>
+        <br><span class="desc">Adds a single item to the end of the list.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>print(b)       # [1, 2, 3, 4] — b is also changed!</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># To make an independent copy:</code>
+        <br><span class="desc">A comment: <em>To make an independent copy:</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>b = a.copy()   # or b = list(a) or b = a[:]</code>
+        <br><span class="desc">Returns a shallow copy of the dictionary.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<div class="note">
+  The project stores settings as a mutable <code>dict</code>. When saving, it
+  serializes the entire dict to JSON. This "snapshot" approach means the settings
+  are effectively immutable at the file level, even though the in-memory dict is
+  mutable.
+</div>
+
+<hr>
+
+<h2>2.9 Identity vs. Equality</h2>
+
+<p>Python has two ways to compare objects:</p>
+
+<pre><code><span class="cm"># == checks VALUE equality</span>
+a = [<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>]
+b = [<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>]
+<span class="kw">print</span>(a == b)    <span class="cm"># True — same contents</span>
+
+<span class="cm"># "is" checks IDENTITY (same object in memory)</span>
+<span class="kw">print</span>(a <span class="kw">is</span> b)    <span class="cm"># False — different list objects</span>
+
+<span class="cm"># For singletons like None, always use "is"</span>
+x = <span class="kw">None</span>
+<span class="kw">print</span>(x <span class="kw">is</span> <span class="kw">None</span>)    <span class="cm"># True ✓</span>
+<span class="kw">print</span>(x == <span class="kw">None</span>)    <span class="cm"># Also True, but un-Pythonic ✗</span>
+
+<span class="cm"># Small integers are cached (CPython optimization)</span>
+a = <span class="num">256</span>
+b = <span class="num">256</span>
+<span class="kw">print</span>(a <span class="kw">is</span> b)    <span class="cm"># True — both refer to cached object</span>
+
+a = <span class="num">257</span>
+b = <span class="num">257</span>
+<span class="kw">print</span>(a <span class="kw">is</span> b)    <span class="cm"># False (usually) — outside the cache range</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 20)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># == checks VALUE equality</code>
+        <br><span class="desc">A comment: <em>== checks VALUE equality</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>a = [1, 2, 3]</code>
+        <br><span class="desc">Assigns <code>[1, 2, 3]</code> to <code>a</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>b = [1, 2, 3]</code>
+        <br><span class="desc">Assigns <code>[1, 2, 3]</code> to <code>b</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>print(a == b)    # True — same contents</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># &quot;is&quot; checks IDENTITY (same object in memory)</code>
+        <br><span class="desc">A comment: <em>&quot;is&quot; checks IDENTITY (same object in memory)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>print(a is b)    # False — different list objects</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># For singletons like None, always use &quot;is&quot;</code>
+        <br><span class="desc">A comment: <em>For singletons like None, always use &quot;is&quot;</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>x = None</code>
+        <br><span class="desc">Assigns <code>None</code> to <code>x</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>print(x is None)    # True ✓</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>print(x == None)    # Also True, but un-Pythonic ✗</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># Small integers are cached (CPython optimization)</code>
+        <br><span class="desc">A comment: <em>Small integers are cached (CPython optimization)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>a = 256</code>
+        <br><span class="desc">Assigns <code>256</code> to <code>a</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>b = 256</code>
+        <br><span class="desc">Assigns <code>256</code> to <code>b</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>print(a is b)    # True — both refer to cached object</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>a = 257</code>
+        <br><span class="desc">Assigns <code>257</code> to <code>a</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>b = 257</code>
+        <br><span class="desc">Assigns <code>257</code> to <code>b</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>print(a is b)    # False (usually) — outside the cache range</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>2.10 Augmented Assignment</h2>
+
+<p>Shorthand operators that modify and assign in one step:</p>
+
+<pre><code>x = <span class="num">10</span>
+x += <span class="num">5</span>    <span class="cm"># x = x + 5  → 15</span>
+x -= <span class="num">3</span>    <span class="cm"># x = x - 3  → 12</span>
+x *= <span class="num">2</span>    <span class="cm"># x = x * 2  → 24</span>
+x /= <span class="num">4</span>    <span class="cm"># x = x / 4  → 6.0 (note: always float after /)</span>
+x //= <span class="num">2</span>   <span class="cm"># x = x // 2 → 3.0 (floor division)</span>
+x %= <span class="num">2</span>    <span class="cm"># x = x % 2  → 1.0 (modulo)</span>
+
+<span class="cm"># For strings, += creates a new string</span>
+msg = <span class="str">"Hello"</span>
+msg += <span class="str">", World!"</span>  <span class="cm"># "Hello, World!"</span>
+
+<span class="cm"># For lists, += extends in-place (mutates)</span>
+items = [<span class="num">1</span>, <span class="num">2</span>]
+items += [<span class="num">3</span>, <span class="num">4</span>]  <span class="cm"># items is now [1, 2, 3, 4]</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 21)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>x = 10</code>
+        <br><span class="desc">Assigns <code>10</code> to <code>x</code>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>x += 5    # x = x + 5  → 15</code>
+        <br><span class="desc">Updates <code>x</code> by += <code>5    # x = x + 5  → 15</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>x -= 3    # x = x - 3  → 12</code>
+        <br><span class="desc">Updates <code>x</code> by -= <code>3    # x = x - 3  → 12</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>x *= 2    # x = x * 2  → 24</code>
+        <br><span class="desc">Updates <code>x</code> by *= <code>2    # x = x * 2  → 24</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>x /= 4    # x = x / 4  → 6.0 (note: always float after /)</code>
+        <br><span class="desc">Updates <code>x</code> by /= <code>4    # x = x / 4  → 6.0 (note: always float after /)</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>x //= 2   # x = x // 2 → 3.0 (floor division)</code>
+        <br><span class="desc">Updates <code>x</code> by //= <code>2   # x = x // 2 → 3.0 (floor division)</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>x %= 2    # x = x % 2  → 1.0 (modulo)</code>
+        <br><span class="desc">Updates <code>x</code> by %= <code>2    # x = x % 2  → 1.0 (modulo)</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># For strings, += creates a new string</code>
+        <br><span class="desc">A comment: <em>For strings, += creates a new string</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>msg = &quot;Hello&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;Hello&quot;</code> to <code>msg</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>msg += &quot;, World!&quot;  # &quot;Hello, World!&quot;</code>
+        <br><span class="desc">Updates <code>msg</code> by += <code>&quot;, World!&quot;  # &quot;Hello, World!&quot;</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># For lists, += extends in-place (mutates)</code>
+        <br><span class="desc">A comment: <em>For lists, += extends in-place (mutates)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>items = [1, 2]</code>
+        <br><span class="desc">Assigns <code>[1, 2]</code> to <code>items</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>items += [3, 4]  # items is now [1, 2, 3, 4]</code>
+        <br><span class="desc">Updates <code>items</code> by += <code>[3, 4]  # items is now [1, 2, 3, 4]</code>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>2.11 Unpacking</h2>
+
+<p>Python's unpacking syntax makes assignments clean and readable:</p>
+
+<pre><code><span class="cm"># Tuple unpacking</span>
+x, y, z = <span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>
+
+<span class="cm"># Swap variables (no temp variable needed!)</span>
+a, b = <span class="num">10</span>, <span class="num">20</span>
+a, b = b, a  <span class="cm"># a=20, b=10</span>
+
+<span class="cm"># Star unpacking (Python 3+)</span>
+first, *middle, last = [<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">4</span>, <span class="num">5</span>]
+<span class="cm"># first=1, middle=[2,3,4], last=5</span>
+
+<span class="cm"># Ignoring values with _</span>
+name, _, version = <span class="str">"Piper"</span>, <span class="str">"en_US"</span>, <span class="str">"medium"</span>
+
+<span class="cm"># Dict unpacking (Python 3.5+)</span>
+defaults = {<span class="str">"rate"</span>: <span class="num">1.0</span>, <span class="str">"pitch"</span>: <span class="num">1.0</span>, <span class="str">"volume"</span>: <span class="num">1.0</span>}
+overrides = {<span class="str">"rate"</span>: <span class="num">1.5</span>}
+params = {**defaults, **overrides}  <span class="cm"># {"rate": 1.5, "pitch": 1.0, "volume": 1.0}</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 22)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Tuple unpacking</code>
+        <br><span class="desc">A comment: <em>Tuple unpacking</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>x, y, z = 1, 2, 3</code>
+        <br><span class="desc"><code>x, y, z = 1, 2, 3</code></span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># Swap variables (no temp variable needed!)</code>
+        <br><span class="desc">A comment: <em>Swap variables (no temp variable needed!)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>a, b = 10, 20</code>
+        <br><span class="desc"><code>a, b = 10, 20</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>a, b = b, a  # a=20, b=10</code>
+        <br><span class="desc"><code>a, b = b, a  # a=20, b=10</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># Star unpacking (Python 3+)</code>
+        <br><span class="desc">A comment: <em>Star unpacking (Python 3+)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>first, *middle, last = [1, 2, 3, 4, 5]</code>
+        <br><span class="desc"><code>first, *middle, last = [1, 2, 3, 4, 5]</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># first=1, middle=[2,3,4], last=5</code>
+        <br><span class="desc">A comment: <em>first=1, middle=[2,3,4], last=5</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code># Ignoring values with _</code>
+        <br><span class="desc">A comment: <em>Ignoring values with _</em>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>name, _, version = &quot;Piper&quot;, &quot;en_US&quot;, &quot;medium&quot;</code>
+        <br><span class="desc"><code>name, _, version = &quot;Piper&quot;, &quot;en_US&quot;, &quot;medium&quot;</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># Dict unpacking (Python 3.5+)</code>
+        <br><span class="desc">A comment: <em>Dict unpacking (Python 3.5+)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>defaults = {&quot;rate&quot;: 1.0, &quot;pitch&quot;: 1.0, &quot;volume&quot;: 1.0}</code>
+        <br><span class="desc">Assigns <code>{&quot;rate&quot;: 1.0, &quot;pitch&quot;: 1.0, &quot;volume&quot;: 1.0}</code> to <code>defaults</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>overrides = {&quot;rate&quot;: 1.5}</code>
+        <br><span class="desc">Assigns <code>{&quot;rate&quot;: 1.5}</code> to <code>overrides</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>params = {**defaults, **overrides}  # {&quot;rate&quot;: 1.5, &quot;pitch&quot;: 1.0, &quot;volume&quot;: 1.0}</code>
+        <br><span class="desc">Assigns <code>{**defaults, **overrides}  # {&quot;rate&quot;: 1.5, &quot;pitch&quot;: 1.0, &quot;volume&quot;: 1.0}</code> to <code>params</code>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>2.12 Type Hints (Preview)</h2>
+
+<p>
+  Python 3.5+ supports optional type annotations. These do not enforce types at
+  runtime but help IDEs, linters, and human readers:
+</p>
+
+<pre><code><span class="cm"># Variable annotations</span>
+name: str = <span class="str">"AI Voice Studio"</span>
+version: float = <span class="num">2.0</span>
+voices: list[str] = [<span class="str">"af"</span>, <span class="str">"am_adam"</span>, <span class="str">"bf_emma"</span>]
+
+<span class="cm"># Function annotations</span>
+<span class="kw">def</span> <span class="fn">sanitize_filename</span>(name: str, max_length: int = <span class="num">80</span>) -> str:
+    <span class="kw">return</span> name[:max_length]
+
+<span class="cm"># Optional values</span>
+<span class="kw">from</span> typing <span class="kw">import</span> Optional
+engine_id: Optional[str] = <span class="kw">None</span>
+
+<span class="cm"># Modern Python 3.10+ (use | instead of Optional)</span>
+engine_id: str | <span class="kw">None</span> = <span class="kw">None</span>
+
+<span class="cm"># Union types</span>
+<span class="kw">from</span> typing <span class="kw">import</span> Union
+value: Union[int, float] = <span class="num">42</span>
+<span class="cm"># Python 3.10+: value: int | float = 42</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 23)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Variable annotations</code>
+        <br><span class="desc">A comment: <em>Variable annotations</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>name: str = &quot;AI Voice Studio&quot;</code>
+        <br><span class="desc"><code>name: str = &quot;AI Voice Studio&quot;</code></span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>version: float = 2.0</code>
+        <br><span class="desc"><code>version: float = 2.0</code></span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>voices: list[str] = [&quot;af&quot;, &quot;am_adam&quot;, &quot;bf_emma&quot;]</code>
+        <br><span class="desc"><code>voices: list[str] = [&quot;af&quot;, &quot;am_adam&quot;, &quot;bf_emma&quot;]</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># Function annotations</code>
+        <br><span class="desc">A comment: <em>Function annotations</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>def sanitize_filename(name: str, max_length: int = 80) -&gt; str:</code>
+        <br><span class="desc">Defines function <code>sanitize_filename</code> accepting (name, max_length), returning <code>str</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>return name[:max_length]</code>
+        <br><span class="desc">Returns <code>name[:max_length]</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># Optional values</code>
+        <br><span class="desc">A comment: <em>Optional values</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>from typing import Optional</code>
+        <br><span class="desc">Imports <code>Optional</code> from <code>typing</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>engine_id: Optional[str] = None</code>
+        <br><span class="desc">Type hint meaning the value can be T or None. Equivalent to T | None in Python 3.10+.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># Modern Python 3.10+ (use | instead of Optional)</code>
+        <br><span class="desc">A comment: <em>Modern Python 3.10+ (use | instead of Optional)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>engine_id: str | None = None</code>
+        <br><span class="desc"><code>engine_id: str | None = None</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code># Union types</code>
+        <br><span class="desc">A comment: <em>Union types</em>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>from typing import Union</code>
+        <br><span class="desc">Imports <code>Union</code> from <code>typing</code>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>value: Union[int, float] = 42</code>
+        <br><span class="desc">Type hint meaning the value can be one of several types.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code># Python 3.10+: value: int | float = 42</code>
+        <br><span class="desc">A comment: <em>Python 3.10+: value: int | float = 42</em>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<p>We will cover type hints in depth in Chapter 22. For now, just know they exist.</p>
+
+<hr>
+
+<h2>2.13 Variables in the AIVS Constants Module</h2>
+
+<p>
+  The AI Voice Studio project centralizes all magic numbers and strings in
+  <code>constants.py</code>. This is a best practice for larger projects:
+</p>
+
+<pre><code><span class="cm"># From ai_voice_studio/constants.py (simplified)</span>
+
+<span class="cm"># Application metadata</span>
+APP_NAME = <span class="str">"AI Voice Studio"</span>
+APP_VERSION = <span class="str">"2.0.0"</span>
+
+<span class="cm"># Audio parameters</span>
+RATE_MIN = <span class="num">0.5</span>
+RATE_MAX = <span class="num">2.0</span>
+PITCH_MIN = <span class="num">0.5</span>
+PITCH_MAX = <span class="num">2.0</span>
+VOLUME_MIN = <span class="num">0.0</span>
+VOLUME_MAX = <span class="num">2.0</span>
+
+<span class="cm"># Output formats</span>
+FORMAT_WAV = <span class="str">"wav"</span>
+FORMAT_MP3 = <span class="str">"mp3"</span>
+FORMAT_FLAC = <span class="str">"flac"</span>
+OUTPUT_FORMAT_CHOICES = [
+    (FORMAT_WAV, <span class="str">"WAV (always available)"</span>),
+    (FORMAT_MP3, <span class="str">"MP3 (requires FFmpeg)"</span>),
+    (FORMAT_FLAC, <span class="str">"FLAC (requires FFmpeg)"</span>),
+]
+
+<span class="cm"># Themes</span>
+THEME_LIGHT = <span class="str">"light"</span>
+THEME_DARK = <span class="str">"dark"</span>
+THEME_SYSTEM = <span class="str">"system"</span>
+
+<span class="cm"># DAISY book constants</span>
+DAISY_NCC_FILE = <span class="str">"ncc.html"</span>
+DAISY_PACKAGE_FILE = <span class="str">"package.opf"</span>
+DAISY_AUDIO_DIR_NAME = <span class="str">"audio"</span>
+
+<span class="cm"># Punctuation modes</span>
+PUNCTUATION_DEFAULT = <span class="str">"default"</span>
+PUNCTUATION_CHOICES = [
+    (<span class="str">"default"</span>, <span class="str">"Default"</span>),
+    (<span class="str">"all"</span>, <span class="str">"Read all punctuation"</span>),
+    (<span class="str">"none"</span>, <span class="str">"No punctuation"</span>),
+]</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 24)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From ai_voice_studio/constants.py (simplified)</code>
+        <br><span class="desc">A comment: <em>From ai_voice_studio/constants.py (simplified)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Application metadata</code>
+        <br><span class="desc">A comment: <em>Application metadata</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>APP_NAME = &quot;AI Voice Studio&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;AI Voice Studio&quot;</code> to <code>APP_NAME</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>APP_VERSION = &quot;2.0.0&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;2.0.0&quot;</code> to <code>APP_VERSION</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># Audio parameters</code>
+        <br><span class="desc">A comment: <em>Audio parameters</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>RATE_MIN = 0.5</code>
+        <br><span class="desc">Assigns <code>0.5</code> to <code>RATE_MIN</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>RATE_MAX = 2.0</code>
+        <br><span class="desc">Assigns <code>2.0</code> to <code>RATE_MAX</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>PITCH_MIN = 0.5</code>
+        <br><span class="desc">Assigns <code>0.5</code> to <code>PITCH_MIN</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>PITCH_MAX = 2.0</code>
+        <br><span class="desc">Assigns <code>2.0</code> to <code>PITCH_MAX</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>VOLUME_MIN = 0.0</code>
+        <br><span class="desc">Assigns <code>0.0</code> to <code>VOLUME_MIN</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>VOLUME_MAX = 2.0</code>
+        <br><span class="desc">Assigns <code>2.0</code> to <code>VOLUME_MAX</code>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code># Output formats</code>
+        <br><span class="desc">A comment: <em>Output formats</em>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>FORMAT_WAV = &quot;wav&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;wav&quot;</code> to <code>FORMAT_WAV</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>FORMAT_MP3 = &quot;mp3&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;mp3&quot;</code> to <code>FORMAT_MP3</code>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>FORMAT_FLAC = &quot;flac&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;flac&quot;</code> to <code>FORMAT_FLAC</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>OUTPUT_FORMAT_CHOICES = [</code>
+        <br><span class="desc">Assigns <code>[</code> to <code>OUTPUT_FORMAT_CHOICES</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>(FORMAT_WAV, &quot;WAV (always available)&quot;),</code>
+        <br><span class="desc"><code>(FORMAT_WAV, &quot;WAV (always available)&quot;),</code></span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>(FORMAT_MP3, &quot;MP3 (requires FFmpeg)&quot;),</code>
+        <br><span class="desc"><code>(FORMAT_MP3, &quot;MP3 (requires FFmpeg)&quot;),</code></span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>(FORMAT_FLAC, &quot;FLAC (requires FFmpeg)&quot;),</code>
+        <br><span class="desc"><code>(FORMAT_FLAC, &quot;FLAC (requires FFmpeg)&quot;),</code></span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>]</code>
+        <br><span class="desc"><code>]</code></span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code># Themes</code>
+        <br><span class="desc">A comment: <em>Themes</em>.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>THEME_LIGHT = &quot;light&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;light&quot;</code> to <code>THEME_LIGHT</code>.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>THEME_DARK = &quot;dark&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;dark&quot;</code> to <code>THEME_DARK</code>.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>THEME_SYSTEM = &quot;system&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;system&quot;</code> to <code>THEME_SYSTEM</code>.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code># DAISY book constants</code>
+        <br><span class="desc">A comment: <em>DAISY book constants</em>.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>DAISY_NCC_FILE = &quot;ncc.html&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;ncc.html&quot;</code> to <code>DAISY_NCC_FILE</code>.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>DAISY_PACKAGE_FILE = &quot;package.opf&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;package.opf&quot;</code> to <code>DAISY_PACKAGE_FILE</code>.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>DAISY_AUDIO_DIR_NAME = &quot;audio&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;audio&quot;</code> to <code>DAISY_AUDIO_DIR_NAME</code>.</span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code># Punctuation modes</code>
+        <br><span class="desc">A comment: <em>Punctuation modes</em>.</span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code>PUNCTUATION_DEFAULT = &quot;default&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;default&quot;</code> to <code>PUNCTUATION_DEFAULT</code>.</span>
+      </li>
+      <li>
+        <strong>Line 31:</strong> <code>PUNCTUATION_CHOICES = [</code>
+        <br><span class="desc">Assigns <code>[</code> to <code>PUNCTUATION_CHOICES</code>.</span>
+      </li>
+      <li>
+        <strong>Line 32:</strong> <code>(&quot;default&quot;, &quot;Default&quot;),</code>
+        <br><span class="desc"><code>(&quot;default&quot;, &quot;Default&quot;),</code></span>
+      </li>
+      <li>
+        <strong>Line 33:</strong> <code>(&quot;all&quot;, &quot;Read all punctuation&quot;),</code>
+        <br><span class="desc"><code>(&quot;all&quot;, &quot;Read all punctuation&quot;),</code></span>
+      </li>
+      <li>
+        <strong>Line 34:</strong> <code>(&quot;none&quot;, &quot;No punctuation&quot;),</code>
+        <br><span class="desc"><code>(&quot;none&quot;, &quot;No punctuation&quot;),</code></span>
+      </li>
+      <li>
+        <strong>Line 35:</strong> <code>]</code>
+        <br><span class="desc"><code>]</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<div class="tip">
+  <strong>Why constants?</strong> If you use the string <code>"wav"</code> in 15
+  different files and later decide to rename it, you would have to find and replace
+  in all 15 files. With a constant, you change it in one place. Constants also
+  serve as documentation — <code>FORMAT_WAV</code> tells you what the value means
+  at a glance.
+</div>
+
+<hr>
+
+<h2>2.14 Key Takeaways</h2>
+
+<ul>
+  <li><strong>Python is dynamically typed</strong> — variables have no declared type, but every value has a type</li>
+  <li><strong>Five core types:</strong> <code>int</code>, <code>float</code>, <code>bool</code>, <code>str</code>, <code>None</code></li>
+  <li><strong>Integers have arbitrary precision</strong> — no overflow</li>
+  <li><strong>Floats have limited precision</strong> — never use <code>==</code> for comparison</li>
+  <li><strong>Strings are immutable</strong> — operations create new strings</li>
+  <li><strong>Use <code>is</code> for None comparison</strong>, <code>==</code> for value equality</li>
+  <li><strong>Constants go in UPPER_SNAKE_CASE</strong> and live in a dedicated module</li>
+  <li><strong>Type hints</strong> document expected types without enforcing them</li>
+  <li><strong>F-strings</strong> are the modern way to format strings</li>
+</ul>
+
+<hr>
+
+<div class="exercise">
+  <strong>Exercise 2.1:</strong> Create a variable for each of the six AIVS TTS
+  engines (Piper, Kokoro, Matcha, Kitten, XTTS v2, OmniVoice) and print them
+  all on one line, separated by commas.
+</div>
+
+<div class="exercise">
+  <strong>Exercise 2.2:</strong> Write a function that converts a sample count to
+  a duration string. Example: <code>samples_to_duration(48000, 24000)</code> →
+  <code>"2.0 seconds"</code>.
+</div>
+
+<div class="exercise">
+  <strong>Exercise 2.3:</strong> Look at the <code>constants.py</code> file in the
+  project. How many constant values are defined? Pick three and explain what
+  they control in the application.
+</div>
+
+<hr>
+
+<p style="text-align: center;">
+  <a href="ch01_introduction.html">← Chapter 1</a> &nbsp;|&nbsp;
+  <a href="ch03_control_flow.html">Chapter 3 — Control Flow →</a>
+</p>
+
+</div><!-- /.main-content -->
+</div><!-- /.book-container -->
+</body>
+</html>

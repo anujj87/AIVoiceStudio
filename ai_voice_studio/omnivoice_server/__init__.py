@@ -314,10 +314,30 @@ class OmniVoiceServerManager:
         speed: float = 1.0,
         stream: bool = False,
         num_step: int | None = None,
-        guidance_scale: float = 3.0,
-        denoise: bool = True,
+        guidance_scale: float | None = 3.0,
+        denoise: bool | None = True,
+        t_shift: float | None = None,
+        position_temperature: float | None = None,
+        class_temperature: float | None = None,
+        duration: float | None = None,
+        language: str | None = None,
+        layer_penalty_factor: float | None = None,
+        preprocess_prompt: bool | None = None,
+        postprocess_output: bool | None = None,
+        audio_chunk_duration: float | None = None,
+        audio_chunk_threshold: float | None = None,
+        request_timeout_s: int | None = None,
+        seed: int | None = None,
+        response_format: str = "wav",
     ) -> np.ndarray:
-        """Synthesize text via the server; returns int16 samples at 24 kHz."""
+        """Synthesize text via the server; returns int16 samples at 24 kHz.
+
+        Every generation parameter the omnivoice-server HTTP API documents is
+        exposed here; parameters left as ``None`` are omitted from the request
+        and the server applies its own defaults.  ``instructions`` (strongest),
+        ``voice`` / ``speaker`` presets and ``ref_audio``-based cloning follow
+        the server's documented precedence rules.
+        """
         import urllib.request  # noqa: PLC0415
 
         if not text.strip():
@@ -328,16 +348,36 @@ class OmniVoiceServerManager:
             "model": "omnivoice",
             "input": text,
             "voice": voice,
-            "response_format": "wav",
+            "response_format": response_format or "wav",
             "speed": speed,
-            "stream": stream,
+            "stream": bool(stream),
+        }
+        # Explicit values win; None means "use the server default" for that
+        # parameter, so each optional field is only included when set.
+        optional = {
+            "num_step": num_step,
             "guidance_scale": guidance_scale,
             "denoise": denoise,
+            "t_shift": t_shift,
+            "position_temperature": position_temperature,
+            "class_temperature": class_temperature,
+            "duration": duration,
+            "language": language,
+            "layer_penalty_factor": layer_penalty_factor,
+            "preprocess_prompt": preprocess_prompt,
+            "postprocess_output": postprocess_output,
+            "audio_chunk_duration": audio_chunk_duration,
+            "audio_chunk_threshold": audio_chunk_threshold,
+            "request_timeout_s": request_timeout_s,
+            "seed": seed,
         }
+        for name, value in optional.items():
+            if value is not None:
+                payload[name] = value
+        # Voice design instructions are the strongest control and are only
+        # sent when the caller provided a real description.
         if instructions:
             payload["instructions"] = instructions
-        if num_step is not None:
-            payload["num_step"] = num_step
 
         data = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(
@@ -367,8 +407,23 @@ class OmniVoiceServerManager:
         ref_text: str = "",
         speed: float = 1.0,
         num_step: int | None = None,
+        guidance_scale: float | None = None,
+        denoise: bool | None = None,
+        t_shift: float | None = None,
+        position_temperature: float | None = None,
+        class_temperature: float | None = None,
+        duration: float | None = None,
+        language: str | None = None,
+        layer_penalty_factor: float | None = None,
+        preprocess_prompt: bool | None = None,
+        postprocess_output: bool | None = None,
+        audio_chunk_duration: float | None = None,
+        audio_chunk_threshold: float | None = None,
+        request_timeout_s: int | None = None,
+        seed: int | None = None,
+        response_format: str = "wav",
     ) -> np.ndarray:
-        """Synthesize text with voice cloning via the server."""
+        """Synthesize text with voice cloning via the server (multipart)."""
         import urllib.request  # noqa: PLC0415
         import io  # noqa: PLC0415
 
@@ -381,18 +436,36 @@ class OmniVoiceServerManager:
         boundary = "----AIVoiceStudioBoundary"
         body = b""
 
-        def _add_field(name: str, value: str) -> None:
+        def _add_field(name: str, value: Any) -> None:
             nonlocal body
             body += f"--{boundary}\r\n".encode()
             body += f'Content-Disposition: form-data; name="{name}"\r\n\r\n'.encode()
             body += f"{value}\r\n".encode()
 
+        def _add_form(name: str, value: Any) -> None:
+            """Add an optional scalar form field (skips None)."""
+            if value is not None and value != "":
+                _add_field(name, value)
+
         _add_field("text", text)
-        if ref_text:
-            _add_field("ref_text", ref_text)
-        _add_field("speed", str(speed))
-        if num_step is not None:
-            _add_field("num_step", str(num_step))
+        _add_form("ref_text", ref_text)
+        _add_form("speed", speed)
+        _add_form("num_step", num_step)
+        _add_form("guidance_scale", guidance_scale)
+        _add_form("denoise", denoise)
+        _add_form("t_shift", t_shift)
+        _add_form("position_temperature", position_temperature)
+        _add_form("class_temperature", class_temperature)
+        _add_form("duration", duration)
+        _add_form("language", language)
+        _add_form("layer_penalty_factor", layer_penalty_factor)
+        _add_form("preprocess_prompt", preprocess_prompt)
+        _add_form("postprocess_output", postprocess_output)
+        _add_form("audio_chunk_duration", audio_chunk_duration)
+        _add_form("audio_chunk_threshold", audio_chunk_threshold)
+        _add_form("request_timeout_s", request_timeout_s)
+        _add_form("seed", seed)
+        _add_form("response_format", response_format if response_format != "wav" else None)
 
         # Add reference audio file
         body += f"--{boundary}\r\n".encode()
@@ -443,6 +516,11 @@ class OmniVoiceServerManager:
 
     def get_voices(self) -> list:
         """Fetch available voices from the server."""
+        return self.get_voice_info().get("voices", [])
+
+    def get_voice_info(self) -> dict:
+        """Fetch the full ``/v1/voices`` response (voices + design
+        attributes vocabulary), or ``{}`` when the server is unreachable."""
         import urllib.request  # noqa: PLC0415
         import urllib.error  # noqa: PLC0415
 
@@ -453,9 +531,138 @@ class OmniVoiceServerManager:
         try:
             with urllib.request.urlopen(req, timeout=10) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
-                return data.get("voices", [])
+                return data if isinstance(data, dict) else {}
         except Exception:  # noqa: BLE001
-            return []
+            return {}
+
+    def get_models(self) -> list:
+        """List models advertised by the server (OpenAI-compatible)."""
+        import urllib.request  # noqa: PLC0415
+
+        url = f"{self.base_url}/v1/models"
+        req = urllib.request.Request(url, method="GET")
+        if self._api_key:
+            req.add_header("Authorization", f"Bearer {self._api_key}")
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                if isinstance(data, dict):
+                    return data.get("data") or data.get("models") or []
+        except Exception:  # noqa: BLE001
+            pass
+        return []
+
+    # -- Voice profiles (server-stored clones) -----------------------------
+
+    def _build_profile_forms(
+        self, *, profile_id: str, ref_audio_path: str, ref_text: str, overwrite: bool,
+    ) -> bytes:
+        """Multipart body for ``POST /v1/voices/profiles``."""
+        boundary = "----AIVoiceStudioProfilesBoundary"
+        body = b""
+
+        def _add_field(name: str, value: str) -> None:
+            nonlocal body
+            body += f"--{boundary}\r\n".encode()
+            body += f'Content-Disposition: form-data; name="{name}"\r\n\r\n'.encode()
+            body += f"{value}\r\n".encode()
+
+        _add_field("profile_id", profile_id)
+        if ref_text:
+            _add_field("ref_text", ref_text)
+        if overwrite:
+            _add_field("overwrite", "true")
+        body += f"--{boundary}\r\n".encode()
+        body += (
+            f'Content-Disposition: form-data; name="ref_audio"; '
+            f'filename="{os.path.basename(ref_audio_path)}"\r\n'
+            f"Content-Type: audio/wav\r\n\r\n"
+        ).encode()
+        with open(ref_audio_path, "rb") as fh:
+            body += fh.read()
+        body += b"\r\n"
+        body += f"--{boundary}--\r\n".encode()
+        return body
+
+    def save_profile(
+        self,
+        profile_id: str,
+        ref_audio_path: str,
+        ref_text: str = "",
+        overwrite: bool = False,
+    ) -> dict:
+        """Store a voice-cloning profile on the server (reusable)."""
+        import urllib.request  # noqa: PLC0415
+
+        url = f"{self.base_url}/v1/voices/profiles"
+        body = self._build_profile_forms(
+            profile_id=profile_id,
+            ref_audio_path=ref_audio_path,
+            ref_text=ref_text,
+            overwrite=overwrite,
+        )
+        req = urllib.request.Request(
+            url,
+            data=body,
+            headers={
+                "Content-Type": "multipart/form-data; "
+                "boundary=----AIVoiceStudioProfilesBoundary",
+            },
+            method="POST",
+        )
+        if self._api_key:
+            req.add_header("Authorization", f"Bearer {self._api_key}")
+        try:
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except Exception as exc:
+            raise OmniVoiceServerError(
+                f"Could not save voice profile: {exc}"
+            ) from exc
+
+    def list_profiles(self) -> list:
+        """List server-stored clone profiles (from ``/v1/voices``)."""
+        voices = self.get_voices()
+        profiles = []
+        for voice in voices:
+            if isinstance(voice, dict) and voice.get("type") == "clone":
+                profiles.append(
+                    {
+                        "profile_id": voice.get("profile_id"),
+                        "description": voice.get("description", ""),
+                    }
+                )
+        return [p for p in profiles if p.get("profile_id")]
+
+    def get_profile(self, profile_id: str) -> dict | None:
+        """Fetch a single server-stored voice profile."""
+        import urllib.request  # noqa: PLC0415
+        import urllib.parse  # noqa: PLC0415
+
+        url = f"{self.base_url}/v1/voices/profiles/{urllib.parse.quote(profile_id)}"
+        req = urllib.request.Request(url, method="GET")
+        if self._api_key:
+            req.add_header("Authorization", f"Bearer {self._api_key}")
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except Exception:  # noqa: BLE001
+            return None
+
+    def delete_profile(self, profile_id: str) -> bool:
+        """Delete a server-stored voice profile."""
+        import urllib.request  # noqa: PLC0415
+        import urllib.parse  # noqa: PLC0415
+
+        url = f"{self.base_url}/v1/voices/profiles/{urllib.parse.quote(profile_id)}"
+        req = urllib.request.Request(url, method="DELETE")
+        if self._api_key:
+            req.add_header("Authorization", f"Bearer {self._api_key}")
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                return resp.status in (200, 204)
+        except Exception:  # noqa: BLE001
+            return False
 
 
 # ---------------------------------------------------------------------------
@@ -498,6 +705,50 @@ class OmniVoiceServerEngine:
         if not self._server.is_running:
             self._server.start()
 
+        # Per-project OmniVoice options (see omnivoice/spec.apply_omni_to_voice).
+        from ..omnivoice import spec  # noqa: PLC0415
+        self._omni = voice_entry.get("omni") or {}
+        self._instruct = spec.resolve_instruct(
+            "omnivoice_server",
+            voice_entry.get("voice"),
+            self._omni.get("instruct") or voice_entry.get("instruct"),
+        )
+        self._ref_audio = (
+            self._omni.get("ref_audio") or voice_entry.get("ref_audio") or ""
+        ).strip()
+        self._ref_text = (
+            self._omni.get("ref_text") or voice_entry.get("ref_text") or ""
+        ).strip()
+        self._language = spec.clean_language(
+            self._omni.get("language") or voice_entry.get("language")
+        )
+
+    def _omni_kwargs(self) -> Dict[str, Any]:
+        """Advanced generation knobs configured for this voice.
+
+        Client-level defaults keep the exact request behaviour the studio had
+        before these knobs existed (guidance 3.0, denoise on); anything the
+        user configured overrides them.  Values stay ``None`` only for
+        parameters that were never sent historically, so the server's own
+        defaults apply.
+        """
+        omni = self._omni
+
+        def _or(value: Any, default: Any) -> Any:
+            return value if value is not None else default
+
+        return {
+            "num_step": omni.get("num_step"),
+            "guidance_scale": _or(omni.get("guidance_scale"), 3.0),
+            "denoise": _or(omni.get("denoise"), True),
+            "class_temperature": omni.get("class_temperature"),
+            "position_temperature": omni.get("position_temperature"),
+            "t_shift": omni.get("t_shift"),
+            "duration": omni.get("duration"),
+            "seed": omni.get("seed"),
+            "language": self._language,
+        }
+
     def synthesize(
         self,
         text: str,
@@ -517,25 +768,24 @@ class OmniVoiceServerEngine:
                 "Try restarting it from Settings > OmniVoice Server."
             )
 
-        instruct = self.voice_entry.get("instruct", "")
-        ref_audio = self.voice_entry.get("ref_audio", "")
-        ref_text = self.voice_entry.get("ref_text", "")
-
-        if ref_audio and os.path.isfile(ref_audio):
+        kwargs = self._omni_kwargs()
+        if self._ref_audio and os.path.isfile(self._ref_audio):
             samples = self._server.synthesize_clone(
                 text,
-                ref_audio_path=ref_audio,
-                ref_text=ref_text,
+                ref_audio_path=self._ref_audio,
+                ref_text=self._ref_text,
                 speed=speed,
+                **kwargs,
             )
         else:
-            # Use voice design via instructions
+            # Voice design (instructions) or an OpenAI preset name.
             voice_id = self.voice_entry.get("voice", "alloy")
             samples = self._server.synthesize(
                 text,
                 voice=voice_id,
-                instructions=instruct,
+                instructions=self._instruct,
                 speed=speed,
+                **kwargs,
             )
 
         if pitch != 1.0:

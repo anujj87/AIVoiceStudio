@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 9: Modules &amp; Packages - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2><div class="part-header">Part I</div><ul class="chapters"><li><a href="ch01_introduction.html">Ch 1</a></li><li><a href="ch02_variables.html">Ch 2</a></li><li><a href="ch03_control_flow.html">Ch 3</a></li><li><a href="ch04_functions.html">Ch 4</a></li><li><a href="ch05_strings.html">Ch 5</a></li><li><a href="ch06_collections.html">Ch 6</a></li><li><a href="ch07_file_io.html">Ch 7</a></li><li><a href="ch08_error_handling.html">Ch 8</a></li><li><a href="ch09_modules.html" class="active">Ch 9: Modules</a></li><li><a href="ch10_oop_basics.html">Ch 10</a></li></ul></nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 9</div>
+<h1>Modules &amp; Packages</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand how Python's import system works</li>
+  <li>Create your own modules and packages</li>
+  <li>Master relative and absolute imports</li>
+  <li>Explore the AI Voice Studio package structure</li>
+</ul>
+
+<hr>
+
+<h2>9.1 Import Basics</h2>
+
+<pre><code><span class="cm"># Import the entire module</span>
+<span class="kw">import</span> os
+<span class="kw">import</span> json
+<span class="kw">print</span>(os.path.join(<span class="str">"a"</span>, <span class="str">"b"</span>))
+
+<span class="cm"># Import with alias</span>
+<span class="kw">import</span> numpy <span class="kw">as</span> np
+arr = np.array([<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>])
+
+<span class="cm"># Import specific names</span>
+<span class="kw">from</span> os.path <span class="kw">import</span> join, exists
+<span class="kw">print</span>(join(<span class="str">"a"</span>, <span class="str">"b"</span>))
+
+<span class="cm"># Import everything (don't do this!)</span>
+<span class="kw">from</span> os <span class="kw">import</span> *  <span class="cm"># Pollutes namespace</span>
+
+<span class="cm"># Conditional import</span>
+<span class="kw">if</span> sys.platform == <span class="str">"win32"</span>:
+    <span class="kw">import</span> winsound</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Import the entire module</code>
+        <br><span class="desc">A comment: <em>Import the entire module</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>import os</code>
+        <br><span class="desc">Imports the <code>os</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>import json</code>
+        <br><span class="desc">Imports the <code>json</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>print(os.path.join(&quot;a&quot;, &quot;b&quot;))</code>
+        <br><span class="desc">OS-agnostic path manipulation. Use join(), exists(), dirname(), basename(), splitext().</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># Import with alias</code>
+        <br><span class="desc">A comment: <em>Import with alias</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>import numpy as np</code>
+        <br><span class="desc">Imports the <code>numpy as np</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>arr = np.array([1, 2, 3])</code>
+        <br><span class="desc">Assigns <code>np.array([1, 2, 3])</code> to <code>arr</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># Import specific names</code>
+        <br><span class="desc">A comment: <em>Import specific names</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>from os.path import join, exists</code>
+        <br><span class="desc">OS-agnostic path manipulation. Use join(), exists(), dirname(), basename(), splitext().</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>print(join(&quot;a&quot;, &quot;b&quot;))</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># Import everything (don&#x27;t do this!)</code>
+        <br><span class="desc">A comment: <em>Import everything (don&#x27;t do this!)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>from os import *  # Pollutes namespace</code>
+        <br><span class="desc">Imports <code>*  # Pollutes namespace</code> from <code>os</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code># Conditional import</code>
+        <br><span class="desc">A comment: <em>Conditional import</em>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>if sys.platform == &quot;win32&quot;:</code>
+        <br><span class="desc">Checks condition: <code>sys.platform == &quot;win32&quot;</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>import winsound</code>
+        <br><span class="desc">Imports the <code>winsound</code> module.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>9.2 Creating Modules</h2>
+
+<p>Any <code>.py</code> file is a module. If you create <code>mymodule.py</code>:</p>
+
+<pre><code><span class="cm"># mymodule.py</span>
+<span class="str">"""My custom module for audio utilities."""</span>
+
+SAMPLE_RATE = <span class="num">24000</span>
+
+<span class="kw">def</span> <span class="fn">format_duration</span>(seconds: float) -> str:
+    <span class="str">"""Format seconds as HH:MM:SS."""</span>
+    h = int(seconds // <span class="num">3600</span>)
+    m = int((seconds % <span class="num">3600</span>) // <span class="num">60</span>)
+    s = int(seconds % <span class="num">60</span>)
+    <span class="kw">return</span> <span class="str">f"</span>{h:02d}<span class="str">:</span>{m:02d}<span class="str">:</span>{s:02d}<span class="str">"</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># mymodule.py</code>
+        <br><span class="desc">A comment: <em>mymodule.py</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>&quot;&quot;&quot;My custom module for audio utilities.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>My custom module for audio utilities.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>SAMPLE_RATE = 24000</code>
+        <br><span class="desc">Assigns <code>24000</code> to <code>SAMPLE_RATE</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>def format_duration(seconds: float) -&gt; str:</code>
+        <br><span class="desc">Defines function <code>format_duration</code> accepting (seconds), returning <code>str</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>&quot;&quot;&quot;Format seconds as HH:MM:SS.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Format seconds as HH:MM:SS.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>h = int(seconds // 3600)</code>
+        <br><span class="desc">Converts a value to an integer. Truncates floats toward zero. Raises ValueError for invalid strings.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>m = int((seconds % 3600) // 60)</code>
+        <br><span class="desc">Converts a value to an integer. Truncates floats toward zero. Raises ValueError for invalid strings.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>s = int(seconds % 60)</code>
+        <br><span class="desc">Converts a value to an integer. Truncates floats toward zero. Raises ValueError for invalid strings.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>return f&quot;{h:02d}:{m:02d}:{s:02d}&quot;</code>
+        <br><span class="desc">Returns <code>f&quot;{h:02d}:{m:02d}:{s:02d}&quot;</code> to the caller.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<p>Then in another file:</p>
+
+<pre><code><span class="kw">import</span> mymodule
+<span class="kw">print</span>(mymodule.format_duration(<span class="num">3661</span>))  <span class="cm"># "01:01:01"</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>import mymodule</code>
+        <br><span class="desc">Imports the <code>mymodule</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>print(mymodule.format_duration(3661))  # &quot;01:01:01&quot;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>9.3 Creating Packages</h2>
+
+<p>A <strong>package</strong> is a directory of modules with an <code>__init__.py</code>:</p>
+
+<pre><code>ai_voice_studio/           <span class="cm"># Package directory</span>
+├── __init__.py            <span class="cm"># Makes it a package (can be empty)</span>
+├── paths.py               <span class="cm"># Module: ai_voice_studio.paths</span>
+├── settings.py            <span class="cm"># Module: ai_voice_studio.settings</span>
+├── tts/                   <span class="cm"># Sub-package</span>
+│   ├── __init__.py
+│   ├── catalog.py         <span class="cm"># Module: ai_voice_studio.tts.catalog</span>
+│   ├── engine.py
+│   └── models.py
+├── gui/                   <span class="cm"># Sub-package</span>
+│   ├── __init__.py
+│   └── main_frame.py</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 4)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>ai_voice_studio/           # Package directory</code>
+        <br><span class="desc"><code>ai_voice_studio/           # Package directory</code></span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>├── __init__.py            # Makes it a package (can be empty)</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>├── paths.py               # Module: ai_voice_studio.paths</code>
+        <br><span class="desc"><code>├── paths.py               # Module: ai_voice_studio.paths</code></span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>├── settings.py            # Module: ai_voice_studio.settings</code>
+        <br><span class="desc"><code>├── settings.py            # Module: ai_voice_studio.settings</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>├── tts/                   # Sub-package</code>
+        <br><span class="desc"><code>├── tts/                   # Sub-package</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>│   ├── __init__.py</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>│   ├── catalog.py         # Module: ai_voice_studio.tts.catalog</code>
+        <br><span class="desc"><code>│   ├── catalog.py         # Module: ai_voice_studio.tts.catalog</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>│   ├── engine.py</code>
+        <br><span class="desc"><code>│   ├── engine.py</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>│   └── models.py</code>
+        <br><span class="desc"><code>│   └── models.py</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>├── gui/                   # Sub-package</code>
+        <br><span class="desc"><code>├── gui/                   # Sub-package</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>│   ├── __init__.py</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>│   └── main_frame.py</code>
+        <br><span class="desc"><code>│   └── main_frame.py</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<pre><code><span class="cm"># __init__.py can be empty, or it can import key names:</span>
+<span class="cm"># ai_voice_studio/tts/__init__.py</span>
+<span class="str">"""TTS engine subsystem."""</span>
+<span class="cm"># Optionally re-export key names:</span>
+<span class="cm"># from .catalog import get_tts_list, find_tts</span>
+<span class="cm"># from .engine import get_engine</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 5)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># __init__.py can be empty, or it can import key names:</code>
+        <br><span class="desc">A comment: <em>__init__.py can be empty, or it can import key names:</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># ai_voice_studio/tts/__init__.py</code>
+        <br><span class="desc">A comment: <em>ai_voice_studio/tts/__init__.py</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;&quot;&quot;TTS engine subsystem.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>TTS engine subsystem.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># Optionally re-export key names:</code>
+        <br><span class="desc">A comment: <em>Optionally re-export key names:</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># from .catalog import get_tts_list, find_tts</code>
+        <br><span class="desc">A comment: <em>from .catalog import get_tts_list, find_tts</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># from .engine import get_engine</code>
+        <br><span class="desc">A comment: <em>from .engine import get_engine</em>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>9.4 Absolute vs. Relative Imports</h2>
+
+<pre><code><span class="cm"># Absolute imports (preferred — clearer)</span>
+<span class="kw">from</span> ai_voice_studio.paths <span class="kw">import</span> user_data_dir
+<span class="kw">from</span> ai_voice_studio.tts.catalog <span class="kw">import</span> get_tts_list
+<span class="kw">from</span> ai_voice_studio.settings <span class="kw">import</span> Settings
+
+<span class="cm"># Relative imports (within the same package)</span>
+<span class="kw">from</span> . <span class="kw">import</span> paths            <span class="cm"># Same package</span>
+<span class="kw">from</span> .. <span class="kw">import</span> settings         <span class="cm"># Parent package</span>
+<span class="kw">from</span> .tts <span class="kw">import</span> catalog        <span class="cm"># Sibling package</span>
+<span class="kw">from</span> ..paths <span class="kw">import</span> user_data_dir <span class="cm"># Parent's module</span>
+<span class="kw">from</span> .models <span class="kw">import</span> ModelStore   <span class="cm"># Same package's module</span>
+
+<span class="cm"># In AIVS, relative imports are used within the package:</span>
+<span class="cm"># From tts/engine.py:</span>
+<span class="kw">from</span> .. <span class="kw">import</span> paths
+<span class="kw">from</span> ..settings <span class="kw">import</span> Settings</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 6)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Absolute imports (preferred — clearer)</code>
+        <br><span class="desc">A comment: <em>Absolute imports (preferred — clearer)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>from ai_voice_studio.paths import user_data_dir</code>
+        <br><span class="desc">Imports <code>user_data_dir</code> from <code>ai_voice_studio.paths</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>from ai_voice_studio.tts.catalog import get_tts_list</code>
+        <br><span class="desc">Imports <code>get_tts_list</code> from <code>ai_voice_studio.tts.catalog</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>from ai_voice_studio.settings import Settings</code>
+        <br><span class="desc">Imports <code>Settings</code> from <code>ai_voice_studio.settings</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># Relative imports (within the same package)</code>
+        <br><span class="desc">A comment: <em>Relative imports (within the same package)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>from . import paths            # Same package</code>
+        <br><span class="desc">Imports <code>paths            # Same package</code> from <code>.</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>from .. import settings         # Parent package</code>
+        <br><span class="desc">Imports <code>settings         # Parent package</code> from <code>..</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>from .tts import catalog        # Sibling package</code>
+        <br><span class="desc">Imports <code>catalog        # Sibling package</code> from <code>.tts</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>from ..paths import user_data_dir # Parent&#x27;s module</code>
+        <br><span class="desc">Imports <code>user_data_dir # Parent&#x27;s module</code> from <code>..paths</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>from .models import ModelStore   # Same package&#x27;s module</code>
+        <br><span class="desc">Imports <code>ModelStore   # Same package&#x27;s module</code> from <code>.models</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># In AIVS, relative imports are used within the package:</code>
+        <br><span class="desc">A comment: <em>In AIVS, relative imports are used within the package:</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code># From tts/engine.py:</code>
+        <br><span class="desc">A comment: <em>From tts/engine.py:</em>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>from .. import paths</code>
+        <br><span class="desc">Imports <code>paths</code> from <code>..</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>from ..settings import Settings</code>
+        <br><span class="desc">Imports <code>Settings</code> from <code>..settings</code>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>9.5 The __name__ and __main__ Pattern</h2>
+
+<pre><code><span class="cm"># Every module has a __name__ variable</span>
+<span class="cm"># When imported: __name__ == "mymodule"</span>
+<span class="cm"># When run directly: __name__ == "__main__"</span>
+
+<span class="kw">def</span> <span class="fn">main</span>():
+    <span class="kw">print</span>(<span class="str">"Running my module!"</span>)
+
+<span class="kw">if</span> __name__ == <span class="str">"__main__"</span>:
+    main()  <span class="cm"># Only runs when executed directly</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 7)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Every module has a __name__ variable</code>
+        <br><span class="desc">A comment: <em>Every module has a __name__ variable</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># When imported: __name__ == &quot;mymodule&quot;</code>
+        <br><span class="desc">A comment: <em>When imported: __name__ == &quot;mymodule&quot;</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># When run directly: __name__ == &quot;__main__&quot;</code>
+        <br><span class="desc">A comment: <em>When run directly: __name__ == &quot;__main__&quot;</em>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>def main():</code>
+        <br><span class="desc">Defines function <code>main</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>print(&quot;Running my module!&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>if __name__ == &quot;__main__&quot;:</code>
+        <br><span class="desc">Checks condition: <code>__name__ == &quot;__main__&quot;</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>main()  # Only runs when executed directly</code>
+        <br><span class="desc">Calls function <code>main()</code>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<p>This pattern is used throughout AIVS:</p>
+
+<pre><code><span class="cm"># main.py — the application entry point</span>
+<span class="kw">def</span> <span class="fn">main</span>() -> int:
+    app = wx.App(False)
+    frame = MainFrame(None)
+    frame.Show()
+    <span class="kw">return</span> app.MainLoop()
+
+<span class="kw">if</span> __name__ == <span class="str">"__main__"</span>:
+    sys.exit(main())
+
+<span class="cm"># ai_voice_studio/clone/worker.py — subprocess entry point</span>
+<span class="kw">def</span> <span class="fn">main</span>() -> int:
+    <span class="cm"># Worker loop reading JSON commands from stdin</span>
+    <span class="kw">for</span> line <span class="kw">in</span> sys.stdin:
+        ...
+    <span class="kw">return</span> <span class="num">0</span>
+
+<span class="kw">if</span> __name__ == <span class="str">"__main__"</span>:
+    sys.exit(main())</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 8)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># main.py — the application entry point</code>
+        <br><span class="desc">A comment: <em>main.py — the application entry point</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def main() -&gt; int:</code>
+        <br><span class="desc">Defines function <code>main</code>, returning <code>int</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>app = wx.App(False)</code>
+        <br><span class="desc">Creates the wxPython application object. Must be created before any GUI elements. False means don't redirect stdout.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>frame = MainFrame(None)</code>
+        <br><span class="desc">Assigns <code>MainFrame(None)</code> to <code>frame</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>frame.Show()</code>
+        <br><span class="desc">Makes the frame visible on screen. The frame is hidden by default.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>return app.MainLoop()</code>
+        <br><span class="desc">Starts the wxPython event loop. This blocks until the last window is closed. All GUI events are processed here.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>if __name__ == &quot;__main__&quot;:</code>
+        <br><span class="desc">Checks condition: <code>__name__ == &quot;__main__&quot;</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>sys.exit(main())</code>
+        <br><span class="desc"><code>sys.exit(main())</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code># ai_voice_studio/clone/worker.py — subprocess entry point</code>
+        <br><span class="desc">A comment: <em>ai_voice_studio/clone/worker.py — subprocess entry point</em>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>def main() -&gt; int:</code>
+        <br><span class="desc">Defines function <code>main</code>, returning <code>int</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># Worker loop reading JSON commands from stdin</code>
+        <br><span class="desc">A comment: <em>Worker loop reading JSON commands from stdin</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>for line in sys.stdin:</code>
+        <br><span class="desc">Iterates over <code>sys.stdin</code>, assigning each element to <code>line</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>...</code>
+        <br><span class="desc">Ellipsis: abstract method placeholder.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>return 0</code>
+        <br><span class="desc">Returns <code>0</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>if __name__ == &quot;__main__&quot;:</code>
+        <br><span class="desc">Checks condition: <code>__name__ == &quot;__main__&quot;</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>sys.exit(main())</code>
+        <br><span class="desc"><code>sys.exit(main())</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>9.6 Import Hooks and Dynamic Imports</h2>
+
+<pre><code><span class="cm"># Importlib — dynamic imports at runtime</span>
+<span class="kw">import</span> importlib
+module = importlib.import_module(<span class="str">"ai_voice_studio.tts.catalog"</span>)
+
+<span class="cm"># Used in the addon system</span>
+<span class="kw">import</span> importlib.util
+spec = importlib.util.spec_from_file_location(
+    <span class="str">"_addon_my_tts"</span>,
+    <span class="str">"/path/to/addon/__init__.py"</span>,
+)
+module = importlib.util.module_from_spec(spec)
+sys.modules[<span class="str">"_addon_my_tts"</span>] = module
+spec.loader.exec_module(module)
+
+<span class="cm"># Lazy imports (import only when needed)</span>
+<span class="kw">def</span> <span class="fn">heavy_function</span>():
+    <span class="kw">import</span> numpy  <span class="cm"># Only imported when function is called</span>
+    <span class="kw">return</span> np.array([<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>])</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 9)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Importlib — dynamic imports at runtime</code>
+        <br><span class="desc">A comment: <em>Importlib — dynamic imports at runtime</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>import importlib</code>
+        <br><span class="desc">Imports the <code>importlib</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>module = importlib.import_module(&quot;ai_voice_studio.tts.catalog&quot;)</code>
+        <br><span class="desc">Assigns <code>importlib.import_module(&quot;ai_voice_studio.tts.catalog&quot;)</code> to <code>module</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># Used in the addon system</code>
+        <br><span class="desc">A comment: <em>Used in the addon system</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>import importlib.util</code>
+        <br><span class="desc">Imports the <code>importlib.util</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>spec = importlib.util.spec_from_file_location(</code>
+        <br><span class="desc">Assigns <code>importlib.util.spec_from_file_location(</code> to <code>spec</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>&quot;_addon_my_tts&quot;,</code>
+        <br><span class="desc"><code>&quot;_addon_my_tts&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>&quot;/path/to/addon/__init__.py&quot;,</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>module = importlib.util.module_from_spec(spec)</code>
+        <br><span class="desc">Assigns <code>importlib.util.module_from_spec(spec)</code> to <code>module</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>sys.modules[&quot;_addon_my_tts&quot;] = module</code>
+        <br><span class="desc"><code>sys.modules[&quot;_addon_my_tts&quot;] = module</code></span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>spec.loader.exec_module(module)</code>
+        <br><span class="desc"><code>spec.loader.exec_module(module)</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code># Lazy imports (import only when needed)</code>
+        <br><span class="desc">A comment: <em>Lazy imports (import only when needed)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>def heavy_function():</code>
+        <br><span class="desc">Defines function <code>heavy_function</code>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>import numpy  # Only imported when function is called</code>
+        <br><span class="desc">Imports the <code>numpy  # Only imported when function is called</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>return np.array([1, 2, 3])</code>
+        <br><span class="desc">Returns <code>np.array([1, 2, 3])</code> to the caller.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>9.7 Standard Library Highlights</h2>
+
+<table>
+  <thead><tr><th>Module</th><th>Purpose</th><th>AIVS Usage</th></tr></thead>
+  <tbody>
+    <tr><td><code>os</code></td><td>OS interface, paths, environment</td><td>File operations, paths</td></tr>
+    <tr><td><code>json</code></td><td>JSON parsing and writing</td><td>Settings, project files</td></tr>
+    <tr><td><code>logging</code></td><td>Logging framework</td><td>Debug and info logging</td></tr>
+    <tr><td><code>threading</code></td><td>Thread-based parallelism</td><td>Background TTS synthesis</td></tr>
+    <tr><td><code>subprocess</code></td><td>Process management</td><td>FFmpeg, pip, worker processes</td></tr>
+    <tr><td><code>re</code></td><td>Regular expressions</td><td>Text processing, parsing</td></tr>
+    <tr><td><code>pathlib</code></td><td>Object-oriented paths</td><td>Modern path handling</td></tr>
+    <tr><td><code>tempfile</code></td><td>Temporary files and dirs</td><td>Atomic writes, pip installs</td></tr>
+    <tr><td><code>zipfile</code></td><td>ZIP archive handling</td><td>DAISY book export</td></tr>
+    <tr><td><code>uuid</code></td><td>Unique identifiers</td><td>DAISY book UIDs</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h2>9.8 Key Takeaways</h2>
+<ul>
+  <li>Any <code>.py</code> file is a module; a directory with <code>__init__.py</code> is a package</li>
+  <li><strong>Use absolute imports</strong> for clarity (<code>from ai_voice_studio.paths import ...</code>)</li>
+  <li><strong>Relative imports</strong> are for within-package references only</li>
+  <li>The <code>if __name__ == "__main__"</code> pattern allows files to be both imported and run</li>
+  <li><strong>Dynamic imports</strong> via <code>importlib</code> enable the AIVS addon system</li>
+  <li>Lazy imports (inside functions) improve startup time for heavy dependencies</li>
+</ul>
+
+<div class="exercise"><strong>Exercise 9.1:</strong> Create a package <code>audio_utils/</code> with two modules: <code>format.py</code> (duration formatting) and <code>levels.py</code> (volume calculations). Import and use both from a script.</div>
+
+<hr>
+<p style="text-align: center;"><a href="ch08_error_handling.html">← Ch 8</a> &nbsp;|&nbsp; <a href="ch10_oop_basics.html">Ch 10 — OOP Basics →</a></p>
+</div></div></body>
+</html>

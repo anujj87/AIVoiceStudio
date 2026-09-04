@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 8: Error Handling - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2><div class="part-header">Part I</div><ul class="chapters"><li><a href="ch01_introduction.html">Ch 1</a></li><li><a href="ch02_variables.html">Ch 2</a></li><li><a href="ch03_control_flow.html">Ch 3</a></li><li><a href="ch04_functions.html">Ch 4</a></li><li><a href="ch05_strings.html">Ch 5</a></li><li><a href="ch06_collections.html">Ch 6</a></li><li><a href="ch07_file_io.html">Ch 7</a></li><li><a href="ch08_error_handling.html" class="active">Ch 8: Error Handling</a></li><li><a href="ch09_modules.html">Ch 9</a></li><li><a href="ch10_oop_basics.html">Ch 10</a></li></ul></nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 8</div>
+<h1>Error Handling</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand Python's exception hierarchy</li>
+  <li>Use try/except/else/finally for robust error handling</li>
+  <li>Create custom exceptions</li>
+  <li>Apply best practices for exception handling in AIVS</li>
+</ul>
+
+<hr>
+
+<h2>8.1 The Exception Hierarchy</h2>
+
+<pre><code>BaseException
+├── KeyboardInterrupt
+├── SystemExit
+├── GeneratorExit
+└── Exception
+    ├── ValueError
+    ├── TypeError
+    ├── KeyError
+    ├── FileNotFoundError
+    ├── OSError
+    │   ├── FileNotFoundError
+    │   ├── PermissionError
+    │   └── TimeoutError
+    ├── RuntimeError
+    ├── IndexError
+    ├── AttributeError
+    └── ... (hundreds more)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>BaseException</code>
+        <br><span class="desc"><code>BaseException</code></span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>├── KeyboardInterrupt</code>
+        <br><span class="desc"><code>├── KeyboardInterrupt</code></span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>├── SystemExit</code>
+        <br><span class="desc"><code>├── SystemExit</code></span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>├── GeneratorExit</code>
+        <br><span class="desc"><code>├── GeneratorExit</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>└── Exception</code>
+        <br><span class="desc"><code>└── Exception</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>├── ValueError</code>
+        <br><span class="desc">Raised when a function receives an argument of the right type but inappropriate value.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>├── TypeError</code>
+        <br><span class="desc">Raised when an operation is applied to an object of inappropriate type.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>├── KeyError</code>
+        <br><span class="desc">Raised when a dictionary key is not found.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>├── FileNotFoundError</code>
+        <br><span class="desc">Raised when a file or directory is requested but doesn't exist.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>├── OSError</code>
+        <br><span class="desc"><code>├── OSError</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>│   ├── FileNotFoundError</code>
+        <br><span class="desc">Raised when a file or directory is requested but doesn't exist.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>│   ├── PermissionError</code>
+        <br><span class="desc"><code>│   ├── PermissionError</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>│   └── TimeoutError</code>
+        <br><span class="desc"><code>│   └── TimeoutError</code></span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>├── RuntimeError</code>
+        <br><span class="desc">Raised when an error doesn't fall into any other category.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>├── IndexError</code>
+        <br><span class="desc">Raised when a sequence index is out of range.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>├── AttributeError</code>
+        <br><span class="desc">Raised when an attribute reference or assignment fails.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>└── ... (hundreds more)</code>
+        <br><span class="desc"><code>└── ... (hundreds more)</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>8.2 try / except / else / finally</h2>
+
+<pre><code><span class="kw">try</span>:
+    <span class="cm"># Code that might fail</span>
+    result = <span class="num">10</span> / <span class="num">0</span>
+<span class="kw">except</span> ZeroDivisionError:
+    <span class="cm"># Handle the specific error</span>
+    <span class="kw">print</span>(<span class="str">"Cannot divide by zero"</span>)
+<span class="kw">else</span>:
+    <span class="cm"># Runs only if NO exception occurred</span>
+    <span class="kw">print</span>(<span class="str">f"Result: </span>{result}<span class="str">"</span>)
+<span class="kw">finally</span>:
+    <span class="cm"># ALWAYS runs, whether or not an exception occurred</span>
+    <span class="kw">print</span>(<span class="str">"Cleanup"</span>)
+
+<span class="cm"># Catching multiple exception types</span>
+<span class="kw">try</span>:
+    load_voice_model(path)
+<span class="kw">except</span> FileNotFoundError:
+    <span class="kw">print</span>(<span class="str">"Model not found — download it first"</span>)
+<span class="kw">except</span> PermissionError:
+    <span class="kw">print</span>(<span class="str">"Permission denied"</span>)
+<span class="kw">except</span> OSError <span class="kw">as</span> exc:
+    <span class="kw">print</span>(<span class="str">f"OS error: </span>{exc}<span class="str">"</span>)
+
+<span class="cm"># Catching multiple types in one handler</span>
+<span class="kw">try</span>:
+    download_model(url)
+<span class="kw">except</span> (ConnectionError, TimeoutError) <span class="kw">as</span> exc:
+    <span class="kw">print</span>(<span class="str">f"Network error: </span>{exc}<span class="str">"</span>)
+
+<span class="cm"># Catching everything (use sparingly!)</span>
+<span class="kw">try</span>:
+    risky_operation()
+<span class="kw">except</span> Exception:
+    <span class="kw">print</span>(<span class="str">"Something went wrong"</span>)
+    <span class="cm"># ⚠️ Don't catch BaseException — it kills Ctrl+C!</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>try:</code>
+        <br><span class="desc">Begins exception handling. Code in this block is monitored for errors.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Code that might fail</code>
+        <br><span class="desc">A comment: <em>Code that might fail</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>result = 10 / 0</code>
+        <br><span class="desc">Assigns <code>10 / 0</code> to <code>result</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>except ZeroDivisionError:</code>
+        <br><span class="desc">Catches <code>ZeroDivisionError</code> exceptions.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># Handle the specific error</code>
+        <br><span class="desc">A comment: <em>Handle the specific error</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>print(&quot;Cannot divide by zero&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>else:</code>
+        <br><span class="desc">Fallback: executes when none of the above conditions matched.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># Runs only if NO exception occurred</code>
+        <br><span class="desc">A comment: <em>Runs only if NO exception occurred</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>print(f&quot;Result: {result}&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>finally:</code>
+        <br><span class="desc">Always executes for cleanup code, whether or not an exception occurred.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># ALWAYS runs, whether or not an exception occurred</code>
+        <br><span class="desc">A comment: <em>ALWAYS runs, whether or not an exception occurred</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>print(&quot;Cleanup&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code># Catching multiple exception types</code>
+        <br><span class="desc">A comment: <em>Catching multiple exception types</em>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>try:</code>
+        <br><span class="desc">Begins exception handling. Code in this block is monitored for errors.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>load_voice_model(path)</code>
+        <br><span class="desc">Calls function <code>load_voice_model()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>except FileNotFoundError:</code>
+        <br><span class="desc">Raised when a file or directory is requested but doesn't exist.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>print(&quot;Model not found — download it first&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>except PermissionError:</code>
+        <br><span class="desc">Catches <code>PermissionError</code> exceptions.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>print(&quot;Permission denied&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>except OSError as exc:</code>
+        <br><span class="desc">Catches <code>OSError</code> exceptions.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>print(f&quot;OS error: {exc}&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code># Catching multiple types in one handler</code>
+        <br><span class="desc">A comment: <em>Catching multiple types in one handler</em>.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>try:</code>
+        <br><span class="desc">Begins exception handling. Code in this block is monitored for errors.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>download_model(url)</code>
+        <br><span class="desc">Calls function <code>download_model()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>except (ConnectionError, TimeoutError) as exc:</code>
+        <br><span class="desc"><code>except (ConnectionError, TimeoutError) as exc:</code></span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>print(f&quot;Network error: {exc}&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code># Catching everything (use sparingly!)</code>
+        <br><span class="desc">A comment: <em>Catching everything (use sparingly!)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>try:</code>
+        <br><span class="desc">Begins exception handling. Code in this block is monitored for errors.</span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>risky_operation()</code>
+        <br><span class="desc">Calls function <code>risky_operation()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code>except Exception:</code>
+        <br><span class="desc">Catches all exceptions that inherit from Exception. Use as a last resort.</span>
+      </li>
+      <li>
+        <strong>Line 31:</strong> <code>print(&quot;Something went wrong&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 32:</strong> <code># ⚠️ Don&#x27;t catch BaseException — it kills Ctrl+C!</code>
+        <br><span class="desc">A comment: <em>⚠️ Don&#x27;t catch BaseException — it kills Ctrl+C!</em>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>8.3 Raising Exceptions</h2>
+
+<pre><code><span class="cm"># Raise with a message</span>
+<span class="kw">raise</span> ValueError(<span class="str">"Invalid sample rate: 0"</span>)
+
+<span class="cm"># Re-raise the current exception (preserves traceback)</span>
+<span class="kw">try</span>:
+    download_model(url)
+<span class="kw">except</span> DownloadError <span class="kw">as</span> exc:
+    log.error(<span class="str">"Download failed: </span>{exc}<span class="str">"</span>)
+    <span class="kw">raise</span>  <span class="cm"># Re-raise with original traceback</span>
+
+<span class="cm"># Exception chaining</span>
+<span class="kw">try</span>:
+    result = json.loads(data)
+<span class="kw">except</span> json.JSONDecodeError <span class="kw">as</span> exc:
+    <span class="kw">raise</span> SettingsError(<span class="str">"Invalid settings file"</span>) <span class="kw">from</span> exc</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Raise with a message</code>
+        <br><span class="desc">A comment: <em>Raise with a message</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>raise ValueError(&quot;Invalid sample rate: 0&quot;)</code>
+        <br><span class="desc">Raised when a function receives an argument of the right type but inappropriate value.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># Re-raise the current exception (preserves traceback)</code>
+        <br><span class="desc">A comment: <em>Re-raise the current exception (preserves traceback)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>try:</code>
+        <br><span class="desc">Begins exception handling. Code in this block is monitored for errors.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>download_model(url)</code>
+        <br><span class="desc">Calls function <code>download_model()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>except DownloadError as exc:</code>
+        <br><span class="desc">Catches <code>DownloadError</code> exceptions.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>log.error(&quot;Download failed: {exc}&quot;)</code>
+        <br><span class="desc"><code>log.error(&quot;Download failed: {exc}&quot;)</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>raise  # Re-raise with original traceback</code>
+        <br><span class="desc">Manually raises an exception. Use to signal error conditions to callers.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code># Exception chaining</code>
+        <br><span class="desc">A comment: <em>Exception chaining</em>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>try:</code>
+        <br><span class="desc">Begins exception handling. Code in this block is monitored for errors.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>result = json.loads(data)</code>
+        <br><span class="desc">Deserializes a JSON string into a Python object.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>except json.JSONDecodeError as exc:</code>
+        <br><span class="desc">Catches <code>json</code> exceptions.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>raise SettingsError(&quot;Invalid settings file&quot;) from exc</code>
+        <br><span class="desc">Manually raises an exception. Use to signal error conditions to callers.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>8.4 Custom Exceptions</h2>
+
+<pre><code><span class="cm"># From ai_voice_studio/clone/__init__.py</span>
+<span class="kw">class</span> <span class="cls">CloneEngineError</span>(Exception):
+    <span class="str">"""Raised when the XTTS cloning engine is not installed or fails."""</span>
+    <span class="kw">pass</span>
+
+<span class="cm"># From ai_voice_studio/omnivoice/__init__.py</span>
+<span class="kw">class</span> <span class="cls">OmniVoiceError</span>(Exception):
+    <span class="str">"""Raised when the OmniVoice engine is not installed or fails."""</span>
+    <span class="kw">pass</span>
+
+<span class="cm"># From ai_voice_studio/tts/downloader.py</span>
+<span class="kw">class</span> <span class="cls">DownloadError</span>(Exception):
+    <span class="str">"""Raised when a model download fails."""</span>
+    <span class="kw">pass</span>
+
+<span class="kw">class</span> <span class="cls">DownloadCancelled</span>(Exception):
+    <span class="str">"""Raised when a download is cancelled by the user."""</span>
+    <span class="kw">pass</span>
+
+<span class="cm"># From ai_voice_studio/documents/parsers.py</span>
+<span class="kw">class</span> <span class="cls">ParseError</span>(Exception):
+    <span class="str">"""Raised when a document cannot be parsed."""</span>
+    <span class="kw">pass</span>
+
+<span class="cm"># Custom exception with context</span>
+<span class="kw">class</span> <span class="cls">VoiceNotFoundError</span>(Exception):
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, voice_id: str, tts_id: str):
+        self.voice_id = voice_id
+        self.tts_id = tts_id
+        <span class="kw">super</span>().__init__(
+            <span class="str">f"Voice '</span>{voice_id}<span class="str">' not found in TTS engine '</span>{tts_id}<span class="str">'"</span>
+        )</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 4)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From ai_voice_studio/clone/__init__.py</code>
+        <br><span class="desc">A comment: <em>From ai_voice_studio/clone/__init__.py</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>class CloneEngineError(Exception):</code>
+        <br><span class="desc">Defines class <code>CloneEngineError</code> inheriting from <code>Exception</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;&quot;&quot;Raised when the XTTS cloning engine is not installed or fails.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Raised when the XTTS cloning engine is not installed or fails.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>pass</code>
+        <br><span class="desc">Placeholder: does nothing.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># From ai_voice_studio/omnivoice/__init__.py</code>
+        <br><span class="desc">A comment: <em>From ai_voice_studio/omnivoice/__init__.py</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>class OmniVoiceError(Exception):</code>
+        <br><span class="desc">Defines class <code>OmniVoiceError</code> inheriting from <code>Exception</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>&quot;&quot;&quot;Raised when the OmniVoice engine is not installed or fails.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Raised when the OmniVoice engine is not installed or fails.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>pass</code>
+        <br><span class="desc">Placeholder: does nothing.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code># From ai_voice_studio/tts/downloader.py</code>
+        <br><span class="desc">A comment: <em>From ai_voice_studio/tts/downloader.py</em>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>class DownloadError(Exception):</code>
+        <br><span class="desc">Defines class <code>DownloadError</code> inheriting from <code>Exception</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>&quot;&quot;&quot;Raised when a model download fails.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Raised when a model download fails.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>pass</code>
+        <br><span class="desc">Placeholder: does nothing.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>class DownloadCancelled(Exception):</code>
+        <br><span class="desc">Defines class <code>DownloadCancelled</code> inheriting from <code>Exception</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>&quot;&quot;&quot;Raised when a download is cancelled by the user.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Raised when a download is cancelled by the user.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>pass</code>
+        <br><span class="desc">Placeholder: does nothing.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code># From ai_voice_studio/documents/parsers.py</code>
+        <br><span class="desc">A comment: <em>From ai_voice_studio/documents/parsers.py</em>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>class ParseError(Exception):</code>
+        <br><span class="desc">Defines class <code>ParseError</code> inheriting from <code>Exception</code>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>&quot;&quot;&quot;Raised when a document cannot be parsed.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Raised when a document cannot be parsed.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>pass</code>
+        <br><span class="desc">Placeholder: does nothing.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code># Custom exception with context</code>
+        <br><span class="desc">A comment: <em>Custom exception with context</em>.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>class VoiceNotFoundError(Exception):</code>
+        <br><span class="desc">Defines class <code>VoiceNotFoundError</code> inheriting from <code>Exception</code>.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>def __init__(self, voice_id: str, tts_id: str):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>self.voice_id = voice_id</code>
+        <br><span class="desc">Stores <code>voice_id</code> in instance attribute <code>voice_id</code>.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>self.tts_id = tts_id</code>
+        <br><span class="desc">Stores <code>tts_id</code> in instance attribute <code>tts_id</code>.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>super().__init__(</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>f&quot;Voice &#x27;{voice_id}&#x27; not found in TTS engine &#x27;{tts_id}&#x27;&quot;</code>
+        <br><span class="desc"><code>f&quot;Voice &#x27;{voice_id}&#x27; not found in TTS engine &#x27;{tts_id}&#x27;&quot;</code></span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>8.5 Exception Handling Patterns in AIVS</h2>
+
+<pre><code><span class="cm"># Pattern 1: Graceful degradation with logging</span>
+<span class="kw">try</span>:
+    result = load_model(path)
+<span class="kw">except</span> FileNotFoundError:
+    log.warning(<span class="str">"Model not found at </span>{path}<span class="str">"</span>)
+    result = <span class="kw">None</span>
+<span class="kw">except</span> Exception <span class="kw">as</span> exc:
+    log.error(<span class="str">"Failed to load model: </span>{exc}<span class="str">"</span>, exc_info=<span class="kw">True</span>)
+    result = <span class="kw">None</span>
+
+<span class="cm"># Pattern 2: Retry with fallback</span>
+<span class="kw">def</span> <span class="fn">download_with_fallback</span>(urls):
+    <span class="str">"""Try multiple URLs until one works."""</span>
+    <span class="kw">for</span> url <span class="kw">in</span> urls:
+        <span class="kw">try</span>:
+            <span class="kw">return</span> download(url)
+        <span class="kw">except</span> DownloadError <span class="kw">as</span> exc:
+            log.warning(<span class="str">"Failed </span>{url}<span class="str">: </span>{exc}<span class="str">"</span>)
+    <span class="kw">raise</span> DownloadError(<span class="str">"All download sources failed"</span>)
+
+<span class="cm"># Pattern 3: Suppressing expected exceptions</span>
+<span class="kw">import</span> contextlib
+<span class="kw">with</span> contextlib.suppress(FileNotFoundError):
+    os.unlink(temp_file)  <span class="cm"># Ignore if already deleted</span>
+
+<span class="cm"># Pattern 4: Safe operations in GUI callbacks</span>
+<span class="kw">def</span> <span class="fn">_on_download</span>(self, _):
+    <span class="kw">try</span>:
+        self._start_download()
+    <span class="kw">except</span> Exception <span class="kw">as</span> exc:
+        <span class="cm"># Never let exceptions crash the GUI!</span>
+        wx.MessageBox(
+            <span class="str">f"Download failed: </span>{exc}<span class="str">"</span>,
+            <span class="str">"Error"</span>,
+            style=wx.OK | wx.ICON_ERROR,
+        )
+
+<span class="cm"># Pattern 5: noqa comments for intentional bare exceptions</span>
+<span class="kw">try</span>:
+    some_risky_call()
+<span class="kw">except</span> Exception:  <span class="cm"># noqa: BLE001</span>
+    <span class="kw">pass</span>  <span class="cm"># Intentionally ignore all errors</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 5)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Pattern 1: Graceful degradation with logging</code>
+        <br><span class="desc">A comment: <em>Pattern 1: Graceful degradation with logging</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>try:</code>
+        <br><span class="desc">Begins exception handling. Code in this block is monitored for errors.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>result = load_model(path)</code>
+        <br><span class="desc">Assigns <code>load_model(path)</code> to <code>result</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>except FileNotFoundError:</code>
+        <br><span class="desc">Raised when a file or directory is requested but doesn't exist.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>log.warning(&quot;Model not found at {path}&quot;)</code>
+        <br><span class="desc"><code>log.warning(&quot;Model not found at {path}&quot;)</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>result = None</code>
+        <br><span class="desc">Assigns <code>None</code> to <code>result</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>except Exception as exc:</code>
+        <br><span class="desc">Catches <code>Exception</code> exceptions.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>log.error(&quot;Failed to load model: {exc}&quot;, exc_info=True)</code>
+        <br><span class="desc"><code>log.error(&quot;Failed to load model: {exc}&quot;, exc_info=True)</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>result = None</code>
+        <br><span class="desc">Assigns <code>None</code> to <code>result</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code># Pattern 2: Retry with fallback</code>
+        <br><span class="desc">A comment: <em>Pattern 2: Retry with fallback</em>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>def download_with_fallback(urls):</code>
+        <br><span class="desc">Defines function <code>download_with_fallback</code> accepting (urls).</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>&quot;&quot;&quot;Try multiple URLs until one works.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Try multiple URLs until one works.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>for url in urls:</code>
+        <br><span class="desc">Iterates over <code>urls</code>, assigning each element to <code>url</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>try:</code>
+        <br><span class="desc">Begins exception handling. Code in this block is monitored for errors.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>return download(url)</code>
+        <br><span class="desc">Returns <code>download(url)</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>except DownloadError as exc:</code>
+        <br><span class="desc">Catches <code>DownloadError</code> exceptions.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>log.warning(&quot;Failed {url}: {exc}&quot;)</code>
+        <br><span class="desc"><code>log.warning(&quot;Failed {url}: {exc}&quot;)</code></span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>raise DownloadError(&quot;All download sources failed&quot;)</code>
+        <br><span class="desc">Manually raises an exception. Use to signal error conditions to callers.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code># Pattern 3: Suppressing expected exceptions</code>
+        <br><span class="desc">A comment: <em>Pattern 3: Suppressing expected exceptions</em>.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>import contextlib</code>
+        <br><span class="desc">Imports the <code>contextlib</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>with contextlib.suppress(FileNotFoundError):</code>
+        <br><span class="desc">Context manager that suppresses specified exceptions.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>os.unlink(temp_file)  # Ignore if already deleted</code>
+        <br><span class="desc"><code>os.unlink(temp_file)  # Ignore if already deleted</code></span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code># Pattern 4: Safe operations in GUI callbacks</code>
+        <br><span class="desc">A comment: <em>Pattern 4: Safe operations in GUI callbacks</em>.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>def _on_download(self, _):</code>
+        <br><span class="desc">Defines function <code>_on_download</code> accepting (self, _).</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>try:</code>
+        <br><span class="desc">Begins exception handling. Code in this block is monitored for errors.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>self._start_download()</code>
+        <br><span class="desc">Calls <code>self._start_download()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>except Exception as exc:</code>
+        <br><span class="desc">Catches <code>Exception</code> exceptions.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code># Never let exceptions crash the GUI!</code>
+        <br><span class="desc">A comment: <em>Never let exceptions crash the GUI!</em>.</span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>wx.MessageBox(</code>
+        <br><span class="desc">Creates a wxPython <code>wx.MessageBox</code> widget.</span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code>f&quot;Download failed: {exc}&quot;,</code>
+        <br><span class="desc"><code>f&quot;Download failed: {exc}&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 31:</strong> <code>&quot;Error&quot;,</code>
+        <br><span class="desc"><code>&quot;Error&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 32:</strong> <code>style=wx.OK | wx.ICON_ERROR,</code>
+        <br><span class="desc">Assigns <code>wx.OK | wx.ICON_ERROR,</code> to <code>style</code>.</span>
+      </li>
+      <li>
+        <strong>Line 33:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+      <li>
+        <strong>Line 34:</strong> <code># Pattern 5: noqa comments for intentional bare exceptions</code>
+        <br><span class="desc">A comment: <em>Pattern 5: noqa comments for intentional bare exceptions</em>.</span>
+      </li>
+      <li>
+        <strong>Line 35:</strong> <code>try:</code>
+        <br><span class="desc">Begins exception handling. Code in this block is monitored for errors.</span>
+      </li>
+      <li>
+        <strong>Line 36:</strong> <code>some_risky_call()</code>
+        <br><span class="desc">Returns True if all elements in the iterable are truthy. Short-circuits on first False.</span>
+      </li>
+      <li>
+        <strong>Line 37:</strong> <code>except Exception:  # noqa: BLE001</code>
+        <br><span class="desc">Catches all exceptions that inherit from Exception. Use as a last resort.</span>
+      </li>
+      <li>
+        <strong>Line 38:</strong> <code>pass  # Intentionally ignore all errors</code>
+        <br><span class="desc"><code>pass  # Intentionally ignore all errors</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>8.6 The assert Statement</h2>
+
+<pre><code><span class="cm"># Assert is for debugging — disabled with python -O</span>
+<span class="kw">def</span> <span class="fn">get_voice</span>(voices, index):
+    <span class="kw">assert</span> <span class="num">0</span> <= index < len(voices), <span class="str">f"Invalid index </span>{index}<span class="str">"</span>
+    <span class="kw">return</span> voices[index]
+
+<span class="cm"># In tests</span>
+<span class="kw">def</span> <span class="fn">test_catalog_has_required_engines</span>():
+    ids = {t[<span class="str">"id"</span>] <span class="kw">for</span> t <span class="kw">in</span> catalog.get_tts_list()}
+    <span class="kw">assert</span> <span class="str">"piper"</span> <span class="kw">in</span> ids, <span class="str">"Piper TTS must be in catalog"</span>
+    <span class="kw">assert</span> <span class="str">"kokoro"</span> <span class="kw">in</span> ids, <span class="str">"Kokoro TTS must be in catalog"</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 6)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Assert is for debugging — disabled with python -O</code>
+        <br><span class="desc">A comment: <em>Assert is for debugging — disabled with python -O</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def get_voice(voices, index):</code>
+        <br><span class="desc">Defines function <code>get_voice</code> accepting (voices, index).</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>assert 0 &lt;= index &lt; len(voices), f&quot;Invalid index {index}&quot;</code>
+        <br><span class="desc">Returns the number of items in a sequence (string, list, dict, tuple). Essential for loop bounds and validation.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>return voices[index]</code>
+        <br><span class="desc">Returns <code>voices[index]</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># In tests</code>
+        <br><span class="desc">A comment: <em>In tests</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>def test_catalog_has_required_engines():</code>
+        <br><span class="desc">Defines function <code>test_catalog_has_required_engines</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>ids = {t[&quot;id&quot;] for t in catalog.get_tts_list()}</code>
+        <br><span class="desc">Assigns <code>{t[&quot;id&quot;] for t in catalog.get_tts_list()}</code> to <code>ids</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>assert &quot;piper&quot; in ids, &quot;Piper TTS must be in catalog&quot;</code>
+        <br><span class="desc"><code>assert &quot;piper&quot; in ids, &quot;Piper TTS must be in catalog&quot;</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>assert &quot;kokoro&quot; in ids, &quot;Kokoro TTS must be in catalog&quot;</code>
+        <br><span class="desc"><code>assert &quot;kokoro&quot; in ids, &quot;Kokoro TTS must be in catalog&quot;</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>8.7 Exception Best Practices</h2>
+
+<div class="tip">
+  <strong>Rules for Exception Handling:</strong>
+  <ol>
+    <li><strong>Be specific</strong> — catch <code>FileNotFoundError</code>, not <code>Exception</code></li>
+    <li><strong>Don't swallow errors silently</strong> — at least log them</li>
+    <li><strong>Never use bare <code>except:</code></strong> — always specify <code>except Exception:</code></li>
+    <li><strong>Use custom exceptions</strong> to distinguish application errors from library errors</li>
+    <li><strong>In GUI code</strong>, always catch exceptions to prevent crashes</li>
+    <li><strong>In worker threads</strong>, catch and report exceptions via events</li>
+  </ol>
+</div>
+
+<hr>
+
+<h2>8.8 Key Takeaways</h2>
+<ul>
+  <li><strong><code>try/except/else/finally</code></strong> is the full error handling pattern</li>
+  <li><strong>Catch specific exceptions</strong> — never use bare <code>except:</code></li>
+  <li><strong>Custom exceptions</strong> make application errors distinguishable from system errors</li>
+  <li><strong>Always log exceptions</strong> with <code>exc_info=True</code> for debugging</li>
+  <li>In AIVS, exceptions are caught at <strong>GUI boundaries</strong> and <strong>worker threads</strong></li>
+</ul>
+
+<div class="exercise"><strong>Exercise 8.1:</strong> Write a <code>safe_load_json(path)</code> function that returns the parsed JSON dict on success, or a default dict on any error. Include proper logging.</div>
+
+<hr>
+<p style="text-align: center;"><a href="ch07_file_io.html">← Ch 7</a> &nbsp;|&nbsp; <a href="ch09_modules.html">Ch 9 — Modules →</a></p>
+</div></div></body>
+</html>

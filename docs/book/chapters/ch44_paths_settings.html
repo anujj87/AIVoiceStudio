@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 44: Paths, Settings &amp; Constants - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part VI</div><ul class="chapters"><li><a href="ch43_architecture.html">Ch 43</a></li><li><a href="ch44_paths_settings.html" class="active">Ch 44: Paths/Settings</a></li><li><a href="ch45_project_model.html">Ch 45</a></li><li><a href="ch46_document_parsing.html">Ch 46</a></li><li><a href="ch47_tts_catalog.html">Ch 47</a></li><li><a href="ch48_tts_engine.html">Ch 48</a></li><li><a href="ch49_downloader.html">Ch 49</a></li><li><a href="ch50_compute_detection.html">Ch 50</a></li><li><a href="ch51_main_frame.html">Ch 51</a></li><li><a href="ch52_settings_dialog.html">Ch 52</a></li><li><a href="ch53_model_panels.html">Ch 53</a></li><li><a href="ch54_new_project_wizard.html">Ch 54</a></li><li><a href="ch55_recording.html">Ch 55</a></li><li><a href="ch56_synthesis_worker.html">Ch 56</a></li><li><a href="ch57_clone_engine.html">Ch 57</a></li><li><a href="ch58_omnivoice.html">Ch 58</a></li><li><a href="ch59_daisy_builder.html">Ch 59</a></li><li><a href="ch60_addons.html">Ch 60</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 44</div>
+<h1>Paths, Settings &amp; Constants</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand the AIVS path resolution system</li>
+  <li>Master the Settings class with dot-notation access</li>
+  <li>See how constants organize application configuration</li>
+</ul>
+
+<hr>
+
+<h2>44.1 Path Resolution</h2>
+
+<pre><code><span class="cm"># From paths.py</span>
+<span class="kw">def</span> <span class="fn">user_data_dir</span>() -> str:
+    <span class="str">"""Return %APPDATA%/AIVoiceStudio on Windows."""</span>
+    <span class="kw">if</span> sys.platform == <span class="str">"win32"</span>:
+        base = os.environ.get(<span class="str">"APPDATA"</span>, os.path.expanduser(<span class="str">"~"</span>))
+    <span class="kw">else</span>:
+        base = os.path.join(os.path.expanduser(<span class="str">"~"</span>), <span class="str">".config"</span>)
+    d = os.path.join(base, <span class="str">"AIVoiceStudio"</span>)
+    os.makedirs(d, exist_ok=<span class="kw">True</span>)
+    <span class="kw">return</span> d
+
+<span class="kw">def</span> <span class="fn">models_dir</span>() -> str:
+    <span class="str">"""Return the directory where TTS models are stored."""</span>
+    d = os.path.join(user_data_dir(), <span class="str">"models"</span>)
+    os.makedirs(d, exist_ok=<span class="kw">True</span>)
+    <span class="kw">return</span> d
+
+<span class="kw">def</span> <span class="fn">project_dir</span>(name: str) -> str:
+    <span class="str">"""Return the directory for a project."""</span>
+    d = os.path.join(user_data_dir(), <span class="str">"projects"</span>, sanitize_filename(name))
+    os.makedirs(d, exist_ok=<span class="kw">True</span>)
+    <span class="kw">return</span> d
+
+<span class="kw">def</span> <span class="fn">settings_file</span>() -> str:
+    <span class="kw">return</span> os.path.join(user_data_dir(), <span class="str">"settings.json"</span>)
+
+<span class="kw">def</span> <span class="fn">log_file</span>() -> str:
+    <span class="kw">return</span> os.path.join(user_data_dir(), <span class="str">"app.log"</span>)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From paths.py</code>
+        <br><span class="desc">A comment indicating the source file: <em>From paths.py</em>. This helps the reader locate the code in the AIVoiceStudio codebase.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def user_data_dir() -&gt; str:</code>
+        <br><span class="desc">Returns the per-user application data directory. On Windows this is %APPDATA%/AIVoiceStudio; on Linux/macOS it's ~/.aivoicestudio. The directory is created automatically if it doesn't exist.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;&quot;&quot;Return %APPDATA%/AIVoiceStudio on Windows.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Return %APPDATA%/AIVoiceStudio on Windows.</em>. Documents the purpose of the following code block.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>if sys.platform == &quot;win32&quot;:</code>
+        <br><span class="desc">String identifying the OS: 'win32', 'darwin', 'linux'. Used for platform-specific code paths.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>base = os.environ.get(&quot;APPDATA&quot;, os.path.expanduser(&quot;~&quot;))</code>
+        <br><span class="desc">Assigns <code>os.environ.get(&quot;APPDATA&quot;, os.path.expanduser(&quot;~&quot;))</code> to <code>base</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>else:</code>
+        <br><span class="desc">Fallback: executes when none of the above conditions matched.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>base = os.path.join(os.path.expanduser(&quot;~&quot;), &quot;.config&quot;)</code>
+        <br><span class="desc">Assigns <code>os.path.join(os.path.expanduser(&quot;~&quot;), &quot;.config&quot;)</code> to <code>base</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>d = os.path.join(base, &quot;AIVoiceStudio&quot;)</code>
+        <br><span class="desc">Assigns <code>os.path.join(base, &quot;AIVoiceStudio&quot;)</code> to <code>d</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>os.makedirs(d, exist_ok=True)</code>
+        <br><span class="desc"><code>os.makedirs(d, exist_ok=True)</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>return d</code>
+        <br><span class="desc">Returns <code>d</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>def models_dir() -&gt; str:</code>
+        <br><span class="desc">Returns the directory where downloaded TTS voice models are stored. Respects any custom path set in Settings > Paths. Creates the directory if needed.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>&quot;&quot;&quot;Return the directory where TTS models are stored.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Return the directory where TTS models are stored.</em>. Documents the purpose of the following code block.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>d = os.path.join(user_data_dir(), &quot;models&quot;)</code>
+        <br><span class="desc">Returns the per-user application data directory. On Windows this is %APPDATA%/AIVoiceStudio; on Linux/macOS it's ~/.aivoicestudio. The directory is created automatically if it doesn't exist.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>os.makedirs(d, exist_ok=True)</code>
+        <br><span class="desc"><code>os.makedirs(d, exist_ok=True)</code></span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>return d</code>
+        <br><span class="desc">Returns <code>d</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>def project_dir(name: str) -&gt; str:</code>
+        <br><span class="desc">Defines function <code>project_dir</code> accepting parameters (name), returning <code>str</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>&quot;&quot;&quot;Return the directory for a project.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Return the directory for a project.</em>. Documents the purpose of the following code block.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>d = os.path.join(user_data_dir(), &quot;projects&quot;, sanitize_filename(name))</code>
+        <br><span class="desc">Returns the per-user application data directory. On Windows this is %APPDATA%/AIVoiceStudio; on Linux/macOS it's ~/.aivoicestudio. The directory is created automatically if it doesn't exist.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>os.makedirs(d, exist_ok=True)</code>
+        <br><span class="desc"><code>os.makedirs(d, exist_ok=True)</code></span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>return d</code>
+        <br><span class="desc">Returns <code>d</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>def settings_file() -&gt; str:</code>
+        <br><span class="desc">Returns the full path to settings.json, the persistent configuration file.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>return os.path.join(user_data_dir(), &quot;settings.json&quot;)</code>
+        <br><span class="desc">Returns the per-user application data directory. On Windows this is %APPDATA%/AIVoiceStudio; on Linux/macOS it's ~/.aivoicestudio. The directory is created automatically if it doesn't exist.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>def log_file() -&gt; str:</code>
+        <br><span class="desc">Returns the full path to app.log, the application log file.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>return os.path.join(user_data_dir(), &quot;app.log&quot;)</code>
+        <br><span class="desc">Returns the per-user application data directory. On Windows this is %APPDATA%/AIVoiceStudio; on Linux/macOS it's ~/.aivoicestudio. The directory is created automatically if it doesn't exist.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>44.2 Settings with Dot-Notation</h2>
+
+<pre><code><span class="cm"># From settings.py</span>
+<span class="kw">class</span> <span class="cls">Settings</span>:
+    _defaults = {
+        <span class="str">"theme"</span>: <span class="str">"system"</span>,
+        <span class="str">"audio_mode"</span>: <span class="str">"page_with_h1"</span>,
+        <span class="str">"recording.rate"</span>: <span class="num">1.0</span>,
+        <span class="str">"recording.pitch"</span>: <span class="num">1.0</span>,
+        <span class="str">"recording.volume"</span>: <span class="num">1.0</span>,
+        <span class="str">"recording.output_format"</span>: <span class="str">"wav"</span>,
+        <span class="str">"recording.punctuation"</span>: <span class="str">"default"</span>,
+        <span class="str">"compute"</span>: <span class="str">"auto"</span>,
+        <span class="str">"developer_mode"</span>: <span class="kw">False</span>,
+        <span class="str">"recent_projects"</span>: [],
+    }
+
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, path=<span class="kw">None</span>):
+        self._path = path <span class="kw">or</span> settings_file()
+        self._data = dict(self._defaults)
+        self._load()
+
+    <span class="kw">def</span> <span class="fn">get</span>(self, key, default=<span class="kw">None</span>):
+        <span class="cm"># Simple: just use the key as-is</span>
+        <span class="kw">return</span> self._data.get(key, default)
+
+    <span class="kw">def</span> <span class="fn">set</span>(self, key, value):
+        self._data[key] = value
+        self.save()
+
+    <span class="kw">def</span> <span class="fn">save</span>(self):
+        os.makedirs(os.path.dirname(self._path), exist_ok=<span class="kw">True</span>)
+        <span class="kw">with</span> open(self._path, <span class="str">"w"</span>, encoding=<span class="str">"utf-8"</span>) <span class="kw">as</span> f:
+            json.dump(self._data, f, indent=<span class="num">2</span>, ensure_ascii=<span class="kw">False</span>)
+
+    <span class="dec">@property</span>
+    <span class="kw">def</span> <span class="fn">theme</span>(self) -> str:
+        <span class="kw">return</span> self._data.get(<span class="str">"theme"</span>, <span class="str">"system"</span>)
+
+    <span class="dec">@property</span>
+    <span class="kw">def</span> <span class="fn">compute</span>(self) -> str:
+        <span class="kw">return</span> self._data.get(<span class="str">"compute"</span>, <span class="str">"auto"</span>)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From settings.py</code>
+        <br><span class="desc">A comment indicating the source file: <em>From settings.py</em>. This helps the reader locate the code in the AIVoiceStudio codebase.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>class Settings:</code>
+        <br><span class="desc">Defines class <code>Settings</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>_defaults = {</code>
+        <br><span class="desc">Assigns <code>{</code> to <code>_defaults</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>&quot;theme&quot;: &quot;system&quot;,</code>
+        <br><span class="desc"><code>&quot;theme&quot;: &quot;system&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>&quot;audio_mode&quot;: &quot;page_with_h1&quot;,</code>
+        <br><span class="desc"><code>&quot;audio_mode&quot;: &quot;page_with_h1&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>&quot;recording.rate&quot;: 1.0,</code>
+        <br><span class="desc"><code>&quot;recording.rate&quot;: 1.0,</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>&quot;recording.pitch&quot;: 1.0,</code>
+        <br><span class="desc"><code>&quot;recording.pitch&quot;: 1.0,</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>&quot;recording.volume&quot;: 1.0,</code>
+        <br><span class="desc"><code>&quot;recording.volume&quot;: 1.0,</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>&quot;recording.output_format&quot;: &quot;wav&quot;,</code>
+        <br><span class="desc"><code>&quot;recording.output_format&quot;: &quot;wav&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>&quot;recording.punctuation&quot;: &quot;default&quot;,</code>
+        <br><span class="desc"><code>&quot;recording.punctuation&quot;: &quot;default&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>&quot;compute&quot;: &quot;auto&quot;,</code>
+        <br><span class="desc"><code>&quot;compute&quot;: &quot;auto&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>&quot;developer_mode&quot;: False,</code>
+        <br><span class="desc"><code>&quot;developer_mode&quot;: False,</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>&quot;recent_projects&quot;: [],</code>
+        <br><span class="desc"><code>&quot;recent_projects&quot;: [],</code></span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>}</code>
+        <br><span class="desc"><code>}</code></span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>def __init__(self, path=None):</code>
+        <br><span class="desc">Defines function <code>__init__</code> accepting parameters (self, path).</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>self._path = path or settings_file()</code>
+        <br><span class="desc">Returns the full path to settings.json, the persistent configuration file.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>self._data = dict(self._defaults)</code>
+        <br><span class="desc">Stores <code>dict(self._defaults)</code> in the instance attribute <code>_data</code>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>self._load()</code>
+        <br><span class="desc">Calls <code>self._load()</code> to perform an operation.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>def get(self, key, default=None):</code>
+        <br><span class="desc">Defines function <code>get</code>: Retrieves a setting by dotted key path (e.g. 'recording.rate'). Returns default if the key doesn't exist.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code># Simple: just use the key as-is</code>
+        <br><span class="desc">A comment: <em>Simple: just use the key as-is</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>return self._data.get(key, default)</code>
+        <br><span class="desc">Returns <code>self._data.get(key, default)</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>def set(self, key, value):</code>
+        <br><span class="desc">Defines function <code>set</code>: Returns the full path to settings.json, the persistent configuration file.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>self._data[key] = value</code>
+        <br><span class="desc"><code>self._data[key] = value</code></span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>self.save()</code>
+        <br><span class="desc">Calls <code>self.save()</code> to perform an operation.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>def save(self):</code>
+        <br><span class="desc">Defines function <code>save</code> accepting parameters (self).</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>os.makedirs(os.path.dirname(self._path), exist_ok=True)</code>
+        <br><span class="desc"><code>os.makedirs(os.path.dirname(self._path), exist_ok=True)</code></span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>with open(self._path, &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:</code>
+        <br><span class="desc">Context manager: <code>open(self._path, &quot;w&quot;, encoding=&quot;utf-8&quot;) as f</code>. Automatically manages resource cleanup.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>json.dump(self._data, f, indent=2, ensure_ascii=False)</code>
+        <br><span class="desc"><code>json.dump(self._data, f, indent=2, ensure_ascii=False)</code></span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>@property</code>
+        <br><span class="desc">Decorator: <code>@property</code>. Wraps the following function/class to add behavior.</span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code>def theme(self) -&gt; str:</code>
+        <br><span class="desc">Defines function <code>theme</code>: Applies a visual theme (light/dark/system) to the entire wxPython frame and its children.</span>
+      </li>
+      <li>
+        <strong>Line 31:</strong> <code>return self._data.get(&quot;theme&quot;, &quot;system&quot;)</code>
+        <br><span class="desc">Returns <code>self._data.get(&quot;theme&quot;, &quot;system&quot;)</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 32:</strong> <code>@property</code>
+        <br><span class="desc">Decorator: <code>@property</code>. Wraps the following function/class to add behavior.</span>
+      </li>
+      <li>
+        <strong>Line 33:</strong> <code>def compute(self) -&gt; str:</code>
+        <br><span class="desc">Defines function <code>compute</code>: Probes the system for available compute backends. Returns a dict like {'cpu': True, 'cuda': False, 'dml': False}.</span>
+      </li>
+      <li>
+        <strong>Line 34:</strong> <code>return self._data.get(&quot;compute&quot;, &quot;auto&quot;)</code>
+        <br><span class="desc">Returns <code>self._data.get(&quot;compute&quot;, &quot;auto&quot;)</code> to the caller.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>44.3 Constants Module</h2>
+
+<pre><code><span class="cm"># From constants.py — organized by category</span>
+
+<span class="cm"># Application</span>
+APP_NAME = <span class="str">"AI Voice Studio"</span>
+APP_VERSION = <span class="str">"2.0.0"</span>
+
+<span class="cm"># Audio parameters</span>
+RATE_MIN, RATE_MAX = <span class="num">0.5</span>, <span class="num">2.0</span>
+PITCH_MIN, PITCH_MAX = <span class="num">0.5</span>, <span class="num">2.0</span>
+VOLUME_MIN, VOLUME_MAX = <span class="num">0.0</span>, <span class="num">2.0</span>
+
+<span class="cm"># Output formats</span>
+FORMAT_WAV = <span class="str">"wav"</span>
+OUTPUT_FORMAT_CHOICES = [
+    (<span class="str">"wav"</span>, <span class="str">"WAV (always available)"</span>),
+    (<span class="str">"mp3"</span>, <span class="str">"MP3 (requires FFmpeg)"</span>),
+    (<span class="str">"flac"</span>, <span class="str">"FLAC (requires FFmpeg)"</span>),
+]
+
+<span class="cm"># Themes</span>
+THEME_LIGHT, THEME_DARK, THEME_SYSTEM = <span class="str">"light"</span>, <span class="str">"dark"</span>, <span class="str">"system"</span>
+
+<span class="cm"># Project types</span>
+PROJECT_TYPE_AUDIO_PLAYLIST = <span class="str">"audio_playlist"</span>
+PROJECT_TYPE_DAISY_AUDIO = <span class="str">"daisy_audio"</span>
+PROJECT_TYPE_DAISY_AUDIO_TEXT = <span class="str">"daisy_audio_text"</span>
+PROJECT_TYPE_CLIPBOARD = <span class="str">"clipboard"</span>
+
+<span class="cm"># DAISY constants</span>
+DAISY_NCC_FILE = <span class="str">"ncc.html"</span>
+DAISY_PACKAGE_FILE = <span class="str">"package.opf"</span>
+DAISY_AUDIO_DIR_NAME = <span class="str">"audio"</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From constants.py — organized by category</code>
+        <br><span class="desc">A comment indicating the source file: <em>From constants.py — organized by category</em>. This helps the reader locate the code in the AIVoiceStudio codebase.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Application</code>
+        <br><span class="desc">A comment: <em>Application</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>APP_NAME = &quot;AI Voice Studio&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;AI Voice Studio&quot;</code> to <code>APP_NAME</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>APP_VERSION = &quot;2.0.0&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;2.0.0&quot;</code> to <code>APP_VERSION</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># Audio parameters</code>
+        <br><span class="desc">A comment: <em>Audio parameters</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>RATE_MIN, RATE_MAX = 0.5, 2.0</code>
+        <br><span class="desc"><code>RATE_MIN, RATE_MAX = 0.5, 2.0</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>PITCH_MIN, PITCH_MAX = 0.5, 2.0</code>
+        <br><span class="desc"><code>PITCH_MIN, PITCH_MAX = 0.5, 2.0</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>VOLUME_MIN, VOLUME_MAX = 0.0, 2.0</code>
+        <br><span class="desc"><code>VOLUME_MIN, VOLUME_MAX = 0.0, 2.0</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code># Output formats</code>
+        <br><span class="desc">A comment: <em>Output formats</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>FORMAT_WAV = &quot;wav&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;wav&quot;</code> to <code>FORMAT_WAV</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>OUTPUT_FORMAT_CHOICES = [</code>
+        <br><span class="desc">Assigns <code>[</code> to <code>OUTPUT_FORMAT_CHOICES</code>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>(&quot;wav&quot;, &quot;WAV (always available)&quot;),</code>
+        <br><span class="desc"><code>(&quot;wav&quot;, &quot;WAV (always available)&quot;),</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>(&quot;mp3&quot;, &quot;MP3 (requires FFmpeg)&quot;),</code>
+        <br><span class="desc"><code>(&quot;mp3&quot;, &quot;MP3 (requires FFmpeg)&quot;),</code></span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>(&quot;flac&quot;, &quot;FLAC (requires FFmpeg)&quot;),</code>
+        <br><span class="desc"><code>(&quot;flac&quot;, &quot;FLAC (requires FFmpeg)&quot;),</code></span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>]</code>
+        <br><span class="desc"><code>]</code></span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code># Themes</code>
+        <br><span class="desc">A comment: <em>Themes</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>THEME_LIGHT, THEME_DARK, THEME_SYSTEM = &quot;light&quot;, &quot;dark&quot;, &quot;system&quot;</code>
+        <br><span class="desc"><code>THEME_LIGHT, THEME_DARK, THEME_SYSTEM = &quot;light&quot;, &quot;dark&quot;, &quot;system&quot;</code></span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code># Project types</code>
+        <br><span class="desc">A comment: <em>Project types</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>PROJECT_TYPE_AUDIO_PLAYLIST = &quot;audio_playlist&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;audio_playlist&quot;</code> to <code>PROJECT_TYPE_AUDIO_PLAYLIST</code>.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>PROJECT_TYPE_DAISY_AUDIO = &quot;daisy_audio&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;daisy_audio&quot;</code> to <code>PROJECT_TYPE_DAISY_AUDIO</code>.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>PROJECT_TYPE_DAISY_AUDIO_TEXT = &quot;daisy_audio_text&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;daisy_audio_text&quot;</code> to <code>PROJECT_TYPE_DAISY_AUDIO_TEXT</code>.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>PROJECT_TYPE_CLIPBOARD = &quot;clipboard&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;clipboard&quot;</code> to <code>PROJECT_TYPE_CLIPBOARD</code>.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code># DAISY constants</code>
+        <br><span class="desc">A comment: <em>DAISY constants</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>DAISY_NCC_FILE = &quot;ncc.html&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;ncc.html&quot;</code> to <code>DAISY_NCC_FILE</code>.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>DAISY_PACKAGE_FILE = &quot;package.opf&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;package.opf&quot;</code> to <code>DAISY_PACKAGE_FILE</code>.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>DAISY_AUDIO_DIR_NAME = &quot;audio&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;audio&quot;</code> to <code>DAISY_AUDIO_DIR_NAME</code>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>44.4 Key Takeaways</h2>
+<ul>
+  <li><strong>paths.py</strong> centralizes all file locations (user data, models, projects, logs)</li>
+  <li><strong>settings.py</strong> provides JSON persistence with property-based access</li>
+  <li><strong>constants.py</strong> eliminates magic numbers and strings across the codebase</li>
+  <li>Settings are loaded at startup and saved immediately on change</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch43_architecture.html">← Ch 43</a> &nbsp;|&nbsp; <a href="ch45_project_model.html">Ch 45 — Project Model →</a></p>
+</div></div></body>
+</html>

@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 56: Background Synthesis Worker - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part VI</div><ul class="chapters"><li><a href="ch43_architecture.html">Ch 43</a></li><li><a href="ch44_paths_settings.html">Ch 44</a></li><li><a href="ch45_project_model.html">Ch 45</a></li><li><a href="ch46_document_parsing.html">Ch 46</a></li><li><a href="ch47_tts_catalog.html">Ch 47</a></li><li><a href="ch48_tts_engine.html">Ch 48</a></li><li><a href="ch49_downloader.html">Ch 49</a></li><li><a href="ch50_compute_detection.html">Ch 50</a></li><li><a href="ch51_main_frame.html">Ch 51</a></li><li><a href="ch52_settings_dialog.html">Ch 52</a></li><li><a href="ch53_model_panels.html">Ch 53</a></li><li><a href="ch54_new_project_wizard.html">Ch 54</a></li><li><a href="ch55_recording.html">Ch 55</a></li><li><a href="ch56_synthesis_worker.html" class="active">Ch 56: Synthesizer</a></li><li><a href="ch57_clone_engine.html">Ch 57</a></li><li><a href="ch58_omnivoice.html">Ch 58</a></li><li><a href="ch59_daisy_builder.html">Ch 59</a></li><li><a href="ch60_addons.html">Ch 60</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 56</div>
+<h1>Background Synthesis Worker</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand the complete SynthesisWorker implementation</li>
+  <li>See how audio is synthesized, processed, and saved</li>
+  <li>Understand the resume-after-crash pattern</li>
+</ul>
+
+<hr>
+
+<h2>56.1 SynthesisWorker Thread</h2>
+
+<pre><code><span class="kw">class</span> <span class="cls">SynthesisWorker</span>(threading.Thread):
+    <span class="str">"""Background thread that synthesizes all segments."""</span>
+
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, segments, voice_entry, params, output_dir,
+                 start_index, on_segment_done, on_all_done, on_error,
+                 cancel_event, pause_event, on_status, ffmpeg_exe=<span class="kw">None</span>):
+        <span class="kw">super</span>().__init__(daemon=<span class="kw">True</span>)
+        self._segments = segments
+        self._voice_entry = voice_entry
+        self._params = params
+        self._output_dir = output_dir
+        self._start_index = start_index
+        self._on_done = on_segment_done
+        self._on_all_done = on_all_done
+        self._on_error = on_error
+        self._cancel = cancel_event
+        self._pause = pause_event
+        self._on_status = on_status
+        self._ffmpeg_exe = ffmpeg_exe
+
+    <span class="kw">def</span> <span class="fn">run</span>(self):
+        <span class="kw">try</span>:
+            engine = get_engine(self._voice_entry)
+
+            <span class="kw">for</span> i, seg <span class="kw">in</span> enumerate(self._segments):
+                <span class="cm"># Check cancellation</span>
+                <span class="kw">if</span> self._cancel.is_set():
+                    <span class="kw">break</span>
+
+                <span class="cm"># Check pause</span>
+                <span class="kw">while</span> self._pause.is_set():
+                    <span class="kw">if</span> self._cancel.is_set():
+                        <span class="kw">break</span>
+                    time.sleep(<span class="num">0.1</span>)
+
+                <span class="cm"># Synthesize</span>
+                self._on_status(<span class="str">f"Recording segment </span>{seg.index}<span class="str">..."</span>)
+                audio = engine.synthesize(
+                    seg.text,
+                    speed=self._params[<span class="str">"rate"</span>],
+                    pitch=self._params[<span class="str">"pitch"</span>],
+                    volume=self._params[<span class="str">"volume"</span>],
+                )
+
+                <span class="cm"># Save audio</span>
+                filename = sanitize_filename(seg.title) + <span class="str">".wav"</span>
+                path = os.path.join(self._output_dir, filename)
+                write_wav(path, audio, engine.sample_rate)
+
+                <span class="cm"># Convert if needed</span>
+                <span class="kw">if</span> self._params[<span class="str">"output_format"</span>] != <span class="str">"wav"</span> <span class="kw">and</span> self._ffmpeg_exe:
+                    fmt = self._params[<span class="str">"output_format"</span>]
+                    out_path = path.replace(<span class="str">".wav"</span>, <span class="str">f".</span>{fmt}<span class="str">"</span>)
+                    convert_wav(path, out_path, fmt, self._ffmpeg_exe)
+                    path = out_path
+
+                <span class="cm"># Mark segment done (saves to project.json)</span>
+                self._on_done(seg.index, seg.title, path)
+
+            self._on_all_done()
+
+        <span class="kw">except</span> Exception <span class="kw">as</span> exc:
+            self._on_error(str(exc))</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>class SynthesisWorker(threading.Thread):</code>
+        <br><span class="desc">Background thread that synthesizes text segments into audio files. Handles progress callbacks and cancellation.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>&quot;&quot;&quot;Background thread that synthesizes all segments.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Background thread that synthesizes all segments.</em>. Documents the purpose of the following code block.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>def __init__(self, segments, voice_entry, params, output_dir,</code>
+        <br><span class="desc"><code>def __init__(self, segments, voice_entry, params, output_dir,</code></span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>start_index, on_segment_done, on_all_done, on_error,</code>
+        <br><span class="desc"><code>start_index, on_segment_done, on_all_done, on_error,</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>cancel_event, pause_event, on_status, ffmpeg_exe=None):</code>
+        <br><span class="desc"><code>cancel_event, pause_event, on_status, ffmpeg_exe=None):</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>super().__init__(daemon=True)</code>
+        <br><span class="desc">Calls function <code>super()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>self._segments = segments</code>
+        <br><span class="desc">Stores <code>segments</code> in the instance attribute <code>_segments</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>self._voice_entry = voice_entry</code>
+        <br><span class="desc">Stores <code>voice_entry</code> in the instance attribute <code>_voice_entry</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>self._params = params</code>
+        <br><span class="desc">Stores <code>params</code> in the instance attribute <code>_params</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>self._output_dir = output_dir</code>
+        <br><span class="desc">Stores <code>output_dir</code> in the instance attribute <code>_output_dir</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>self._start_index = start_index</code>
+        <br><span class="desc">Stores <code>start_index</code> in the instance attribute <code>_start_index</code>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>self._on_done = on_segment_done</code>
+        <br><span class="desc">Stores <code>on_segment_done</code> in the instance attribute <code>_on_done</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>self._on_all_done = on_all_done</code>
+        <br><span class="desc">Stores <code>on_all_done</code> in the instance attribute <code>_on_all_done</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>self._on_error = on_error</code>
+        <br><span class="desc">Stores <code>on_error</code> in the instance attribute <code>_on_error</code>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>self._cancel = cancel_event</code>
+        <br><span class="desc">Stores <code>cancel_event</code> in the instance attribute <code>_cancel</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>self._pause = pause_event</code>
+        <br><span class="desc">Stores <code>pause_event</code> in the instance attribute <code>_pause</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>self._on_status = on_status</code>
+        <br><span class="desc">Stores <code>on_status</code> in the instance attribute <code>_on_status</code>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>self._ffmpeg_exe = ffmpeg_exe</code>
+        <br><span class="desc">Stores <code>ffmpeg_exe</code> in the instance attribute <code>_ffmpeg_exe</code>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>def run(self):</code>
+        <br><span class="desc">Defines function <code>run</code>: Main synthesis loop. Iterates over segments, calls the TTS engine for each, and saves audio files.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>try:</code>
+        <br><span class="desc">Begins exception handling. Errors in this block will be caught below.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>engine = get_engine(self._voice_entry)</code>
+        <br><span class="desc">Assigns <code>get_engine(self._voice_entry)</code> to <code>engine</code>.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>for i, seg in enumerate(self._segments):</code>
+        <br><span class="desc"><code>for i, seg in enumerate(self._segments):</code></span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code># Check cancellation</code>
+        <br><span class="desc">A comment: <em>Check cancellation</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>if self._cancel.is_set():</code>
+        <br><span class="desc">Checks condition: <code>self._cancel.is_set()</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>break</code>
+        <br><span class="desc">Exits the innermost loop immediately.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code># Check pause</code>
+        <br><span class="desc">A comment: <em>Check pause</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>while self._pause.is_set():</code>
+        <br><span class="desc">While loop: repeats as long as <code>self._pause.is_set()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>if self._cancel.is_set():</code>
+        <br><span class="desc">Checks condition: <code>self._cancel.is_set()</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>break</code>
+        <br><span class="desc">Exits the innermost loop immediately.</span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code>time.sleep(0.1)</code>
+        <br><span class="desc"><code>time.sleep(0.1)</code></span>
+      </li>
+      <li>
+        <strong>Line 31:</strong> <code># Synthesize</code>
+        <br><span class="desc">A comment: <em>Synthesize</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 32:</strong> <code>self._on_status(f&quot;Recording segment {seg.index}...&quot;)</code>
+        <br><span class="desc">Calls <code>self._on_status()</code> to perform an operation.</span>
+      </li>
+      <li>
+        <strong>Line 33:</strong> <code>audio = engine.synthesize(</code>
+        <br><span class="desc">Assigns <code>engine.synthesize(</code> to <code>audio</code>.</span>
+      </li>
+      <li>
+        <strong>Line 34:</strong> <code>seg.text,</code>
+        <br><span class="desc"><code>seg.text,</code></span>
+      </li>
+      <li>
+        <strong>Line 35:</strong> <code>speed=self._params[&quot;rate&quot;],</code>
+        <br><span class="desc">Assigns <code>self._params[&quot;rate&quot;],</code> to <code>speed</code>.</span>
+      </li>
+      <li>
+        <strong>Line 36:</strong> <code>pitch=self._params[&quot;pitch&quot;],</code>
+        <br><span class="desc">Assigns <code>self._params[&quot;pitch&quot;],</code> to <code>pitch</code>.</span>
+      </li>
+      <li>
+        <strong>Line 37:</strong> <code>volume=self._params[&quot;volume&quot;],</code>
+        <br><span class="desc">Assigns <code>self._params[&quot;volume&quot;],</code> to <code>volume</code>.</span>
+      </li>
+      <li>
+        <strong>Line 38:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+      <li>
+        <strong>Line 39:</strong> <code># Save audio</code>
+        <br><span class="desc">A comment: <em>Save audio</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 40:</strong> <code>filename = sanitize_filename(seg.title) + &quot;.wav&quot;</code>
+        <br><span class="desc">Removes or replaces characters that are illegal in filenames (Windows: <>:"/\|?*). Truncates to max_length to avoid filesystem limits.</span>
+      </li>
+      <li>
+        <strong>Line 41:</strong> <code>path = os.path.join(self._output_dir, filename)</code>
+        <br><span class="desc">Assigns <code>os.path.join(self._output_dir, filename)</code> to <code>path</code>.</span>
+      </li>
+      <li>
+        <strong>Line 42:</strong> <code>write_wav(path, audio, engine.sample_rate)</code>
+        <br><span class="desc">Calls function <code>write_wav()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 43:</strong> <code># Convert if needed</code>
+        <br><span class="desc">A comment: <em>Convert if needed</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 44:</strong> <code>if self._params[&quot;output_format&quot;] != &quot;wav&quot; and self._ffmpeg_exe:</code>
+        <br><span class="desc">Checks condition: <code>self._params[&quot;output_format&quot;] != &quot;wav&quot; and self._ffmpeg_exe</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 45:</strong> <code>fmt = self._params[&quot;output_format&quot;]</code>
+        <br><span class="desc">Assigns <code>self._params[&quot;output_format&quot;]</code> to <code>fmt</code>.</span>
+      </li>
+      <li>
+        <strong>Line 46:</strong> <code>out_path = path.replace(&quot;.wav&quot;, f&quot;.{fmt}&quot;)</code>
+        <br><span class="desc">Assigns <code>path.replace(&quot;.wav&quot;, f&quot;.{fmt}&quot;)</code> to <code>out_path</code>.</span>
+      </li>
+      <li>
+        <strong>Line 47:</strong> <code>convert_wav(path, out_path, fmt, self._ffmpeg_exe)</code>
+        <br><span class="desc">Calls function <code>convert_wav()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 48:</strong> <code>path = out_path</code>
+        <br><span class="desc">Assigns <code>out_path</code> to <code>path</code>.</span>
+      </li>
+      <li>
+        <strong>Line 49:</strong> <code># Mark segment done (saves to project.json)</code>
+        <br><span class="desc">A comment: <em>Mark segment done (saves to project.json)</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 50:</strong> <code>self._on_done(seg.index, seg.title, path)</code>
+        <br><span class="desc">Calls <code>self._on_done()</code> to perform an operation.</span>
+      </li>
+      <li>
+        <strong>Line 51:</strong> <code>self._on_all_done()</code>
+        <br><span class="desc">Calls <code>self._on_all_done()</code> to perform an operation.</span>
+      </li>
+      <li>
+        <strong>Line 52:</strong> <code>except Exception as exc:</code>
+        <br><span class="desc">Catches <code>Exception</code> exceptions.</span>
+      </li>
+      <li>
+        <strong>Line 53:</strong> <code>self._on_error(str(exc))</code>
+        <br><span class="desc">Calls <code>self._on_error()</code> to perform an operation.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>56.2 Resume Pattern</h2>
+
+<pre><code><span class="cm"># The key insight: segments are saved IMMEDIATELY to disk</span>
+<span class="cm"># When the app restarts, first_pending_index() finds where to resume</span>
+
+<span class="cm"># In RecordingDialog._on_start:</span>
+start_index = project.first_pending_index(self.project_dir)
+<span class="cm"># If segments 1-5 are done, start_index = 5</span>
+<span class="cm"># Worker processes segments[5:] (segments 6, 7, 8, ...)</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># The key insight: segments are saved IMMEDIATELY to disk</code>
+        <br><span class="desc">A comment: <em>The key insight: segments are saved IMMEDIATELY to disk</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># When the app restarts, first_pending_index() finds where to resume</code>
+        <br><span class="desc">A comment: <em>When the app restarts, first_pending_index() finds where to resume</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># In RecordingDialog._on_start:</code>
+        <br><span class="desc">A comment: <em>In RecordingDialog._on_start:</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>start_index = project.first_pending_index(self.project_dir)</code>
+        <br><span class="desc">Assigns <code>project.first_pending_index(self.project_dir)</code> to <code>start_index</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># If segments 1-5 are done, start_index = 5</code>
+        <br><span class="desc">A comment: <em>If segments 1-5 are done, start_index = 5</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># Worker processes segments[5:] (segments 6, 7, 8, ...)</code>
+        <br><span class="desc">A comment: <em>Worker processes segments[5:] (segments 6, 7, 8, ...)</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>56.3 Key Takeaways</h2>
+<ul>
+  <li>The worker is a <strong>daemon thread</strong> — dies with the main process</li>
+  <li><strong>Immediate save</strong> after each segment enables crash recovery</li>
+  <li><strong>Cancel</strong> exits after the current segment; <strong>Pause</strong> waits between segments</li>
+  <li>Audio goes through: <strong>synthesize → pitch/volume → save WAV → convert (optional)</strong></li>
+  <li>The resume pattern: <strong>first_pending_index() → skip done segments → continue</strong></li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch55_recording.html">← Ch 55</a> &nbsp;|&nbsp; <a href="ch57_clone_engine.html">Ch 57 — Voice Cloning →</a></p>
+</div></div></body>
+</html>

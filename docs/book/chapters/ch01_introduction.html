@@ -1,0 +1,1541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 1: Introduction &amp; Setup - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar">
+  <h2>📖 Table of Contents</h2>
+  <div class="part-header">Part I — Python Fundamentals</div>
+  <ul class="chapters">
+    <li><a href="ch01_introduction.html" class="active">Ch 1: Introduction &amp; Setup</a></li>
+    <li><a href="ch02_variables.html">Ch 2: Variables &amp; Data Types</a></li>
+    <li><a href="ch03_control_flow.html">Ch 3: Control Flow</a></li>
+    <li><a href="ch04_functions.html">Ch 4: Functions</a></li>
+    <li><a href="ch05_strings.html">Ch 5: Strings &amp; Formatting</a></li>
+    <li><a href="ch06_collections.html">Ch 6: Lists, Tuples, Sets &amp; Dicts</a></li>
+    <li><a href="ch07_file_io.html">Ch 7: File I/O</a></li>
+    <li><a href="ch08_error_handling.html">Ch 8: Error Handling</a></li>
+    <li><a href="ch09_modules.html">Ch 9: Modules &amp; Packages</a></li>
+    <li><a href="ch10_oop_basics.html">Ch 10: OOP Basics</a></li>
+  </ul>
+  <div class="part-header">Part II — Intermediate Python</div>
+  <ul class="chapters">
+    <li><a href="ch11_oop_advanced.html">Ch 11: OOP Advanced</a></li>
+    <li><a href="ch12_iterators.html">Ch 12: Iterators &amp; Generators</a></li>
+    <li><a href="ch13_decorators.html">Ch 13: Decorators</a></li>
+    <li><a href="ch14_context.html">Ch 14: Context Managers</a></li>
+    <li><a href="ch15_regex.html">Ch 15: Regular Expressions</a></li>
+    <li><a href="ch16_datetime.html">Ch 16: Date &amp; Time</a></li>
+    <li><a href="ch17_testing.html">Ch 17: Testing</a></li>
+    <li><a href="ch18_json_xml.html">Ch 18: JSON, XML &amp; Data</a></li>
+  </ul>
+  <div class="part-header">Part III — Advanced Python</div>
+  <ul class="chapters">
+    <li><a href="ch19_concurrency.html">Ch 19: Concurrency</a></li>
+    <li><a href="ch20_multiprocessing.html">Ch 20: Multiprocessing</a></li>
+    <li><a href="ch21_async.html">Ch 21: Async I/O</a></li>
+    <li><a href="ch22_type_hints.html">Ch 22: Type Hints</a></li>
+    <li><a href="ch23_metaclasses.html">Ch 23: Metaclasses</a></li>
+    <li><a href="ch24_design_patterns.html">Ch 24: Design Patterns</a></li>
+    <li><a href="ch25_introspection.html">Ch 25: Introspection</a></li>
+    <li><a href="ch26_c_extensions.html">Ch 26: C Extensions</a></li>
+  </ul>
+  <div class="part-header">Part IV — wxPython</div>
+  <ul class="chapters">
+    <li><a href="ch27_wxpython_intro.html">Ch 27: wxPython Intro</a></li>
+    <li><a href="ch28_sizers_layout.html">Ch 28: Sizers &amp; Layout</a></li>
+    <li><a href="ch29_controls.html">Ch 29: Controls</a></li>
+    <li><a href="ch30_events.html">Ch 30: Events</a></li>
+    <li><a href="ch31_dialogs.html">Ch 31: Dialogs</a></li>
+    <li><a href="ch32_custom_drawing.html">Ch 32: Custom Drawing</a></li>
+    <li><a href="ch33_threading_gui.html">Ch 33: Threading + GUI</a></li>
+    <li><a href="ch34_accessibility.html">Ch 34: Accessibility</a></li>
+    <li><a href="ch35_themes.html">Ch 35: Theming</a></li>
+    <li><a href="ch36_wx_adv.html">Ch 36: wx.adv</a></li>
+  </ul>
+  <div class="part-header">Part V — Dependencies</div>
+  <ul class="chapters">
+    <li><a href="ch37_numpy.html">Ch 37: NumPy</a></li>
+    <li><a href="ch38_requests.html">Ch 38: Requests</a></li>
+    <li><a href="ch39_sherpa_onnx.html">Ch 39: sherpa-onnx</a></li>
+    <li><a href="ch40_pypdf_docx.html">Ch 40: PDF &amp; DOCX</a></li>
+    <li><a href="ch41_ffmpeg.html">Ch 41: FFmpeg</a></li>
+    <li><a href="ch42_virtualenvs.html">Ch 42: Virtual Envs</a></li>
+  </ul>
+  <div class="part-header">Part VI — Building AIVS</div>
+  <ul class="chapters">
+    <li><a href="ch43_architecture.html">Ch 43: Architecture</a></li>
+    <li><a href="ch44_paths_settings.html">Ch 44: Paths &amp; Settings</a></li>
+    <li><a href="ch45_project_model.html">Ch 45: Project Model</a></li>
+    <li><a href="ch46_document_parsing.html">Ch 46: Documents</a></li>
+    <li><a href="ch47_tts_catalog.html">Ch 47: TTS Catalog</a></li>
+    <li><a href="ch48_tts_engine.html">Ch 48: TTS Engine</a></li>
+    <li><a href="ch49_downloader.html">Ch 49: Downloader</a></li>
+    <li><a href="ch50_compute_detection.html">Ch 50: Compute</a></li>
+    <li><a href="ch51_main_frame.html">Ch 51: Main Frame</a></li>
+    <li><a href="ch52_settings_dialog.html">Ch 52: Settings</a></li>
+    <li><a href="ch53_model_panels.html">Ch 53: Model Panels</a></li>
+    <li><a href="ch54_new_project_wizard.html">Ch 54: Wizard</a></li>
+    <li><a href="ch55_recording.html">Ch 55: Recording</a></li>
+    <li><a href="ch56_synthesis_worker.html">Ch 56: Synthesizer</a></li>
+    <li><a href="ch57_clone_engine.html">Ch 57: Voice Cloning</a></li>
+    <li><a href="ch58_omnivoice.html">Ch 58: OmniVoice</a></li>
+    <li><a href="ch59_daisy_builder.html">Ch 59: DAISY Builder</a></li>
+    <li><a href="ch60_addons.html">Ch 60: Addons</a></li>
+  </ul>
+  <div class="part-header">Part VII — Testing &amp; Deployment</div>
+  <ul class="chapters">
+    <li><a href="ch61_unit_testing.html">Ch 61: Unit Testing</a></li>
+    <li><a href="ch62_mocking.html">Ch 62: Mocking</a></li>
+    <li><a href="ch63_integration.html">Ch 63: Integration</a></li>
+    <li><a href="ch64_pyinstaller.html">Ch 64: PyInstaller</a></li>
+    <li><a href="ch65_inno_setup.html">Ch 65: Inno Setup</a></li>
+    <li><a href="ch66_ci_cd.html">Ch 66: CI/CD</a></li>
+  </ul>
+  <div class="part-header">Part VIII — Advanced Topics</div>
+  <ul class="chapters">
+    <li><a href="ch67_python_runtime.html">Ch 67: Runtime</a></li>
+    <li><a href="ch68_subprocess.html">Ch 68: Subprocess</a></li>
+    <li><a href="ch69_logging.html">Ch 69: Logging</a></li>
+    <li><a href="ch70_performance.html">Ch 70: Performance</a></li>
+    <li><a href="ch71_security.html">Ch 71: Security</a></li>
+    <li><a href="ch72_roadmap.html">Ch 72: Roadmap</a></li>
+  </ul>
+  <div class="part-header">Appendices</div>
+  <ul class="chapters">
+    <li><a href="appendix_a_reference.html">A: Reference</a></li>
+    <li><a href="appendix_b_api.html">B: API</a></li>
+    <li><a href="appendix_c_glossary.html">C: Glossary</a></li>
+  </ul>
+</nav>
+
+<div class="main-content">
+
+<div class="chapter-number">Chapter 1</div>
+<h1>Introduction &amp; Setup</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand what Python is and why it dominates desktop and AI development</li>
+  <li>Install Python 3.13 on Windows, macOS, or Linux</li>
+  <li>Set up a command-line terminal and run your first Python program</li>
+  <li>Explore the AI Voice Studio project structure</li>
+  <li>Create and activate a virtual environment</li>
+  <li>Install project dependencies</li>
+</ul>
+
+<hr>
+
+<h2>1.1 What Is Python?</h2>
+
+<p>
+  Python is a high-level, interpreted, general-purpose programming language created by
+  Guido van Rossum and first released in 1991. It emphasizes code readability with its
+  use of significant indentation and English-like syntax. Today, Python is one of the
+  most popular programming languages in the world, powering everything from web servers
+  to artificial intelligence to desktop applications.
+</p>
+
+<h3>Why Python?</h3>
+
+<table>
+  <thead>
+    <tr><th>Feature</th><th>Benefit</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Interpreted</td><td>No compilation step — run code immediately</td></tr>
+    <tr><td>Dynamically typed</td><td>No type declarations needed (but available via hints)</td></tr>
+    <tr><td>Extensive stdlib</td><td>Over 200 modules in the standard library</td></tr>
+    <tr><td>Massive ecosystem</td><td>400,000+ packages on PyPI</td></tr>
+    <tr><td>Cross-platform</td><td>Windows, macOS, Linux with one codebase</td></tr>
+    <tr><td>AI/ML dominance</td><td>NumPy, PyTorch, TensorFlow all use Python</td></tr>
+    <tr><td>Desktop GUIs</td><td>wxPython, PyQt, Tkinter, Kivy</td></tr>
+  </tbody>
+</table>
+
+<h3>Python in AI Voice Studio</h3>
+
+<p>
+  AI Voice Studio is a desktop application that converts text documents into spoken
+  audio using neural text-to-speech (TTS) engines. It is built entirely in Python
+  with wxPython for the GUI. This makes it a perfect learning vehicle because it
+  touches every major area of Python development:
+</p>
+
+<ul>
+  <li><strong>Core Python:</strong> File I/O, string processing, data structures, error handling</li>
+  <li><strong>OOP:</strong> Classes, inheritance, polymorphism, encapsulation</li>
+  <li><strong>Concurrency:</strong> Threading for background TTS synthesis</li>
+  <li><strong>GUI:</strong> wxPython for native Windows interface</li>
+  <li><strong>AI/ML:</strong> sherpa-onnx for neural speech synthesis</li>
+  <li><strong>Networking:</strong> HTTP downloads of voice models</li>
+  <li><strong>Packaging:</strong> PyInstaller and Inno Setup for distribution</li>
+</ul>
+
+<hr>
+
+<h2>1.2 Installing Python</h2>
+
+<h3>System Requirements</h3>
+
+<ul>
+  <li>Operating System: Windows 10/11 (64-bit), macOS 12+, or Ubuntu 20.04+</li>
+  <li>Python version: 3.11 or later (we use 3.13)</li>
+  <li>RAM: 4 GB minimum, 8 GB recommended</li>
+  <li>Disk: 2 GB free space (for TTS voice models)</li>
+</ul>
+
+<h3>Windows Installation</h3>
+
+<ol>
+  <li>
+    Visit <a href="https://www.python.org/downloads/">python.org/downloads</a>
+  </li>
+  <li>Download the Windows installer (64-bit)</li>
+  <li>Run the installer. <strong>Important:</strong> Check the box that says
+    "Add python.exe to PATH" before clicking Install</li>
+  <li>Verify the installation by opening a terminal and typing:
+    <pre><code>python --version
+<span class="cm"># Output: Python 3.13.0</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>python --version</code>
+        <br><span class="desc"><code>python --version</code></span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Output: Python 3.13.0</code>
+        <br><span class="desc">A comment: <em>Output: Python 3.13.0</em>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+  </li>
+</ol>
+
+<div class="warning">
+  Always add Python to PATH during installation. If you skip this, you will not be
+  able to run <code>python</code> or <code>pip</code> from the terminal without
+  specifying the full path.
+</div>
+
+<h3>macOS / Linux Installation</h3>
+
+<pre><code><span class="cm"># macOS (using Homebrew)</span>
+brew install python@3.13
+
+<span class="cm"># Ubuntu/Debian</span>
+sudo apt update
+sudo apt install python3.13 python3.13-venv python3.13-dev
+
+<span class="cm"># Verify</span>
+python3 --version</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># macOS (using Homebrew)</code>
+        <br><span class="desc">A comment: <em>macOS (using Homebrew)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>brew install python@3.13</code>
+        <br><span class="desc"><code>brew install python@3.13</code></span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># Ubuntu/Debian</code>
+        <br><span class="desc">A comment: <em>Ubuntu/Debian</em>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>sudo apt update</code>
+        <br><span class="desc"><code>sudo apt update</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>sudo apt install python3.13 python3.13-venv python3.13-dev</code>
+        <br><span class="desc"><code>sudo apt install python3.13 python3.13-venv python3.13-dev</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># Verify</code>
+        <br><span class="desc">A comment: <em>Verify</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>python3 --version</code>
+        <br><span class="desc"><code>python3 --version</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>1.3 The Python REPL</h2>
+
+<p>
+  The <strong>REPL</strong> (Read-Eval-Print Loop) is Python's interactive shell.
+  Open a terminal and type <code>python</code> to enter it:
+</p>
+
+<pre><code>$ python
+Python 3.13.0 (main, Oct  7 2024)
+Type "help", "copyright", "credits" or "license" for more information.
+>>> <span class="cm"># You are now in the Python REPL</span>
+>>> 2 + 2
+4
+>>> "Hello, " + "World!"
+'Hello, World!'
+>>> import sys
+>>> sys.version
+'3.13.0 (main, Oct  7 2024, 05:45:20) ...'
+>>> exit()  <span class="cm"># or press Ctrl+Z (Windows) / Ctrl+D (macOS/Linux)</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>$ python</code>
+        <br><span class="desc"><code>$ python</code></span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>Python 3.13.0 (main, Oct  7 2024)</code>
+        <br><span class="desc"><code>Python 3.13.0 (main, Oct  7 2024)</code></span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>Type &quot;help&quot;, &quot;copyright&quot;, &quot;credits&quot; or &quot;license&quot; for more information.</code>
+        <br><span class="desc"><code>Type &quot;help&quot;, &quot;copyright&quot;, &quot;credits&quot; or &quot;license&quot; for more information.</code></span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>&gt;&gt;&gt; # You are now in the Python REPL</code>
+        <br><span class="desc"><code>&gt;&gt;&gt; # You are now in the Python REPL</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>&gt;&gt;&gt; 2 + 2</code>
+        <br><span class="desc"><code>&gt;&gt;&gt; 2 + 2</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>4</code>
+        <br><span class="desc"><code>4</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>&gt;&gt;&gt; &quot;Hello, &quot; + &quot;World!&quot;</code>
+        <br><span class="desc"><code>&gt;&gt;&gt; &quot;Hello, &quot; + &quot;World!&quot;</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>&#x27;Hello, World!&#x27;</code>
+        <br><span class="desc"><code>&#x27;Hello, World!&#x27;</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>&gt;&gt;&gt; import sys</code>
+        <br><span class="desc"><code>&gt;&gt;&gt; import sys</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>&gt;&gt;&gt; sys.version</code>
+        <br><span class="desc"><code>&gt;&gt;&gt; sys.version</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>&#x27;3.13.0 (main, Oct  7 2024, 05:45:20) ...&#x27;</code>
+        <br><span class="desc"><code>&#x27;3.13.0 (main, Oct  7 2024, 05:45:20) ...&#x27;</code></span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>&gt;&gt;&gt; exit()  # or press Ctrl+Z (Windows) / Ctrl+D (macOS/Linux)</code>
+        <br><span class="desc"><code>&gt;&gt;&gt; exit()  # or press Ctrl+Z (Windows) / Ctrl+D (macOS/Linux)</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<p>
+  The REPL is your sandbox for experimenting. You can type any Python expression and
+  see the result immediately. We will use the REPL extensively throughout this book.
+</p>
+
+<h3>Running a Python Script</h3>
+
+<p>While the REPL is great for experiments, real programs live in files with a <code>.py</code> extension:</p>
+
+<pre><code><span class="cm"># hello.py</span>
+<span class="kw">print</span>(<span class="str">"Hello, AI Voice Studio!"</span>)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 4)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># hello.py</code>
+        <br><span class="desc">A comment: <em>hello.py</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>print(&quot;Hello, AI Voice Studio!&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<pre><code>$ python hello.py
+Hello, AI Voice Studio!</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 5)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>$ python hello.py</code>
+        <br><span class="desc"><code>$ python hello.py</code></span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>Hello, AI Voice Studio!</code>
+        <br><span class="desc"><code>Hello, AI Voice Studio!</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>1.4 The AI Voice Studio Project</h2>
+
+<h3>Project Structure</h3>
+
+<p>
+  Let's explore the project we will be building throughout this book. The AI Voice
+  Studio repository has this structure:
+</p>
+
+<pre><code>ai_voice_studio/
+├── main.py                      <span class="cm"># Application entry point</span>
+├── requirements.txt             <span class="cm"># Core dependencies</span>
+├── LICENSE                      <span class="cm"># GPL-3.0 license</span>
+├── README.md                    <span class="cm"># Project documentation</span>
+├── PROJECT_SPEC.md              <span class="cm"># Full feature specification</span>
+├── DEV_PLAN.md                  <span class="cm"># Development plan</span>
+├── ai_voice_studio/             <span class="cm"># Main package</span>
+│   ├── __init__.py
+│   ├── constants.py             <span class="cm"># Application constants</span>
+│   ├── paths.py                 <span class="cm"># File path management</span>
+│   ├── settings.py              <span class="cm"># User preferences (JSON)</span>
+│   ├── project.py               <span class="cm"># Project persistence</span>
+│   ├── compute.py               <span class="cm"># GPU/CPU detection</span>
+│   ├── util.py                  <span class="cm"># Utility functions</span>
+│   ├── heavy_logging.py         <span class="cm"># Developer logging</span>
+│   ├── runtime.py               <span class="cm"># Runtime management</span>
+│   ├── gui/                     <span class="cm"># wxPython GUI modules</span>
+│   │   ├── main_frame.py        <span class="cm"># Main window</span>
+│   │   ├── settings_dialog.py   <span class="cm"># Settings window</span>
+│   │   ├── model_panels.py      <span class="cm"># Voice download/management</span>
+│   │   ├── new_project_wizard.py</span><span class="cm"># Project creation wizard</span>
+│   │   ├── recording_dialog.py  <span class="cm"># Recording window</span>
+│   │   ├── a11y.py              <span class="cm"># Accessibility helpers</span>
+│   │   ├── theme.py             <span class="cm"># Light/Dark themes</span>
+│   │   └── events.py            <span class="cm"># Custom wx events</span>
+│   ├── tts/                     <span class="cm"># TTS engine subsystem</span>
+│   │   ├── catalog.py           <span class="cm"># Voice catalog (JSON data)</span>
+│   │   ├── engine.py            <span class="cm"># TTS engine wrapper</span>
+│   │   ├── models.py            <span class="cm"># Model store &amp; file resolution</span>
+│   │   └── downloader.py        <span class="cm"># Voice model downloads</span>
+│   ├── audio/                   <span class="cm"># Audio output subsystem</span>
+│   │   ├── output.py            <span class="cm"># WAV/MP3/FLAC output</span>
+│   │   └── ffmpeg.py            <span class="cm"># FFmpeg management</span>
+│   ├── documents/               <span class="cm"># Document parsing</span>
+│   │   ├── parsers.py           <span class="cm"># PDF/DOCX/HTML parsers</span>
+│   │   ├── splitter.py          <span class="cm"># Text splitting logic</span>
+│   │   └── daisy_builder.py     <span class="cm"># DAISY 2.02 book builder</span>
+│   ├── jobs/                    <span class="cm"># Background processing</span>
+│   │   └── synthesizer.py       <span class="cm"># Background TTS worker</span>
+│   ├── clone/                   <span class="cm"># Voice cloning (XTTS v2)</span>
+│   │   ├── __init__.py          <span class="cm"># CloneClient &amp; CloneEngine</span>
+│   │   └── worker.py            <span class="cm"># Cloning subprocess</span>
+│   ├── omnivoice/               <span class="cm"># OmniVoice TTS engine</span>
+│   │   ├── __init__.py          <span class="cm"># OmniVoiceEngine</span>
+│   │   └── worker.py            <span class="cm"># OmniVoice subprocess</span>
+│   ├── addons/                  <span class="cm"># Addon system</span>
+│   │   └── __init__.py          <span class="cm"># AddonManager</span>
+│   └── python_runtime/          <span class="cm"># Managed Python environment</span>
+│       └── __init__.py          <span class="cm"># PythonRuntime</span>
+├── tests/                       <span class="cm"># Unit test suite</span>
+│   ├── test_catalog.py
+│   ├── test_compute.py
+│   ├── test_engine.py
+│   ├── test_parsers.py
+│   ├── test_project.py
+│   ├── test_splitter.py
+│   ├── test_settings.py
+│   ├── test_paths.py
+│   └── ... (12 test files, 99+ tests)
+├── packaging/                   <span class="cm"># Build &amp; installer scripts</span>
+│   ├── build.ps1
+│   ├── ai_voice_studio.spec
+│   ├── installer_64.iss
+│   └── installer_common.iss
+├── tools/                       <span class="cm"># Developer utilities</span>
+│   └── dead_code_audit.py
+└── docs/                        <span class="cm"># Documentation</span>
+    └── book/                    <span class="cm"># This book!</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 6)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>ai_voice_studio/</code>
+        <br><span class="desc"><code>ai_voice_studio/</code></span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>├── main.py                      # Application entry point</code>
+        <br><span class="desc"><code>├── main.py                      # Application entry point</code></span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>├── requirements.txt             # Core dependencies</code>
+        <br><span class="desc"><code>├── requirements.txt             # Core dependencies</code></span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>├── LICENSE                      # GPL-3.0 license</code>
+        <br><span class="desc"><code>├── LICENSE                      # GPL-3.0 license</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>├── README.md                    # Project documentation</code>
+        <br><span class="desc"><code>├── README.md                    # Project documentation</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>├── PROJECT_SPEC.md              # Full feature specification</code>
+        <br><span class="desc"><code>├── PROJECT_SPEC.md              # Full feature specification</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>├── DEV_PLAN.md                  # Development plan</code>
+        <br><span class="desc"><code>├── DEV_PLAN.md                  # Development plan</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>├── ai_voice_studio/             # Main package</code>
+        <br><span class="desc"><code>├── ai_voice_studio/             # Main package</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>│   ├── __init__.py</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>│   ├── constants.py             # Application constants</code>
+        <br><span class="desc"><code>│   ├── constants.py             # Application constants</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>│   ├── paths.py                 # File path management</code>
+        <br><span class="desc"><code>│   ├── paths.py                 # File path management</code></span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>│   ├── settings.py              # User preferences (JSON)</code>
+        <br><span class="desc"><code>│   ├── settings.py              # User preferences (JSON)</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>│   ├── project.py               # Project persistence</code>
+        <br><span class="desc"><code>│   ├── project.py               # Project persistence</code></span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>│   ├── compute.py               # GPU/CPU detection</code>
+        <br><span class="desc"><code>│   ├── compute.py               # GPU/CPU detection</code></span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>│   ├── util.py                  # Utility functions</code>
+        <br><span class="desc"><code>│   ├── util.py                  # Utility functions</code></span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>│   ├── heavy_logging.py         # Developer logging</code>
+        <br><span class="desc"><code>│   ├── heavy_logging.py         # Developer logging</code></span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>│   ├── runtime.py               # Runtime management</code>
+        <br><span class="desc"><code>│   ├── runtime.py               # Runtime management</code></span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>│   ├── gui/                     # wxPython GUI modules</code>
+        <br><span class="desc"><code>│   ├── gui/                     # wxPython GUI modules</code></span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>│   │   ├── main_frame.py        # Main window</code>
+        <br><span class="desc"><code>│   │   ├── main_frame.py        # Main window</code></span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>│   │   ├── settings_dialog.py   # Settings window</code>
+        <br><span class="desc"><code>│   │   ├── settings_dialog.py   # Settings window</code></span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>│   │   ├── model_panels.py      # Voice download/management</code>
+        <br><span class="desc"><code>│   │   ├── model_panels.py      # Voice download/management</code></span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>│   │   ├── new_project_wizard.py# Project creation wizard</code>
+        <br><span class="desc"><code>│   │   ├── new_project_wizard.py# Project creation wizard</code></span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>│   │   ├── recording_dialog.py  # Recording window</code>
+        <br><span class="desc"><code>│   │   ├── recording_dialog.py  # Recording window</code></span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>│   │   ├── a11y.py              # Accessibility helpers</code>
+        <br><span class="desc"><code>│   │   ├── a11y.py              # Accessibility helpers</code></span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>│   │   ├── theme.py             # Light/Dark themes</code>
+        <br><span class="desc"><code>│   │   ├── theme.py             # Light/Dark themes</code></span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>│   │   └── events.py            # Custom wx events</code>
+        <br><span class="desc"><code>│   │   └── events.py            # Custom wx events</code></span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>│   ├── tts/                     # TTS engine subsystem</code>
+        <br><span class="desc"><code>│   ├── tts/                     # TTS engine subsystem</code></span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>│   │   ├── catalog.py           # Voice catalog (JSON data)</code>
+        <br><span class="desc"><code>│   │   ├── catalog.py           # Voice catalog (JSON data)</code></span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>│   │   ├── engine.py            # TTS engine wrapper</code>
+        <br><span class="desc"><code>│   │   ├── engine.py            # TTS engine wrapper</code></span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code>│   │   ├── models.py            # Model store &amp; file resolution</code>
+        <br><span class="desc"><code>│   │   ├── models.py            # Model store &amp; file resolution</code></span>
+      </li>
+      <li>
+        <strong>Line 31:</strong> <code>│   │   └── downloader.py        # Voice model downloads</code>
+        <br><span class="desc"><code>│   │   └── downloader.py        # Voice model downloads</code></span>
+      </li>
+      <li>
+        <strong>Line 32:</strong> <code>│   ├── audio/                   # Audio output subsystem</code>
+        <br><span class="desc"><code>│   ├── audio/                   # Audio output subsystem</code></span>
+      </li>
+      <li>
+        <strong>Line 33:</strong> <code>│   │   ├── output.py            # WAV/MP3/FLAC output</code>
+        <br><span class="desc"><code>│   │   ├── output.py            # WAV/MP3/FLAC output</code></span>
+      </li>
+      <li>
+        <strong>Line 34:</strong> <code>│   │   └── ffmpeg.py            # FFmpeg management</code>
+        <br><span class="desc"><code>│   │   └── ffmpeg.py            # FFmpeg management</code></span>
+      </li>
+      <li>
+        <strong>Line 35:</strong> <code>│   ├── documents/               # Document parsing</code>
+        <br><span class="desc"><code>│   ├── documents/               # Document parsing</code></span>
+      </li>
+      <li>
+        <strong>Line 36:</strong> <code>│   │   ├── parsers.py           # PDF/DOCX/HTML parsers</code>
+        <br><span class="desc"><code>│   │   ├── parsers.py           # PDF/DOCX/HTML parsers</code></span>
+      </li>
+      <li>
+        <strong>Line 37:</strong> <code>│   │   ├── splitter.py          # Text splitting logic</code>
+        <br><span class="desc"><code>│   │   ├── splitter.py          # Text splitting logic</code></span>
+      </li>
+      <li>
+        <strong>Line 38:</strong> <code>│   │   └── daisy_builder.py     # DAISY 2.02 book builder</code>
+        <br><span class="desc"><code>│   │   └── daisy_builder.py     # DAISY 2.02 book builder</code></span>
+      </li>
+      <li>
+        <strong>Line 39:</strong> <code>│   ├── jobs/                    # Background processing</code>
+        <br><span class="desc"><code>│   ├── jobs/                    # Background processing</code></span>
+      </li>
+      <li>
+        <strong>Line 40:</strong> <code>│   │   └── synthesizer.py       # Background TTS worker</code>
+        <br><span class="desc"><code>│   │   └── synthesizer.py       # Background TTS worker</code></span>
+      </li>
+      <li>
+        <strong>Line 41:</strong> <code>│   ├── clone/                   # Voice cloning (XTTS v2)</code>
+        <br><span class="desc"><code>│   ├── clone/                   # Voice cloning (XTTS v2)</code></span>
+      </li>
+      <li>
+        <strong>Line 42:</strong> <code>│   │   ├── __init__.py          # CloneClient &amp; CloneEngine</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 43:</strong> <code>│   │   └── worker.py            # Cloning subprocess</code>
+        <br><span class="desc"><code>│   │   └── worker.py            # Cloning subprocess</code></span>
+      </li>
+      <li>
+        <strong>Line 44:</strong> <code>│   ├── omnivoice/               # OmniVoice TTS engine</code>
+        <br><span class="desc"><code>│   ├── omnivoice/               # OmniVoice TTS engine</code></span>
+      </li>
+      <li>
+        <strong>Line 45:</strong> <code>│   │   ├── __init__.py          # OmniVoiceEngine</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 46:</strong> <code>│   │   └── worker.py            # OmniVoice subprocess</code>
+        <br><span class="desc"><code>│   │   └── worker.py            # OmniVoice subprocess</code></span>
+      </li>
+      <li>
+        <strong>Line 47:</strong> <code>│   ├── addons/                  # Addon system</code>
+        <br><span class="desc"><code>│   ├── addons/                  # Addon system</code></span>
+      </li>
+      <li>
+        <strong>Line 48:</strong> <code>│   │   └── __init__.py          # AddonManager</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 49:</strong> <code>│   └── python_runtime/          # Managed Python environment</code>
+        <br><span class="desc"><code>│   └── python_runtime/          # Managed Python environment</code></span>
+      </li>
+      <li>
+        <strong>Line 50:</strong> <code>│       └── __init__.py          # PythonRuntime</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 51:</strong> <code>├── tests/                       # Unit test suite</code>
+        <br><span class="desc"><code>├── tests/                       # Unit test suite</code></span>
+      </li>
+      <li>
+        <strong>Line 52:</strong> <code>│   ├── test_catalog.py</code>
+        <br><span class="desc"><code>│   ├── test_catalog.py</code></span>
+      </li>
+      <li>
+        <strong>Line 53:</strong> <code>│   ├── test_compute.py</code>
+        <br><span class="desc"><code>│   ├── test_compute.py</code></span>
+      </li>
+      <li>
+        <strong>Line 54:</strong> <code>│   ├── test_engine.py</code>
+        <br><span class="desc"><code>│   ├── test_engine.py</code></span>
+      </li>
+      <li>
+        <strong>Line 55:</strong> <code>│   ├── test_parsers.py</code>
+        <br><span class="desc"><code>│   ├── test_parsers.py</code></span>
+      </li>
+      <li>
+        <strong>Line 56:</strong> <code>│   ├── test_project.py</code>
+        <br><span class="desc"><code>│   ├── test_project.py</code></span>
+      </li>
+      <li>
+        <strong>Line 57:</strong> <code>│   ├── test_splitter.py</code>
+        <br><span class="desc"><code>│   ├── test_splitter.py</code></span>
+      </li>
+      <li>
+        <strong>Line 58:</strong> <code>│   ├── test_settings.py</code>
+        <br><span class="desc"><code>│   ├── test_settings.py</code></span>
+      </li>
+      <li>
+        <strong>Line 59:</strong> <code>│   ├── test_paths.py</code>
+        <br><span class="desc"><code>│   ├── test_paths.py</code></span>
+      </li>
+      <li>
+        <strong>Line 60:</strong> <code>│   └── ... (12 test files, 99+ tests)</code>
+        <br><span class="desc"><code>│   └── ... (12 test files, 99+ tests)</code></span>
+      </li>
+      <li>
+        <strong>Line 61:</strong> <code>├── packaging/                   # Build &amp; installer scripts</code>
+        <br><span class="desc"><code>├── packaging/                   # Build &amp; installer scripts</code></span>
+      </li>
+      <li>
+        <strong>Line 62:</strong> <code>│   ├── build.ps1</code>
+        <br><span class="desc"><code>│   ├── build.ps1</code></span>
+      </li>
+      <li>
+        <strong>Line 63:</strong> <code>│   ├── ai_voice_studio.spec</code>
+        <br><span class="desc"><code>│   ├── ai_voice_studio.spec</code></span>
+      </li>
+      <li>
+        <strong>Line 64:</strong> <code>│   ├── installer_64.iss</code>
+        <br><span class="desc"><code>│   ├── installer_64.iss</code></span>
+      </li>
+      <li>
+        <strong>Line 65:</strong> <code>│   └── installer_common.iss</code>
+        <br><span class="desc"><code>│   └── installer_common.iss</code></span>
+      </li>
+      <li>
+        <strong>Line 66:</strong> <code>├── tools/                       # Developer utilities</code>
+        <br><span class="desc"><code>├── tools/                       # Developer utilities</code></span>
+      </li>
+      <li>
+        <strong>Line 67:</strong> <code>│   └── dead_code_audit.py</code>
+        <br><span class="desc"><code>│   └── dead_code_audit.py</code></span>
+      </li>
+      <li>
+        <strong>Line 68:</strong> <code>└── docs/                        # Documentation</code>
+      </li>
+      <li>
+        <strong>Line 69:</strong> <code>└── book/                    # This book!</code>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>What Each Module Does</h3>
+
+<table>
+  <thead>
+    <tr><th>Module</th><th>Purpose</th><th>Key Concepts</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>main.py</code></td>
+      <td>Entry point: creates wx.App, shows MainFrame</td>
+      <td>Script execution, <code>if __name__</code></td>
+    </tr>
+    <tr>
+      <td><code>constants.py</code></td>
+      <td>All magic numbers and string constants</td>
+      <td>Module-level constants, enums</td>
+    </tr>
+    <tr>
+      <td><code>paths.py</code></td>
+      <td>Cross-platform path management</td>
+      <td><code>os.path</code>, <code>pathlib</code></td>
+    </tr>
+    <tr>
+      <td><code>settings.py</code></td>
+      <td>JSON-based user preferences</td>
+      <td>File I/O, JSON, defaults</td>
+    </tr>
+    <tr>
+      <td><code>project.py</code></td>
+      <td>Project persistence (save/load)</td>
+      <td>JSON, atomic writes</td>
+    </tr>
+    <tr>
+      <td><code>gui/main_frame.py</code></td>
+      <td>Main application window</td>
+      <td>wxPython frames, menus, events</td>
+    </tr>
+    <tr>
+      <td><code>tts/engine.py</code></td>
+      <td>Sherpa-onnx TTS wrapper</td>
+      <td>CTypes, audio processing</td>
+    </tr>
+    <tr>
+      <td><code>jobs/synthesizer.py</code></td>
+      <td>Background TTS processing</td>
+      <td>Threading, events, callbacks</td>
+    </tr>
+    <tr>
+      <td><code>addons/__init__.py</code></td>
+      <td>Plugin/addon system</td>
+      <td>Dynamic imports, JSON manifests</td>
+    </tr>
+    <tr>
+      <td><code>python_runtime/__init__.py</code></td>
+      <td>Managed virtual environment</td>
+      <td>Subprocess, venv creation</td>
+    </tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h2>1.5 Setting Up the Development Environment</h2>
+
+<h3>Step 1: Clone the Repository</h3>
+
+<pre><code><span class="cm"># Clone the repository (replace with your actual URL)</span>
+git clone https://github.com/your-org/ai-voice-studio.git
+cd ai-voice-studio</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 7)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Clone the repository (replace with your actual URL)</code>
+        <br><span class="desc">A comment: <em>Clone the repository (replace with your actual URL)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>git clone https://github.com/your-org/ai-voice-studio.git</code>
+        <br><span class="desc"><code>git clone https://github.com/your-org/ai-voice-studio.git</code></span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>cd ai-voice-studio</code>
+        <br><span class="desc"><code>cd ai-voice-studio</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>Step 2: Create a Virtual Environment</h3>
+
+<p>
+  A <strong>virtual environment</strong> is an isolated Python environment that
+  prevents dependency conflicts between projects. This is one of the most important
+  practices in Python development:
+</p>
+
+<pre><code><span class="cm"># Create a virtual environment named .venv</span>
+python -m venv .venv
+
+<span class="cm"># Activate it (Windows PowerShell)</span>
+.venv\Scripts\Activate.ps1
+
+<span class="cm"># Activate it (Windows Command Prompt)</span>
+.venv\Scripts\activate.bat
+
+<span class="cm"># Activate it (macOS/Linux)</span>
+source .venv/bin/activate</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 8)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Create a virtual environment named .venv</code>
+        <br><span class="desc">A comment: <em>Create a virtual environment named .venv</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>python -m venv .venv</code>
+        <br><span class="desc"><code>python -m venv .venv</code></span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># Activate it (Windows PowerShell)</code>
+        <br><span class="desc">A comment: <em>Activate it (Windows PowerShell)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>.venv\Scripts\Activate.ps1</code>
+        <br><span class="desc"><code>.venv\Scripts\Activate.ps1</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># Activate it (Windows Command Prompt)</code>
+        <br><span class="desc">A comment: <em>Activate it (Windows Command Prompt)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>.venv\Scripts\activate.bat</code>
+        <br><span class="desc"><code>.venv\Scripts\activate.bat</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># Activate it (macOS/Linux)</code>
+        <br><span class="desc">A comment: <em>Activate it (macOS/Linux)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>source .venv/bin/activate</code>
+        <br><span class="desc"><code>source .venv/bin/activate</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<p>
+  Once activated, your terminal prompt changes to show <code>(.venv)</code>, and
+  all Python/pip commands use the isolated environment:
+</p>
+
+<pre><code>(.venv) $ python --version
+Python 3.13.0
+(.venv) $ pip --version
+pip 24.2 from .venv/lib/python3.13/site-packages/pip</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 9)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>(.venv) $ python --version</code>
+        <br><span class="desc"><code>(.venv) $ python --version</code></span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>Python 3.13.0</code>
+        <br><span class="desc"><code>Python 3.13.0</code></span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>(.venv) $ pip --version</code>
+        <br><span class="desc"><code>(.venv) $ pip --version</code></span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>pip 24.2 from .venv/lib/python3.13/site-packages/pip</code>
+        <br><span class="desc"><code>pip 24.2 from .venv/lib/python3.13/site-packages/pip</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>Step 3: Install Dependencies</h3>
+
+<p>AI Voice Studio requires six core dependencies:</p>
+
+<pre><code><span class="cm"># Install from requirements.txt</span>
+pip install -r requirements.txt</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 10)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Install from requirements.txt</code>
+        <br><span class="desc">A comment: <em>Install from requirements.txt</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>pip install -r requirements.txt</code>
+        <br><span class="desc"><code>pip install -r requirements.txt</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<table>
+  <thead>
+    <tr><th>Package</th><th>Version</th><th>Purpose</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>wxPython</code></td>
+      <td>≥4.3.1</td>
+      <td>Cross-platform native GUI toolkit</td>
+    </tr>
+    <tr>
+      <td><code>sherpa-onnx</code></td>
+      <td>≥1.13.0</td>
+      <td>Neural TTS engine (ONNX runtime)</td>
+    </tr>
+    <tr>
+      <td><code>numpy</code></td>
+      <td>≥2.0</td>
+      <td>Numerical array operations for audio</td>
+    </tr>
+    <tr>
+      <td><code>requests</code></td>
+      <td>≥2.31</td>
+      <td>HTTP client for downloading models</td>
+    </tr>
+    <tr>
+      <td><code>pypdf</code></td>
+      <td>≥5.0</td>
+      <td>PDF document parsing</td>
+    </tr>
+    <tr>
+      <td><code>python-docx</code></td>
+      <td>≥1.1</td>
+      <td>Word document (.docx) parsing</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="tip">
+  <strong>Why virtual environments?</strong> Without them, installing wxPython for
+  one project could overwrite packages needed by another. The <code>.venv</code>
+  directory contains a complete, isolated Python installation. It is listed in
+  <code>.gitignore</code> so it is never committed to version control.
+</div>
+
+<h3>Step 4: Verify the Installation</h3>
+
+<pre><code><span class="cm"># Test all core imports</span>
+python -c "
+import wx
+import sherpa_onnx
+import numpy
+import requests
+import pypdf
+import docx
+print('All imports successful!')
+print(f'wxPython: {wx.__version__}')
+print(f'NumPy: {numpy.__version__}')
+print(f'sherpa-onnx: {sherpa_onnx.__version__}')
+"</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 11)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Test all core imports</code>
+        <br><span class="desc">A comment: <em>Test all core imports</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>python -c &quot;</code>
+        <br><span class="desc"><code>python -c &quot;</code></span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>import wx</code>
+        <br><span class="desc">Imports the <code>wx</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>import sherpa_onnx</code>
+        <br><span class="desc">Imports the <code>sherpa_onnx</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>import numpy</code>
+        <br><span class="desc">Imports the <code>numpy</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>import requests</code>
+        <br><span class="desc">Imports the <code>requests</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>import pypdf</code>
+        <br><span class="desc">Imports the <code>pypdf</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>import docx</code>
+        <br><span class="desc">Imports the <code>docx</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>print(&#x27;All imports successful!&#x27;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>print(f&#x27;wxPython: {wx.__version__}&#x27;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>print(f&#x27;NumPy: {numpy.__version__}&#x27;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>print(f&#x27;sherpa-onnx: {sherpa_onnx.__version__}&#x27;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>&quot;</code>
+        <br><span class="desc"><code>&quot;</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>Step 5: Run the Tests</h3>
+
+<pre><code><span class="cm"># Install pytest first</span>
+pip install pytest
+
+<span class="cm"># Run the full test suite</span>
+python -m pytest tests/ -v</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 12)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Install pytest first</code>
+        <br><span class="desc">A comment: <em>Install pytest first</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>pip install pytest</code>
+        <br><span class="desc"><code>pip install pytest</code></span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># Run the full test suite</code>
+        <br><span class="desc">A comment: <em>Run the full test suite</em>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>python -m pytest tests/ -v</code>
+        <br><span class="desc"><code>python -m pytest tests/ -v</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<p>You should see all 99 tests pass:</p>
+
+<pre><code>tests/test_catalog.py::CatalogStructureTest::test_tts_ids_unique PASSED
+tests/test_catalog.py::CatalogStructureTest::test_required_tts_present PASSED
+tests/test_compute.py::CudaDetectionTest::test_cpu_always_available PASSED
+...
+<span class="cm">===== 99 passed in 12.34s =====</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 13)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>tests/test_catalog.py::CatalogStructureTest::test_tts_ids_unique PASSED</code>
+        <br><span class="desc"><code>tests/test_catalog.py::CatalogStructureTest::test_tts_ids_unique PASSED</code></span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>tests/test_catalog.py::CatalogStructureTest::test_required_tts_present PASSED</code>
+        <br><span class="desc"><code>tests/test_catalog.py::CatalogStructureTest::test_required_tts_present PASSED</code></span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>tests/test_compute.py::CudaDetectionTest::test_cpu_always_available PASSED</code>
+        <br><span class="desc"><code>tests/test_compute.py::CudaDetectionTest::test_cpu_always_available PASSED</code></span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>...</code>
+        <br><span class="desc">Ellipsis: abstract method placeholder.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>===== 99 passed in 12.34s =====</code>
+        <br><span class="desc"><code>===== 99 passed in 12.34s =====</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>Step 6: Run the Application</h3>
+
+<pre><code>python main.py</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 14)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>python main.py</code>
+        <br><span class="desc"><code>python main.py</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<p>
+  The AI Voice Studio main window should appear. You will see a menu bar with
+  File, Edit, Tools, Settings, and Help menus, and a status bar at the bottom.
+</p>
+
+<hr>
+
+<h2>1.6 Your First Python Program</h2>
+
+<p>
+  Before we dive into the project, let's write a simple Python program to make
+  sure everything works:
+</p>
+
+<pre><code><span class="cm"># first_program.py</span>
+
+<span class="cm"># This is a comment - Python ignores it</span>
+
+<span class="cm"># Variables don't need type declarations</span>
+app_name = <span class="str">"AI Voice Studio"</span>
+version = <span class="num">2.0</span>
+is_open_source = <span class="kw">True</span>
+
+<span class="cm"># Print with f-strings (formatted string literals)</span>
+<span class="kw">print</span>(<span class="str">f"Welcome to <span class="op">{</span>app_name<span class="op">}</span> v<span class="op">{</span>version<span class="op">}</span>"</span>)
+<span class="kw">print</span>(<span class="str">f"Open source: <span class="op">{</span>is_open_source<span class="op">}</span>"</span>)
+
+<span class="cm"># List of TTS engines</span>
+engines = [<span class="str">"Piper"</span>, <span class="str">"Kokoro"</span>, <span class="str">"Matcha"</span>, <span class="str">"Kitten"</span>]
+<span class="kw">print</span>(<span class="str">f"Available engines: <span class="op">{</span>', '.join(engines)<span class="op">}</span>"</span>)
+
+<span class="cm"># Simple function</span>
+<span class="kw">def</span> <span class="fn">greet</span>(name):
+    <span class="kw">return</span> <span class="str">f"Hello, <span class="op">{</span>name<span class="op">}</span>! Ready to build TTS apps."</span>
+
+<span class="kw">print</span>(greet(<span class="str">"Developer"</span>))</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 15)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># first_program.py</code>
+        <br><span class="desc">A comment: <em>first_program.py</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># This is a comment - Python ignores it</code>
+        <br><span class="desc">A comment: <em>This is a comment - Python ignores it</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># Variables don&#x27;t need type declarations</code>
+        <br><span class="desc">A comment: <em>Variables don&#x27;t need type declarations</em>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>app_name = &quot;AI Voice Studio&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;AI Voice Studio&quot;</code> to <code>app_name</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>version = 2.0</code>
+        <br><span class="desc">Assigns <code>2.0</code> to <code>version</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>is_open_source = True</code>
+        <br><span class="desc">Assigns <code>True</code> to <code>is_open_source</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># Print with f-strings (formatted string literals)</code>
+        <br><span class="desc">A comment: <em>Print with f-strings (formatted string literals)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>print(f&quot;Welcome to {app_name} v{version}&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>print(f&quot;Open source: {is_open_source}&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code># List of TTS engines</code>
+        <br><span class="desc">A comment: <em>List of TTS engines</em>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>engines = [&quot;Piper&quot;, &quot;Kokoro&quot;, &quot;Matcha&quot;, &quot;Kitten&quot;]</code>
+        <br><span class="desc">Assigns <code>[&quot;Piper&quot;, &quot;Kokoro&quot;, &quot;Matcha&quot;, &quot;Kitten&quot;]</code> to <code>engines</code>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>print(f&quot;Available engines: {&#x27;, &#x27;.join(engines)}&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code># Simple function</code>
+        <br><span class="desc">A comment: <em>Simple function</em>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>def greet(name):</code>
+        <br><span class="desc">Defines function <code>greet</code> accepting (name).</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>return f&quot;Hello, {name}! Ready to build TTS apps.&quot;</code>
+        <br><span class="desc">Returns <code>f&quot;Hello, {name}! Ready to build TTS apps.&quot;</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>print(greet(&quot;Developer&quot;))</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<pre><code>$ python first_program.py
+Welcome to AI Voice Studio v2.0
+Open source: True
+Available engines: Piper, Kokoro, Matcha, Kitten
+Hello, Developer! Ready to build TTS apps.</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 16)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>$ python first_program.py</code>
+        <br><span class="desc"><code>$ python first_program.py</code></span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>Welcome to AI Voice Studio v2.0</code>
+        <br><span class="desc"><code>Welcome to AI Voice Studio v2.0</code></span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>Open source: True</code>
+        <br><span class="desc"><code>Open source: True</code></span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>Available engines: Piper, Kokoro, Matcha, Kitten</code>
+        <br><span class="desc"><code>Available engines: Piper, Kokoro, Matcha, Kitten</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>Hello, Developer! Ready to build TTS apps.</code>
+        <br><span class="desc"><code>Hello, Developer! Ready to build TTS apps.</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<p>Congratulations! You have just written your first Python program.</p>
+
+<hr>
+
+<h2>1.7 A Note on Python Versions</h2>
+
+<p>
+  This book targets <strong>Python 3.13</strong>, but all code is compatible with
+  Python 3.11+. Here are the key version features we use:
+</p>
+
+<table>
+  <thead>
+    <tr><th>Version</th><th>Feature</th><th>Example</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>3.6+</td>
+      <td>f-strings</td>
+      <td><code>f"Hello {name}"</code></td>
+    </tr>
+    <tr>
+      <td>3.7+</td>
+      <td>dataclasses</td>
+      <td><code>@dataclass class Foo:</code></td>
+    </tr>
+    <tr>
+      <td>3.8+</td>
+      <td>Walrus operator <code>:=</code></td>
+      <td><code>if (n := len(x)) > 5:</code></td>
+    </tr>
+    <tr>
+      <td>3.9+</td>
+      <td>Built-in generics</td>
+      <td><code>list[str]</code> instead of <code>List[str]</code></td>
+    </tr>
+    <tr>
+      <td>3.10+</td>
+      <td>match/case</td>
+      <td><code>match command: case "quit":</code></td>
+    </tr>
+    <tr>
+      <td>3.11+</td>
+      <td>Exception groups</td>
+      <td><code>except* ValueError:</code></td>
+    </tr>
+    <tr>
+      <td>3.12+</td>
+      <td>Type parameter syntax</td>
+      <td><code>def foo[T](x: T) -> T:</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h2>1.8 IDE Setup</h2>
+
+<p>While any text editor works, a proper IDE dramatically improves productivity.</p>
+
+<h3>VS Code (Recommended)</h3>
+
+<ol>
+  <li>Install <a href="https://code.visualstudio.com/">VS Code</a></li>
+  <li>Install the <strong>Python</strong> extension by Microsoft</li>
+  <li>Install the <strong>Pylance</strong> extension for type checking</li>
+  <li>Open the project folder and select the <code>.venv</code> as the interpreter</li>
+</ol>
+
+<h3>PyCharm</h3>
+
+<ol>
+  <li>Install <a href="https://www.jetbrains.com/pycharm/">PyCharm</a> (Community is free)</li>
+  <li>Open the project directory</li>
+  <li>Go to Settings → Project → Python Interpreter → Add → Existing Environment → select <code>.venv/Scripts/python.exe</code></li>
+</ol>
+
+<hr>
+
+<h2>1.9 The GitHub Copilot / AI-Assisted Development</h2>
+
+<p>
+  Modern Python development often includes AI assistants. Throughout this book,
+  we write code that is <em>readable and well-documented</em> — exactly the kind
+  of code that AI assistants work best with. The AI Voice Studio project itself
+  follows these principles:
+</p>
+
+<ul>
+  <li>Clear variable and function names (no single-letter variables except loop counters)</li>
+  <li>Docstrings on every public class and function</li>
+  <li>Type hints on function signatures</li>
+  <li>Constants instead of magic numbers</li>
+</ul>
+
+<hr>
+
+<h2>1.10 Key Takeaways</h2>
+
+<ul>
+  <li><strong>Python is interpreted</strong> — you write code and run it directly, no compilation step needed</li>
+  <li><strong>Virtual environments</strong> are essential for isolating project dependencies</li>
+  <li><strong>AI Voice Studio</strong> is a production-quality Python desktop app that demonstrates every major Python concept</li>
+  <li>The project has <strong>53 Python source files</strong> across 13 subpackages, plus 12 test files</li>
+  <li>All core dependencies (wxPython, sherpa-onnx, numpy, requests, pypdf, python-docx) are installed from <code>requirements.txt</code></li>
+  <li>The test suite has <strong>99+ tests</strong> — good testing is not optional in real projects</li>
+  <li>An IDE with Python support makes development much more productive</li>
+</ul>
+
+<hr>
+
+<div class="exercise">
+  <strong>Exercise 1.1:</strong> Create a virtual environment, install the dependencies
+  from requirements.txt, and run <code>python main.py</code>. Verify the application
+  window appears.
+</div>
+
+<div class="exercise">
+  <strong>Exercise 1.2:</strong> Write a script called <code>count_lines.py</code> that
+  counts the number of lines in every <code>.py</code> file under the
+  <code>ai_voice_studio/</code> directory. Hint: use <code>os.walk()</code> and a
+  loop.
+</div>
+
+<div class="exercise">
+  <strong>Exercise 1.3:</strong> Open the <code>main.py</code> file and identify the
+  imports at the top. For each import, write a one-sentence explanation of what it
+  does. (You can look at the import statements — you will understand them fully by
+  Chapter 9.)
+</div>
+
+<hr>
+
+<p style="text-align: center;">
+  <a href="ch02_variables.html">Next: Chapter 2 — Variables &amp; Data Types →</a>
+</p>
+
+</div><!-- /.main-content -->
+</div><!-- /.book-container -->
+</body>
+</html>

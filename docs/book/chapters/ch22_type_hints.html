@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 22: Type Hints - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part III</div><ul class="chapters"><li><a href="ch19_concurrency.html">Ch 19</a></li><li><a href="ch20_multiprocessing.html">Ch 20</a></li><li><a href="ch21_async.html">Ch 21</a></li><li><a href="ch22_type_hints.html" class="active">Ch 22: Type Hints</a></li><li><a href="ch23_metaclasses.html">Ch 23</a></li><li><a href="ch24_design_patterns.html">Ch 24</a></li><li><a href="ch25_introspection.html">Ch 25</a></li><li><a href="ch26_c_extensions.html">Ch 26</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 22</div>
+<h1>Type Hints &amp; Static Typing</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand type hints and their benefits</li>
+  <li>Use modern type hint syntax (Python 3.9-3.12)</li>
+  <li>See type hints throughout the AIVS codebase</li>
+</ul>
+
+<hr>
+
+<h2>22.1 Why Type Hints?</h2>
+
+<p>Type hints document expected types without enforcing them at runtime. Benefits:</p>
+
+<ul>
+  <li><strong>IDE support</strong> — autocompletion, error detection</li>
+  <li><strong>Documentation</strong> — function signatures are self-documenting</li>
+  <li><strong>Catch bugs early</strong> — static type checkers (mypy, Pylance) catch type errors before runtime</li>
+  <li><strong>Refactoring safety</strong> — rename a method and see all affected call sites</li>
+</ul>
+
+<hr>
+
+<h2>22.2 Basic Type Hints</h2>
+
+<pre><code><span class="cm"># Variable annotations</span>
+name: str = <span class="str">"AI Voice Studio"</span>
+version: float = <span class="num">2.0</span>
+voices: list[str] = [<span class="str">"af"</span>, <span class="str">"am_adam"</span>]
+
+<span class="cm"># Function annotations</span>
+<span class="kw">def</span> <span class="fn">greet</span>(name: str) -> str:
+    <span class="kw">return</span> <span class="str">f"Hello, </span>{name}<span class="str">!"</span>
+
+<span class="cm"># No return value (returns None)</span>
+<span class="kw">def</span> <span class="fn">log</span>(message: str) -> None:
+    <span class="kw">print</span>(message)
+
+<span class="cm"># Optional values</span>
+<span class="kw">def</span> <span class="fn">find</span>(items: list, index: int) -> str | <span class="kw">None</span>:
+    <span class="kw">if</span> <span class="num">0</span> <= index < len(items):
+        <span class="kw">return</span> items[index]
+    <span class="kw">return</span> <span class="kw">None</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Variable annotations</code>
+        <br><span class="desc">A comment: <em>Variable annotations</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>name: str = &quot;AI Voice Studio&quot;</code>
+        <br><span class="desc"><code>name: str = &quot;AI Voice Studio&quot;</code></span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>version: float = 2.0</code>
+        <br><span class="desc"><code>version: float = 2.0</code></span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>voices: list[str] = [&quot;af&quot;, &quot;am_adam&quot;]</code>
+        <br><span class="desc"><code>voices: list[str] = [&quot;af&quot;, &quot;am_adam&quot;]</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># Function annotations</code>
+        <br><span class="desc">A comment: <em>Function annotations</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>def greet(name: str) -&gt; str:</code>
+        <br><span class="desc">Defines function <code>greet</code> accepting (name), returning <code>str</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>return f&quot;Hello, {name}!&quot;</code>
+        <br><span class="desc">Returns <code>f&quot;Hello, {name}!&quot;</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># No return value (returns None)</code>
+        <br><span class="desc">A comment: <em>No return value (returns None)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>def log(message: str) -&gt; None:</code>
+        <br><span class="desc">Defines function <code>log</code> accepting (message), returning <code>None</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>print(message)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># Optional values</code>
+        <br><span class="desc">A comment: <em>Optional values</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>def find(items: list, index: int) -&gt; str | None:</code>
+        <br><span class="desc">Defines function <code>find</code> accepting (items, index), returning <code>str | None</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>if 0 &lt;= index &lt; len(items):</code>
+        <br><span class="desc">Returns the number of items in a sequence (string, list, dict, tuple). Essential for loop bounds and validation.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>return items[index]</code>
+        <br><span class="desc">Returns <code>items[index]</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>return None</code>
+        <br><span class="desc">Returns <code>None</code> (no value).</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>22.3 Complex Types</h2>
+
+<pre><code><span class="kw">from</span> typing <span class="kw">import</span> TypeAlias
+
+<span class="cm"># Dict types</span>
+config: dict[str, str | int | bool] = {<span class="str">"rate"</span>: <span class="num">1.0</span>}
+voice_entry: dict[str, <span class="kw">any</span>] = {<span class="str">"id"</span>: <span class="str">"af"</span>}
+
+<span class="cm"># TypedDict for structured dicts</span>
+<span class="kw">from</span> typing <span class="kw">import</span> TypedDict
+
+<span class="kw">class</span> <span class="cls">VoiceParams</span>(TypedDict):
+    rate: float
+    pitch: float
+    volume: float
+    output_format: str
+
+<span class="cm"># Callable types</span>
+<span class="kw">from</span> typing <span class="kw">import</span> Callable
+callback: Callable[[str, int, int], None]  <span class="cm"># func(name, done, total) -> None</span>
+
+<span class="cm"># Union types</span>
+value: str | int | float  <span class="cm"># Python 3.10+</span>
+
+<span class="cm"># Type aliases</span>
+Path: TypeAlias = str
+AudioSamples: TypeAlias = <span class="str">"np.ndarray"</span>
+
+<span class="cm"># Generic types</span>
+<span class="kw">from</span> typing <span class="kw">import</span> TypeVar, Generic
+T = TypeVar(<span class="str">"T"</span>)
+
+<span class="kw">class</span> <span class="cls">Cache</span>(Generic[T]):
+    <span class="kw">def</span> <span class="fn">get</span>(self, key: str) -> T | <span class="kw">None</span>: ...
+    <span class="kw">def</span> <span class="fn">set</span>(self, key: str, value: T) -> None: ...</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>from typing import TypeAlias</code>
+        <br><span class="desc">Imports <code>TypeAlias</code> from <code>typing</code>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Dict types</code>
+        <br><span class="desc">A comment: <em>Dict types</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>config: dict[str, str | int | bool] = {&quot;rate&quot;: 1.0}</code>
+        <br><span class="desc"><code>config: dict[str, str | int | bool] = {&quot;rate&quot;: 1.0}</code></span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>voice_entry: dict[str, any] = {&quot;id&quot;: &quot;af&quot;}</code>
+        <br><span class="desc">Begins exception handling. Code in this block is monitored for errors.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># TypedDict for structured dicts</code>
+        <br><span class="desc">A comment: <em>TypedDict for structured dicts</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>from typing import TypedDict</code>
+        <br><span class="desc">Imports <code>TypedDict</code> from <code>typing</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>class VoiceParams(TypedDict):</code>
+        <br><span class="desc">Defines class <code>VoiceParams</code> inheriting from <code>TypedDict</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>rate: float</code>
+        <br><span class="desc"><code>rate: float</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>pitch: float</code>
+        <br><span class="desc"><code>pitch: float</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>volume: float</code>
+        <br><span class="desc"><code>volume: float</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>output_format: str</code>
+        <br><span class="desc"><code>output_format: str</code></span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code># Callable types</code>
+        <br><span class="desc">A comment: <em>Callable types</em>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>from typing import Callable</code>
+        <br><span class="desc">Imports <code>Callable</code> from <code>typing</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>callback: Callable[[str, int, int], None]  # func(name, done, total) -&gt; None</code>
+        <br><span class="desc">Type hint for a callable (function) with specific parameter and return types.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code># Union types</code>
+        <br><span class="desc">A comment: <em>Union types</em>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>value: str | int | float  # Python 3.10+</code>
+        <br><span class="desc"><code>value: str | int | float  # Python 3.10+</code></span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code># Type aliases</code>
+        <br><span class="desc">A comment: <em>Type aliases</em>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>Path: TypeAlias = str</code>
+        <br><span class="desc"><code>Path: TypeAlias = str</code></span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>AudioSamples: TypeAlias = &quot;np.ndarray&quot;</code>
+        <br><span class="desc"><code>AudioSamples: TypeAlias = &quot;np.ndarray&quot;</code></span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code># Generic types</code>
+        <br><span class="desc">A comment: <em>Generic types</em>.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>from typing import TypeVar, Generic</code>
+        <br><span class="desc">Imports <code>TypeVar, Generic</code> from <code>typing</code>.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>T = TypeVar(&quot;T&quot;)</code>
+        <br><span class="desc">Assigns <code>TypeVar(&quot;T&quot;)</code> to <code>T</code>.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>class Cache(Generic[T]):</code>
+        <br><span class="desc">Defines class <code>Cache</code> inheriting from <code>Generic[T]</code>.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>def get(self, key: str) -&gt; T | None: ...</code>
+        <br><span class="desc">Defines function <code>get</code> accepting (self, key), returning <code>T | None</code>.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>def set(self, key: str, value: T) -&gt; None: ...</code>
+        <br><span class="desc">Defines function <code>set</code> accepting (self, key, value), returning <code>None</code>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>22.4 Type Hints in AIVS</h2>
+
+<pre><code><span class="cm"># From tts/engine.py — complete function signatures</span>
+<span class="kw">def</span> <span class="fn">get_engine</span>(voice_entry: dict) -> <span class="str">"TtsEngine"</span>:
+    <span class="str">"""Get or create a cached TTS engine."""</span>
+
+<span class="kw">def</span> <span class="fn">_shift_pitch</span>(samples: <span class="str">"np.ndarray"</span>, pitch: float) -> <span class="str">"np.ndarray"</span>:
+    <span class="str">"""Shift the pitch of audio samples."""</span>
+
+<span class="cm"># From settings.py — properties with type hints</span>
+<span class="kw">class</span> <span class="cls">Settings</span>:
+    <span class="dec">@property</span>
+    <span class="kw">def</span> <span class="fn">theme</span>(self) -> str:
+        <span class="kw">return</span> self._data.get(<span class="str">"theme"</span>, <span class="str">"system"</span>)
+
+    <span class="dec">@property</span>
+    <span class="kw">def</span> <span class="fn">recent_projects</span>(self) -> list[list[str]]:
+        <span class="kw">return</span> self._data.get(<span class="str">"recent_projects"</span>, [])
+
+<span class="cm"># From clone/__init__.py — complex type annotations</span>
+<span class="kw">class</span> <span class="cls">CloneClient</span>:
+    <span class="kw">def</span> <span class="fn">synthesize</span>(
+        self,
+        text: str,
+        sample_wav: str,
+        language: str = <span class="str">"en"</span>,
+        speed: float = <span class="num">1.0</span>,
+    ) -> np.ndarray:
+        <span class="str">"""Synthesize text; returns int16 samples at 24 kHz."""</span>
+
+<span class="cm"># From python_runtime/__init__.py</span>
+<span class="kw">class</span> <span class="cls">PythonRuntime</span>:
+    <span class="kw">def</span> <span class="fn">pip_install</span>(
+        self,
+        packages: list[str] | str,
+        progress: Callable[[str, int, int], None] | <span class="kw">None</span> = <span class="kw">None</span>,
+        cancel_event: threading.Event | <span class="kw">None</span> = <span class="kw">None</span>,
+    ) -> dict[str, str]:</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From tts/engine.py — complete function signatures</code>
+        <br><span class="desc">A comment: <em>From tts/engine.py — complete function signatures</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def get_engine(voice_entry: dict) -&gt; &quot;TtsEngine&quot;:</code>
+        <br><span class="desc">Begins exception handling. Code in this block is monitored for errors.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;&quot;&quot;Get or create a cached TTS engine.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Get or create a cached TTS engine.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>def _shift_pitch(samples: &quot;np.ndarray&quot;, pitch: float) -&gt; &quot;np.ndarray&quot;:</code>
+        <br><span class="desc">Defines function <code>_shift_pitch</code> accepting (samples, pitch), returning <code>&quot;np.ndarray&quot;</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>&quot;&quot;&quot;Shift the pitch of audio samples.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Shift the pitch of audio samples.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># From settings.py — properties with type hints</code>
+        <br><span class="desc">A comment: <em>From settings.py — properties with type hints</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>class Settings:</code>
+        <br><span class="desc">Defines class <code>Settings</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>@property</code>
+        <br><span class="desc">Decorator that converts a method into a managed attribute. Enables getter/setter syntax.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>def theme(self) -&gt; str:</code>
+        <br><span class="desc">Defines function <code>theme</code> accepting (self), returning <code>str</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>return self._data.get(&quot;theme&quot;, &quot;system&quot;)</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>@property</code>
+        <br><span class="desc">Decorator that converts a method into a managed attribute. Enables getter/setter syntax.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>def recent_projects(self) -&gt; list[list[str]]:</code>
+        <br><span class="desc">Defines function <code>recent_projects</code> accepting (self), returning <code>list[list[str]]</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>return self._data.get(&quot;recent_projects&quot;, [])</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code># From clone/__init__.py — complex type annotations</code>
+        <br><span class="desc">A comment: <em>From clone/__init__.py — complex type annotations</em>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>class CloneClient:</code>
+        <br><span class="desc">Defines class <code>CloneClient</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>def synthesize(</code>
+        <br><span class="desc"><code>def synthesize(</code></span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>self,</code>
+        <br><span class="desc"><code>self,</code></span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>text: str,</code>
+        <br><span class="desc"><code>text: str,</code></span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>sample_wav: str,</code>
+        <br><span class="desc"><code>sample_wav: str,</code></span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>language: str = &quot;en&quot;,</code>
+        <br><span class="desc"><code>language: str = &quot;en&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>speed: float = 1.0,</code>
+        <br><span class="desc"><code>speed: float = 1.0,</code></span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>) -&gt; np.ndarray:</code>
+        <br><span class="desc"><code>) -&gt; np.ndarray:</code></span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>&quot;&quot;&quot;Synthesize text; returns int16 samples at 24 kHz.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Synthesize text; returns int16 samples at 24 kHz.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code># From python_runtime/__init__.py</code>
+        <br><span class="desc">A comment: <em>From python_runtime/__init__.py</em>.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>class PythonRuntime:</code>
+        <br><span class="desc">Defines class <code>PythonRuntime</code>.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>def pip_install(</code>
+        <br><span class="desc">Returns True if all elements in the iterable are truthy. Short-circuits on first False.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>self,</code>
+        <br><span class="desc"><code>self,</code></span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>packages: list[str] | str,</code>
+        <br><span class="desc"><code>packages: list[str] | str,</code></span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>progress: Callable[[str, int, int], None] | None = None,</code>
+        <br><span class="desc">Type hint for a callable (function) with specific parameter and return types.</span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code>cancel_event: threading.Event | None = None,</code>
+        <br><span class="desc">A flag that threads can wait on. Used for signaling between threads.</span>
+      </li>
+      <li>
+        <strong>Line 31:</strong> <code>) -&gt; dict[str, str]:</code>
+        <br><span class="desc"><code>) -&gt; dict[str, str]:</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>22.5 Forward References</h2>
+
+<pre><code><span class="cm"># When a class references itself or a not-yet-defined class</span>
+<span class="kw">class</span> <span class="cls">Node</span>:
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, children: list[<span class="str">"Node"</span>] | <span class="kw">None</span> = <span class="kw">None</span>):
+        self.children = children <span class="kw">or</span> []
+
+<span class="cm"># Or use from __future__ import annotations (Python 3.7+)</span>
+<span class="kw">from</span> __future__ <span class="kw">import</span> annotations  <span class="cm"># All annotations are strings by default</span>
+
+<span class="kw">class</span> <span class="cls">Node</span>:
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, children: list[Node] | <span class="kw">None</span> = <span class="kw">None</span>):
+        self.children = children <span class="kw">or</span>  <span class="cm"># No quotes needed!</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 4)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># When a class references itself or a not-yet-defined class</code>
+        <br><span class="desc">A comment: <em>When a class references itself or a not-yet-defined class</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>class Node:</code>
+        <br><span class="desc">Defines class <code>Node</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>def __init__(self, children: list[&quot;Node&quot;] | None = None):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>self.children = children or []</code>
+        <br><span class="desc">Stores <code>children or []</code> in instance attribute <code>children</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># Or use from __future__ import annotations (Python 3.7+)</code>
+        <br><span class="desc">A comment: <em>Or use from __future__ import annotations (Python 3.7+)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>from __future__ import annotations  # All annotations are strings by default</code>
+        <br><span class="desc">Imports <code>annotations  # All annotations are strings by default</code> from <code>__future__</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>class Node:</code>
+        <br><span class="desc">Defines class <code>Node</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>def __init__(self, children: list[Node] | None = None):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>self.children = children or  # No quotes needed!</code>
+        <br><span class="desc">Stores <code>children or  # No quotes needed!</code> in instance attribute <code>children</code>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>22.6 Key Takeaways</h2>
+<ul>
+  <li>Type hints are <strong>optional documentation</strong> that help IDEs and catch bugs</li>
+  <li>Use <strong>Python 3.10+ syntax</strong>: <code>str | None</code> instead of <code>Optional[str]</code></li>
+  <li><strong>TypedDict</strong> for structured dicts, <strong>Callable</strong> for function types</li>
+  <li>AIVS uses type hints on <strong>all public function signatures</strong></li>
+  <li><code>from __future__ import annotations</code> enables forward references</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch21_async.html">← Ch 21</a> &nbsp;|&nbsp; <a href="ch23_metaclasses.html">Ch 23 — Metaclasses →</a></p>
+</div></div></body>
+</html>

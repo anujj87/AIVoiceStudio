@@ -18,6 +18,7 @@ Verified against sherpa-onnx 1.13.5 (Aug 2026):
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
@@ -267,15 +268,33 @@ def get_engine(
     # identity: multi-speaker models (e.g. Kokoro multi-lang with 53 speakers)
     # must share one loaded engine, otherwise each speaker would reload the
     # whole model. The model files (``dir``) fully determine the engine.
-    key = (
-        voice_entry.get("tts", ""),
-        voice_entry.get("language", ""),
-        voice_entry.get("variant", ""),
-        voice_entry.get("voice", ""),
-        voice_entry.get("dir", ""),
-        provider,
-    )
-    key = str(key)
+    if voice_entry.get("engine") in ("omnivoice", "omnivoice_server"):
+        # OmniVoice engines carry their voice identity *inside* the voice
+        # entry: cloning reference audio, design instructions and the
+        # per-project ``omni`` generation settings.  Two projects that use
+        # the same catalog voice (e.g. "auto") but different clone samples
+        # or instructions must NOT share one cached engine, or the second
+        # project would speak with the first project's voice.
+        key = str((
+            voice_entry.get("tts", ""),
+            voice_entry.get("variant", ""),
+            voice_entry.get("voice", ""),
+            voice_entry.get("instruct", ""),
+            voice_entry.get("ref_audio", ""),
+            voice_entry.get("ref_text", ""),
+            voice_entry.get("language", ""),
+            json.dumps(voice_entry.get("omni") or {}, sort_keys=True),
+            provider,
+        ))
+    else:
+        key = str((
+            voice_entry.get("tts", ""),
+            voice_entry.get("language", ""),
+            voice_entry.get("variant", ""),
+            voice_entry.get("voice", ""),
+            voice_entry.get("dir", ""),
+            provider,
+        ))
     with _engine_lock:
         engine = _engine_cache.get(key)
         if engine is None:

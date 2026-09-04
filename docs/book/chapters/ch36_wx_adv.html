@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 36: wx.adv &amp; Advanced Widgets - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part IV</div><ul class="chapters"><li><a href="ch27_wxpython_intro.html">Ch 27</a></li><li><a href="ch28_sizers_layout.html">Ch 28</a></li><li><a href="ch29_controls.html">Ch 29</a></li><li><a href="ch30_events.html">Ch 30</a></li><li><a href="ch31_dialogs.html">Ch 31</a></li><li><a href="ch32_custom_drawing.html">Ch 32</a></li><li><a href="ch33_threading_gui.html">Ch 33</a></li><li><a href="ch34_accessibility.html">Ch 34</a></li><li><a href="ch35_themes.html">Ch 35</a></li><li><a href="ch36_wx_adv.html" class="active">Ch 36: wx.adv</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 36</div>
+<h1>wx.adv &amp; Advanced Widgets</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Use wx.adv for wizards, taskbar icons, and advanced controls</li>
+  <li>See the AIVS Wizard implementation</li>
+</ul>
+
+<hr>
+
+<h2>36.1 wx.adv.Wizard</h2>
+
+<pre><code><span class="kw">from</span> wx.adv <span class="kw">import</span> Wizard, WizardPage, EVT_WIZARD_FINISHED, EVT_WIZARD_PAGE_CHANGED
+
+<span class="kw">class</span> <span class="cls">NewProjectWizard</span>(Wizard):
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, parent, settings, store):
+        <span class="kw">super</span>().__init__(parent, title=<span class="str">"New Project"</span>)
+
+        <span class="cm"># Create pages</span>
+        self.page_details = _DetailsPage(self)
+        self.page_mode = _ModePage(self, settings)
+
+        <span class="cm"># Wire up the page area</span>
+        self.GetPageAreaSizer().Add(self.page_details)
+
+        <span class="cm"># Events</span>
+        self.Bind(EVT_WIZARD_FINISHED, self._on_finish)
+        self.Bind(EVT_WIZARD_PAGE_CHANGED, self._on_page_changed)
+
+<span class="kw">class</span> <span class="cls">_DetailsPage</span>(WizardPage):
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, wizard):
+        <span class="kw">super</span>().__init__(wizard)
+        self.wizard = wizard
+        self._build_ui()
+
+    <span class="kw">def</span> <span class="fn">GetNext</span>(self):
+        <span class="kw">return</span> self.wizard.page_mode  <span class="cm"># Next page</span>
+
+    <span class="kw">def</span> <span class="fn">GetPrev</span>(self):
+        <span class="kw">return</span> <span class="kw">None</span>  <span class="cm"># This is the first page</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>from wx.adv import Wizard, WizardPage, EVT_WIZARD_FINISHED, EVT_WIZARD_PAGE_CHANGED</code>
+        <br><span class="desc">Imports <code>Wizard, WizardPage, EVT_WIZARD_FINISHED, EVT_WIZARD_PAGE_CHANGED</code> from <code>wx.adv</code>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>class NewProjectWizard(Wizard):</code>
+        <br><span class="desc">Defines class <code>NewProjectWizard</code> inheriting from <code>Wizard</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>def __init__(self, parent, settings, store):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>super().__init__(parent, title=&quot;New Project&quot;)</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># Create pages</code>
+        <br><span class="desc">A comment: <em>Create pages</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>self.page_details = _DetailsPage(self)</code>
+        <br><span class="desc">Stores <code>_DetailsPage(self)</code> in instance attribute <code>page_details</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>self.page_mode = _ModePage(self, settings)</code>
+        <br><span class="desc">Stores <code>_ModePage(self, settings)</code> in instance attribute <code>page_mode</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># Wire up the page area</code>
+        <br><span class="desc">A comment: <em>Wire up the page area</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>self.GetPageAreaSizer().Add(self.page_details)</code>
+        <br><span class="desc">Calls <code>self.GetPageAreaSizer()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code># Events</code>
+        <br><span class="desc">A comment: <em>Events</em>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>self.Bind(EVT_WIZARD_FINISHED, self._on_finish)</code>
+        <br><span class="desc">Registers an event handler on the frame/window itself. Used for frame-level events.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>self.Bind(EVT_WIZARD_PAGE_CHANGED, self._on_page_changed)</code>
+        <br><span class="desc">Registers an event handler on the frame/window itself. Used for frame-level events.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>class _DetailsPage(WizardPage):</code>
+        <br><span class="desc">Defines class <code>_DetailsPage</code> inheriting from <code>WizardPage</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>def __init__(self, wizard):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>super().__init__(wizard)</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>self.wizard = wizard</code>
+        <br><span class="desc">Stores <code>wizard</code> in instance attribute <code>wizard</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>self._build_ui()</code>
+        <br><span class="desc">Calls <code>self._build_ui()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>def GetNext(self):</code>
+        <br><span class="desc">Defines function <code>GetNext</code> accepting (self).</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>return self.wizard.page_mode  # Next page</code>
+        <br><span class="desc">Returns <code>self.wizard.page_mode  # Next page</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>def GetPrev(self):</code>
+        <br><span class="desc">Defines function <code>GetPrev</code> accepting (self).</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>return None  # This is the first page</code>
+        <br><span class="desc">Returns <code>None</code> (no value).</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>36.2 TaskbarIcon</h2>
+
+<pre><code><span class="kw">from</span> wx.adv <span class="kw">import</span> TaskBarIcon
+
+<span class="kw">class</span> <span class="cls">AppTaskBarIcon</span>(TaskBarIcon):
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, frame):
+        <span class="kw">super</span>().__init__()
+        self.frame = frame
+        <span class="cm"># Set icon (would need an .ico file)</span>
+        <span class="cm"># icon = wx.Icon("app.ico", wx.BITMAP_TYPE_ICO)</span>
+        <span class="cm"># self.SetIcon(icon, "AI Voice Studio")</span>
+
+    <span class="kw">def</span> <span class="fn">CreatePopupMenu</span>(self):
+        menu = wx.Menu()
+        menu.Append(wx.ID_OPEN, <span class="str">"&amp;Open"</span>)
+        menu.AppendSeparator()
+        menu.Append(wx.ID_EXIT, <span class="str">"E&amp;xit"</span>)
+        <span class="kw">return</span> menu</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>from wx.adv import TaskBarIcon</code>
+        <br><span class="desc">Imports <code>TaskBarIcon</code> from <code>wx.adv</code>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>class AppTaskBarIcon(TaskBarIcon):</code>
+        <br><span class="desc">Defines class <code>AppTaskBarIcon</code> inheriting from <code>TaskBarIcon</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>def __init__(self, frame):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>super().__init__()</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>self.frame = frame</code>
+        <br><span class="desc">Stores <code>frame</code> in instance attribute <code>frame</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># Set icon (would need an .ico file)</code>
+        <br><span class="desc">A comment: <em>Set icon (would need an .ico file)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># icon = wx.Icon(&quot;app.ico&quot;, wx.BITMAP_TYPE_ICO)</code>
+        <br><span class="desc">A comment: <em>icon = wx.Icon(&quot;app.ico&quot;, wx.BITMAP_TYPE_ICO)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># self.SetIcon(icon, &quot;AI Voice Studio&quot;)</code>
+        <br><span class="desc">A comment: <em>self.SetIcon(icon, &quot;AI Voice Studio&quot;)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>def CreatePopupMenu(self):</code>
+        <br><span class="desc">Defines function <code>CreatePopupMenu</code> accepting (self).</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>menu = wx.Menu()</code>
+        <br><span class="desc">Creates a dropdown menu. Contains menu items, separators, and sub-menus.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>menu.Append(wx.ID_OPEN, &quot;&amp;Open&quot;)</code>
+        <br><span class="desc">Adds a menu item with an ID, label, and optional help text. Use \t for accelerators.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>menu.AppendSeparator()</code>
+        <br><span class="desc">Adds a visual separator line between menu items.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>menu.Append(wx.ID_EXIT, &quot;E&amp;xit&quot;)</code>
+        <br><span class="desc">Adds a menu item with an ID, label, and optional help text. Use \t for accelerators.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>return menu</code>
+        <br><span class="desc">Returns <code>menu</code> to the caller.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>36.3 wx.adv.HyperlinkCtrl</h2>
+
+<pre><code><span class="kw">from</span> wx.adv <span class="kw">import</span> HyperlinkCtrl, HL_ALIGN_LEFT
+
+link = wx.adv.HyperlinkCtrl(
+    self, wx.ID_ANY,
+    label=<span class="str">"Visit documentation"</span>,
+    url=<span class="str">"https://example.com/docs"</span>,
+)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>from wx.adv import HyperlinkCtrl, HL_ALIGN_LEFT</code>
+        <br><span class="desc">Imports <code>HyperlinkCtrl, HL_ALIGN_LEFT</code> from <code>wx.adv</code>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>link = wx.adv.HyperlinkCtrl(</code>
+        <br><span class="desc">Assigns <code>wx.adv.HyperlinkCtrl(</code> to <code>link</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>self, wx.ID_ANY,</code>
+        <br><span class="desc"><code>self, wx.ID_ANY,</code></span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>label=&quot;Visit documentation&quot;,</code>
+        <br><span class="desc">Assigns <code>&quot;Visit documentation&quot;,</code> to <code>label</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>url=&quot;https://example.com/docs&quot;,</code>
+        <br><span class="desc">Assigns <code>&quot;https://example.com/docs&quot;,</code> to <code>url</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>36.4 Key Takeaways</h2>
+<ul>
+  <li><strong>wx.adv.Wizard</strong> provides multi-page wizard UI with Next/Back/Finish</li>
+  <li><strong>wx.adv.TaskBarIcon</strong> for system tray integration</li>
+  <li>AIVS uses the Wizard for <strong>new project creation</strong> (2 pages)</li>
+  <li>The Wizard pattern: create pages, link them with <code>GetNext()</code>/<code>GetPrev()</code>, handle <code>EVT_WIZARD_FINISHED</code></li>
+</ul>
+
+<hr>
+
+<p style="text-align: center;">
+  <a href="ch35_themes.html">← Ch 35</a> &nbsp;|&nbsp;
+  <strong>End of Part IV</strong> &nbsp;|&nbsp;
+  <a href="ch37_numpy.html">Part V — Ch 37: NumPy →</a>
+</p>
+
+</div></div></body>
+</html>

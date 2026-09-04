@@ -10,6 +10,7 @@ project resumes from the first unsaved segment.
 from __future__ import annotations
 
 import logging
+import os
 import threading
 import wx
 
@@ -157,6 +158,22 @@ class RecordingDialog(wx.Dialog):
         add_labeled(self, params, "Output format", self.format_combo, flag=wx.LEFT | wx.RIGHT, border=2)
         sizer.Add(params, 0, wx.EXPAND | wx.ALL, 6)
 
+        # -- OmniVoice voice options (per project) ---------------------------
+        omni_row = wx.BoxSizer(wx.HORIZONTAL)
+        self.omni_btn = wx.Button(self, label="OmniVoice voice options...")
+        self.omni_btn.SetName("OmniVoice voice options")
+        self.omni_btn.SetToolTip(
+            "Choose auto / voice design / voice clone and the advanced "
+            "OmniVoice generation settings for this project."
+        )
+        omni_row.Add(self.omni_btn, 0, wx.ALL, 4)
+        self.omni_summary = wx.StaticText(self, label="")
+        self.omni_summary.SetName("OmniVoice voice options summary")
+        omni_row.Add(self.omni_summary, 1, wx.ALL | wx.ALIGN_CENTER_VERTICAL, 4)
+        self.omni_btn.Hide()
+        self.omni_summary.Hide()
+        sizer.Add(omni_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 6)
+
         # -- controls --------------------------------------------------------
         btns = wx.BoxSizer(wx.HORIZONTAL)
         self.start_btn = wx.Button(self, label="Start recording")
@@ -222,6 +239,7 @@ class RecordingDialog(wx.Dialog):
         self.tts_combo.Bind(wx.EVT_COMBOBOX, self._on_tts)
         self.lang_combo.Bind(wx.EVT_COMBOBOX, self._on_lang)
         self.variant_combo.Bind(wx.EVT_COMBOBOX, self._on_variant)
+        self.omni_btn.Bind(wx.EVT_BUTTON, self._on_omni_options)
         self.Bind(wx.EVT_CLOSE, self._on_close)
         self.Bind(EVT_SYNTH_STATUS, self._on_synth_status)
         self.Bind(EVT_SYNTH_SEGMENT_DONE, self._on_segment_done)
@@ -312,6 +330,18 @@ class RecordingDialog(wx.Dialog):
                     "instruct": voice.get("instruct", ""),
                 }
             )
+        # Universal OmniVoice voice library: created voices are engine
+        # agnostic, so register them under every installed OmniVoice engine
+        # and they appear no matter which TTS version is selected.
+        try:
+            from ..omnivoice import voice_store  # noqa: PLC0415
+            if voice_store.omni_custom_voices(self.store):
+                installed = voice_store.engine_ids_installed()
+                self._all_voices.extend(
+                    voice_store.consumer_entries(self.store, installed)
+                )
+        except Exception:  # noqa: BLE001
+            pass
         # Inject pip-installed OmniVoice voices (not in artifact system)
         self._inject_omnivoice_voices()
         # Bind compute combo change to refresh TTS list
@@ -391,6 +421,7 @@ class RecordingDialog(wx.Dialog):
             )
             for combo in (self.lang_combo, self.variant_combo, self.voice_combo):
                 combo.Clear()
+        self._update_omni_ui()
 
     def _voices_for(self):
         tts_sel = self.tts_combo.GetSelection()
@@ -447,6 +478,98 @@ class RecordingDialog(wx.Dialog):
             self.voice_combo.Append(v["voice_name"], v)
         if self.voice_combo.GetCount():
             self.voice_combo.SetSelection(0)
+        self._update_omni_ui()
+
+    # -- OmniVoice options (per project) ------------------------------------
+    def _selected_tts_id(self):
+        sel = self.tts_combo.GetSelection()
+        return self.tts_combo.GetClientData(sel) if sel >= 0 else None
+
+    def _is_omnivoice_selected(self) -> bool:
+        """True when the selected TTS engine is an OmniVoice engine."""
+        return self._selected_tts_id() in _OMNIVOICE_ENGINES
+
+    def _omni_settings(self) -> dict:
+        return self.data.get("tts", {}).get("omni") or {}
+
+    @staticmethod
+    def _omni_summary_text(omni: dict, engine: str | None = None) -> str:
+        """Short human summary of the stored per-project OmniVoice options."""
+        if not omni:
+            return ""
+        from ..omnivoice import spec  # noqa: PLC0415
+        mode = omni.get("mode", "auto")
+        if mode == "clone":
+            ref = omni.get("ref_audio") or ""
+            who = os.path.basename(ref) if ref else "(no reference set)"
+            detail = f"clone of '{who}'"
+        elif mode == "design":
+            detail = f"design: {omni.get('instruct') or '(auto attributes)'}"
+        else:
+            detail = "auto voice"
+        bits = []
+        if omni.get("num_step"):
+            bits.append(f"{omni['num_step']} steps")
+        if omni.get("guidance_scale") is not None:
+            bits.append(f"guidance {omni['guidance_scale']:g}")
+        if omni.get("seed") is not None:
+            bits.append(f"seed {omni['seed']}")
+        suffix = f" - {', '.join(bits)}" if bits else ""
+        return f"{detail}{suffix}."
+
+    def _update_omni_ui(self):
+        """Show the OmniVoice options button only for OmniVoice engines and
+        refresh its summary from the project's stored options.
+
+        Voice-library voices (created in Settings > OmniVoice engines) carry
+        their own clone/design identity, so the per-project options button is
+        hidden for them and the summary describes the library voice instead.
+        """
+        voice = self._selected_voice()
+        is_library = bool(voice and voice.get("custom_omni"))
+        visible = self._is_omnivoice_selected()
+        self.omni_btn.Show(visible and not is_library)
+        self.omni_summary.Show(visible)
+        if visible:
+            if is_library:
+                omni = voice.get("omni") or {}
+                if omni.get("mode") == "clone":
+                    ref = voice.get("ref_audio") or omni.get("ref_audio") or ""
+                    text = ("Voice library voice - clone of "
+                            f"'{os.path.basename(ref) if ref else '?'}'.")
+                else:
+                    text = ("Voice library voice - design: "
+                            f"{omni.get('instruct') or '(auto attributes)'}")
+            else:
+                omni = self._omni_settings()
+                text = self._omni_summary_text(omni)
+                text = (text if text
+                        else "No OmniVoice options set - auto voice will be used.")
+            self.omni_summary.SetLabel(text)
+            self.omni_summary.SetName("OmniVoice voice options summary: " + text)
+        self.Layout()
+
+    def _on_omni_options(self, _):
+        """Open the full-feature OmniVoice options dialog for this project."""
+        from .omnivoice_options_dialog import OmniVoiceOptionsDialog  # noqa: PLC0415
+        tts_id = self._selected_tts_id()
+        engine_label = "OmniVoice Server" if tts_id == "omnivoice_server" else "OmniVoice"
+        dlg = OmniVoiceOptionsDialog(
+            self,
+            engine_label=engine_label,
+            omni=self._omni_settings(),
+            project_name=self.data.get("name", ""),
+        )
+        try:
+            if dlg.ShowModal() != wx.ID_OK:
+                return
+            self.data.setdefault("tts", {})["omni"] = dlg.get_omni()
+        finally:
+            dlg.Destroy()
+        self._update_omni_ui()
+        self.status.SetLabel(
+            "OmniVoice options saved for this project. Press Start recording."
+        )
 
     def _selected_voice(self):
         sel = self.voice_combo.GetSelection()
@@ -474,6 +597,7 @@ class RecordingDialog(wx.Dialog):
             value = float(tts.get(name, 1.0))
             slider.SetValue(int(value * 100))
             slider.value_label.SetLabel(f"{value:.2f}")  # type: ignore[attr-defined]
+        self._update_omni_ui()
         fmt = tts.get("output_format", FORMAT_WAV)
         idx = next((i for i in range(self.format_combo.GetCount())
                     if self.format_combo.GetClientData(i) == fmt), 0)
@@ -512,7 +636,8 @@ class RecordingDialog(wx.Dialog):
     def _save_tts_to_project(self):
         voice = self._selected_voice()
         params = self._current_params()
-        self.data["tts"] = {
+        omni = self.data.get("tts", {}).get("omni") or {}
+        tts_data = {
             "tts": voice.get("tts") if voice else None,
             "language": voice.get("language") if voice else None,
             "variant": voice.get("variant") if voice else None,
@@ -524,6 +649,9 @@ class RecordingDialog(wx.Dialog):
             "output_format": params["output_format"],
             "compute": params["compute"],
         }
+        if omni:
+            tts_data["omni"] = omni
+        self.data["tts"] = tts_data
         project.save_project(self.project_dir, self.data)
 
     def _on_start(self, _):
@@ -532,6 +660,39 @@ class RecordingDialog(wx.Dialog):
             wx.MessageBox("Select a voice first.", "Recording",
                           style=wx.OK | wx.ICON_INFORMATION)
             return
+        # Enrich the voice entry with this project's OmniVoice options
+        # (cloning reference, design instructions, language hint, knobs).
+        # Voice-library voices (Settings > OmniVoice engines) carry their own
+        # identity, so the project's options never override them.
+        if voice.get("engine") in _OMNIVOICE_ENGINES:
+            from ..omnivoice import spec  # noqa: PLC0415
+
+            if voice.get("custom_omni"):
+                omni = voice.get("omni") or {}
+            else:
+                voice = spec.apply_omni_to_voice(voice, self._omni_settings())
+                omni = voice.get("omni") or {}
+            if omni.get("mode") == "clone":
+                ref = voice.get("ref_audio") or omni.get("ref_audio") or ""
+                if not ref or not os.path.isfile(ref):
+                    if voice.get("custom_omni"):
+                        wx.MessageBox(
+                            "This voice library clone's sample audio is missing. "
+                            "Re-create the voice from Settings > OmniVoice engines.",
+                            "OmniVoice clone",
+                            style=wx.OK | wx.ICON_INFORMATION,
+                        )
+                    else:
+                        wx.MessageBox(
+                            "Voice clone mode needs a reference audio sample. "
+                            "Choose one in OmniVoice voice options before recording.",
+                            "OmniVoice clone",
+                            style=wx.OK | wx.ICON_INFORMATION,
+                        )
+                    return
+                self.omni_summary.SetLabel(
+                    f"Cloning the voice from: {os.path.basename(ref)}."
+                )
         params = self._current_params()
         fmt = params["output_format"]
         ffmpeg_exe = None

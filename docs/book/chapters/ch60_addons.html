@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 60: Addon System - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part VI</div><ul class="chapters"><li><a href="ch43_architecture.html">Ch 43</a></li><li><a href="ch44_paths_settings.html">Ch 44</a></li><li><a href="ch45_project_model.html">Ch 45</a></li><li><a href="ch46_document_parsing.html">Ch 46</a></li><li><a href="ch47_tts_catalog.html">Ch 47</a></li><li><a href="ch48_tts_engine.html">Ch 48</a></li><li><a href="ch49_downloader.html">Ch 49</a></li><li><a href="ch50_compute_detection.html">Ch 50</a></li><li><a href="ch51_main_frame.html">Ch 51</a></li><li><a href="ch52_settings_dialog.html">Ch 52</a></li><li><a href="ch53_model_panels.html">Ch 53</a></li><li><a href="ch54_new_project_wizard.html">Ch 54</a></li><li><a href="ch55_recording.html">Ch 55</a></li><li><a href="ch56_synthesis_worker.html">Ch 56</a></li><li><a href="ch57_clone_engine.html">Ch 57</a></li><li><a href="ch58_omnivoice.html">Ch 58</a></li><li><a href="ch59_daisy_builder.html">Ch 59</a></li><li><a href="ch60_addons.html" class="active">Ch 60: Addons</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 60</div>
+<h1>Addon System</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand the addon architecture (inspired by NVDA)</li>
+  <li>See the manifest.json format</li>
+  <li>Understand addon discovery, loading, and registration</li>
+</ul>
+
+<hr>
+
+<h2>60.1 Addon Architecture</h2>
+
+<pre><code><span class="cm"># Addons live in %APPDATA%/AIVoiceStudio/addons/</span>
+<span class="cm"># Each addon has:</span>
+<span class="cm"># - manifest.json (required)</span>
+<span class="cm"># - __init__.py (entry point, optional)</span>
+<span class="cm"># - engine.py (custom TTS engine, optional)</span>
+<span class="cm"># - voices/ (bundled voice data, optional)</span>
+
+<span class="cm"># manifest.json layout:</span>
+{
+    <span class="str">"name"</span>: <span class="str">"My TTS Addon"</span>,
+    <span class="str">"version"</span>: <span class="str">"1.0.0"</span>,
+    <span class="str">"description"</span>: <span class="str">"Adds a new TTS engine"</span>,
+    <span class="str">"author"</span>: <span class="str">"Jane Doe"</span>,
+    <span class="str">"min_app_version"</span>: <span class="str">"0.1.0"</span>,
+    <span class="str">"engine_id"</span>: <span class="str">"my_tts"</span>,
+    <span class="str">"engine_name"</span>: <span class="str">"My TTS Engine"</span>,
+    <span class="str">"engine_entry_point"</span>: <span class="str">"engine:MyTtsEngine"</span>,
+    <span class="str">"dependencies"</span>: [<span class="str">"requests>=2.31"</span>],
+    <span class="str">"provides"</span>: [<span class="str">"tts_engine"</span>, <span class="str">"voice"</span>]
+}</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Addons live in %APPDATA%/AIVoiceStudio/addons/</code>
+        <br><span class="desc">A comment: <em>Addons live in %APPDATA%/AIVoiceStudio/addons/</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Each addon has:</code>
+        <br><span class="desc">A comment: <em>Each addon has:</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># - manifest.json (required)</code>
+        <br><span class="desc">A comment: <em>- manifest.json (required)</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># - __init__.py (entry point, optional)</code>
+        <br><span class="desc">A comment: <em>- __init__.py (entry point, optional)</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># - engine.py (custom TTS engine, optional)</code>
+        <br><span class="desc">A comment: <em>- engine.py (custom TTS engine, optional)</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># - voices/ (bundled voice data, optional)</code>
+        <br><span class="desc">A comment: <em>- voices/ (bundled voice data, optional)</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># manifest.json layout:</code>
+        <br><span class="desc">A comment: <em>manifest.json layout:</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>{</code>
+        <br><span class="desc"><code>{</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>&quot;name&quot;: &quot;My TTS Addon&quot;,</code>
+        <br><span class="desc"><code>&quot;name&quot;: &quot;My TTS Addon&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>&quot;version&quot;: &quot;1.0.0&quot;,</code>
+        <br><span class="desc"><code>&quot;version&quot;: &quot;1.0.0&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>&quot;description&quot;: &quot;Adds a new TTS engine&quot;,</code>
+        <br><span class="desc"><code>&quot;description&quot;: &quot;Adds a new TTS engine&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>&quot;author&quot;: &quot;Jane Doe&quot;,</code>
+        <br><span class="desc"><code>&quot;author&quot;: &quot;Jane Doe&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>&quot;min_app_version&quot;: &quot;0.1.0&quot;,</code>
+        <br><span class="desc"><code>&quot;min_app_version&quot;: &quot;0.1.0&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>&quot;engine_id&quot;: &quot;my_tts&quot;,</code>
+        <br><span class="desc"><code>&quot;engine_id&quot;: &quot;my_tts&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>&quot;engine_name&quot;: &quot;My TTS Engine&quot;,</code>
+        <br><span class="desc"><code>&quot;engine_name&quot;: &quot;My TTS Engine&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>&quot;engine_entry_point&quot;: &quot;engine:MyTtsEngine&quot;,</code>
+        <br><span class="desc">Abstract base class that all TTS engines must implement. Defines the synthesize() contract: takes text + parameters, returns int16 audio samples.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>&quot;dependencies&quot;: [&quot;requests&gt;=2.31&quot;],</code>
+        <br><span class="desc"><code>&quot;dependencies&quot;: [&quot;requests&gt;=2.31&quot;],</code></span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>&quot;provides&quot;: [&quot;tts_engine&quot;, &quot;voice&quot;]</code>
+        <br><span class="desc"><code>&quot;provides&quot;: [&quot;tts_engine&quot;, &quot;voice&quot;]</code></span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>}</code>
+        <br><span class="desc"><code>}</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>60.2 AddonManager</h2>
+
+<pre><code><span class="kw">class</span> <span class="cls">AddonManager</span>:
+    <span class="str">"""Discovers, loads, and manages addons."""</span>
+
+    <span class="kw">def</span> <span class="fn">discover</span>(self) -> list[AddonManifest]:
+        <span class="str">"""Scan addons directory and load manifests."""</span>
+        <span class="kw">for</span> name <span class="kw">in</span> os.listdir(self._dir):
+            manifest_path = os.path.join(self._dir, name, <span class="str">"manifest.json"</span>)
+            <span class="kw">if</span> os.path.isfile(manifest_path):
+                <span class="kw">with</span> open(manifest_path) <span class="kw">as</span> f:
+                    data = json.load(f)
+                manifest = AddonManifest(manifest_path, data)
+                <span class="kw">if</span> manifest.is_compatible:
+                    self._addons[name] = manifest
+
+    <span class="kw">def</span> <span class="fn">load_addon</span>(self, name: str) -> bool:
+        <span class="str">"""Load addon's Python module and register its engine."""</span>
+        manifest = self._addons[name]
+        addon_dir = manifest.addon_dir
+
+        <span class="cm"># Dynamic import</span>
+        spec = importlib.util.spec_from_file_location(
+            <span class="str">f"_aivs_addon_{name}"</span>,
+            os.path.join(addon_dir, <span class="str">"__init__.py"</span>),
+        )
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[<span class="str">f"_aivs_addon_{name}"</span>] = module
+        spec.loader.exec_module(module)
+
+        <span class="cm"># Register engine</span>
+        <span class="kw">if</span> manifest.engine_id:
+            self._register_engine(manifest, addon_dir)
+
+    <span class="kw">def</span> <span class="fn">install_addon</span>(self, addon_path: str) -> bool:
+        <span class="str">"""Install from ZIP or directory."""</span>
+        <span class="kw">if</span> addon_path.endswith(<span class="str">".zip"</span>):
+            <span class="cm"># Extract ZIP to addons directory</span>
+            ...
+        <span class="kw">elif</span> os.path.isdir(addon_path):
+            <span class="cm"># Copy directory</span>
+            shutil.copytree(addon_path, dest)
+            self.discover()
+
+<span class="cm"># Singleton access</span>
+<span class="kw">def</span> <span class="fn">get_addon_manager</span>() -> AddonManager:
+    <span class="kw">global</span> _default_manager
+    <span class="kw">if</span> _default_manager <span class="kw">is</span> <span class="kw">None</span>:
+        _default_manager = AddonManager()
+    <span class="kw">return</span> _default_manager</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>class AddonManager:</code>
+        <br><span class="desc">Defines class <code>AddonManager</code>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>&quot;&quot;&quot;Discovers, loads, and manages addons.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Discovers, loads, and manages addons.</em>. Documents the purpose of the following code block.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>def discover(self) -&gt; list[AddonManifest]:</code>
+        <br><span class="desc">Defines function <code>discover</code> accepting parameters (self), returning <code>list[AddonManifest]</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>&quot;&quot;&quot;Scan addons directory and load manifests.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Scan addons directory and load manifests.</em>. Documents the purpose of the following code block.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>for name in os.listdir(self._dir):</code>
+        <br><span class="desc">Iterates over <code>os.listdir(self._dir)</code>, assigning each element to <code>name</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>manifest_path = os.path.join(self._dir, name, &quot;manifest.json&quot;)</code>
+        <br><span class="desc">Assigns <code>os.path.join(self._dir, name, &quot;manifest.json&quot;)</code> to <code>manifest_path</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>if os.path.isfile(manifest_path):</code>
+        <br><span class="desc">Checks condition: <code>os.path.isfile(manifest_path)</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>with open(manifest_path) as f:</code>
+        <br><span class="desc">Context manager: <code>open(manifest_path) as f</code>. Automatically manages resource cleanup.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>data = json.load(f)</code>
+        <br><span class="desc">Assigns <code>json.load(f)</code> to <code>data</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>manifest = AddonManifest(manifest_path, data)</code>
+        <br><span class="desc">Assigns <code>AddonManifest(manifest_path, data)</code> to <code>manifest</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>if manifest.is_compatible:</code>
+        <br><span class="desc">Checks condition: <code>manifest.is_compatible</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>self._addons[name] = manifest</code>
+        <br><span class="desc"><code>self._addons[name] = manifest</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>def load_addon(self, name: str) -&gt; bool:</code>
+        <br><span class="desc">Defines function <code>load_addon</code> accepting parameters (self, name), returning <code>bool</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>&quot;&quot;&quot;Load addon&#x27;s Python module and register its engine.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Load addon&#x27;s Python module and register its engine.</em>. Documents the purpose of the following code block.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>manifest = self._addons[name]</code>
+        <br><span class="desc">Assigns <code>self._addons[name]</code> to <code>manifest</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>addon_dir = manifest.addon_dir</code>
+        <br><span class="desc">Assigns <code>manifest.addon_dir</code> to <code>addon_dir</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code># Dynamic import</code>
+        <br><span class="desc">A comment: <em>Dynamic import</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>spec = importlib.util.spec_from_file_location(</code>
+        <br><span class="desc">Assigns <code>importlib.util.spec_from_file_location(</code> to <code>spec</code>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>f&quot;_aivs_addon_{name}&quot;,</code>
+        <br><span class="desc"><code>f&quot;_aivs_addon_{name}&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>os.path.join(addon_dir, &quot;__init__.py&quot;),</code>
+        <br><span class="desc"><code>os.path.join(addon_dir, &quot;__init__.py&quot;),</code></span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>module = importlib.util.module_from_spec(spec)</code>
+        <br><span class="desc">Assigns <code>importlib.util.module_from_spec(spec)</code> to <code>module</code>.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>sys.modules[f&quot;_aivs_addon_{name}&quot;] = module</code>
+        <br><span class="desc"><code>sys.modules[f&quot;_aivs_addon_{name}&quot;] = module</code></span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>spec.loader.exec_module(module)</code>
+        <br><span class="desc"><code>spec.loader.exec_module(module)</code></span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code># Register engine</code>
+        <br><span class="desc">A comment: <em>Register engine</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>if manifest.engine_id:</code>
+        <br><span class="desc">Checks condition: <code>manifest.engine_id</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>self._register_engine(manifest, addon_dir)</code>
+        <br><span class="desc">Calls <code>self._register_engine()</code> to perform an operation.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>def install_addon(self, addon_path: str) -&gt; bool:</code>
+        <br><span class="desc">Defines function <code>install_addon</code> accepting parameters (self, addon_path), returning <code>bool</code>.</span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>&quot;&quot;&quot;Install from ZIP or directory.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Install from ZIP or directory.</em>. Documents the purpose of the following code block.</span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code>if addon_path.endswith(&quot;.zip&quot;):</code>
+        <br><span class="desc">Checks condition: <code>addon_path.endswith(&quot;.zip&quot;)</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 31:</strong> <code># Extract ZIP to addons directory</code>
+        <br><span class="desc">A comment: <em>Extract ZIP to addons directory</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 32:</strong> <code>...</code>
+        <br><span class="desc">Ellipsis placeholder: indicates an abstract method that subclasses must implement.</span>
+      </li>
+      <li>
+        <strong>Line 33:</strong> <code>elif os.path.isdir(addon_path):</code>
+        <br><span class="desc">Alternative condition: <code>os.path.isdir(addon_path)</code>. Checked only if all previous conditions were <code>False</code>.</span>
+      </li>
+      <li>
+        <strong>Line 34:</strong> <code># Copy directory</code>
+        <br><span class="desc">A comment: <em>Copy directory</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 35:</strong> <code>shutil.copytree(addon_path, dest)</code>
+        <br><span class="desc"><code>shutil.copytree(addon_path, dest)</code></span>
+      </li>
+      <li>
+        <strong>Line 36:</strong> <code>self.discover()</code>
+        <br><span class="desc">Calls <code>self.discover()</code> to perform an operation.</span>
+      </li>
+      <li>
+        <strong>Line 37:</strong> <code># Singleton access</code>
+        <br><span class="desc">A comment: <em>Singleton access</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 38:</strong> <code>def get_addon_manager() -&gt; AddonManager:</code>
+        <br><span class="desc">Defines function <code>get_addon_manager</code>, returning <code>AddonManager</code>.</span>
+      </li>
+      <li>
+        <strong>Line 39:</strong> <code>global _default_manager</code>
+        <br><span class="desc"><code>global _default_manager</code></span>
+      </li>
+      <li>
+        <strong>Line 40:</strong> <code>if _default_manager is None:</code>
+        <br><span class="desc">Checks condition: <code>_default_manager is None</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 41:</strong> <code>_default_manager = AddonManager()</code>
+        <br><span class="desc">Assigns <code>AddonManager()</code> to <code>_default_manager</code>.</span>
+      </li>
+      <li>
+        <strong>Line 42:</strong> <code>return _default_manager</code>
+        <br><span class="desc">Returns <code>_default_manager</code> to the caller.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>60.3 Key Takeaways</h2>
+<ul>
+  <li>Addons follow the <strong>NVDA addon architecture</strong> pattern</li>
+  <li><strong>manifest.json</strong> declares name, version, engine, dependencies</li>
+  <li><strong>Dynamic imports</strong> via importlib load addon code at runtime</li>
+  <li>Addons can provide <strong>new TTS engines, voices, and punctuation modes</strong></li>
+  <li>The addon system is <strong>thread-safe</strong> with RLock protection</li>
+</ul>
+
+<hr>
+
+<p style="text-align: center;">
+  <a href="ch59_daisy_builder.html">← Ch 59</a> &nbsp;|&nbsp;
+  <strong>End of Part VI</strong> &nbsp;|&nbsp;
+  <a href="ch61_unit_testing.html">Part VII — Ch 61: Testing →</a>
+</p>
+
+</div></div></body>
+</html>

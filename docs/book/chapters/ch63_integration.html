@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 63: Integration Testing - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part VII</div><ul class="chapters"><li><a href="ch61_unit_testing.html">Ch 61</a></li><li><a href="ch62_mocking.html">Ch 62</a></li><li><a href="ch63_integration.html" class="active">Ch 63: Integration</a></li><li><a href="ch64_pyinstaller.html">Ch 64</a></li><li><a href="ch65_inno_setup.html">Ch 65</a></li><li><a href="ch66_ci_cd.html">Ch 66</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 63</div>
+<h1>Integration Testing</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand integration vs. unit testing</li>
+  <li>See how AIVS tests end-to-end flows</li>
+  <li>Understand the GUI smoke test pattern</li>
+</ul>
+
+<hr>
+
+<h2>63.1 GUI Smoke Tests</h2>
+
+<pre><code><span class="cm"># From test_gui_smoke.py — verify wx objects can be created</span>
+<span class="kw">class</span> <span class="cls">GuiSmokeTest</span>(unittest.TestCase):
+    <span class="kw">def</span> <span class="fn">test_main_frame_creation</span>(self):
+        <span class="str">"""Verify MainFrame can be created without errors."""</span>
+        app = wx.App(<span class="kw">False</span>)
+        settings = Settings()
+        store = ModelStore()
+        frame = MainFrame(<span class="kw">None</span>, settings, store)
+        frame.Show()
+        frame.Close()
+        app.Destroy()
+
+    <span class="kw">def</span> <span class="fn">test_settings_dialog_creation</span>(self):
+        <span class="str">"""Verify SettingsDialog can be created."""</span>
+        app = wx.App(<span class="kw">False</span>)
+        dlg = SettingsDialog(<span class="kw">None</span>, Settings(), ModelStore())
+        dlg.Destroy()
+        app.Destroy()</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From test_gui_smoke.py — verify wx objects can be created</code>
+        <br><span class="desc">A comment: <em>From test_gui_smoke.py — verify wx objects can be created</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>class GuiSmokeTest(unittest.TestCase):</code>
+        <br><span class="desc">Defines a new class.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>def test_main_frame_creation(self):</code>
+        <br><span class="desc">Test function. pytest discovers functions prefixed with 'test_'.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>&quot;&quot;&quot;Verify MainFrame can be created without errors.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Verify MainFrame can be created without errors.</em>. Documents the following code.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>app = wx.App(False)</code>
+        <br><span class="desc">Assigns <code>wx.App(False)</code> to <code>app</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>settings = Settings()</code>
+        <br><span class="desc">Assigns <code>Settings()</code> to <code>settings</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>store = ModelStore()</code>
+        <br><span class="desc">Assigns <code>ModelStore()</code> to <code>store</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>frame = MainFrame(None, settings, store)</code>
+        <br><span class="desc">Assigns <code>MainFrame(None, settings, store)</code> to <code>frame</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>frame.Show()</code>
+        <br><span class="desc"><code>frame.Show()</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>frame.Close()</code>
+        <br><span class="desc"><code>frame.Close()</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>app.Destroy()</code>
+        <br><span class="desc"><code>app.Destroy()</code></span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>def test_settings_dialog_creation(self):</code>
+        <br><span class="desc">Test function. pytest discovers functions prefixed with 'test_'.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>&quot;&quot;&quot;Verify SettingsDialog can be created.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Verify SettingsDialog can be created.</em>. Documents the following code.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>app = wx.App(False)</code>
+        <br><span class="desc">Assigns <code>wx.App(False)</code> to <code>app</code>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>dlg = SettingsDialog(None, Settings(), ModelStore())</code>
+        <br><span class="desc">Assigns <code>SettingsDialog(None, Settings(), ModelStore())</code> to <code>dlg</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>dlg.Destroy()</code>
+        <br><span class="desc"><code>dlg.Destroy()</code></span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>app.Destroy()</code>
+        <br><span class="desc"><code>app.Destroy()</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>63.2 End-to-End Test Patterns</h2>
+
+<pre><code><span class="cm"># Test: parse document → split → create project → save/load</span>
+<span class="kw">def</span> <span class="fn">test_full_project_lifecycle</span>(self):
+    <span class="cm"># 1. Create a temp text file</span>
+    txt = os.path.join(self.tmp.name, <span class="str">"test.txt"</span>)
+    <span class="kw">with</span> open(txt, <span class="str">"w"</span>) <span class="kw">as</span> f:
+        f.write(<span class="str">"Chapter 1\n\nHello world.\n\nChapter 2\n\nGoodbye."</span>)
+
+    <span class="cm"># 2. Parse</span>
+    doc = parse_document(txt)
+    <span class="kw">assert</span> len(doc.blocks) >= <span class="num">2</span>
+
+    <span class="cm"># 3. Split</span>
+    segments = split_document(doc, MODE_PAGE_WITH_H1)
+    <span class="kw">assert</span> len(segments) >= <span class="num">2</span>
+
+    <span class="cm"># 4. Create project</span>
+    pdir = os.path.join(self.tmp.name, <span class="str">"project"</span>)
+    project.create_project(pdir, <span class="str">"Test"</span>, txt, <span class="str">"page_with_h1"</span>,
+        [{<span class="str">"index"</span>: s.index, <span class="str">"title"</span>: s.title, <span class="str">"text"</span>: s.text}
+         <span class="kw">for</span> s <span class="kw">in</span> segments])
+
+    <span class="cm"># 5. Load and verify</span>
+    data = project.load_project(pdir)
+    <span class="kw">assert</span> data[<span class="str">"name"</span>] == <span class="str">"Test"</span>
+    <span class="kw">assert</span> len(data[<span class="str">"segments"</span>]) >= <span class="num">2</span>
+
+    <span class="cm"># 6. Mark segment done</span>
+    project.mark_segment_done(pdir, <span class="num">1</span>, <span class="str">"test.wav"</span>)
+    data = project.load_project(pdir)
+    <span class="kw">assert</span> data[<span class="str">"segments"</span>][<span class="num">0</span>][<span class="str">"status"</span>] == <span class="str">"done"</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Test: parse document → split → create project → save/load</code>
+        <br><span class="desc">A comment: <em>Test: parse document → split → create project → save/load</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def test_full_project_lifecycle(self):</code>
+        <br><span class="desc">Test function. pytest discovers functions prefixed with 'test_'.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># 1. Create a temp text file</code>
+        <br><span class="desc">A comment: <em>1. Create a temp text file</em>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>txt = os.path.join(self.tmp.name, &quot;test.txt&quot;)</code>
+        <br><span class="desc">Assigns <code>os.path.join(self.tmp.name, &quot;test.txt&quot;)</code> to <code>txt</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>with open(txt, &quot;w&quot;) as f:</code>
+        <br><span class="desc">Opens a file using a context manager. Auto-closes when the block exits.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>f.write(&quot;Chapter 1\n\nHello world.\n\nChapter 2\n\nGoodbye.&quot;)</code>
+        <br><span class="desc"><code>f.write(&quot;Chapter 1\n\nHello world.\n\nChapter 2\n\nGoodbye.&quot;)</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># 2. Parse</code>
+        <br><span class="desc">A comment: <em>2. Parse</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>doc = parse_document(txt)</code>
+        <br><span class="desc">Assigns <code>parse_document(txt)</code> to <code>doc</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>assert len(doc.blocks) &gt;= 2</code>
+        <br><span class="desc">Assertion that verifies a condition is True.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code># 3. Split</code>
+        <br><span class="desc">A comment: <em>3. Split</em>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>segments = split_document(doc, MODE_PAGE_WITH_H1)</code>
+        <br><span class="desc">Assigns <code>split_document(doc, MODE_PAGE_WITH_H1)</code> to <code>segments</code>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>assert len(segments) &gt;= 2</code>
+        <br><span class="desc">Assertion that verifies a condition is True.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code># 4. Create project</code>
+        <br><span class="desc">A comment: <em>4. Create project</em>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>pdir = os.path.join(self.tmp.name, &quot;project&quot;)</code>
+        <br><span class="desc">Assigns <code>os.path.join(self.tmp.name, &quot;project&quot;)</code> to <code>pdir</code>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>project.create_project(pdir, &quot;Test&quot;, txt, &quot;page_with_h1&quot;,</code>
+        <br><span class="desc"><code>project.create_project(pdir, &quot;Test&quot;, txt, &quot;page_with_h1&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>[{&quot;index&quot;: s.index, &quot;title&quot;: s.title, &quot;text&quot;: s.text}</code>
+        <br><span class="desc">The text content of a paragraph or page.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>for s in segments])</code>
+        <br><span class="desc">For loop iteration.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code># 5. Load and verify</code>
+        <br><span class="desc">A comment: <em>5. Load and verify</em>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>data = project.load_project(pdir)</code>
+        <br><span class="desc">Assigns <code>project.load_project(pdir)</code> to <code>data</code>.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>assert data[&quot;name&quot;] == &quot;Test&quot;</code>
+        <br><span class="desc">Assertion that verifies a condition is True.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>assert len(data[&quot;segments&quot;]) &gt;= 2</code>
+        <br><span class="desc">Assertion that verifies a condition is True.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code># 6. Mark segment done</code>
+        <br><span class="desc">A comment: <em>6. Mark segment done</em>.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>project.mark_segment_done(pdir, 1, &quot;test.wav&quot;)</code>
+        <br><span class="desc"><code>project.mark_segment_done(pdir, 1, &quot;test.wav&quot;)</code></span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>data = project.load_project(pdir)</code>
+        <br><span class="desc">Assigns <code>project.load_project(pdir)</code> to <code>data</code>.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>assert data[&quot;segments&quot;][0][&quot;status&quot;] == &quot;done&quot;</code>
+        <br><span class="desc">Assertion that verifies a condition is True.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>63.3 Key Takeaways</h2>
+<ul>
+  <li><strong>Smoke tests</strong> verify objects can be created without crashes</li>
+  <li><strong>End-to-end tests</strong> exercise the full pipeline (parse → split → save → load)</li>
+  <li>AIVS tests avoid actual TTS synthesis (too slow, requires models)</li>
+  <li>The test suite runs in <strong>under 30 seconds</strong></li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch62_mocking.html">← Ch 62</a> &nbsp;|&nbsp; <a href="ch64_pyinstaller.html">Ch 64 — PyInstaller →</a></p>
+</div></div></body>
+</html>

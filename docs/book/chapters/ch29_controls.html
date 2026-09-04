@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 29: Controls &amp; Widgets - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part IV</div><ul class="chapters"><li><a href="ch27_wxpython_intro.html">Ch 27</a></li><li><a href="ch28_sizers_layout.html">Ch 28</a></li><li><a href="ch29_controls.html" class="active">Ch 29: Controls</a></li><li><a href="ch30_events.html">Ch 30</a></li><li><a href="ch31_dialogs.html">Ch 31</a></li><li><a href="ch32_custom_drawing.html">Ch 32</a></li><li><a href="ch33_threading_gui.html">Ch 33</a></li><li><a href="ch34_accessibility.html">Ch 34</a></li><li><a href="ch35_themes.html">Ch 35</a></li><li><a href="ch36_wx_adv.html">Ch 36</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 29</div>
+<h1>Controls &amp; Widgets</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Use common wxPython controls: TextCtrl, ComboBox, Slider, Gauge</li>
+  <li>Handle control events</li>
+  <li>See control patterns in AIVS</li>
+</ul>
+
+<hr>
+
+<h2>29.1 Essential Controls</h2>
+
+<pre><code><span class="cm"># StaticText — read-only label</span>
+label = wx.StaticText(parent, label=<span class="str">"TTS Engine:"</span>)
+
+<span class="cm"># TextCtrl — text input</span>
+text = wx.TextCtrl(parent, value=<span class="str">"Default text"</span>)
+text = wx.TextCtrl(parent, style=wx.TE_MULTILINE | wx.TE_READONLY)
+
+<span class="cm"># Button</span>
+btn = wx.Button(parent, label=<span class="str">"Start Recording"</span>)
+btn.Disable()  <span class="cm"># Gray out</span>
+btn.Enable()   <span class="cm"># Re-enable</span>
+
+<span class="cm"># ComboBox — dropdown selection</span>
+combo = wx.ComboBox(parent, style=wx.CB_READONLY)
+combo.Append(<span class="str">"Option 1"</span>, <span class="str">"value1"</span>)  <span class="cm"># label, client data</span>
+combo.Append(<span class="str">"Option 2"</span>, <span class="str">"value2"</span>)
+combo.SetSelection(<span class="num">0</span>)
+value = combo.GetClientData(combo.GetSelection())  <span class="cm"># "value1"</span>
+
+<span class="cm"># CheckBox</span>
+cb = wx.CheckBox(parent, label=<span class="str">"Developer mode"</span>)
+cb.SetValue(<span class="kw">True</span>)
+
+<span class="cm"># RadioButton</span>
+rb1 = wx.RadioButton(parent, label=<span class="str">"Light"</span>, style=wx.RB_GROUP)
+rb2 = wx.RadioButton(parent, label=<span class="str">"Dark"</span>)
+
+<span class="cm"># Slider</span>
+slider = wx.Slider(parent, minValue=<span class="num">50</span>, maxValue=<span class="num">200</span>, value=<span class="num">100</span>)
+value = slider.GetValue() / <span class="num">100.0</span>  <span class="cm"># 1.00</span>
+
+<span class="cm"># Gauge (progress bar)</span>
+gauge = wx.Gauge(parent, range=<span class="num">100</span>)
+gauge.SetValue(<span class="num">50</span>)  <span class="cm"># 50%</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># StaticText — read-only label</code>
+        <br><span class="desc">A comment: <em>StaticText — read-only label</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>label = wx.StaticText(parent, label=&quot;TTS Engine:&quot;)</code>
+        <br><span class="desc">Creates a non-editable text label.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># TextCtrl — text input</code>
+        <br><span class="desc">A comment: <em>TextCtrl — text input</em>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>text = wx.TextCtrl(parent, value=&quot;Default text&quot;)</code>
+        <br><span class="desc">Creates a text input control. Can be single-line (for paths) or multi-line (for text display).</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>text = wx.TextCtrl(parent, style=wx.TE_MULTILINE | wx.TE_READONLY)</code>
+        <br><span class="desc">TextCtrl style: enables multi-line text input.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># Button</code>
+        <br><span class="desc">A comment: <em>Button</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>btn = wx.Button(parent, label=&quot;Start Recording&quot;)</code>
+        <br><span class="desc">Creates a clickable push button. The most common way to trigger user actions.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>btn.Disable()  # Gray out</code>
+        <br><span class="desc"><code>btn.Disable()  # Gray out</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>btn.Enable()   # Re-enable</code>
+        <br><span class="desc"><code>btn.Enable()   # Re-enable</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code># ComboBox — dropdown selection</code>
+        <br><span class="desc">A comment: <em>ComboBox — dropdown selection</em>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>combo = wx.ComboBox(parent, style=wx.CB_READONLY)</code>
+        <br><span class="desc">ComboBox style: prevents typing custom values.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>combo.Append(&quot;Option 1&quot;, &quot;value1&quot;)  # label, client data</code>
+        <br><span class="desc"><code>combo.Append(&quot;Option 1&quot;, &quot;value1&quot;)  # label, client data</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>combo.Append(&quot;Option 2&quot;, &quot;value2&quot;)</code>
+        <br><span class="desc"><code>combo.Append(&quot;Option 2&quot;, &quot;value2&quot;)</code></span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>combo.SetSelection(0)</code>
+        <br><span class="desc"><code>combo.SetSelection(0)</code></span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>value = combo.GetClientData(combo.GetSelection())  # &quot;value1&quot;</code>
+        <br><span class="desc">Assigns <code>combo.GetClientData(combo.GetSelection())  # &quot;value1&quot;</code> to <code>value</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code># CheckBox</code>
+        <br><span class="desc">A comment: <em>CheckBox</em>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>cb = wx.CheckBox(parent, label=&quot;Developer mode&quot;)</code>
+        <br><span class="desc">Creates a check box toggle. Returns True when checked, False when unchecked.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>cb.SetValue(True)</code>
+        <br><span class="desc"><code>cb.SetValue(True)</code></span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code># RadioButton</code>
+        <br><span class="desc">A comment: <em>RadioButton</em>.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>rb1 = wx.RadioButton(parent, label=&quot;Light&quot;, style=wx.RB_GROUP)</code>
+        <br><span class="desc">Assigns <code>wx.RadioButton(parent, label=&quot;Light&quot;, style=wx.RB_GROUP)</code> to <code>rb1</code>.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>rb2 = wx.RadioButton(parent, label=&quot;Dark&quot;)</code>
+        <br><span class="desc">Assigns <code>wx.RadioButton(parent, label=&quot;Dark&quot;)</code> to <code>rb2</code>.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code># Slider</code>
+        <br><span class="desc">A comment: <em>Slider</em>.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>slider = wx.Slider(parent, minValue=50, maxValue=200, value=100)</code>
+        <br><span class="desc">Creates a slider control for selecting a value within a range. Used for rate, pitch, volume.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>value = slider.GetValue() / 100.0  # 1.00</code>
+        <br><span class="desc">Assigns <code>slider.GetValue() / 100.0  # 1.00</code> to <code>value</code>.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code># Gauge (progress bar)</code>
+        <br><span class="desc">A comment: <em>Gauge (progress bar)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>gauge = wx.Gauge(parent, range=100)</code>
+        <br><span class="desc">Creates a progress bar control. Shows download and synthesis progress.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>gauge.SetValue(50)  # 50%</code>
+        <br><span class="desc"><code>gauge.SetValue(50)  # 50%</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>29.2 The add_labeled Helper (AIVS)</h2>
+
+<pre><code><span class="cm"># From gui/a11y.py — reusable helper for label+control pairs</span>
+<span class="kw">def</span> <span class="fn">add_labeled</span>(parent, sizer, label_text, control, **kwargs):
+    <span class="str">"""Add a label-control pair to a sizer."""</span>
+    label = wx.StaticText(parent, label=label_text + <span class="str">":"</span>)
+    control.SetName(label_text)  <span class="cm"># Accessibility name</span>
+    sizer.Add(label, <span class="num">0</span>, wx.ALIGN_CENTER_VERTICAL | wx.ALL, <span class="num">4</span>)
+    sizer.Add(control, <span class="num">1</span>, wx.EXPAND | wx.ALL, <span class="num">4</span>)
+    <span class="kw">return</span> label
+
+<span class="cm"># Usage</span>
+add_labeled(self, grid, <span class="str">"TTS engine"</span>, self.tts_combo)
+add_labeled(self, grid, <span class="str">"Language"</span>, self.lang_combo)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From gui/a11y.py — reusable helper for label+control pairs</code>
+        <br><span class="desc">A comment: <em>From gui/a11y.py — reusable helper for label+control pairs</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def add_labeled(parent, sizer, label_text, control, **kwargs):</code>
+        <br><span class="desc">Defines function <code>add_labeled</code> accepting (parent, sizer, label_text, control, ...).</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;&quot;&quot;Add a label-control pair to a sizer.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Add a label-control pair to a sizer.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>label = wx.StaticText(parent, label=label_text + &quot;:&quot;)</code>
+        <br><span class="desc">Creates a non-editable text label.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>control.SetName(label_text)  # Accessibility name</code>
+        <br><span class="desc"><code>control.SetName(label_text)  # Accessibility name</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>sizer.Add(label, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 4)</code>
+        <br><span class="desc">Flag: centers the widget vertically.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>sizer.Add(control, 1, wx.EXPAND | wx.ALL, 4)</code>
+        <br><span class="desc">Adds a child window to the sizer. Parameters: window, proportion, flags, border. Flags control alignment and padding.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>return label</code>
+        <br><span class="desc">Returns <code>label</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code># Usage</code>
+        <br><span class="desc">A comment: <em>Usage</em>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>add_labeled(self, grid, &quot;TTS engine&quot;, self.tts_combo)</code>
+        <br><span class="desc">Calls function <code>add_labeled()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>add_labeled(self, grid, &quot;Language&quot;, self.lang_combo)</code>
+        <br><span class="desc">Calls function <code>add_labeled()</code>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>29.3 Slider with Value Display</h2>
+
+<pre><code><span class="cm"># From recording_dialog.py — slider with live value label</span>
+<span class="kw">def</span> <span class="fn">_slider</span>(self, grid, name: str, lo: float, hi: float) -> wx.Slider:
+    label = wx.StaticText(self, label=name + <span class="str">":"</span>)
+    slider = wx.Slider(
+        self,
+        minValue=int(lo * <span class="num">100</span>),
+        maxValue=int(hi * <span class="num">100</span>),
+        value=int(<span class="num">1.0</span> * <span class="num">100</span>),
+    )
+    value_label = wx.StaticText(self, label=<span class="str">"1.00"</span>)
+    slider.value_label = value_label  <span class="cm"># Attach label to slider</span>
+
+    <span class="cm"># Update label when slider moves</span>
+    slider.Bind(
+        wx.EVT_SLIDER,
+        <span class="kw">lambda</span> evt, s=slider, vl=value_label, n=name: (
+            vl.SetLabel(<span class="str">f"</span>{s.GetValue() / <span class="num">100.0</span>:<span class="num">.2f</span>}<span class="str">"</span>),
+            s.SetName(<span class="str">f"</span>{n}<span class="str">: </span>{s.GetValue() / <span class="num">100.0</span>:<span class="num">.2f</span>}<span class="str">"</span>),
+        ),
+    )
+
+    box = wx.BoxSizer(wx.HORIZONTAL)
+    box.Add(slider, <span class="num">1</span>, wx.EXPAND)
+    box.Add(value_label, <span class="num">0</span>, wx.LEFT | wx.ALIGN_CENTER_VERTICAL, <span class="num">6</span>)
+    grid.Add(label, <span class="num">0</span>, wx.ALIGN_CENTER_VERTICAL)
+    grid.Add(box, <span class="num">1</span>, wx.EXPAND)
+    <span class="kw">return</span> slider</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From recording_dialog.py — slider with live value label</code>
+        <br><span class="desc">A comment: <em>From recording_dialog.py — slider with live value label</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def _slider(self, grid, name: str, lo: float, hi: float) -&gt; wx.Slider:</code>
+        <br><span class="desc">A slider control for numeric values. The range is set in the constructor; GetValue() returns the current position.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>label = wx.StaticText(self, label=name + &quot;:&quot;)</code>
+        <br><span class="desc">Creates a non-editable text label.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>slider = wx.Slider(</code>
+        <br><span class="desc">Creates a slider control for selecting a value within a range. Used for rate, pitch, volume.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>self,</code>
+        <br><span class="desc"><code>self,</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>minValue=int(lo * 100),</code>
+        <br><span class="desc">Converts a value to an integer. Truncates floats toward zero. Raises ValueError for invalid strings.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>maxValue=int(hi * 100),</code>
+        <br><span class="desc">Converts a value to an integer. Truncates floats toward zero. Raises ValueError for invalid strings.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>value=int(1.0 * 100),</code>
+        <br><span class="desc">Converts a value to an integer. Truncates floats toward zero. Raises ValueError for invalid strings.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>value_label = wx.StaticText(self, label=&quot;1.00&quot;)</code>
+        <br><span class="desc">Creates a non-editable text label.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>slider.value_label = value_label  # Attach label to slider</code>
+        <br><span class="desc">Assigns <code>value_label  # Attach label to slider</code> to <code>slider.value_label</code>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code># Update label when slider moves</code>
+        <br><span class="desc">A comment: <em>Update label when slider moves</em>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>slider.Bind(</code>
+        <br><span class="desc"><code>slider.Bind(</code></span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>wx.EVT_SLIDER,</code>
+        <br><span class="desc">Event triggered when a Slider value changes.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>lambda evt, s=slider, vl=value_label, n=name: (</code>
+        <br><span class="desc"><code>lambda evt, s=slider, vl=value_label, n=name: (</code></span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>vl.SetLabel(f&quot;{s.GetValue() / 100.0:.2f}&quot;),</code>
+        <br><span class="desc"><code>vl.SetLabel(f&quot;{s.GetValue() / 100.0:.2f}&quot;),</code></span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>s.SetName(f&quot;{n}: {s.GetValue() / 100.0:.2f}&quot;),</code>
+        <br><span class="desc"><code>s.SetName(f&quot;{n}: {s.GetValue() / 100.0:.2f}&quot;),</code></span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>),</code>
+        <br><span class="desc"><code>),</code></span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>box = wx.BoxSizer(wx.HORIZONTAL)</code>
+        <br><span class="desc">Creates a layout manager that arranges children horizontally (HORIZONTAL) or vertically (VERTICAL).</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>box.Add(slider, 1, wx.EXPAND)</code>
+        <br><span class="desc">Flag: the widget stretches to fill the sizer's available space.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>box.Add(value_label, 0, wx.LEFT | wx.ALIGN_CENTER_VERTICAL, 6)</code>
+        <br><span class="desc">Flag: centers the widget vertically.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>grid.Add(label, 0, wx.ALIGN_CENTER_VERTICAL)</code>
+        <br><span class="desc">Flag: centers the widget vertically.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>grid.Add(box, 1, wx.EXPAND)</code>
+        <br><span class="desc">Flag: the widget stretches to fill the sizer's available space.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>return slider</code>
+        <br><span class="desc">Returns <code>slider</code> to the caller.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>29.4 Key Takeaways</h2>
+<ul>
+  <li>wxPython provides <strong>native controls</strong> for every common UI pattern</li>
+  <li><strong>ComboBox</strong> with CB_READONLY is the preferred dropdown (stores client data)</li>
+  <li><strong>Slider</strong> values are integers — divide by 100 for float parameters</li>
+  <li>AIVS uses the <strong>add_labeled</strong> helper for consistent label+control pairs</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch28_sizers_layout.html">← Ch 28</a> &nbsp;|&nbsp; <a href="ch30_events.html">Ch 30 — Events →</a></p>
+</div></div></body>
+</html>

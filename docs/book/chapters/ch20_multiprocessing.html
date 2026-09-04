@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 20: Multiprocessing - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part III</div><ul class="chapters"><li><a href="ch19_concurrency.html">Ch 19</a></li><li><a href="ch20_multiprocessing.html" class="active">Ch 20: Multiprocessing</a></li><li><a href="ch21_async.html">Ch 21</a></li><li><a href="ch22_type_hints.html">Ch 22</a></li><li><a href="ch23_metaclasses.html">Ch 23</a></li><li><a href="ch24_design_patterns.html">Ch 24</a></li><li><a href="ch25_introspection.html">Ch 25</a></li><li><a href="ch26_c_extensions.html">Ch 26</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 20</div>
+<h1>Multiprocessing</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand when to use processes vs. threads</li>
+  <li>Use the <code>subprocess</code> module for process management</li>
+  <li>See the subprocess architecture in AIVS</li>
+</ul>
+
+<hr>
+
+<h2>20.1 Processes vs. Threads</h2>
+
+<table>
+  <thead><tr><th>Feature</th><th>Threads</th><th>Processes</th></tr></thead>
+  <tbody>
+    <tr><td>GIL</td><td>Shared (limited parallelism)</td><td>Each has its own (true parallelism)</td></tr>
+    <tr><td>Memory</td><td>Shared</td><td>Separate (need IPC)</td></tr>
+    <tr><td>Creation</td><td>Fast</td><td>Slower</td></tr>
+    <tr><td>Use case</td><td>I/O-bound</td><td>CPU-bound</td></tr>
+    <tr><td>AIVS use</td><td>TTS synthesis, downloads</td><td>XTTS clone worker, OmniVoice worker</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h2>20.2 The subprocess Module</h2>
+
+<pre><code><span class="kw">import</span> subprocess
+
+<span class="cm"># Run a command and wait</span>
+result = subprocess.run(
+    [<span class="str">"python"</span>, <span class="str">"-c"</span>, <span class="str">"print('hello')"</span>],
+    capture_output=<span class="kw">True</span>,
+    text=<span class="kw">True</span>,
+)
+<span class="kw">print</span>(result.stdout)       <span class="cm"># "hello\n"</span>
+<span class="kw">print</span>(result.returncode)   <span class="cm"># 0</span>
+
+<span class="cm"># Start a long-running process</span>
+proc = subprocess.Popen(
+    [<span class="str">"python"</span>, <span class="str">"-m"</span>, <span class="str">"worker"</span>],
+    stdin=subprocess.PIPE,
+    stdout=subprocess.PIPE,
+    text=<span class="kw">True</span>,
+)
+
+<span class="cm"># Communicate via stdin/stdout</span>
+proc.stdin.write(<span class="str">'{"cmd": "ping"}\n'</span>)
+proc.stdin.flush()
+response = proc.stdout.readline()  <span class="cm"># Read one line</span>
+
+<span class="cm"># Terminate</span>
+proc.terminate()
+proc.wait(timeout=<span class="num">5</span>)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>import subprocess</code>
+        <br><span class="desc">Imports the <code>subprocess</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Run a command and wait</code>
+        <br><span class="desc">A comment: <em>Run a command and wait</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>result = subprocess.run(</code>
+        <br><span class="desc">Runs a command and waits for it to complete. Returns a CompletedProcess.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>[&quot;python&quot;, &quot;-c&quot;, &quot;print(&#x27;hello&#x27;)&quot;],</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>capture_output=True,</code>
+        <br><span class="desc">Assigns <code>True,</code> to <code>capture_output</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>text=True,</code>
+        <br><span class="desc">Assigns <code>True,</code> to <code>text</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>print(result.stdout)       # &quot;hello\n&quot;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>print(result.returncode)   # 0</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code># Start a long-running process</code>
+        <br><span class="desc">A comment: <em>Start a long-running process</em>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>proc = subprocess.Popen(</code>
+        <br><span class="desc">Starts a process. More control than run() — can read stdout/stderr asynchronously.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>[&quot;python&quot;, &quot;-m&quot;, &quot;worker&quot;],</code>
+        <br><span class="desc"><code>[&quot;python&quot;, &quot;-m&quot;, &quot;worker&quot;],</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>stdin=subprocess.PIPE,</code>
+        <br><span class="desc">Assigns <code>subprocess.PIPE,</code> to <code>stdin</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>stdout=subprocess.PIPE,</code>
+        <br><span class="desc">Assigns <code>subprocess.PIPE,</code> to <code>stdout</code>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>text=True,</code>
+        <br><span class="desc">Assigns <code>True,</code> to <code>text</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code># Communicate via stdin/stdout</code>
+        <br><span class="desc">A comment: <em>Communicate via stdin/stdout</em>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>proc.stdin.write(&#x27;{&quot;cmd&quot;: &quot;ping&quot;}\n&#x27;)</code>
+        <br><span class="desc">Writes a string to the file. In text mode, does not add a newline automatically.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>proc.stdin.flush()</code>
+        <br><span class="desc"><code>proc.stdin.flush()</code></span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>response = proc.stdout.readline()  # Read one line</code>
+        <br><span class="desc">Reads a single line from the file, including the newline character.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code># Terminate</code>
+        <br><span class="desc">A comment: <em>Terminate</em>.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>proc.terminate()</code>
+        <br><span class="desc"><code>proc.terminate()</code></span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>proc.wait(timeout=5)</code>
+        <br><span class="desc"><code>proc.wait(timeout=5)</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>20.3 AIVS Subprocess Architecture</h2>
+
+<p>
+  AI Voice Studio uses subprocesses to isolate heavy runtimes (PyTorch, ONNX) from
+  the main GUI process. This is a critical architectural decision:
+</p>
+
+<pre><code><span class="cm"># From clone/__init__.py — CloneClient manages a subprocess</span>
+<span class="kw">class</span> <span class="cls">CloneClient</span>:
+    <span class="kw">def</span> <span class="fn">_ensure_proc</span>(self):
+        <span class="kw">if</span> self._proc <span class="kw">is not</span> <span class="kw">None</span> <span class="kw">and</span> self._proc.poll() <span class="kw">is</span> <span class="kw">None</span>:
+            <span class="kw">return</span>
+        cmd = [sys.executable, <span class="str">"-m"</span>, <span class="str">"ai_voice_studio.clone.worker"</span>]
+        self._proc = subprocess.Popen(
+            cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=<span class="kw">True</span>,
+            bufsize=<span class="num">1</span>,
+        )
+        <span class="cm"># Verify the worker started</span>
+        resp = self._request({<span class="str">"cmd"</span>: <span class="str">"ping"</span>})
+        <span class="kw">if not</span> resp.get(<span class="str">"ok"</span>):
+            <span class="kw">raise</span> CloneEngineError(<span class="str">"Worker failed to start"</span>)
+
+    <span class="kw">def</span> <span class="fn">_request</span>(self, req: dict) -> dict:
+        <span class="str">"""Send JSON request, read JSON response."""</span>
+        <span class="kw">with</span> self._lock:
+            req[<span class="str">"id"</span>] = self._next_id
+            self._next_id += <span class="num">1</span>
+            self._proc.stdin.write(json.dumps(req) + <span class="str">"\n"</span>)
+            self._proc.stdin.flush()
+            line = self._proc.stdout.readline()
+            <span class="kw">return</span> json.loads(line)
+
+<span class="cm"># Protocol: JSON lines over stdin/stdout</span>
+<span class="cm"># Request:  {"cmd": "synthesize", "text": "Hello", "speed": 1.0}</span>
+<span class="cm"># Response: {"ok": true, "wav": "base64..."}</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From clone/__init__.py — CloneClient manages a subprocess</code>
+        <br><span class="desc">A comment: <em>From clone/__init__.py — CloneClient manages a subprocess</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>class CloneClient:</code>
+        <br><span class="desc">Defines class <code>CloneClient</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>def _ensure_proc(self):</code>
+        <br><span class="desc">Defines function <code>_ensure_proc</code> accepting (self).</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>if self._proc is not None and self._proc.poll() is None:</code>
+        <br><span class="desc">Checks condition: <code>self._proc is not None and self._proc.poll() is None</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>return</code>
+        <br><span class="desc">Returns <code>None</code> implicitly (exits the function).</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>cmd = [sys.executable, &quot;-m&quot;, &quot;ai_voice_studio.clone.worker&quot;]</code>
+        <br><span class="desc">Assigns <code>[sys.executable, &quot;-m&quot;, &quot;ai_voice_studio.clone.worker&quot;]</code> to <code>cmd</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>self._proc = subprocess.Popen(</code>
+        <br><span class="desc">Starts a process. More control than run() — can read stdout/stderr asynchronously.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>cmd,</code>
+        <br><span class="desc"><code>cmd,</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>stdin=subprocess.PIPE,</code>
+        <br><span class="desc">Assigns <code>subprocess.PIPE,</code> to <code>stdin</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>stdout=subprocess.PIPE,</code>
+        <br><span class="desc">Assigns <code>subprocess.PIPE,</code> to <code>stdout</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>stderr=subprocess.DEVNULL,</code>
+        <br><span class="desc">Assigns <code>subprocess.DEVNULL,</code> to <code>stderr</code>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>text=True,</code>
+        <br><span class="desc">Assigns <code>True,</code> to <code>text</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>bufsize=1,</code>
+        <br><span class="desc">Assigns <code>1,</code> to <code>bufsize</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code># Verify the worker started</code>
+        <br><span class="desc">A comment: <em>Verify the worker started</em>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>resp = self._request({&quot;cmd&quot;: &quot;ping&quot;})</code>
+        <br><span class="desc">Assigns <code>self._request({&quot;cmd&quot;: &quot;ping&quot;})</code> to <code>resp</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>if not resp.get(&quot;ok&quot;):</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>raise CloneEngineError(&quot;Worker failed to start&quot;)</code>
+        <br><span class="desc">Manually raises an exception. Use to signal error conditions to callers.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>def _request(self, req: dict) -&gt; dict:</code>
+        <br><span class="desc">Defines function <code>_request</code> accepting (self, req), returning <code>dict</code>.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>&quot;&quot;&quot;Send JSON request, read JSON response.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Send JSON request, read JSON response.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>with self._lock:</code>
+        <br><span class="desc">Context manager: <code>self._lock</code>. Automatically manages resource cleanup.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>req[&quot;id&quot;] = self._next_id</code>
+        <br><span class="desc"><code>req[&quot;id&quot;] = self._next_id</code></span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>self._next_id += 1</code>
+        <br><span class="desc"><code>self._next_id += 1</code></span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>self._proc.stdin.write(json.dumps(req) + &quot;\n&quot;)</code>
+        <br><span class="desc">Serializes a Python object to a JSON string.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>self._proc.stdin.flush()</code>
+        <br><span class="desc"><code>self._proc.stdin.flush()</code></span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>line = self._proc.stdout.readline()</code>
+        <br><span class="desc">Reads a single line from the file, including the newline character.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>return json.loads(line)</code>
+        <br><span class="desc">Deserializes a JSON string into a Python object.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code># Protocol: JSON lines over stdin/stdout</code>
+        <br><span class="desc">A comment: <em>Protocol: JSON lines over stdin/stdout</em>.</span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code># Request:  {&quot;cmd&quot;: &quot;synthesize&quot;, &quot;text&quot;: &quot;Hello&quot;, &quot;speed&quot;: 1.0}</code>
+        <br><span class="desc">A comment: <em>Request:  {&quot;cmd&quot;: &quot;synthesize&quot;, &quot;text&quot;: &quot;Hello&quot;, &quot;speed&quot;: 1.0}</em>.</span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code># Response: {&quot;ok&quot;: true, &quot;wav&quot;: &quot;base64...&quot;}</code>
+        <br><span class="desc">A comment: <em>Response: {&quot;ok&quot;: true, &quot;wav&quot;: &quot;base64...&quot;}</em>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>20.4 Windows-Specific: CREATE_NO_WINDOW</h2>
+
+<pre><code><span class="cm"># On Windows, hide console windows for subprocesses</span>
+creationflags = <span class="num">0</span>
+<span class="kw">if</span> sys.platform == <span class="str">"win32"</span>:
+    creationflags = getattr(subprocess, <span class="str">"CREATE_NO_WINDOW"</span>, <span class="num">0</span>)
+
+proc = subprocess.Popen(
+    cmd,
+    creationflags=creationflags,
+    ...
+)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># On Windows, hide console windows for subprocesses</code>
+        <br><span class="desc">A comment: <em>On Windows, hide console windows for subprocesses</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>creationflags = 0</code>
+        <br><span class="desc">Assigns <code>0</code> to <code>creationflags</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>if sys.platform == &quot;win32&quot;:</code>
+        <br><span class="desc">Checks condition: <code>sys.platform == &quot;win32&quot;</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>creationflags = getattr(subprocess, &quot;CREATE_NO_WINDOW&quot;, 0)</code>
+        <br><span class="desc">Gets an attribute value by name. Supports a default value if the attribute doesn't exist.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>proc = subprocess.Popen(</code>
+        <br><span class="desc">Starts a process. More control than run() — can read stdout/stderr asynchronously.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>cmd,</code>
+        <br><span class="desc"><code>cmd,</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>creationflags=creationflags,</code>
+        <br><span class="desc">Assigns <code>creationflags,</code> to <code>creationflags</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>...</code>
+        <br><span class="desc">Ellipsis: abstract method placeholder.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>20.5 Key Takeaways</h2>
+<ul>
+  <li>Use <strong>subprocess</strong> when you need true isolation (different runtime, memory space)</li>
+  <li>AIVS uses <strong>subprocesses</strong> for TTS engines to prevent runtime conflicts</li>
+  <li><strong>JSON lines protocol</strong> over stdin/stdout is the communication pattern</li>
+  <li>Always use <strong>threading.RLock</strong> to synchronize access to the subprocess</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch19_concurrency.html">← Ch 19</a> &nbsp;|&nbsp; <a href="ch21_async.html">Ch 21 — Async I/O →</a></p>
+</div></div></body>
+</html>

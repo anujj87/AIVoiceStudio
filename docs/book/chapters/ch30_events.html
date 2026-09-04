@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 30: Event Handling - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part IV</div><ul class="chapters"><li><a href="ch27_wxpython_intro.html">Ch 27</a></li><li><a href="ch28_sizers_layout.html">Ch 28</a></li><li><a href="ch29_controls.html">Ch 29</a></li><li><a href="ch30_events.html" class="active">Ch 30: Events</a></li><li><a href="ch31_dialogs.html">Ch 31</a></li><li><a href="ch32_custom_drawing.html">Ch 32</a></li><li><a href="ch33_threading_gui.html">Ch 33</a></li><li><a href="ch34_accessibility.html">Ch 34</a></li><li><a href="ch35_themes.html">Ch 35</a></li><li><a href="ch36_wx_adv.html">Ch 36</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 30</div>
+<h1>Event Handling</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand wxPython's event system (Bind/PostEvent)</li>
+  <li>Create custom event types for worker-GUI communication</li>
+  <li>See event patterns in AIVS</li>
+</ul>
+
+<hr>
+
+<h2>30.1 Basic Event Binding</h2>
+
+<pre><code><span class="cm"># Bind a button click</span>
+self.start_btn.Bind(wx.EVT_BUTTON, self._on_start)
+
+<span class="cm"># Bind with lambda</span>
+self.close_btn.Bind(wx.EVT_BUTTON, <span class="kw">lambda</span> _: self.Close())
+
+<span class="cm"># Bind combo box selection</span>
+self.tts_combo.Bind(wx.EVT_COMBOBOX, self._on_tts_changed)
+
+<span class="cm"># Bind window close</span>
+self.Bind(wx.EVT_CLOSE, self._on_close)
+
+<span class="cm"># Bind slider change</span>
+self.slider.Bind(wx.EVT_SLIDER, self._on_slider_change)
+
+<span class="cm"># Common event types</span>
+wx.EVT_BUTTON        <span class="cm"># Button clicked</span>
+wx.EVT_COMBOBOX      <span class="cm"># ComboBox selection</span>
+wx.EVT_TEXT          <span class="cm"># TextCtrl changed</span>
+wx.EVT_CHECKBOX      <span class="cm"># CheckBox toggled</span>
+wx.EVT_CLOSE         <span class="cm"># Window close requested</span>
+wx.EVT_SLIDER        <span class="cm"># Slider moved</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Bind a button click</code>
+        <br><span class="desc">A comment: <em>Bind a button click</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>self.start_btn.Bind(wx.EVT_BUTTON, self._on_start)</code>
+        <br><span class="desc">Event triggered when a button is clicked. Bind with: widget.Bind(wx.EVT_BUTTON, handler).</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># Bind with lambda</code>
+        <br><span class="desc">A comment: <em>Bind with lambda</em>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>self.close_btn.Bind(wx.EVT_BUTTON, lambda _: self.Close())</code>
+        <br><span class="desc">Event triggered when a button is clicked. Bind with: widget.Bind(wx.EVT_BUTTON, handler).</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># Bind combo box selection</code>
+        <br><span class="desc">A comment: <em>Bind combo box selection</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>self.tts_combo.Bind(wx.EVT_COMBOBOX, self._on_tts_changed)</code>
+        <br><span class="desc">Event triggered when a ComboBox selection changes.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># Bind window close</code>
+        <br><span class="desc">A comment: <em>Bind window close</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>self.Bind(wx.EVT_CLOSE, self._on_close)</code>
+        <br><span class="desc">Event triggered when the window close button (X) is clicked.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code># Bind slider change</code>
+        <br><span class="desc">A comment: <em>Bind slider change</em>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>self.slider.Bind(wx.EVT_SLIDER, self._on_slider_change)</code>
+        <br><span class="desc">Event triggered when a Slider value changes.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># Common event types</code>
+        <br><span class="desc">A comment: <em>Common event types</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>wx.EVT_BUTTON        # Button clicked</code>
+        <br><span class="desc">Event triggered when a button is clicked. Bind with: widget.Bind(wx.EVT_BUTTON, handler).</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>wx.EVT_COMBOBOX      # ComboBox selection</code>
+        <br><span class="desc">Event triggered when a ComboBox selection changes.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>wx.EVT_TEXT          # TextCtrl changed</code>
+        <br><span class="desc">Event triggered when text in a TextCtrl changes.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>wx.EVT_CHECKBOX      # CheckBox toggled</code>
+        <br><span class="desc">Event triggered when a CheckBox is toggled.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>wx.EVT_CLOSE         # Window close requested</code>
+        <br><span class="desc">Event triggered when the window close button (X) is clicked.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>wx.EVT_SLIDER        # Slider moved</code>
+        <br><span class="desc">Event triggered when a Slider value changes.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>30.2 Custom Events (Worker → GUI)</h2>
+
+<pre><code><span class="cm"># From gui/events.py</span>
+<span class="cm"># Step 1: Create a unique event type</span>
+_SYNTH_STATUS = wx.NewEventType()
+EVT_SYNTH_STATUS = wx.PyEventBinder(_SYNTH_STATUS, <span class="num">1</span>)
+
+<span class="cm"># Step 2: Create an event class</span>
+<span class="kw">class</span> <span class="cls">SynthStatusEvent</span>(wx.PyCommandEvent):
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, message: str):
+        <span class="kw">super</span>().__init__(_SYNTH_STATUS)
+        self.message = message
+
+<span class="cm"># Step 3: Post from worker thread</span>
+<span class="kw">def</span> <span class="fn">_on_status</span>(self, msg):
+    wx.PostEvent(self, SynthStatusEvent(msg))
+
+<span class="cm"># Step 4: Handle in GUI (main thread)</span>
+self.Bind(EVT_SYNTH_STATUS, self._handle_status)
+
+<span class="kw">def</span> <span class="fn">_handle_status</span>(self, evt: SynthStatusEvent):
+    self.status_label.SetLabel(evt.message)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From gui/events.py</code>
+        <br><span class="desc">A comment: <em>From gui/events.py</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Step 1: Create a unique event type</code>
+        <br><span class="desc">A comment: <em>Step 1: Create a unique event type</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>_SYNTH_STATUS = wx.NewEventType()</code>
+        <br><span class="desc">Assigns <code>wx.NewEventType()</code> to <code>_SYNTH_STATUS</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>EVT_SYNTH_STATUS = wx.PyEventBinder(_SYNTH_STATUS, 1)</code>
+        <br><span class="desc">Assigns <code>wx.PyEventBinder(_SYNTH_STATUS, 1)</code> to <code>EVT_SYNTH_STATUS</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># Step 2: Create an event class</code>
+        <br><span class="desc">A comment: <em>Step 2: Create an event class</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>class SynthStatusEvent(wx.PyCommandEvent):</code>
+        <br><span class="desc">Defines class <code>SynthStatusEvent</code> inheriting from <code>wx.PyCommandEvent</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>def __init__(self, message: str):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>super().__init__(_SYNTH_STATUS)</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>self.message = message</code>
+        <br><span class="desc">Stores <code>message</code> in instance attribute <code>message</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code># Step 3: Post from worker thread</code>
+        <br><span class="desc">A comment: <em>Step 3: Post from worker thread</em>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>def _on_status(self, msg):</code>
+        <br><span class="desc">Defines function <code>_on_status</code> accepting (self, msg).</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>wx.PostEvent(self, SynthStatusEvent(msg))</code>
+        <br><span class="desc">Creates a wxPython <code>wx.PostEvent</code> widget.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code># Step 4: Handle in GUI (main thread)</code>
+        <br><span class="desc">A comment: <em>Step 4: Handle in GUI (main thread)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>self.Bind(EVT_SYNTH_STATUS, self._handle_status)</code>
+        <br><span class="desc">Registers an event handler on the frame/window itself. Used for frame-level events.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>def _handle_status(self, evt: SynthStatusEvent):</code>
+        <br><span class="desc">Defines function <code>_handle_status</code> accepting (self, evt).</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>self.status_label.SetLabel(evt.message)</code>
+        <br><span class="desc"><code>self.status_label.SetLabel(evt.message)</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>Complete Event System in AIVS</h3>
+
+<table>
+  <thead><tr><th>Event</th><th>Purpose</th><th>Posted From</th></tr></thead>
+  <tbody>
+    <tr><td><code>SynthStatusEvent</code></td><td>Status update message</td><td>SynthesisWorker</td></tr>
+    <tr><td><code>SynthSegmentDoneEvent</code></td><td>Segment recording complete</td><td>SynthesisWorker</td></tr>
+    <tr><td><code>SynthFinishedEvent</code></td><td>All recording done</td><td>SynthesisWorker</td></tr>
+    <tr><td><code>SynthErrorEvent</code></td><td>Recording error</td><td>SynthesisWorker</td></tr>
+    <tr><td><code>DownloadProgressEvent</code></td><td>Download progress update</td><td>Download thread</td></tr>
+    <tr><td><code>DownloadFinishedEvent</code></td><td>Download complete/failed</td><td>Download thread</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h2>30.3 Event Propagation</h2>
+
+<pre><code><span class="cm"># Events propagate up the widget hierarchy</span>
+<span class="cm"># Use evt.Skip() to let parent handle the event too</span>
+
+<span class="kw">def</span> <span class="fn">_on_close</span>(self, evt):
+    <span class="kw">if</span> self._worker <span class="kw">and</span> self._worker.is_alive():
+        answer = wx.MessageBox(
+            <span class="str">"Recording is running. Stop and close?"</span>,
+            <span class="str">"Close"</span>,
+            style=wx.YES_NO | wx.ICON_QUESTION,
+        )
+        <span class="kw">if</span> answer != wx.YES:
+            <span class="kw">return</span>  <span class="cm"># Don't close — consume the event</span>
+        self._worker.cancel()
+    self._save_tts_to_project()
+    self.EndModal(wx.ID_CLOSE)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Events propagate up the widget hierarchy</code>
+        <br><span class="desc">A comment: <em>Events propagate up the widget hierarchy</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Use evt.Skip() to let parent handle the event too</code>
+        <br><span class="desc">A comment: <em>Use evt.Skip() to let parent handle the event too</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>def _on_close(self, evt):</code>
+        <br><span class="desc">Defines function <code>_on_close</code> accepting (self, evt).</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>if self._worker and self._worker.is_alive():</code>
+        <br><span class="desc">Checks condition: <code>self._worker and self._worker.is_alive()</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>answer = wx.MessageBox(</code>
+        <br><span class="desc">Assigns <code>wx.MessageBox(</code> to <code>answer</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>&quot;Recording is running. Stop and close?&quot;,</code>
+        <br><span class="desc"><code>&quot;Recording is running. Stop and close?&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>&quot;Close&quot;,</code>
+        <br><span class="desc"><code>&quot;Close&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>style=wx.YES_NO | wx.ICON_QUESTION,</code>
+        <br><span class="desc">Assigns <code>wx.YES_NO | wx.ICON_QUESTION,</code> to <code>style</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>if answer != wx.YES:</code>
+        <br><span class="desc">Checks condition: <code>answer != wx.YES</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>return  # Don&#x27;t close — consume the event</code>
+        <br><span class="desc">Returns <code># Don&#x27;t close — consume the event</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>self._worker.cancel()</code>
+        <br><span class="desc"><code>self._worker.cancel()</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>self._save_tts_to_project()</code>
+        <br><span class="desc">Calls <code>self._save_tts_to_project()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>self.EndModal(wx.ID_CLOSE)</code>
+        <br><span class="desc">Standard ID for Close button.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>30.4 Key Takeaways</h2>
+<ul>
+  <li><strong>Bind()</strong> connects events to handler methods</li>
+  <li><strong>wx.PostEvent()</strong> is the only safe way to send events from worker threads</li>
+  <li>Custom events use <strong>NewEventType()</strong> + <strong>PyEventBinder()</strong></li>
+  <li>AIVS has <strong>6 custom event types</strong> for synthesis and download communication</li>
+  <li><strong>evt.Skip()</strong> allows event propagation to parent widgets</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch29_controls.html">← Ch 29</a> &nbsp;|&nbsp; <a href="ch31_dialogs.html">Ch 31 — Dialogs →</a></p>
+</div></div></body>
+</html>

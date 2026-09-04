@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 35: Theming &amp; Styling - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part IV</div><ul class="chapters"><li><a href="ch27_wxpython_intro.html">Ch 27</a></li><li><a href="ch28_sizers_layout.html">Ch 28</a></li><li><a href="ch29_controls.html">Ch 29</a></li><li><a href="ch30_events.html">Ch 30</a></li><li><a href="ch31_dialogs.html">Ch 31</a></li><li><a href="ch32_custom_drawing.html">Ch 32</a></li><li><a href="ch33_threading_gui.html">Ch 33</a></li><li><a href="ch34_accessibility.html">Ch 34</a></li><li><a href="ch35_themes.html" class="active">Ch 35: Theming</a></li><li><a href="ch36_wx_adv.html">Ch 36</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 35</div>
+<h1>Theming &amp; Styling</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Implement Light/Dark/System theme support</li>
+  <li>Apply colors to wxPython widgets</li>
+  <li>See the AIVS theme manager</li>
+</ul>
+
+<hr>
+
+<h2>35.1 Theme Manager in AIVS</h2>
+
+<pre><code><span class="cm"># From gui/theme.py</span>
+_LIGHT = {<span class="str">"bg"</span>: <span class="str">"#ffffff"</span>, <span class="str">"fg"</span>: <span class="str">"#1a1a1a"</span>,
+          <span class="str">"control_bg"</span>: <span class="str">"#ffffff"</span>, <span class="str">"control_fg"</span>: <span class="str">"#1a1a1a"</span>}
+_DARK = {<span class="str">"bg"</span>: <span class="str">"#1e1e1e"</span>, <span class="str">"fg"</span>: <span class="str">"#e8e8e8"</span>,
+         <span class="str">"control_bg"</span>: <span class="str">"#2d2d2d"</span>, <span class="str">"control_fg"</span>: <span class="str">"#e8e8e8"</span>}
+
+_state = {<span class="str">"theme"</span>: THEME_SYSTEM, <span class="str">"colors"</span>: _LIGHT}
+_lock = threading.Lock()
+
+<span class="kw">def</span> <span class="fn">apply_theme</span>(top: wx.Window, theme: str) -> <span class="kw">None</span>:
+    <span class="str">"""Apply theme to window and all descendants."""</span>
+    resolved = _resolve(theme)
+    colors = _DARK <span class="kw">if</span> resolved == THEME_DARK <span class="kw">else</span> _LIGHT
+    <span class="kw">with</span> _lock:
+        _state[<span class="str">"theme"</span>] = theme
+        _state[<span class="str">"colors"</span>] = colors
+    _paint(top, colors)
+    <span class="kw">for</span> child <span class="kw">in</span> _descendants(top):
+        _paint(child, colors)
+    top.Refresh()
+
+<span class="kw">def</span> <span class="fn">_resolve</span>(theme: str) -> str:
+    <span class="str">"""Resolve 'system' to light or dark based on OS."""</span>
+    <span class="kw">if</span> theme == THEME_SYSTEM:
+        <span class="kw">try</span>:
+            appearance = wx.SystemSettings.GetAppearance()
+            <span class="kw">return</span> THEME_DARK <span class="kw">if</span> appearance.IsDark() <span class="kw">else</span> THEME_LIGHT
+        <span class="kw">except</span> Exception:
+            <span class="kw">return</span> THEME_LIGHT
+    <span class="kw">return</span> theme</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From gui/theme.py</code>
+        <br><span class="desc">A comment: <em>From gui/theme.py</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>_LIGHT = {&quot;bg&quot;: &quot;#ffffff&quot;, &quot;fg&quot;: &quot;#1a1a1a&quot;,</code>
+        <br><span class="desc">Assigns <code>{&quot;bg&quot;: &quot;#ffffff&quot;, &quot;fg&quot;: &quot;#1a1a1a&quot;,</code> to <code>_LIGHT</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;control_bg&quot;: &quot;#ffffff&quot;, &quot;control_fg&quot;: &quot;#1a1a1a&quot;}</code>
+        <br><span class="desc"><code>&quot;control_bg&quot;: &quot;#ffffff&quot;, &quot;control_fg&quot;: &quot;#1a1a1a&quot;}</code></span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>_DARK = {&quot;bg&quot;: &quot;#1e1e1e&quot;, &quot;fg&quot;: &quot;#e8e8e8&quot;,</code>
+        <br><span class="desc">Assigns <code>{&quot;bg&quot;: &quot;#1e1e1e&quot;, &quot;fg&quot;: &quot;#e8e8e8&quot;,</code> to <code>_DARK</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>&quot;control_bg&quot;: &quot;#2d2d2d&quot;, &quot;control_fg&quot;: &quot;#e8e8e8&quot;}</code>
+        <br><span class="desc"><code>&quot;control_bg&quot;: &quot;#2d2d2d&quot;, &quot;control_fg&quot;: &quot;#e8e8e8&quot;}</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>_state = {&quot;theme&quot;: THEME_SYSTEM, &quot;colors&quot;: _LIGHT}</code>
+        <br><span class="desc">Assigns <code>{&quot;theme&quot;: THEME_SYSTEM, &quot;colors&quot;: _LIGHT}</code> to <code>_state</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>_lock = threading.Lock()</code>
+        <br><span class="desc">A mutual exclusion lock. Only one thread can hold it at a time. Prevents race conditions.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>def apply_theme(top: wx.Window, theme: str) -&gt; None:</code>
+        <br><span class="desc">Defines function <code>apply_theme</code> accepting (top, theme), returning <code>None</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>&quot;&quot;&quot;Apply theme to window and all descendants.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Apply theme to window and all descendants.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>resolved = _resolve(theme)</code>
+        <br><span class="desc">Assigns <code>_resolve(theme)</code> to <code>resolved</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>colors = _DARK if resolved == THEME_DARK else _LIGHT</code>
+        <br><span class="desc">Assigns <code>_DARK if resolved == THEME_DARK else _LIGHT</code> to <code>colors</code>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>with _lock:</code>
+        <br><span class="desc">Context manager: <code>_lock</code>. Automatically manages resource cleanup.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>_state[&quot;theme&quot;] = theme</code>
+        <br><span class="desc"><code>_state[&quot;theme&quot;] = theme</code></span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>_state[&quot;colors&quot;] = colors</code>
+        <br><span class="desc"><code>_state[&quot;colors&quot;] = colors</code></span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>_paint(top, colors)</code>
+        <br><span class="desc">Converts a value to an integer. Truncates floats toward zero. Raises ValueError for invalid strings.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>for child in _descendants(top):</code>
+        <br><span class="desc">Iterates over <code>_descendants(top)</code>, assigning each element to <code>child</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>_paint(child, colors)</code>
+        <br><span class="desc">Converts a value to an integer. Truncates floats toward zero. Raises ValueError for invalid strings.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>top.Refresh()</code>
+        <br><span class="desc"><code>top.Refresh()</code></span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>def _resolve(theme: str) -&gt; str:</code>
+        <br><span class="desc">Defines function <code>_resolve</code> accepting (theme), returning <code>str</code>.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>&quot;&quot;&quot;Resolve &#x27;system&#x27; to light or dark based on OS.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Resolve &#x27;system&#x27; to light or dark based on OS.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>if theme == THEME_SYSTEM:</code>
+        <br><span class="desc">Checks condition: <code>theme == THEME_SYSTEM</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>try:</code>
+        <br><span class="desc">Begins exception handling. Code in this block is monitored for errors.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>appearance = wx.SystemSettings.GetAppearance()</code>
+        <br><span class="desc">Assigns <code>wx.SystemSettings.GetAppearance()</code> to <code>appearance</code>.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>return THEME_DARK if appearance.IsDark() else THEME_LIGHT</code>
+        <br><span class="desc">Returns <code>THEME_DARK if appearance.IsDark() else THEME_LIGHT</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>except Exception:</code>
+        <br><span class="desc">Catches all exceptions that inherit from Exception. Use as a last resort.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>return THEME_LIGHT</code>
+        <br><span class="desc">Returns <code>THEME_LIGHT</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>return theme</code>
+        <br><span class="desc">Returns <code>theme</code> to the caller.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>35.2 Applying Colors to Widgets</h2>
+
+<pre><code><span class="kw">def</span> <span class="fn">_paint</span>(window: wx.Window, colors: dict) -> <span class="kw">None</span>:
+    <span class="kw">try</span>:
+        <span class="cm"># Containers get background color</span>
+        <span class="kw">if</span> isinstance(window, (wx.Panel, wx.Dialog, wx.Frame, wx.ScrolledWindow)):
+            window.SetBackgroundColour(colors[<span class="str">"bg"</span>])
+
+        <span class="cm"># Text labels get foreground color</span>
+        <span class="kw">elif</span> isinstance(window, (wx.StaticText, wx.CheckBox, wx.RadioButton)):
+            window.SetForegroundColour(colors[<span class="str">"fg"</span>])
+
+        <span class="cm"># Input controls get both</span>
+        <span class="kw">elif</span> isinstance(window, (wx.TextCtrl, wx.ComboBox, wx.ListBox)):
+            window.SetBackgroundColour(colors[<span class="str">"control_bg"</span>])
+            window.SetForegroundColour(colors[<span class="str">"control_fg"</span>])
+    <span class="kw">except</span> Exception:
+        <span class="kw">pass</span>  <span class="cm"># Some widgets don't support color changes</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>def _paint(window: wx.Window, colors: dict) -&gt; None:</code>
+        <br><span class="desc">Converts a value to an integer. Truncates floats toward zero. Raises ValueError for invalid strings.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>try:</code>
+        <br><span class="desc">Begins exception handling. Code in this block is monitored for errors.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># Containers get background color</code>
+        <br><span class="desc">A comment: <em>Containers get background color</em>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>if isinstance(window, (wx.Panel, wx.Dialog, wx.Frame, wx.ScrolledWindow)):</code>
+        <br><span class="desc">Checks if an object is an instance of a class. Preferred over type() for type checking.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>window.SetBackgroundColour(colors[&quot;bg&quot;])</code>
+        <br><span class="desc"><code>window.SetBackgroundColour(colors[&quot;bg&quot;])</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># Text labels get foreground color</code>
+        <br><span class="desc">A comment: <em>Text labels get foreground color</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>elif isinstance(window, (wx.StaticText, wx.CheckBox, wx.RadioButton)):</code>
+        <br><span class="desc">A non-editable text label widget. The primary way to display text information in wxPython.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>window.SetForegroundColour(colors[&quot;fg&quot;])</code>
+        <br><span class="desc"><code>window.SetForegroundColour(colors[&quot;fg&quot;])</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code># Input controls get both</code>
+        <br><span class="desc">A comment: <em>Input controls get both</em>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>elif isinstance(window, (wx.TextCtrl, wx.ComboBox, wx.ListBox)):</code>
+        <br><span class="desc">Checks if an object is an instance of a class. Preferred over type() for type checking.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>window.SetBackgroundColour(colors[&quot;control_bg&quot;])</code>
+        <br><span class="desc"><code>window.SetBackgroundColour(colors[&quot;control_bg&quot;])</code></span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>window.SetForegroundColour(colors[&quot;control_fg&quot;])</code>
+        <br><span class="desc"><code>window.SetForegroundColour(colors[&quot;control_fg&quot;])</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>except Exception:</code>
+        <br><span class="desc">Catches all exceptions that inherit from Exception. Use as a last resort.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>pass  # Some widgets don&#x27;t support color changes</code>
+        <br><span class="desc"><code>pass  # Some widgets don&#x27;t support color changes</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>35.3 Key Takeaways</h2>
+<ul>
+  <li><strong>Three themes:</strong> Light, Dark, System (auto-detect OS preference)</li>
+  <li><strong>wx.SystemSettings.GetAppearance()</strong> detects dark mode on Windows 10/11</li>
+  <li>Colors are applied by <strong>walking the widget tree</strong> and setting background/foreground</li>
+  <li><strong>Buttons keep native look</strong> — only panels, text, and inputs are themed</li>
+  <li>Theme state is stored in a <strong>thread-safe dict</strong> with locking</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch34_accessibility.html">← Ch 34</a> &nbsp;|&nbsp; <a href="ch36_wx_adv.html">Ch 36 — wx.adv →</a></p>
+</div></div></body>
+</html>

@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 37: NumPy for Audio Processing - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part V — Dependencies</div><ul class="chapters"><li><a href="ch37_numpy.html" class="active">Ch 37: NumPy</a></li><li><a href="ch38_requests.html">Ch 38</a></li><li><a href="ch39_sherpa_onnx.html">Ch 39</a></li><li><a href="ch40_pypdf_docx.html">Ch 40</a></li><li><a href="ch41_ffmpeg.html">Ch 41</a></li><li><a href="ch42_virtualenvs.html">Ch 42</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="part-divider">
+  <div class="part-number">Part V</div>
+  <h2>Dependencies Deep Dive</h2>
+</div>
+
+<div class="chapter-number">Chapter 37</div>
+<h1>NumPy for Audio Processing</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand NumPy arrays and their role in audio</li>
+  <li>Perform audio operations: pitch shifting, volume, format conversion</li>
+  <li>See NumPy usage throughout AIVS</li>
+</ul>
+
+<hr>
+
+<h2>37.1 NumPy Arrays — The Audio Building Block</h2>
+
+<pre><code><span class="kw">import</span> numpy <span class="kw">as</span> np
+
+<span class="cm"># Create arrays from lists</span>
+samples = np.array([<span class="num">0</span>, <span class="num">1000</span>, <span class="num">-1000</span>, <span class="num">2000</span>, <span class="num">-2000</span>], dtype=np.int16)
+
+<span class="cm"># Audio properties</span>
+sample_rate = <span class="num">24000</span>  <span class="cm"># Hz (24 kHz for TTS output)</span>
+duration = len(samples) / sample_rate
+<span class="kw">print</span>(<span class="str">f"Duration: </span>{duration:<span class="num">.3f</span>}<span class="str">s"</span>)
+
+<span class="cm"># Create synthetic audio (sine wave)</span>
+t = np.linspace(<span class="num">0</span>, <span class="num">1.0</span>, sample_rate)  <span class="cm"># 1 second of samples</span>
+freq = <span class="num">440</span>  <span class="cm"># A4 note</span>
+wave = np.sin(<span class="num">2</span> * np.pi * freq * t)
+samples_16bit = (wave * <span class="num">32767</span>).astype(np.int16)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>import numpy as np</code>
+        <br><span class="desc">Imports a module.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Create arrays from lists</code>
+        <br><span class="desc">A comment: <em>Create arrays from lists</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>samples = np.array([0, 1000, -1000, 2000, -2000], dtype=np.int16)</code>
+        <br><span class="desc">Creates a NumPy array from a list or tuple. The dtype parameter specifies the data type (e.g., np.int16 for 16-bit audio samples).</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># Audio properties</code>
+        <br><span class="desc">A comment: <em>Audio properties</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>sample_rate = 24000  # Hz (24 kHz for TTS output)</code>
+        <br><span class="desc">For loop iteration.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>duration = len(samples) / sample_rate</code>
+        <br><span class="desc">Returns the number of items in a sequence (string, list, dict, tuple).</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>print(f&quot;Duration: {duration:.3f}s&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># Create synthetic audio (sine wave)</code>
+        <br><span class="desc">A comment: <em>Create synthetic audio (sine wave)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>t = np.linspace(0, 1.0, sample_rate)  # 1 second of samples</code>
+        <br><span class="desc">Creates an array with evenly spaced values between start and stop. num specifies the count.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>freq = 440  # A4 note</code>
+        <br><span class="desc">Assigns <code>440  # A4 note</code> to <code>freq</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>wave = np.sin(2 * np.pi * freq * t)</code>
+        <br><span class="desc">Element-wise sine function. Used for generating audio waveforms.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>samples_16bit = (wave * 32767).astype(np.int16)</code>
+        <br><span class="desc">16-bit integer type. The standard format for audio samples in TTS output.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>37.2 Audio Operations in AIVS</h2>
+
+<pre><code><span class="cm"># From tts/engine.py — pitch shifting</span>
+<span class="kw">def</span> <span class="fn">_shift_pitch</span>(samples: np.ndarray, pitch: float) -> np.ndarray:
+    <span class="str">"""Shift pitch without changing duration (resample)."""</span>
+    <span class="kw">if</span> pitch == <span class="num">1.0</span>:
+        <span class="kw">return</span> samples
+    <span class="cm"># Resample to change pitch</span>
+    new_length = int(len(samples) / pitch)
+    indices = np.linspace(<span class="num">0</span>, len(samples) - <span class="num">1</span>, new_length)
+    shifted = np.interp(indices, np.arange(len(samples)), samples.astype(np.float64))
+    <span class="kw">return</span> shifted.astype(np.int16)
+
+<span class="cm"># From tts/engine.py — volume adjustment</span>
+<span class="kw">def</span> <span class="fn">_apply_volume</span>(samples: np.ndarray, volume: float) -> np.ndarray:
+    <span class="str">"""Scale audio samples by volume factor."""</span>
+    <span class="kw">if</span> volume == <span class="num">1.0</span>:
+        <span class="kw">return</span> samples
+    scaled = samples.astype(np.float64) * volume
+    <span class="kw">return</span> np.clip(scaled, -<span class="num">32768</span>, <span class="num">32767</span>).astype(np.int16)
+
+<span class="cm"># From clone/worker.py — base64 encode/decode for IPC</span>
+<span class="cm"># Worker → App: encode audio as base64</span>
+samples_int16 = np.clip(arr, -<span class="num">1.0</span>, <span class="num">1.0</span>) * <span class="num">32767.0</span>
+wav_b64 = base64.b64encode(samples_int16.astype(np.int16).tobytes()).decode(<span class="str">"ascii"</span>)
+
+<span class="cm"># App → decode from base64</span>
+raw = base64.b64decode(resp[<span class="str">"wav"</span>])
+samples = np.frombuffer(raw, dtype=np.int16).copy()</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From tts/engine.py — pitch shifting</code>
+        <br><span class="desc">A comment: <em>From tts/engine.py — pitch shifting</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def _shift_pitch(samples: np.ndarray, pitch: float) -&gt; np.ndarray:</code>
+        <br><span class="desc">Defines a function.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;&quot;&quot;Shift pitch without changing duration (resample).&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Shift pitch without changing duration (resample).</em>. Documents the following code.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>if pitch == 1.0:</code>
+        <br><span class="desc">Conditional check.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>return samples</code>
+        <br><span class="desc">Returns a value from a function.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># Resample to change pitch</code>
+        <br><span class="desc">A comment: <em>Resample to change pitch</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>new_length = int(len(samples) / pitch)</code>
+        <br><span class="desc">Returns the number of items in a sequence (string, list, dict, tuple).</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>indices = np.linspace(0, len(samples) - 1, new_length)</code>
+        <br><span class="desc">Creates an array with evenly spaced values between start and stop. num specifies the count.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>shifted = np.interp(indices, np.arange(len(samples)), samples.astype(np.float64))</code>
+        <br><span class="desc">Creates an array with values from start to stop (exclusive) with a given step.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>return shifted.astype(np.int16)</code>
+        <br><span class="desc">16-bit integer type. The standard format for audio samples in TTS output.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># From tts/engine.py — volume adjustment</code>
+        <br><span class="desc">A comment: <em>From tts/engine.py — volume adjustment</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>def _apply_volume(samples: np.ndarray, volume: float) -&gt; np.ndarray:</code>
+        <br><span class="desc">Defines a function.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>&quot;&quot;&quot;Scale audio samples by volume factor.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Scale audio samples by volume factor.</em>. Documents the following code.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>if volume == 1.0:</code>
+        <br><span class="desc">Conditional check.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>return samples</code>
+        <br><span class="desc">Returns a value from a function.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>scaled = samples.astype(np.float64) * volume</code>
+        <br><span class="desc">64-bit floating point (double precision). Default float type in NumPy.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>return np.clip(scaled, -32768, 32767).astype(np.int16)</code>
+        <br><span class="desc">16-bit integer type. The standard format for audio samples in TTS output.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code># From clone/worker.py — base64 encode/decode for IPC</code>
+        <br><span class="desc">A comment: <em>From clone/worker.py — base64 encode/decode for IPC</em>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code># Worker → App: encode audio as base64</code>
+        <br><span class="desc">A comment: <em>Worker → App: encode audio as base64</em>.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>samples_int16 = np.clip(arr, -1.0, 1.0) * 32767.0</code>
+        <br><span class="desc">Clips array values to a range [min, max]. Essential for preventing audio clipping.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>wav_b64 = base64.b64encode(samples_int16.astype(np.int16).tobytes()).decode(&quot;ascii&quot;)</code>
+        <br><span class="desc">16-bit integer type. The standard format for audio samples in TTS output.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code># App → decode from base64</code>
+        <br><span class="desc">A comment: <em>App → decode from base64</em>.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>raw = base64.b64decode(resp[&quot;wav&quot;])</code>
+        <br><span class="desc">Assigns <code>base64.b64decode(resp[&quot;wav&quot;])</code> to <code>raw</code>.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>samples = np.frombuffer(raw, dtype=np.int16).copy()</code>
+        <br><span class="desc">Creates an array from a binary buffer. Used for decoding raw audio data.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>37.3 WAV File Writing</h2>
+
+<pre><code><span class="kw">import</span> wave
+
+<span class="kw">def</span> <span class="fn">write_wav</span>(path: str, samples: np.ndarray, sample_rate: int = <span class="num">24000</span>):
+    <span class="str">"""Write int16 samples to a WAV file."""</span>
+    <span class="kw">with</span> wave.open(path, <span class="str">"wb"</span>) <span class="kw">as</span> wf:
+        wf.setnchannels(<span class="num">1</span>)       <span class="cm"># Mono</span>
+        wf.setsampwidth(<span class="num">2</span>)       <span class="cm"># 16-bit = 2 bytes</span>
+        wf.setframerate(sample_rate)
+        wf.writeframes(samples.tobytes())</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>import wave</code>
+        <br><span class="desc">Imports a module.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def write_wav(path: str, samples: np.ndarray, sample_rate: int = 24000):</code>
+        <br><span class="desc">Defines a function.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;&quot;&quot;Write int16 samples to a WAV file.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Write int16 samples to a WAV file.</em>. Documents the following code.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>with wave.open(path, &quot;wb&quot;) as wf:</code>
+        <br><span class="desc">Opens a file and returns a file object.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>wf.setnchannels(1)       # Mono</code>
+        <br><span class="desc"><code>wf.setnchannels(1)       # Mono</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>wf.setsampwidth(2)       # 16-bit = 2 bytes</code>
+        <br><span class="desc"><code>wf.setsampwidth(2)       # 16-bit = 2 bytes</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>wf.setframerate(sample_rate)</code>
+        <br><span class="desc"><code>wf.setframerate(sample_rate)</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>wf.writeframes(samples.tobytes())</code>
+        <br><span class="desc"><code>wf.writeframes(samples.tobytes())</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>37.4 Key Takeaways</h2>
+<ul>
+  <li><strong>NumPy int16 arrays</strong> are the universal audio format in AIVS</li>
+  <li><strong>24 kHz sample rate</strong> is the standard for TTS output</li>
+  <li><strong>Base64 encoding</strong> is used to pass audio between subprocesses</li>
+  <li><strong>np.clip()</strong> prevents audio clipping (values outside -32768..32767)</li>
+  <li><strong>np.interp()</strong> is used for pitch shifting (resampling)</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch36_wx_adv.html">← Ch 36</a> &nbsp;|&nbsp; <a href="ch38_requests.html">Ch 38 — Requests →</a></p>
+</div></div></body>
+</html>

@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 32: Custom Drawing &amp; DC - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part IV</div><ul class="chapters"><li><a href="ch27_wxpython_intro.html">Ch 27</a></li><li><a href="ch28_sizers_layout.html">Ch 28</a></li><li><a href="ch29_controls.html">Ch 29</a></li><li><a href="ch30_events.html">Ch 30</a></li><li><a href="ch31_dialogs.html">Ch 31</a></li><li><a href="ch32_custom_drawing.html" class="active">Ch 32: Drawing</a></li><li><a href="ch33_threading_gui.html">Ch 33</a></li><li><a href="ch34_accessibility.html">Ch 34</a></li><li><a href="ch35_themes.html">Ch 35</a></li><li><a href="ch36_wx_adv.html">Ch 36</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 32</div>
+<h1>Custom Drawing &amp; Device Context</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand wxPython's Device Context (DC) drawing model</li>
+  <li>Create custom-painted widgets</li>
+  <li>See how AIVS themes and custom controls work</li>
+</ul>
+
+<hr>
+
+<h2>32.1 Device Context (DC) Basics</h2>
+
+<pre><code><span class="kw">import</span> wx
+
+<span class="kw">class</span> <span class="cls">WaveformPanel</span>(wx.Panel):
+    <span class="str">"""Custom panel that draws an audio waveform."""</span>
+
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, parent):
+        <span class="kw">super</span>().__init__(parent)
+        self._samples = []
+        self.Bind(wx.EVT_PAINT, self._on_paint)
+
+    <span class="kw">def</span> <span class="fn">set_samples</span>(self, samples):
+        self._samples = samples
+        self.Refresh()  <span class="cm"># Trigger repaint</span>
+
+    <span class="kw">def</span> <span class="fn">_on_paint</span>(self, event):
+        dc = wx.PaintDC(self)
+        width, height = self.GetSize()
+
+        <span class="cm"># Clear background</span>
+        dc.SetBackground(wx.Brush(wx.WHITE))
+        dc.Clear()
+
+        <span class="kw">if not</span> self._samples:
+            <span class="kw">return</span>
+
+        <span class="cm"># Draw waveform</span>
+        dc.SetPen(wx.Pen(wx.BLUE, <span class="num">1</span>))
+        mid = height // <span class="num">2</span>
+        step = max(<span class="num">1</span>, len(self._samples) // width)
+
+        <span class="kw">for</span> x <span class="kw">in</span> range(width):
+            idx = int(x * len(self._samples) / width)
+            sample = self._samples[idx] / <span class="num">32768.0</span>
+            y = int(mid - sample * mid * <span class="num">0.9</span>)
+            dc.DrawPoint(x, y)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>import wx</code>
+        <br><span class="desc">Imports the <code>wx</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>class WaveformPanel(wx.Panel):</code>
+        <br><span class="desc">A container that sits inside a Frame. Groups controls and provides a background for drawing.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;&quot;&quot;Custom panel that draws an audio waveform.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Custom panel that draws an audio waveform.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>def __init__(self, parent):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>super().__init__(parent)</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>self._samples = []</code>
+        <br><span class="desc">Stores <code>[]</code> in instance attribute <code>_samples</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>self.Bind(wx.EVT_PAINT, self._on_paint)</code>
+        <br><span class="desc">Event triggered when the window needs repainting.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>def set_samples(self, samples):</code>
+        <br><span class="desc">Defines function <code>set_samples</code> accepting (self, samples).</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>self._samples = samples</code>
+        <br><span class="desc">Stores <code>samples</code> in instance attribute <code>_samples</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>self.Refresh()  # Trigger repaint</code>
+        <br><span class="desc">Calls <code>self.Refresh()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>def _on_paint(self, event):</code>
+        <br><span class="desc">Converts a value to an integer. Truncates floats toward zero. Raises ValueError for invalid strings.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>dc = wx.PaintDC(self)</code>
+        <br><span class="desc">A DC for handling EVT_PAINT events. Auto-finishes painting when the context is destroyed.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>width, height = self.GetSize()</code>
+        <br><span class="desc"><code>width, height = self.GetSize()</code></span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code># Clear background</code>
+        <br><span class="desc">A comment: <em>Clear background</em>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>dc.SetBackground(wx.Brush(wx.WHITE))</code>
+        <br><span class="desc">Rounds a number to the given number of decimal places. Uses banker's rounding (round half to even).</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>dc.Clear()</code>
+        <br><span class="desc"><code>dc.Clear()</code></span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>if not self._samples:</code>
+        <br><span class="desc">Checks condition: <code>not self._samples</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>return</code>
+        <br><span class="desc">Returns <code>None</code> implicitly (exits the function).</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code># Draw waveform</code>
+        <br><span class="desc">A comment: <em>Draw waveform</em>.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>dc.SetPen(wx.Pen(wx.BLUE, 1))</code>
+        <br><span class="desc"><code>dc.SetPen(wx.Pen(wx.BLUE, 1))</code></span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>mid = height // 2</code>
+        <br><span class="desc">Assigns <code>height // 2</code> to <code>mid</code>.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>step = max(1, len(self._samples) // width)</code>
+        <br><span class="desc">Returns the number of items in a sequence (string, list, dict, tuple). Essential for loop bounds and validation.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>for x in range(width):</code>
+        <br><span class="desc">Generates a sequence of integers. Commonly used in for loops.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>idx = int(x * len(self._samples) / width)</code>
+        <br><span class="desc">Returns the number of items in a sequence (string, list, dict, tuple). Essential for loop bounds and validation.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>sample = self._samples[idx] / 32768.0</code>
+        <br><span class="desc">Assigns <code>self._samples[idx] / 32768.0</code> to <code>sample</code>.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>y = int(mid - sample * mid * 0.9)</code>
+        <br><span class="desc">Converts a value to an integer. Truncates floats toward zero. Raises ValueError for invalid strings.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>dc.DrawPoint(x, y)</code>
+        <br><span class="desc">Converts a value to an integer. Truncates floats toward zero. Raises ValueError for invalid strings.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>32.2 Common DC Operations</h2>
+
+<pre><code><span class="cm"># Drawing primitives</span>
+dc.DrawLine(x1, y1, x2, y2)          <span class="cm"># Line</span>
+dc.DrawRectangle(x, y, w, h)         <span class="cm"># Rectangle</span>
+dc.DrawCircle(cx, cy, radius)        <span class="cm"># Circle</span>
+dc.DrawEllipse(x, y, w, h)           <span class="cm"># Ellipse</span>
+dc.DrawText(<span class="str">"Hello"</span>, x, y)           <span class="cm"># Text</span>
+
+<span class="cm"># Pen (outlines) and Brush (fills)</span>
+dc.SetPen(wx.Pen(wx.RED, <span class="num">2</span>))         <span class="cm"># 2px red outline</span>
+dc.SetBrush(wx.Brush(wx.BLUE))        <span class="cm"># Blue fill</span>
+
+<span class="cm"># Font</span>
+dc.SetFont(wx.Font(<span class="num">12</span>, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
+dc.SetTextForeground(wx.BLACK)
+
+<span class="cm"># Buffered DC (flicker-free drawing)</span>
+<span class="kw">def</span> <span class="fn">_on_paint</span>(self, event):
+    dc = wx.PaintDC(self)
+    buf_dc = wx.BufferedDC(dc)  <span class="cm"># Double-buffered</span>
+    <span class="cm"># Draw on buf_dc...</span>
+    <span class="cm"># Automatically blits to screen when done</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Drawing primitives</code>
+        <br><span class="desc">A comment: <em>Drawing primitives</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>dc.DrawLine(x1, y1, x2, y2)          # Line</code>
+        <br><span class="desc"><code>dc.DrawLine(x1, y1, x2, y2)          # Line</code></span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>dc.DrawRectangle(x, y, w, h)         # Rectangle</code>
+        <br><span class="desc"><code>dc.DrawRectangle(x, y, w, h)         # Rectangle</code></span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>dc.DrawCircle(cx, cy, radius)        # Circle</code>
+        <br><span class="desc"><code>dc.DrawCircle(cx, cy, radius)        # Circle</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>dc.DrawEllipse(x, y, w, h)           # Ellipse</code>
+        <br><span class="desc"><code>dc.DrawEllipse(x, y, w, h)           # Ellipse</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>dc.DrawText(&quot;Hello&quot;, x, y)           # Text</code>
+        <br><span class="desc"><code>dc.DrawText(&quot;Hello&quot;, x, y)           # Text</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># Pen (outlines) and Brush (fills)</code>
+        <br><span class="desc">A comment: <em>Pen (outlines) and Brush (fills)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>dc.SetPen(wx.Pen(wx.RED, 2))         # 2px red outline</code>
+        <br><span class="desc"><code>dc.SetPen(wx.Pen(wx.RED, 2))         # 2px red outline</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>dc.SetBrush(wx.Brush(wx.BLUE))        # Blue fill</code>
+        <br><span class="desc"><code>dc.SetBrush(wx.Brush(wx.BLUE))        # Blue fill</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code># Font</code>
+        <br><span class="desc">A comment: <em>Font</em>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>dc.SetFont(wx.Font(12, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))</code>
+        <br><span class="desc">Represents a font face, size, and style. Used for consistent typography.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>dc.SetTextForeground(wx.BLACK)</code>
+        <br><span class="desc">Rounds a number to the given number of decimal places. Uses banker's rounding (round half to even).</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code># Buffered DC (flicker-free drawing)</code>
+        <br><span class="desc">A comment: <em>Buffered DC (flicker-free drawing)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>def _on_paint(self, event):</code>
+        <br><span class="desc">Converts a value to an integer. Truncates floats toward zero. Raises ValueError for invalid strings.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>dc = wx.PaintDC(self)</code>
+        <br><span class="desc">A DC for handling EVT_PAINT events. Auto-finishes painting when the context is destroyed.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>buf_dc = wx.BufferedDC(dc)  # Double-buffered</code>
+        <br><span class="desc">A DC that buffers drawing operations to prevent flicker.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code># Draw on buf_dc...</code>
+        <br><span class="desc">A comment: <em>Draw on buf_dc...</em>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code># Automatically blits to screen when done</code>
+        <br><span class="desc">A comment: <em>Automatically blits to screen when done</em>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>32.3 Themed Drawing in AIVS</h2>
+
+<pre><code><span class="cm"># From gui/theme.py — applying colors to controls</span>
+<span class="kw">def</span> <span class="fn">_paint</span>(window: wx.Window, colors: dict) -> None:
+    <span class="str">"""Apply theme colors to a control."""</span>
+    <span class="kw">try</span>:
+        <span class="kw">if</span> isinstance(window, (wx.Panel, wx.Dialog, wx.Frame)):
+            window.SetBackgroundColour(colors[<span class="str">"bg"</span>])
+        <span class="kw">elif</span> isinstance(window, (wx.StaticText, wx.CheckBox)):
+            window.SetForegroundColour(colors[<span class="str">"fg"</span>])
+        <span class="kw">elif</span> isinstance(window, (wx.TextCtrl, wx.ComboBox)):
+            window.SetBackgroundColour(colors[<span class="str">"control_bg"</span>])
+            window.SetForegroundColour(colors[<span class="str">"control_fg"</span>])
+    <span class="kw">except</span> Exception:
+        <span class="kw">pass</span>  <span class="cm"># Some controls don't support color changes</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From gui/theme.py — applying colors to controls</code>
+        <br><span class="desc">A comment: <em>From gui/theme.py — applying colors to controls</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def _paint(window: wx.Window, colors: dict) -&gt; None:</code>
+        <br><span class="desc">Converts a value to an integer. Truncates floats toward zero. Raises ValueError for invalid strings.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;&quot;&quot;Apply theme colors to a control.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Apply theme colors to a control.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>try:</code>
+        <br><span class="desc">Begins exception handling. Code in this block is monitored for errors.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>if isinstance(window, (wx.Panel, wx.Dialog, wx.Frame)):</code>
+        <br><span class="desc">Checks if an object is an instance of a class. Preferred over type() for type checking.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>window.SetBackgroundColour(colors[&quot;bg&quot;])</code>
+        <br><span class="desc"><code>window.SetBackgroundColour(colors[&quot;bg&quot;])</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>elif isinstance(window, (wx.StaticText, wx.CheckBox)):</code>
+        <br><span class="desc">A non-editable text label widget. The primary way to display text information in wxPython.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>window.SetForegroundColour(colors[&quot;fg&quot;])</code>
+        <br><span class="desc"><code>window.SetForegroundColour(colors[&quot;fg&quot;])</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>elif isinstance(window, (wx.TextCtrl, wx.ComboBox)):</code>
+        <br><span class="desc">Checks if an object is an instance of a class. Preferred over type() for type checking.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>window.SetBackgroundColour(colors[&quot;control_bg&quot;])</code>
+        <br><span class="desc"><code>window.SetBackgroundColour(colors[&quot;control_bg&quot;])</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>window.SetForegroundColour(colors[&quot;control_fg&quot;])</code>
+        <br><span class="desc"><code>window.SetForegroundColour(colors[&quot;control_fg&quot;])</code></span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>except Exception:</code>
+        <br><span class="desc">Catches all exceptions that inherit from Exception. Use as a last resort.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>pass  # Some controls don&#x27;t support color changes</code>
+        <br><span class="desc"><code>pass  # Some controls don&#x27;t support color changes</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>32.4 Key Takeaways</h2>
+<ul>
+  <li><strong>DC (Device Context)</strong> is the drawing API — paint, draw, fill</li>
+  <li><strong>BufferedDC</strong> prevents flicker by double-buffering</li>
+  <li><strong>Bind(EVT_PAINT)</strong> for custom drawing; call <code>Refresh()</code> to trigger repaint</li>
+  <li>AIVS uses DC drawing for <strong>theme application</strong> across all widgets</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch31_dialogs.html">← Ch 31</a> &nbsp;|&nbsp; <a href="ch33_threading_gui.html">Ch 33 — Threading + GUI →</a></p>
+</div></div></body>
+</html>

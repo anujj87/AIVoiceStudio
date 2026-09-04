@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 47: TTS Catalog &amp; Model Store - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part VI</div><ul class="chapters"><li><a href="ch43_architecture.html">Ch 43</a></li><li><a href="ch44_paths_settings.html">Ch 44</a></li><li><a href="ch45_project_model.html">Ch 45</a></li><li><a href="ch46_document_parsing.html">Ch 46</a></li><li><a href="ch47_tts_catalog.html" class="active">Ch 47: TTS Catalog</a></li><li><a href="ch48_tts_engine.html">Ch 48</a></li><li><a href="ch49_downloader.html">Ch 49</a></li><li><a href="ch50_compute_detection.html">Ch 50</a></li><li><a href="ch51_main_frame.html">Ch 51</a></li><li><a href="ch52_settings_dialog.html">Ch 52</a></li><li><a href="ch53_model_panels.html">Ch 53</a></li><li><a href="ch54_new_project_wizard.html">Ch 54</a></li><li><a href="ch55_recording.html">Ch 55</a></li><li><a href="ch56_synthesis_worker.html">Ch 56</a></li><li><a href="ch57_clone_engine.html">Ch 57</a></li><li><a href="ch58_omnivoice.html">Ch 58</a></li><li><a href="ch59_daisy_builder.html">Ch 59</a></li><li><a href="ch60_addons.html">Ch 60</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 47</div>
+<h1>TTS Catalog &amp; Model Store</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand the TTS catalog data structure</li>
+  <li>Master the ModelStore for tracking installed voices</li>
+  <li>See how voice file resolution works</li>
+</ul>
+
+<hr>
+
+<h2>47.1 The TTS Catalog</h2>
+
+<pre><code><span class="cm"># From tts/catalog.py — a large tuple of TTS engine definitions</span>
+<span class="cm"># Each entry has: id, name, engine, license, languages → variants → voices</span>
+
+<span class="kw">def</span> <span class="fn">get_tts_list</span>() -> list[dict]:
+    <span class="str">"""Return all TTS engines from the catalog."""</span>
+    <span class="kw">return</span> list(_CATALOG)
+
+<span class="kw">def</span> <span class="fn">find_tts</span>(tts_id: str) -> dict | <span class="kw">None</span>:
+    <span class="str">"""Find a TTS engine by ID."""</span>
+    <span class="kw">for</span> tts <span class="kw">in</span> _CATALOG:
+        <span class="kw">if</span> tts[<span class="str">"id"</span>] == tts_id:
+            <span class="kw">return</span> tts
+    <span class="kw">return</span> <span class="kw">None</span>
+
+<span class="kw">def</span> <span class="fn">find_language</span>(tts: dict, lang_code: str) -> dict | <span class="kw">None</span>:
+    <span class="kw">for</span> lang <span class="kw">in</span> tts.get(<span class="str">"languages"</span>, []):
+        <span class="kw">if</span> lang[<span class="str">"code"</span>] == lang_code:
+            <span class="kw">return</span> lang
+    <span class="kw">return</span> <span class="kw">None</span>
+
+<span class="kw">def</span> <span class="fn">find_variant</span>(tts, lang_code, variant_id) -> dict | <span class="kw">None</span>:
+    lang = find_language(tts, lang_code)
+    <span class="kw">if</span> lang:
+        <span class="kw">for</span> v <span class="kw">in</span> lang.get(<span class="str">"variants"</span>, []):
+            <span class="kw">if</span> v[<span class="str">"id"</span>] == variant_id:
+                <span class="kw">return</span> v
+    <span class="kw">return</span> <span class="kw">None</span>
+
+<span class="kw">def</span> <span class="fn">find_voice</span>(tts, lang_code, variant_id, voice_id) -> dict | <span class="kw">None</span>:
+    variant = find_variant(tts, lang_code, variant_id)
+    <span class="kw">if</span> variant:
+        <span class="kw">for</span> v <span class="kw">in</span> variant.get(<span class="str">"voices"</span>, []):
+            <span class="kw">if</span> v[<span class="str">"id"</span>] == voice_id:
+                <span class="kw">return</span> v
+    <span class="kw">return</span> <span class="kw">None</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From tts/catalog.py — a large tuple of TTS engine definitions</code>
+        <br><span class="desc">A comment indicating the source file: <em>From tts/catalog.py — a large tuple of TTS engine definitions</em>. This helps the reader locate the code in the AIVoiceStudio codebase.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Each entry has: id, name, engine, license, languages → variants → voices</code>
+        <br><span class="desc">A comment: <em>Each entry has: id, name, engine, license, languages → variants → voices</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>def get_tts_list() -&gt; list[dict]:</code>
+        <br><span class="desc">Defines function <code>get_tts_list</code>, returning <code>list[dict]</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>&quot;&quot;&quot;Return all TTS engines from the catalog.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Return all TTS engines from the catalog.</em>. Documents the purpose of the following code block.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>return list(_CATALOG)</code>
+        <br><span class="desc">Returns <code>list(_CATALOG)</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>def find_tts(tts_id: str) -&gt; dict | None:</code>
+        <br><span class="desc">Defines function <code>find_tts</code> accepting parameters (tts_id), returning <code>dict | None</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>&quot;&quot;&quot;Find a TTS engine by ID.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Find a TTS engine by ID.</em>. Documents the purpose of the following code block.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>for tts in _CATALOG:</code>
+        <br><span class="desc">Iterates over <code>_CATALOG</code>, assigning each element to <code>tts</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>if tts[&quot;id&quot;] == tts_id:</code>
+        <br><span class="desc">Checks condition: <code>tts[&quot;id&quot;] == tts_id</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>return tts</code>
+        <br><span class="desc">Returns <code>tts</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>return None</code>
+        <br><span class="desc">Returns <code>None</code> (no value).</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>def find_language(tts: dict, lang_code: str) -&gt; dict | None:</code>
+        <br><span class="desc">Defines function <code>find_language</code> accepting parameters (tts, lang_code), returning <code>dict | None</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>for lang in tts.get(&quot;languages&quot;, []):</code>
+        <br><span class="desc">Iterates over <code>tts.get(&quot;languages&quot;, [])</code>, assigning each element to <code>lang</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>if lang[&quot;code&quot;] == lang_code:</code>
+        <br><span class="desc">Checks condition: <code>lang[&quot;code&quot;] == lang_code</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>return lang</code>
+        <br><span class="desc">Returns <code>lang</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>return None</code>
+        <br><span class="desc">Returns <code>None</code> (no value).</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>def find_variant(tts, lang_code, variant_id) -&gt; dict | None:</code>
+        <br><span class="desc">Defines function <code>find_variant</code> accepting parameters (tts, lang_code, variant_id), returning <code>dict | None</code>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>lang = find_language(tts, lang_code)</code>
+        <br><span class="desc">Assigns <code>find_language(tts, lang_code)</code> to <code>lang</code>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>if lang:</code>
+        <br><span class="desc">Checks condition: <code>lang</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>for v in lang.get(&quot;variants&quot;, []):</code>
+        <br><span class="desc">Iterates over <code>lang.get(&quot;variants&quot;, [])</code>, assigning each element to <code>v</code>.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>if v[&quot;id&quot;] == variant_id:</code>
+        <br><span class="desc">Checks condition: <code>v[&quot;id&quot;] == variant_id</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>return v</code>
+        <br><span class="desc">Returns <code>v</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>return None</code>
+        <br><span class="desc">Returns <code>None</code> (no value).</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>def find_voice(tts, lang_code, variant_id, voice_id) -&gt; dict | None:</code>
+        <br><span class="desc">Defines function <code>find_voice</code> accepting parameters (tts, lang_code, variant_id, voice_id), returning <code>dict | None</code>.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>variant = find_variant(tts, lang_code, variant_id)</code>
+        <br><span class="desc">Assigns <code>find_variant(tts, lang_code, variant_id)</code> to <code>variant</code>.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>if variant:</code>
+        <br><span class="desc">Checks condition: <code>variant</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>for v in variant.get(&quot;voices&quot;, []):</code>
+        <br><span class="desc">Iterates over <code>variant.get(&quot;voices&quot;, [])</code>, assigning each element to <code>v</code>.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>if v[&quot;id&quot;] == voice_id:</code>
+        <br><span class="desc">Checks condition: <code>v[&quot;id&quot;] == voice_id</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>return v</code>
+        <br><span class="desc">Returns <code>v</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code>return None</code>
+        <br><span class="desc">Returns <code>None</code> (no value).</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>47.2 The ModelStore</h2>
+
+<pre><code><span class="cm"># From tts/models.py</span>
+<span class="kw">class</span> <span class="cls">ModelStore</span>:
+    <span class="str">"""Manages which voice models are installed on disk."""</span>
+
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, state_file=<span class="kw">None</span>):
+        self._state_file = state_file <span class="kw">or</span> self._default_state_file()
+        self._state = self._load_state()
+
+    <span class="kw">def</span> <span class="fn">variant_dir</span>(self, tts_id, lang, variant) -> str:
+        <span class="str">"""models/piper/en_US/medium"""</span>
+        <span class="kw">return</span> os.path.join(paths.models_dir(), tts_id, lang, variant)
+
+    <span class="kw">def</span> <span class="fn">is_variant_installed</span>(self, tts_id, lang, variant) -> bool:
+        <span class="kw">return</span> os.path.isdir(self.variant_dir(tts_id, lang, variant))
+
+    <span class="kw">def</span> <span class="fn">mark_installed</span>(self, tts_id, lang, variant, path):
+        self._state.setdefault(tts_id, {})
+        self._state[tts_id].setdefault(lang, {})
+        self._state[tts_id][lang][variant] = {<span class="str">"path"</span>: path}
+        self._save_state()
+
+    <span class="kw">def</span> <span class="fn">installed_voices</span>(self) -> list[dict]:
+        <span class="str">"""Return flat list of all installed voice entries."""</span>
+        voices = []
+        <span class="kw">for</span> tts_id, langs <span class="kw">in</span> self._state.items():
+            tts = catalog.find_tts(tts_id)
+            <span class="kw">for</span> lang_code, variants <span class="kw">in</span> langs.items():
+                <span class="kw">for</span> var_id <span class="kw">in</span> variants:
+                    variant = catalog.find_variant(tts, lang_code, var_id)
+                    <span class="kw">if</span> variant:
+                        <span class="kw">for</span> voice <span class="kw">in</span> variant.get(<span class="str">"voices"</span>, []):
+                            entry = dict(voice)
+                            entry[<span class="str">"tts"</span>] = tts_id
+                            entry[<span class="str">"language"</span>] = lang_code
+                            entry[<span class="str">"variant"</span>] = var_id
+                            entry[<span class="str">"dir"</span>] = self.variant_dir(tts_id, lang_code, var_id)
+                            voices.append(entry)
+        <span class="kw">return</span> voices</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From tts/models.py</code>
+        <br><span class="desc">A comment indicating the source file: <em>From tts/models.py</em>. This helps the reader locate the code in the AIVoiceStudio codebase.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>class ModelStore:</code>
+        <br><span class="desc">Manages downloaded voice models on disk. Tracks which voices are installed, their file paths, and total disk usage.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;&quot;&quot;Manages which voice models are installed on disk.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Manages which voice models are installed on disk.</em>. Documents the purpose of the following code block.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>def __init__(self, state_file=None):</code>
+        <br><span class="desc">Defines function <code>__init__</code> accepting parameters (self, state_file).</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>self._state_file = state_file or self._default_state_file()</code>
+        <br><span class="desc">Stores <code>state_file or self._default_state_file()</code> in the instance attribute <code>_state_file</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>self._state = self._load_state()</code>
+        <br><span class="desc">Stores <code>self._load_state()</code> in the instance attribute <code>_state</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>def variant_dir(self, tts_id, lang, variant) -&gt; str:</code>
+        <br><span class="desc">Defines function <code>variant_dir</code> accepting parameters (self, tts_id, lang, variant), returning <code>str</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>&quot;&quot;&quot;models/piper/en_US/medium&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>models/piper/en_US/medium</em>. Documents the purpose of the following code block.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>return os.path.join(paths.models_dir(), tts_id, lang, variant)</code>
+        <br><span class="desc">Returns the directory where downloaded TTS voice models are stored. Respects any custom path set in Settings > Paths. Creates the directory if needed.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>def is_variant_installed(self, tts_id, lang, variant) -&gt; bool:</code>
+        <br><span class="desc">Defines function <code>is_variant_installed</code> accepting parameters (self, tts_id, lang, variant), returning <code>bool</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>return os.path.isdir(self.variant_dir(tts_id, lang, variant))</code>
+        <br><span class="desc">Returns <code>os.path.isdir(self.variant_dir(tts_id, lang, variant))</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>def mark_installed(self, tts_id, lang, variant, path):</code>
+        <br><span class="desc">Defines function <code>mark_installed</code> accepting parameters (self, tts_id, lang, variant, ...).</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>self._state.setdefault(tts_id, {})</code>
+        <br><span class="desc"><code>self._state.setdefault(tts_id, {})</code></span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>self._state[tts_id].setdefault(lang, {})</code>
+        <br><span class="desc"><code>self._state[tts_id].setdefault(lang, {})</code></span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>self._state[tts_id][lang][variant] = {&quot;path&quot;: path}</code>
+        <br><span class="desc"><code>self._state[tts_id][lang][variant] = {&quot;path&quot;: path}</code></span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>self._save_state()</code>
+        <br><span class="desc">Calls <code>self._save_state()</code> to perform an operation.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>def installed_voices(self) -&gt; list[dict]:</code>
+        <br><span class="desc">Defines function <code>installed_voices</code> accepting parameters (self), returning <code>list[dict]</code>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>&quot;&quot;&quot;Return flat list of all installed voice entries.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Return flat list of all installed voice entries.</em>. Documents the purpose of the following code block.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>voices = []</code>
+        <br><span class="desc">Assigns <code>[]</code> to <code>voices</code>.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>for tts_id, langs in self._state.items():</code>
+        <br><span class="desc"><code>for tts_id, langs in self._state.items():</code></span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>tts = catalog.find_tts(tts_id)</code>
+        <br><span class="desc">Assigns <code>catalog.find_tts(tts_id)</code> to <code>tts</code>.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>for lang_code, variants in langs.items():</code>
+        <br><span class="desc"><code>for lang_code, variants in langs.items():</code></span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>for var_id in variants:</code>
+        <br><span class="desc">Iterates over <code>variants</code>, assigning each element to <code>var_id</code>.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>variant = catalog.find_variant(tts, lang_code, var_id)</code>
+        <br><span class="desc">Assigns <code>catalog.find_variant(tts, lang_code, var_id)</code> to <code>variant</code>.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>if variant:</code>
+        <br><span class="desc">Checks condition: <code>variant</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>for voice in variant.get(&quot;voices&quot;, []):</code>
+        <br><span class="desc">Iterates over <code>variant.get(&quot;voices&quot;, [])</code>, assigning each element to <code>voice</code>.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>entry = dict(voice)</code>
+        <br><span class="desc">Assigns <code>dict(voice)</code> to <code>entry</code>.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>entry[&quot;tts&quot;] = tts_id</code>
+        <br><span class="desc"><code>entry[&quot;tts&quot;] = tts_id</code></span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>entry[&quot;language&quot;] = lang_code</code>
+        <br><span class="desc"><code>entry[&quot;language&quot;] = lang_code</code></span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code>entry[&quot;variant&quot;] = var_id</code>
+        <br><span class="desc"><code>entry[&quot;variant&quot;] = var_id</code></span>
+      </li>
+      <li>
+        <strong>Line 31:</strong> <code>entry[&quot;dir&quot;] = self.variant_dir(tts_id, lang_code, var_id)</code>
+        <br><span class="desc"><code>entry[&quot;dir&quot;] = self.variant_dir(tts_id, lang_code, var_id)</code></span>
+      </li>
+      <li>
+        <strong>Line 32:</strong> <code>voices.append(entry)</code>
+        <br><span class="desc"><code>voices.append(entry)</code></span>
+      </li>
+      <li>
+        <strong>Line 33:</strong> <code>return voices</code>
+        <br><span class="desc">Returns <code>voices</code> to the caller.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>47.3 Voice File Resolution</h2>
+
+<pre><code><span class="cm"># From tts/models.py — resolve voice entry → actual file paths</span>
+<span class="kw">def</span> <span class="fn">resolve_voice_files</span>(entry: dict) -> dict[str, str]:
+    <span class="str">"""Map a voice entry dict to actual file paths on disk."""</span>
+    vdir = entry.get(<span class="str">"dir"</span>, <span class="str">""</span>)
+    engine = entry.get(<span class="str">"engine"</span>, <span class="str">"vits"</span>)
+
+    result = {
+        <span class="str">"model"</span>: <span class="str">""</span>, <span class="str">"tokens"</span>: <span class="str">""</span>, <span class="str">"data_dir"</span>: <span class="str">""</span>,
+        <span class="str">"lexicon"</span>: <span class="str">""</span>, <span class="str">"vocoder"</span>: <span class="str">""</span>, <span class="str">"voices_file"</span>: <span class="str">""</span>,
+        <span class="str">"engine"</span>: engine,
+    }
+
+    <span class="kw">if</span> <span class="kw">not</span> vdir <span class="kw">or not</span> os.path.isdir(vdir):
+        <span class="kw">return</span> result
+
+    <span class="cm"># Find model file</span>
+    <span class="kw">for</span> f <span class="kw">in</span> os.listdir(vdir):
+        <span class="kw">if</span> f.endswith(<span class="str">".onnx"</span>):
+            result[<span class="str">"model"</span>] = os.path.join(vdir, f)
+            <span class="kw">break</span>
+
+    <span class="cm"># Find tokens file</span>
+    tokens = os.path.join(vdir, <span class="str">"tokens.txt"</span>)
+    <span class="kw">if</span> os.path.isfile(tokens):
+        result[<span class="str">"tokens"</span>] = tokens
+
+    <span class="cm"># Find voices file (for multi-speaker models)</span>
+    voices = os.path.join(vdir, <span class="str">"voices.bin"</span>)
+    <span class="kw">if</span> os.path.isfile(voices):
+        result[<span class="str">"voices_file"</span>] = voices
+
+    <span class="cm"># Shared espeak-ng-data</span>
+    shared = os.path.join(paths.models_dir(), <span class="str">"shared"</span>, <span class="str">"espeak-ng-data"</span>)
+    <span class="kw">if</span> os.path.isdir(shared) <span class="kw">and</span> entry.get(<span class="str">"frontend"</span>) != <span class="str">"char"</span>:
+        result[<span class="str">"data_dir"</span>] = shared
+
+    <span class="kw">return</span> result</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From tts/models.py — resolve voice entry → actual file paths</code>
+        <br><span class="desc">A comment indicating the source file: <em>From tts/models.py — resolve voice entry → actual file paths</em>. This helps the reader locate the code in the AIVoiceStudio codebase.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def resolve_voice_files(entry: dict) -&gt; dict[str, str]:</code>
+        <br><span class="desc">Defines function <code>resolve_voice_files</code> accepting parameters (entry), returning <code>dict[str, str]</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;&quot;&quot;Map a voice entry dict to actual file paths on disk.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Map a voice entry dict to actual file paths on disk.</em>. Documents the purpose of the following code block.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>vdir = entry.get(&quot;dir&quot;, &quot;&quot;)</code>
+        <br><span class="desc">Assigns <code>entry.get(&quot;dir&quot;, &quot;&quot;)</code> to <code>vdir</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>engine = entry.get(&quot;engine&quot;, &quot;vits&quot;)</code>
+        <br><span class="desc">Assigns <code>entry.get(&quot;engine&quot;, &quot;vits&quot;)</code> to <code>engine</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>result = {</code>
+        <br><span class="desc">Assigns <code>{</code> to <code>result</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>&quot;model&quot;: &quot;&quot;, &quot;tokens&quot;: &quot;&quot;, &quot;data_dir&quot;: &quot;&quot;,</code>
+        <br><span class="desc"><code>&quot;model&quot;: &quot;&quot;, &quot;tokens&quot;: &quot;&quot;, &quot;data_dir&quot;: &quot;&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>&quot;lexicon&quot;: &quot;&quot;, &quot;vocoder&quot;: &quot;&quot;, &quot;voices_file&quot;: &quot;&quot;,</code>
+        <br><span class="desc"><code>&quot;lexicon&quot;: &quot;&quot;, &quot;vocoder&quot;: &quot;&quot;, &quot;voices_file&quot;: &quot;&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>&quot;engine&quot;: engine,</code>
+        <br><span class="desc"><code>&quot;engine&quot;: engine,</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>}</code>
+        <br><span class="desc"><code>}</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>if not vdir or not os.path.isdir(vdir):</code>
+        <br><span class="desc">Checks condition: <code>not vdir or not os.path.isdir(vdir)</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>return result</code>
+        <br><span class="desc">Returns <code>result</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code># Find model file</code>
+        <br><span class="desc">A comment: <em>Find model file</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>for f in os.listdir(vdir):</code>
+        <br><span class="desc">Iterates over <code>os.listdir(vdir)</code>, assigning each element to <code>f</code>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>if f.endswith(&quot;.onnx&quot;):</code>
+        <br><span class="desc">Checks condition: <code>f.endswith(&quot;.onnx&quot;)</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>result[&quot;model&quot;] = os.path.join(vdir, f)</code>
+        <br><span class="desc"><code>result[&quot;model&quot;] = os.path.join(vdir, f)</code></span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>break</code>
+        <br><span class="desc">Exits the innermost loop immediately.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code># Find tokens file</code>
+        <br><span class="desc">A comment: <em>Find tokens file</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>tokens = os.path.join(vdir, &quot;tokens.txt&quot;)</code>
+        <br><span class="desc">Assigns <code>os.path.join(vdir, &quot;tokens.txt&quot;)</code> to <code>tokens</code>.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>if os.path.isfile(tokens):</code>
+        <br><span class="desc">Checks condition: <code>os.path.isfile(tokens)</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>result[&quot;tokens&quot;] = tokens</code>
+        <br><span class="desc"><code>result[&quot;tokens&quot;] = tokens</code></span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code># Find voices file (for multi-speaker models)</code>
+        <br><span class="desc">A comment: <em>Find voices file (for multi-speaker models)</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>voices = os.path.join(vdir, &quot;voices.bin&quot;)</code>
+        <br><span class="desc">Assigns <code>os.path.join(vdir, &quot;voices.bin&quot;)</code> to <code>voices</code>.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>if os.path.isfile(voices):</code>
+        <br><span class="desc">Checks condition: <code>os.path.isfile(voices)</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>result[&quot;voices_file&quot;] = voices</code>
+        <br><span class="desc"><code>result[&quot;voices_file&quot;] = voices</code></span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code># Shared espeak-ng-data</code>
+        <br><span class="desc">A comment: <em>Shared espeak-ng-data</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>shared = os.path.join(paths.models_dir(), &quot;shared&quot;, &quot;espeak-ng-data&quot;)</code>
+        <br><span class="desc">Returns the directory where downloaded TTS voice models are stored. Respects any custom path set in Settings > Paths. Creates the directory if needed.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>if os.path.isdir(shared) and entry.get(&quot;frontend&quot;) != &quot;char&quot;:</code>
+        <br><span class="desc">Checks condition: <code>os.path.isdir(shared) and entry.get(&quot;frontend&quot;) != &quot;char&quot;</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>result[&quot;data_dir&quot;] = shared</code>
+        <br><span class="desc"><code>result[&quot;data_dir&quot;] = shared</code></span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code>return result</code>
+        <br><span class="desc">Returns <code>result</code> to the caller.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>47.4 Key Takeaways</h2>
+<ul>
+  <li>The <strong>catalog</strong> is a nested data structure: TTS → language → variant → voice</li>
+  <li><strong>ModelStore</strong> tracks which variants are installed on disk</li>
+  <li><strong>resolve_voice_files()</strong> maps voice entries to actual file paths</li>
+  <li><strong>Shared resources</strong> (espeak-ng-data) are stored in a common directory</li>
+  <li>The catalog has <strong>14 TTS engines</strong> with hundreds of voices across dozens of languages</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch46_document_parsing.html">← Ch 46</a> &nbsp;|&nbsp; <a href="ch48_tts_engine.html">Ch 48 — TTS Engine →</a></p>
+</div></div></body>
+</html>

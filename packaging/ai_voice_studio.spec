@@ -51,6 +51,10 @@ datas = [
     ("../docs/UserGuide.html", "docs"),
     ("../docs/AddonDevelopmentGuide.html", "docs"),
     ("../docs/AccessibilityGuide.html", "docs"),
+    # Python & wxPython book (HTML, opened from Help menu via F1).
+    ("../docs/book/index.html", "docs/book"),
+    ("../docs/book/css/style.css", "docs/book/css"),
+    ("../docs/book/chapters", "docs/book/chapters"),
 ]
 
 

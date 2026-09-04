@@ -268,6 +268,24 @@ class ModelStore:
             self._data["custom_voices"].append(entry)
         self.save()
 
+    def rename_custom_voice(self, name: str, new_name: str) -> bool:
+        """Rename a custom voice in place (the voice folder keeps its name
+        because it is keyed by an id, not by the voice name).
+
+        Returns ``True`` on success; ``False`` when ``name`` is not found or
+        ``new_name`` collides with an existing custom voice.
+        """
+        with self._lock:
+            voices = self._data.get("custom_voices", [])
+            if any(v["name"] == new_name for v in voices):
+                return False
+            for v in voices:
+                if v["name"] == name:
+                    v["name"] = new_name
+                    self.save()
+                    return True
+        return False
+
     def custom_voices(self, tts_id: str | None = None) -> List[Dict[str, Any]]:
         voices = self._data.get("custom_voices", [])
         if tts_id:

@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 12: Iterators &amp; Generators - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part II — Intermediate</div><ul class="chapters"><li><a href="ch11_oop_advanced.html">Ch 11</a></li><li><a href="ch12_iterators.html" class="active">Ch 12: Iterators</a></li><li><a href="ch13_decorators.html">Ch 13</a></li><li><a href="ch14_context.html">Ch 14</a></li><li><a href="ch15_regex.html">Ch 15</a></li><li><a href="ch16_datetime.html">Ch 16</a></li><li><a href="ch17_testing.html">Ch 17</a></li><li><a href="ch18_json_xml.html">Ch 18</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 12</div>
+<h1>Iterators &amp; Generators</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand the iterator protocol (__iter__ and __next__)</li>
+  <li>Create generator functions with yield</li>
+  <li>Use generator expressions for memory-efficient processing</li>
+  <li>Apply itertools for advanced iteration patterns</li>
+</ul>
+
+<hr>
+
+<h2>12.1 The Iterator Protocol</h2>
+
+<pre><code><span class="cm"># Every iterable has __iter__ that returns an iterator</span>
+<span class="cm"># Every iterator has __next__ that returns the next value</span>
+
+<span class="kw">class</span> <span class="cls">VoiceIterator</span>:
+    <span class="str">"""Iterates over voice entries in the catalog."""</span>
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, catalog):
+        self._catalog = catalog
+        self._tts_idx = <span class="num">0</span>
+        self._lang_idx = <span class="num">0</span>
+        self._var_idx = <span class="num">0</span>
+        self._voice_idx = <span class="num">0</span>
+
+    <span class="kw">def</span> <span class="fn">__iter__</span>(self):
+        <span class="kw">return</span> self  <span class="cm"># Iterators return themselves</span>
+
+    <span class="kw">def</span> <span class="fn">__next__</span>(self):
+        <span class="cm"># Navigate through nested structure</span>
+        <span class="kw">while</span> self._tts_idx < len(self._catalog):
+            tts = self._catalog[self._tts_idx]
+            langs = tts.get(<span class="str">"languages"</span>, [])
+            <span class="kw">while</span> self._lang_idx < len(langs):
+                lang = langs[self._lang_idx]
+                variants = lang.get(<span class="str">"variants"</span>, [])
+                <span class="kw">while</span> self._var_idx < len(variants):
+                    variant = variants[self._var_idx]
+                    voices = variant.get(<span class="str">"voices"</span>, [])
+                    <span class="kw">while</span> self._voice_idx < len(voices):
+                        voice = voices[self._voice_idx]
+                        self._voice_idx += <span class="num">1</span>
+                        <span class="kw">return</span> {<span class="str">"tts"</span>: tts[<span class="str">"id"</span>], <span class="str">"voice"</span>: voice}
+                    self._var_idx += <span class="num">1</span>
+                    self._voice_idx = <span class="num">0</span>
+                self._lang_idx += <span class="num">1</span>
+                self._var_idx = <span class="num">0</span>
+            self._tts_idx += <span class="num">1</span>
+            self._lang_idx = <span class="num">0</span>
+        <span class="kw">raise</span> StopIteration
+
+<span class="cm"># Usage</span>
+<span class="kw">for</span> voice <span class="kw">in</span> VoiceIterator(catalog):
+    <span class="kw">print</span>(voice)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Every iterable has __iter__ that returns an iterator</code>
+        <br><span class="desc">A comment: <em>Every iterable has __iter__ that returns an iterator</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Every iterator has __next__ that returns the next value</code>
+        <br><span class="desc">A comment: <em>Every iterator has __next__ that returns the next value</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>class VoiceIterator:</code>
+        <br><span class="desc">Defines class <code>VoiceIterator</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>&quot;&quot;&quot;Iterates over voice entries in the catalog.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Iterates over voice entries in the catalog.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>def __init__(self, catalog):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>self._catalog = catalog</code>
+        <br><span class="desc">Stores <code>catalog</code> in instance attribute <code>_catalog</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>self._tts_idx = 0</code>
+        <br><span class="desc">Stores <code>0</code> in instance attribute <code>_tts_idx</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>self._lang_idx = 0</code>
+        <br><span class="desc">Stores <code>0</code> in instance attribute <code>_lang_idx</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>self._var_idx = 0</code>
+        <br><span class="desc">Stores <code>0</code> in instance attribute <code>_var_idx</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>self._voice_idx = 0</code>
+        <br><span class="desc">Stores <code>0</code> in instance attribute <code>_voice_idx</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>def __iter__(self):</code>
+        <br><span class="desc">Returns an iterator. Called by for loops.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>return self  # Iterators return themselves</code>
+        <br><span class="desc">Returns <code>self  # Iterators return themselves</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>def __next__(self):</code>
+        <br><span class="desc">Returns the next item from an iterator. Raises StopIteration when done.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code># Navigate through nested structure</code>
+        <br><span class="desc">A comment: <em>Navigate through nested structure</em>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>while self._tts_idx &lt; len(self._catalog):</code>
+        <br><span class="desc">Returns the number of items in a sequence (string, list, dict, tuple). Essential for loop bounds and validation.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>tts = self._catalog[self._tts_idx]</code>
+        <br><span class="desc">Assigns <code>self._catalog[self._tts_idx]</code> to <code>tts</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>langs = tts.get(&quot;languages&quot;, [])</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>while self._lang_idx &lt; len(langs):</code>
+        <br><span class="desc">Returns the number of items in a sequence (string, list, dict, tuple). Essential for loop bounds and validation.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>lang = langs[self._lang_idx]</code>
+        <br><span class="desc">Assigns <code>langs[self._lang_idx]</code> to <code>lang</code>.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>variants = lang.get(&quot;variants&quot;, [])</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>while self._var_idx &lt; len(variants):</code>
+        <br><span class="desc">Returns the number of items in a sequence (string, list, dict, tuple). Essential for loop bounds and validation.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>variant = variants[self._var_idx]</code>
+        <br><span class="desc">Assigns <code>variants[self._var_idx]</code> to <code>variant</code>.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>voices = variant.get(&quot;voices&quot;, [])</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>while self._voice_idx &lt; len(voices):</code>
+        <br><span class="desc">Returns the number of items in a sequence (string, list, dict, tuple). Essential for loop bounds and validation.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>voice = voices[self._voice_idx]</code>
+        <br><span class="desc">Assigns <code>voices[self._voice_idx]</code> to <code>voice</code>.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>self._voice_idx += 1</code>
+        <br><span class="desc"><code>self._voice_idx += 1</code></span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>return {&quot;tts&quot;: tts[&quot;id&quot;], &quot;voice&quot;: voice}</code>
+        <br><span class="desc">Returns <code>{&quot;tts&quot;: tts[&quot;id&quot;], &quot;voice&quot;: voice}</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>self._var_idx += 1</code>
+        <br><span class="desc"><code>self._var_idx += 1</code></span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>self._voice_idx = 0</code>
+        <br><span class="desc">Stores <code>0</code> in instance attribute <code>_voice_idx</code>.</span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code>self._lang_idx += 1</code>
+        <br><span class="desc"><code>self._lang_idx += 1</code></span>
+      </li>
+      <li>
+        <strong>Line 31:</strong> <code>self._var_idx = 0</code>
+        <br><span class="desc">Stores <code>0</code> in instance attribute <code>_var_idx</code>.</span>
+      </li>
+      <li>
+        <strong>Line 32:</strong> <code>self._tts_idx += 1</code>
+        <br><span class="desc"><code>self._tts_idx += 1</code></span>
+      </li>
+      <li>
+        <strong>Line 33:</strong> <code>self._lang_idx = 0</code>
+        <br><span class="desc">Stores <code>0</code> in instance attribute <code>_lang_idx</code>.</span>
+      </li>
+      <li>
+        <strong>Line 34:</strong> <code>raise StopIteration</code>
+        <br><span class="desc">Raised by iterators when there are no more values to yield.</span>
+      </li>
+      <li>
+        <strong>Line 35:</strong> <code># Usage</code>
+        <br><span class="desc">A comment: <em>Usage</em>.</span>
+      </li>
+      <li>
+        <strong>Line 36:</strong> <code>for voice in VoiceIterator(catalog):</code>
+        <br><span class="desc">Iterates over <code>VoiceIterator(catalog)</code>, assigning each element to <code>voice</code>.</span>
+      </li>
+      <li>
+        <strong>Line 37:</strong> <code>print(voice)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>12.2 Generator Functions</h2>
+
+<p>Generators use <code>yield</code> to produce values lazily, one at a time:</p>
+
+<pre><code><span class="kw">def</span> <span class="fn">voice_entries</span>(catalog):
+    <span class="str">"""Yield all voice entries from the catalog (lazy)."""</span>
+    <span class="kw">for</span> tts <span class="kw">in</span> catalog:
+        <span class="kw">for</span> lang <span class="kw">in</span> tts.get(<span class="str">"languages"</span>, []):
+            <span class="kw">for</span> variant <span class="kw">in</span> lang.get(<span class="str">"variants"</span>, []):
+                <span class="kw">for</span> voice <span class="kw">in</span> variant.get(<span class="str">"voices"</span>, []):
+                    <span class="kw">yield</span> {
+                        <span class="str">"tts"</span>: tts[<span class="str">"id"</span>],
+                        <span class="str">"language"</span>: lang[<span class="str">"code"</span>],
+                        <span class="str">"variant"</span>: variant[<span class="str">"id"</span>],
+                        <span class="str">"voice"</span>: voice,
+                    }
+
+<span class="cm"># Usage — memory efficient (no list in memory)</span>
+<span class="kw">for</span> entry <span class="kw">in</span> voice_entries(catalog):
+    <span class="kw">print</span>(entry[<span class="str">"voice"</span>][<span class="str">"id"</span>])
+
+<span class="cm"># Can convert to list if needed</span>
+all_entries = list(voice_entries(catalog))</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>def voice_entries(catalog):</code>
+        <br><span class="desc">Defines function <code>voice_entries</code> accepting (catalog).</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>&quot;&quot;&quot;Yield all voice entries from the catalog (lazy).&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Yield all voice entries from the catalog (lazy).</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>for tts in catalog:</code>
+        <br><span class="desc">Iterates over <code>catalog</code>, assigning each element to <code>tts</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>for lang in tts.get(&quot;languages&quot;, []):</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>for variant in lang.get(&quot;variants&quot;, []):</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>for voice in variant.get(&quot;voices&quot;, []):</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>yield {</code>
+        <br><span class="desc">Pauses the function and sends a value to the caller. The function can be resumed later. Makes the function a generator.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>&quot;tts&quot;: tts[&quot;id&quot;],</code>
+        <br><span class="desc"><code>&quot;tts&quot;: tts[&quot;id&quot;],</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>&quot;language&quot;: lang[&quot;code&quot;],</code>
+        <br><span class="desc"><code>&quot;language&quot;: lang[&quot;code&quot;],</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>&quot;variant&quot;: variant[&quot;id&quot;],</code>
+        <br><span class="desc"><code>&quot;variant&quot;: variant[&quot;id&quot;],</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>&quot;voice&quot;: voice,</code>
+        <br><span class="desc"><code>&quot;voice&quot;: voice,</code></span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>}</code>
+        <br><span class="desc"><code>}</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code># Usage — memory efficient (no list in memory)</code>
+        <br><span class="desc">A comment: <em>Usage — memory efficient (no list in memory)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>for entry in voice_entries(catalog):</code>
+        <br><span class="desc">Iterates over <code>voice_entries(catalog)</code>, assigning each element to <code>entry</code>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>print(entry[&quot;voice&quot;][&quot;id&quot;])</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code># Can convert to list if needed</code>
+        <br><span class="desc">A comment: <em>Can convert to list if needed</em>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>all_entries = list(voice_entries(catalog))</code>
+        <br><span class="desc">Assigns <code>list(voice_entries(catalog))</code> to <code>all_entries</code>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>yield from — Delegating to Sub-generators</h3>
+
+<pre><code><span class="kw">def</span> <span class="fn">all_paths</span>(directory):
+    <span class="str">"""Recursively yield all file paths."""</span>
+    <span class="kw">for</span> entry <span class="kw">in</span> os.scandir(directory):
+        <span class="kw">if</span> entry.is_file():
+            <span class="kw">yield</span> entry.path
+        <span class="kw">elif</span> entry.is_dir():
+            <span class="kw">yield from</span> all_paths(entry.path)  <span class="cm"># Delegate to sub-generator</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>def all_paths(directory):</code>
+        <br><span class="desc">Defines function <code>all_paths</code> accepting (directory).</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>&quot;&quot;&quot;Recursively yield all file paths.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Recursively yield all file paths.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>for entry in os.scandir(directory):</code>
+        <br><span class="desc">Returns a list of attributes and methods of an object. Useful for exploration and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>if entry.is_file():</code>
+        <br><span class="desc">Checks condition: <code>entry.is_file()</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>yield entry.path</code>
+        <br><span class="desc">Pauses the function and sends a value to the caller. The function can be resumed later. Makes the function a generator.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>elif entry.is_dir():</code>
+        <br><span class="desc">Returns a list of attributes and methods of an object. Useful for exploration and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>yield from all_paths(entry.path)  # Delegate to sub-generator</code>
+        <br><span class="desc">Delegates to a sub-generator. Shorthand for iterating and yielding each item.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>12.3 Generator Expressions</h2>
+
+<pre><code><span class="cm"># List comprehension creates list in memory</span>
+big_list = [x ** <span class="num">2</span> <span class="kw">for</span> x <span class="kw">in</span> range(<span class="num">1_000_000</span>)]  <span class="cm"># ~8MB in memory</span>
+
+<span class="cm"># Generator expression — lazy evaluation (almost no memory)</span>
+big_gen = (x ** <span class="num">2</span> <span class="kw">for</span> x <span class="kw">in</span> range(<span class="num">1_000_000</span>))  <span class="cm"># One number at a time</span>
+
+<span class="cm"># Common pattern: sum/count/min/max on generators</span>
+total_chars = sum(len(v[<span class="str">"text"</span>]) <span class="kw">for</span> v <span class="kw">in</span> segments)
+max_length = max(len(s[<span class="str">"text"</span>]) <span class="kw">for</span> s <span class="kw">in</span> segments)
+has_empty = any(<span class="kw">not</span> s[<span class="str">"text"</span>].strip() <span class="kw">for</span> s <span class="kw">in</span> segments)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 4)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># List comprehension creates list in memory</code>
+        <br><span class="desc">A comment: <em>List comprehension creates list in memory</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>big_list = [x ** 2 for x in range(1_000_000)]  # ~8MB in memory</code>
+        <br><span class="desc">Generates a sequence of integers. Commonly used in for loops.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># Generator expression — lazy evaluation (almost no memory)</code>
+        <br><span class="desc">A comment: <em>Generator expression — lazy evaluation (almost no memory)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>big_gen = (x ** 2 for x in range(1_000_000))  # One number at a time</code>
+        <br><span class="desc">Generates a sequence of integers. Commonly used in for loops.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># Common pattern: sum/count/min/max on generators</code>
+        <br><span class="desc">A comment: <em>Common pattern: sum/count/min/max on generators</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>total_chars = sum(len(v[&quot;text&quot;]) for v in segments)</code>
+        <br><span class="desc">Returns the number of items in a sequence (string, list, dict, tuple). Essential for loop bounds and validation.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>max_length = max(len(s[&quot;text&quot;]) for s in segments)</code>
+        <br><span class="desc">Returns the number of items in a sequence (string, list, dict, tuple). Essential for loop bounds and validation.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>has_empty = any(not s[&quot;text&quot;].strip() for s in segments)</code>
+        <br><span class="desc">Removes leading and trailing whitespace (or specified characters). Returns a new string.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>12.4 itertools — Advanced Iteration</h2>
+
+<pre><code><span class="kw">import</span> itertools
+
+<span class="cm"># chain — concatenate iterables</span>
+all_voices = list(itertools.chain(piper_voices, kokoro_voices))
+
+<span class="cm"># islice — slice an iterator</span>
+first_10 = list(itertools.islice(voice_iterator, <span class="num">10</span>))
+
+<span class="cm"># groupby — group consecutive elements</span>
+<span class="kw">from</span> itertools <span class="kw">import</span> groupby
+voices_sorted = sorted(voices, key=<span class="kw">lambda</span> v: v[<span class="str">"tts"</span>])
+<span class="kw">for</span> tts_id, group <span class="kw">in</span> groupby(voices_sorted, key=<span class="kw">lambda</span> v: v[<span class="str">"tts"</span>]):
+    <span class="kw">print</span>(<span class="str">f"</span>{tts_id}<span class="str">: </span>{len(list(group))}<span class="str"> voices"</span>)
+
+<span class="cm"># product — Cartesian product</span>
+engines = [<span class="str">"piper"</span>, <span class="str">"kokoro"</span>]
+languages = [<span class="str">"en"</span>, <span class="str">"zh"</span>]
+<span class="kw">for</span> engine, lang <span class="kw">in</span> itertools.product(engines, languages):
+    <span class="kw">print</span>(<span class="str">f"</span>{engine}<span class="str">/</span>{lang}<span class="str">"</span>)
+
+<span class="cm"># cycle — infinite cycling</span>
+spinner = itertools.cycle([<span class="str">"|"</span>, <span class="str">"/"</span>, <span class="str">"-"</span>, <span class="str">"\\"</span>])
+<span class="kw">for</span> _ <span class="kw">in</span> range(<span class="num">8</span>):
+    <span class="kw">print</span>(<span class="str">f"\r</span>{next(spinner)}<span class="str"> Loading..."</span>, end=<span class="str">""</span>)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 5)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>import itertools</code>
+        <br><span class="desc">Imports the <code>itertools</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># chain — concatenate iterables</code>
+        <br><span class="desc">A comment: <em>chain — concatenate iterables</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>all_voices = list(itertools.chain(piper_voices, kokoro_voices))</code>
+        <br><span class="desc">Combines multiple iterables into a single sequence.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># islice — slice an iterator</code>
+        <br><span class="desc">A comment: <em>islice — slice an iterator</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>first_10 = list(itertools.islice(voice_iterator, 10))</code>
+        <br><span class="desc">Creates a slice object for sequence slicing. Useful for dynamic slice construction.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># groupby — group consecutive elements</code>
+        <br><span class="desc">A comment: <em>groupby — group consecutive elements</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>from itertools import groupby</code>
+        <br><span class="desc">Imports <code>groupby</code> from <code>itertools</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>voices_sorted = sorted(voices, key=lambda v: v[&quot;tts&quot;])</code>
+        <br><span class="desc">Returns a new sorted list from any iterable. Does not modify the original. Accepts a key= parameter for custom sorting.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>for tts_id, group in groupby(voices_sorted, key=lambda v: v[&quot;tts&quot;]):</code>
+        <br><span class="desc"><code>for tts_id, group in groupby(voices_sorted, key=lambda v: v[&quot;tts&quot;]):</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>print(f&quot;{tts_id}: {len(list(group))} voices&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># product — Cartesian product</code>
+        <br><span class="desc">A comment: <em>product — Cartesian product</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>engines = [&quot;piper&quot;, &quot;kokoro&quot;]</code>
+        <br><span class="desc">Assigns <code>[&quot;piper&quot;, &quot;kokoro&quot;]</code> to <code>engines</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>languages = [&quot;en&quot;, &quot;zh&quot;]</code>
+        <br><span class="desc">Assigns <code>[&quot;en&quot;, &quot;zh&quot;]</code> to <code>languages</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>for engine, lang in itertools.product(engines, languages):</code>
+        <br><span class="desc">Cartesian product of input iterables.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>print(f&quot;{engine}/{lang}&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code># cycle — infinite cycling</code>
+        <br><span class="desc">A comment: <em>cycle — infinite cycling</em>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>spinner = itertools.cycle([&quot;|&quot;, &quot;/&quot;, &quot;-&quot;, &quot;\\&quot;])</code>
+        <br><span class="desc">Assigns <code>itertools.cycle([&quot;|&quot;, &quot;/&quot;, &quot;-&quot;, &quot;\\&quot;])</code> to <code>spinner</code>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>for _ in range(8):</code>
+        <br><span class="desc">Generates a sequence of integers. Commonly used in for loops.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>print(f&quot;\r{next(spinner)} Loading...&quot;, end=&quot;&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>12.5 Real Example: Segmented File Reading</h2>
+
+<pre><code><span class="cm"># From AIVS: reading text files in chunks for large documents</span>
+<span class="kw">def</span> <span class="fn">read_in_chunks</span>(file_path: str, chunk_size: int = <span class="num">4096</span>):
+    <span class="str">"""Read a file in chunks — memory efficient."""</span>
+    <span class="kw">with</span> open(file_path, <span class="str">"r"</span>, encoding=<span class="str">"utf-8"</span>) <span class="kw">as</span> f:
+        <span class="kw">while</span> <span class="kw">True</span>:
+            chunk = f.read(chunk_size)
+            <span class="kw">if not</span> chunk:
+                <span class="kw">break</span>
+            <span class="kw">yield</span> chunk
+
+<span class="cm"># Count words without loading entire file</span>
+<span class="kw">def</span> <span class="fn">count_words</span>(file_path: str) -> int:
+    <span class="kw">return</span> sum(chunk.count(<span class="str">" "</span>) + <span class="num">1</span> <span class="kw">for</span> chunk <span class="kw">in</span> read_in_chunks(file_path))</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 6)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From AIVS: reading text files in chunks for large documents</code>
+        <br><span class="desc">A comment: <em>From AIVS: reading text files in chunks for large documents</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def read_in_chunks(file_path: str, chunk_size: int = 4096):</code>
+        <br><span class="desc">Defines function <code>read_in_chunks</code> accepting (file_path, chunk_size).</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;&quot;&quot;Read a file in chunks — memory efficient.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Read a file in chunks — memory efficient.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>with open(file_path, &quot;r&quot;, encoding=&quot;utf-8&quot;) as f:</code>
+        <br><span class="desc">Opens a file using a context manager. The file is automatically closed when the block exits, even if an error occurs.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>while True:</code>
+        <br><span class="desc">While loop: repeats as long as <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>chunk = f.read(chunk_size)</code>
+        <br><span class="desc">Assigns <code>f.read(chunk_size)</code> to <code>chunk</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>if not chunk:</code>
+        <br><span class="desc">Checks condition: <code>not chunk</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>break</code>
+        <br><span class="desc">Exits the innermost loop.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>yield chunk</code>
+        <br><span class="desc">Pauses the function and sends a value to the caller. The function can be resumed later. Makes the function a generator.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code># Count words without loading entire file</code>
+        <br><span class="desc">A comment: <em>Count words without loading entire file</em>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>def count_words(file_path: str) -&gt; int:</code>
+        <br><span class="desc">Defines function <code>count_words</code> accepting (file_path), returning <code>int</code>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>return sum(chunk.count(&quot; &quot;) + 1 for chunk in read_in_chunks(file_path))</code>
+        <br><span class="desc">Returns the number of occurrences of a value.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>12.6 Key Takeaways</h2>
+<ul>
+  <li><strong>Generators</strong> are the Pythonic way to create iterators — much simpler than implementing <code>__iter__</code>/<code>__next__</code></li>
+  <li><strong>yield</strong> pauses the function and produces a value; <strong>yield from</strong> delegates to sub-generators</li>
+  <li>Generators are <strong>lazy</strong> — they produce values on demand, saving memory</li>
+  <li><strong>Generator expressions</strong> are like list comprehensions but with parentheses: <code>(x for x in ...)</code></li>
+  <li><strong>itertools</strong> provides powerful iteration building blocks (chain, groupby, product, etc.)</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch11_oop_advanced.html">← Ch 11</a> &nbsp;|&nbsp; <a href="ch13_decorators.html">Ch 13 — Decorators →</a></p>
+</div></div></body>
+</html>

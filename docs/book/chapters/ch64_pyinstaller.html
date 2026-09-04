@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 64: PyInstaller Packaging - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part VII</div><ul class="chapters"><li><a href="ch61_unit_testing.html">Ch 61</a></li><li><a href="ch62_mocking.html">Ch 62</a></li><li><a href="ch63_integration.html">Ch 63</a></li><li><a href="ch64_pyinstaller.html" class="active">Ch 64: PyInstaller</a></li><li><a href="ch65_inno_setup.html">Ch 65</a></li><li><a href="ch66_ci_cd.html">Ch 66</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 64</div>
+<h1>PyInstaller Packaging</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand how PyInstaller bundles Python apps</li>
+  <li>Configure the .spec file for AIVS</li>
+  <li>Handle hidden imports and data files</li>
+</ul>
+
+<hr>
+
+<h2>64.1 What PyInstaller Does</h2>
+
+<p>PyInstaller analyzes Python imports and bundles everything — the interpreter, all dependencies, and data files — into a single executable or folder.</p>
+
+<pre><code><span class="cm"># Basic usage</span>
+pip install pyinstaller
+pyinstaller --onefile main.py
+
+<span class="cm"># With spec file (what AIVS uses)</span>
+pyinstaller packaging/ai_voice_studio.spec --noconfirm</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Basic usage</code>
+        <br><span class="desc">A comment: <em>Basic usage</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>pip install pyinstaller</code>
+        <br><span class="desc">Command-line tool for building executables. Supports --onefile, --windowed, --add-data options.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>pyinstaller --onefile main.py</code>
+        <br><span class="desc">Command-line tool for building executables. Supports --onefile, --windowed, --add-data options.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># With spec file (what AIVS uses)</code>
+        <br><span class="desc">A comment: <em>With spec file (what AIVS uses)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>pyinstaller packaging/ai_voice_studio.spec --noconfirm</code>
+        <br><span class="desc">Command-line tool for building executables. Supports --onefile, --windowed, --add-data options.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>64.2 The AIVS Spec File</h2>
+
+<pre><code><span class="cm"># packaging/ai_voice_studio.spec (simplified)</span>
+a = Analysis(
+    [<span class="str">'main.py'</span>],
+    pathex=[],
+    binaries=[],
+    datas=[
+        (<span class="str">'ai_voice_studio/tts/catalog.py'</span>, <span class="str">'ai_voice_studio/tts'</span>),
+    ],
+    hiddenimports=[
+        <span class="str">'wx'</span>,
+        <span class="str">'sherpa_onnx'</span>,
+        <span class="str">'numpy'</span>,
+        <span class="str">'pypdf'</span>,
+        <span class="str">'docx'</span>,
+    ],
+    hookspath=[],
+    runtime_hooks=[],
+    excludes=[],
+    noarchive=<span class="kw">False</span>,
+)
+
+pyz = PYZ(a.pure)
+
+exe = EXE(
+    pyz,
+    a.scripts,
+    a.binaries,
+    a.datas,
+    [],
+    name=<span class="str">'AI-Voice-Studio'</span>,
+    debug=<span class="kw">False</span>,
+    strip=<span class="kw">False</span>,
+    upx=<span class="kw">True</span>,
+    console=<span class="kw">False</span>,  <span class="cm"># No console window</span>
+    icon=<span class="str">'packaging/icon.ico'</span>,
+)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># packaging/ai_voice_studio.spec (simplified)</code>
+        <br><span class="desc">A comment: <em>packaging/ai_voice_studio.spec (simplified)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>a = Analysis(</code>
+        <br><span class="desc">PyInstaller spec component that analyzes the script and collects dependencies.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>[&#x27;main.py&#x27;],</code>
+        <br><span class="desc"><code>[&#x27;main.py&#x27;],</code></span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>pathex=[],</code>
+        <br><span class="desc">Assigns <code>[],</code> to <code>pathex</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>binaries=[],</code>
+        <br><span class="desc">Assigns <code>[],</code> to <code>binaries</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>datas=[</code>
+        <br><span class="desc">Assigns <code>[</code> to <code>datas</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>(&#x27;ai_voice_studio/tts/catalog.py&#x27;, &#x27;ai_voice_studio/tts&#x27;),</code>
+        <br><span class="desc"><code>(&#x27;ai_voice_studio/tts/catalog.py&#x27;, &#x27;ai_voice_studio/tts&#x27;),</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>],</code>
+        <br><span class="desc"><code>],</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>hiddenimports=[</code>
+        <br><span class="desc">PyInstaller parameter for modules that aren't automatically detected.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>&#x27;wx&#x27;,</code>
+        <br><span class="desc"><code>&#x27;wx&#x27;,</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>&#x27;sherpa_onnx&#x27;,</code>
+        <br><span class="desc"><code>&#x27;sherpa_onnx&#x27;,</code></span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>&#x27;numpy&#x27;,</code>
+        <br><span class="desc"><code>&#x27;numpy&#x27;,</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>&#x27;pypdf&#x27;,</code>
+        <br><span class="desc"><code>&#x27;pypdf&#x27;,</code></span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>&#x27;docx&#x27;,</code>
+        <br><span class="desc"><code>&#x27;docx&#x27;,</code></span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>],</code>
+        <br><span class="desc"><code>],</code></span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>hookspath=[],</code>
+        <br><span class="desc">Assigns <code>[],</code> to <code>hookspath</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>runtime_hooks=[],</code>
+        <br><span class="desc">Assigns <code>[],</code> to <code>runtime_hooks</code>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>excludes=[],</code>
+        <br><span class="desc">Assigns <code>[],</code> to <code>excludes</code>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>noarchive=False,</code>
+        <br><span class="desc">Assigns <code>False,</code> to <code>noarchive</code>.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>pyz = PYZ(a.pure)</code>
+        <br><span class="desc">PyInstaller spec component that creates the compressed Python archive.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>exe = EXE(</code>
+        <br><span class="desc">PyInstaller spec component that creates the final executable.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>pyz,</code>
+        <br><span class="desc"><code>pyz,</code></span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>a.scripts,</code>
+        <br><span class="desc"><code>a.scripts,</code></span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>a.binaries,</code>
+        <br><span class="desc"><code>a.binaries,</code></span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>a.datas,</code>
+        <br><span class="desc"><code>a.datas,</code></span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>[],</code>
+        <br><span class="desc"><code>[],</code></span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>name=&#x27;AI-Voice-Studio&#x27;,</code>
+        <br><span class="desc">Assigns <code>&#x27;AI-Voice-Studio&#x27;,</code> to <code>name</code>.</span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>debug=False,</code>
+        <br><span class="desc">Assigns <code>False,</code> to <code>debug</code>.</span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code>strip=False,</code>
+        <br><span class="desc">Assigns <code>False,</code> to <code>strip</code>.</span>
+      </li>
+      <li>
+        <strong>Line 31:</strong> <code>upx=True,</code>
+        <br><span class="desc">Assigns <code>True,</code> to <code>upx</code>.</span>
+      </li>
+      <li>
+        <strong>Line 32:</strong> <code>console=False,  # No console window</code>
+        <br><span class="desc">Assigns <code>False,  # No console window</code> to <code>console</code>.</span>
+      </li>
+      <li>
+        <strong>Line 33:</strong> <code>icon=&#x27;packaging/icon.ico&#x27;,</code>
+        <br><span class="desc">Assigns <code>&#x27;packaging/icon.ico&#x27;,</code> to <code>icon</code>.</span>
+      </li>
+      <li>
+        <strong>Line 34:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>64.3 Build Commands</h2>
+
+<pre><code><span class="cm"># From packaging/build.ps1</span>
+<span class="cm"># Build x64 distribution</span>
+.venv\Scripts\python -m PyInstaller packaging\ai_voice_studio.spec `
+    --noconfirm `
+    --distpath dist\AIVS-64 `
+    --workpath build\pyinstaller-x64
+
+<span class="cm"># Output: dist/AIVS-64/AI-Voice-Studio/AI-Voice-Studio.exe</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From packaging/build.ps1</code>
+        <br><span class="desc">A comment: <em>From packaging/build.ps1</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Build x64 distribution</code>
+        <br><span class="desc">A comment: <em>Build x64 distribution</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>.venv\Scripts\python -m PyInstaller packaging\ai_voice_studio.spec `</code>
+        <br><span class="desc">A tool that packages Python apps into standalone executables. Bundles Python interpreter and all dependencies.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>--noconfirm `</code>
+        <br><span class="desc">PyInstaller flag: overwrites output without asking.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>--distpath dist\AIVS-64 `</code>
+        <br><span class="desc"><code>--distpath dist\AIVS-64 `</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>--workpath build\pyinstaller-x64</code>
+        <br><span class="desc">Command-line tool for building executables. Supports --onefile, --windowed, --add-data options.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># Output: dist/AIVS-64/AI-Voice-Studio/AI-Voice-Studio.exe</code>
+        <br><span class="desc">A comment: <em>Output: dist/AIVS-64/AI-Voice-Studio/AI-Voice-Studio.exe</em>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>64.4 Key Takeaways</h2>
+<ul>
+  <li>PyInstaller bundles everything into a <strong>single executable</strong> or folder</li>
+  <li>The <strong>.spec file</strong> configures hidden imports, data files, and build options</li>
+  <li>AIVS output is ~<strong>39 MB</strong> (compressed)</li>
+  <li><strong>console=False</strong> hides the console window for the GUI app</li>
+  <li>The build is automated via <strong>packaging/build.ps1</strong></li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch63_integration.html">← Ch 63</a> &nbsp;|&nbsp; <a href="ch65_inno_setup.html">Ch 65 — Inno Setup →</a></p>
+</div></div></body>
+</html>

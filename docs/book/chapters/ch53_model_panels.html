@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 53: Model Management Panels - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part VI</div><ul class="chapters"><li><a href="ch43_architecture.html">Ch 43</a></li><li><a href="ch44_paths_settings.html">Ch 44</a></li><li><a href="ch45_project_model.html">Ch 45</a></li><li><a href="ch46_document_parsing.html">Ch 46</a></li><li><a href="ch47_tts_catalog.html">Ch 47</a></li><li><a href="ch48_tts_engine.html">Ch 48</a></li><li><a href="ch49_downloader.html">Ch 49</a></li><li><a href="ch50_compute_detection.html">Ch 50</a></li><li><a href="ch51_main_frame.html">Ch 51</a></li><li><a href="ch52_settings_dialog.html">Ch 52</a></li><li><a href="ch53_model_panels.html" class="active">Ch 53: Model Panels</a></li><li><a href="ch54_new_project_wizard.html">Ch 54</a></li><li><a href="ch55_recording.html">Ch 55</a></li><li><a href="ch56_synthesis_worker.html">Ch 56</a></li><li><a href="ch57_clone_engine.html">Ch 57</a></li><li><a href="ch58_omnivoice.html">Ch 58</a></li><li><a href="ch59_daisy_builder.html">Ch 59</a></li><li><a href="ch60_addons.html">Ch 60</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 53</div>
+<h1>Model Management Panels</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand the Download and Available TTS panels</li>
+  <li>See cascading combo-box selection (TTS → language → variant)</li>
+  <li>Understand background download with progress</li>
+</ul>
+
+<hr>
+
+<h2>53.1 Cascading Selection Pattern</h2>
+
+<pre><code><span class="cm"># Three cascading ComboBoxes narrow the selection:</span>
+<span class="cm"># TTS Engine → Language → Variant → Voice</span>
+
+<span class="kw">def</span> <span class="fn">populate_tts</span>(combo, tts_list):
+    combo.Clear()
+    <span class="kw">for</span> tts <span class="kw">in</span> tts_list:
+        combo.Append(tts[<span class="str">"name"</span>], tts[<span class="str">"id"</span>])
+
+<span class="kw">def</span> <span class="fn">populate_languages</span>(combo, tts):
+    combo.Clear()
+    <span class="kw">for</span> lang <span class="kw">in</span> tts.get(<span class="str">"languages"</span>, []):
+        combo.Append(<span class="str">f"</span>{lang[<span class="str">'name'</span>]}<span class="str"> (</span>{lang[<span class="str">'code'</span>]}<span class="str">)"</span>, lang[<span class="str">"code"</span>])
+
+<span class="kw">def</span> <span class="fn">populate_variants</span>(combo, tts, lang_code):
+    combo.Clear()
+    lang = catalog.find_language(tts, lang_code)
+    <span class="kw">if not</span> lang: <span class="kw">return</span>
+    <span class="kw">for</span> variant <span class="kw">in</span> lang.get(<span class="str">"variants"</span>, []):
+        combo.Append(variant[<span class="str">"name"</span>], variant[<span class="str">"id"</span>])
+
+<span class="cm"># Selection cascades: changing TTS refreshes languages,</span>
+<span class="cm"># changing language refreshes variants</span>
+self.tts_combo.Bind(wx.EVT_COMBOBOX, self._on_tts)
+self.lang_combo.Bind(wx.EVT_COMBOBOX, self._on_lang)
+self.variant_combo.Bind(wx.EVT_COMBOBOX, self._on_variant)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Three cascading ComboBoxes narrow the selection:</code>
+        <br><span class="desc">A comment: <em>Three cascading ComboBoxes narrow the selection:</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># TTS Engine → Language → Variant → Voice</code>
+        <br><span class="desc">A comment: <em>TTS Engine → Language → Variant → Voice</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>def populate_tts(combo, tts_list):</code>
+        <br><span class="desc">Defines function <code>populate_tts</code> accepting parameters (combo, tts_list).</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>combo.Clear()</code>
+        <br><span class="desc"><code>combo.Clear()</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>for tts in tts_list:</code>
+        <br><span class="desc">Iterates over <code>tts_list</code>, assigning each element to <code>tts</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>combo.Append(tts[&quot;name&quot;], tts[&quot;id&quot;])</code>
+        <br><span class="desc"><code>combo.Append(tts[&quot;name&quot;], tts[&quot;id&quot;])</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>def populate_languages(combo, tts):</code>
+        <br><span class="desc">Defines function <code>populate_languages</code> accepting parameters (combo, tts).</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>combo.Clear()</code>
+        <br><span class="desc"><code>combo.Clear()</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>for lang in tts.get(&quot;languages&quot;, []):</code>
+        <br><span class="desc">Iterates over <code>tts.get(&quot;languages&quot;, [])</code>, assigning each element to <code>lang</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>combo.Append(f&quot;{lang[&#x27;name&#x27;]} ({lang[&#x27;code&#x27;]})&quot;, lang[&quot;code&quot;])</code>
+        <br><span class="desc"><code>combo.Append(f&quot;{lang[&#x27;name&#x27;]} ({lang[&#x27;code&#x27;]})&quot;, lang[&quot;code&quot;])</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>def populate_variants(combo, tts, lang_code):</code>
+        <br><span class="desc">Defines function <code>populate_variants</code> accepting parameters (combo, tts, lang_code).</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>combo.Clear()</code>
+        <br><span class="desc"><code>combo.Clear()</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>lang = catalog.find_language(tts, lang_code)</code>
+        <br><span class="desc">Assigns <code>catalog.find_language(tts, lang_code)</code> to <code>lang</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>if not lang: return</code>
+        <br><span class="desc">Checks condition: <code>not lang</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>for variant in lang.get(&quot;variants&quot;, []):</code>
+        <br><span class="desc">Iterates over <code>lang.get(&quot;variants&quot;, [])</code>, assigning each element to <code>variant</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>combo.Append(variant[&quot;name&quot;], variant[&quot;id&quot;])</code>
+        <br><span class="desc"><code>combo.Append(variant[&quot;name&quot;], variant[&quot;id&quot;])</code></span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code># Selection cascades: changing TTS refreshes languages,</code>
+        <br><span class="desc">A comment: <em>Selection cascades: changing TTS refreshes languages,</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code># changing language refreshes variants</code>
+        <br><span class="desc">A comment: <em>changing language refreshes variants</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>self.tts_combo.Bind(wx.EVT_COMBOBOX, self._on_tts)</code>
+        <br><span class="desc"><code>self.tts_combo.Bind(wx.EVT_COMBOBOX, self._on_tts)</code></span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>self.lang_combo.Bind(wx.EVT_COMBOBOX, self._on_lang)</code>
+        <br><span class="desc"><code>self.lang_combo.Bind(wx.EVT_COMBOBOX, self._on_lang)</code></span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>self.variant_combo.Bind(wx.EVT_COMBOBOX, self._on_variant)</code>
+        <br><span class="desc"><code>self.variant_combo.Bind(wx.EVT_COMBOBOX, self._on_variant)</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>53.2 Background Download with Progress</h2>
+
+<pre><code><span class="kw">class</span> <span class="cls">DownloadPanel</span>(_ManagerPanel):
+    <span class="kw">def</span> <span class="fn">_on_download</span>(self, _):
+        self._cancel_event = threading.Event()
+        self._thread = threading.Thread(
+            target=self._download_job,
+            daemon=<span class="kw">True</span>,
+        )
+        self._thread.start()
+
+    <span class="kw">def</span> <span class="fn">_download_job</span>(self):
+        <span class="kw">def</span> <span class="fn">progress</span>(name, done, total):
+            wx.PostEvent(self, DownloadProgressEvent(name, done, total))
+        <span class="kw">try</span>:
+            self.downloader.download_variant(tts_id, lang, variant, progress=progress)
+            wx.PostEvent(self, DownloadFinishedEvent(True, <span class="str">"Done!"</span>))
+        <span class="kw">except</span> DownloadCancelled:
+            wx.PostEvent(self, DownloadFinishedEvent(False, <span class="str">"Cancelled"</span>))
+
+    <span class="kw">def</span> <span class="fn">_on_progress</span>(self, evt: DownloadProgressEvent):
+        pct = int(evt.done * <span class="num">100</span> / evt.total) <span class="kw">if</span> evt.total <span class="kw">else</span> <span class="num">0</span>
+        self.gauge.SetValue(pct)
+        self.progress_label.SetLabel(
+            <span class="str">f"Downloading: </span>{evt.done / <span class="num">1048576</span>:<span class="num">.1f</span>}<span class="str"> MB"</span>
+        )</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>class DownloadPanel(_ManagerPanel):</code>
+        <br><span class="desc">Defines class <code>DownloadPanel</code> inheriting from <code>_ManagerPanel</code>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def _on_download(self, _):</code>
+        <br><span class="desc">Defines function <code>_on_download</code> accepting parameters (self, _).</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>self._cancel_event = threading.Event()</code>
+        <br><span class="desc">Stores <code>threading.Event()</code> in the instance attribute <code>_cancel_event</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>self._thread = threading.Thread(</code>
+        <br><span class="desc">Creates a background thread. Used for TTS synthesis, downloads, and other long-running operations that shouldn't block the GUI.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>target=self._download_job,</code>
+        <br><span class="desc">Assigns <code>self._download_job,</code> to <code>target</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>daemon=True,</code>
+        <br><span class="desc">Assigns <code>True,</code> to <code>daemon</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>self._thread.start()</code>
+        <br><span class="desc"><code>self._thread.start()</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>def _download_job(self):</code>
+        <br><span class="desc">Defines function <code>_download_job</code> accepting parameters (self).</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>def progress(name, done, total):</code>
+        <br><span class="desc">Defines function <code>progress</code> accepting parameters (name, done, total).</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>wx.PostEvent(self, DownloadProgressEvent(name, done, total))</code>
+        <br><span class="desc">Creates a wxPython <code>wx.PostEvent</code> widget.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>try:</code>
+        <br><span class="desc">Begins exception handling. Errors in this block will be caught below.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>self.downloader.download_variant(tts_id, lang, variant, progress=progress)</code>
+        <br><span class="desc">Downloads a voice model variant (e.g. 'en_US/medium') from the catalog URL to the local models directory. Shows progress in the GUI.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>wx.PostEvent(self, DownloadFinishedEvent(True, &quot;Done!&quot;))</code>
+        <br><span class="desc">Creates a wxPython <code>wx.PostEvent</code> widget.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>except DownloadCancelled:</code>
+        <br><span class="desc">Catches <code>DownloadCancelled</code> exceptions.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>wx.PostEvent(self, DownloadFinishedEvent(False, &quot;Cancelled&quot;))</code>
+        <br><span class="desc">Creates a wxPython <code>wx.PostEvent</code> widget.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>def _on_progress(self, evt: DownloadProgressEvent):</code>
+        <br><span class="desc">Defines function <code>_on_progress</code> accepting parameters (self, evt).</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>pct = int(evt.done * 100 / evt.total) if evt.total else 0</code>
+        <br><span class="desc">Assigns <code>int(evt.done * 100 / evt.total) if evt.total else 0</code> to <code>pct</code>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>self.gauge.SetValue(pct)</code>
+        <br><span class="desc"><code>self.gauge.SetValue(pct)</code></span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>self.progress_label.SetLabel(</code>
+        <br><span class="desc"><code>self.progress_label.SetLabel(</code></span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>f&quot;Downloading: {evt.done / 1048576:.1f} MB&quot;</code>
+        <br><span class="desc"><code>f&quot;Downloading: {evt.done / 1048576:.1f} MB&quot;</code></span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>53.3 Key Takeaways</h2>
+<ul>
+  <li><strong>Cascading ComboBoxes</strong> narrow selection: TTS → language → variant → voice</li>
+  <li><strong>"Download all variants"</strong> option fetches every quality level of a language</li>
+  <li><strong>Background threading</strong> keeps the GUI responsive during downloads</li>
+  <li><strong>wx.PostEvent()</strong> sends progress updates from worker to GUI</li>
+  <li><strong>Cancellation</strong> via threading.Event checked between download chunks</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch52_settings_dialog.html">← Ch 52</a> &nbsp;|&nbsp; <a href="ch54_new_project_wizard.html">Ch 54 — Wizard →</a></p>
+</div></div></body>
+</html>

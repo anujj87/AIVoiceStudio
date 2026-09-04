@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 49: Model Downloader &amp; Artifacts - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part VI</div><ul class="chapters"><li><a href="ch43_architecture.html">Ch 43</a></li><li><a href="ch44_paths_settings.html">Ch 44</a></li><li><a href="ch45_project_model.html">Ch 45</a></li><li><a href="ch46_document_parsing.html">Ch 46</a></li><li><a href="ch47_tts_catalog.html">Ch 47</a></li><li><a href="ch48_tts_engine.html">Ch 48</a></li><li><a href="ch49_downloader.html" class="active">Ch 49: Downloader</a></li><li><a href="ch50_compute_detection.html">Ch 50</a></li><li><a href="ch51_main_frame.html">Ch 51</a></li><li><a href="ch52_settings_dialog.html">Ch 52</a></li><li><a href="ch53_model_panels.html">Ch 53</a></li><li><a href="ch54_new_project_wizard.html">Ch 54</a></li><li><a href="ch55_recording.html">Ch 55</a></li><li><a href="ch56_synthesis_worker.html">Ch 56</a></li><li><a href="ch57_clone_engine.html">Ch 57</a></li><li><a href="ch58_omnivoice.html">Ch 58</a></li><li><a href="ch59_daisy_builder.html">Ch 59</a></li><li><a href="ch60_addons.html">Ch 60</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 49</div>
+<h1>Model Downloader &amp; Artifacts</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand the download pipeline for voice models</li>
+  <li>Handle tar.bz2 extraction and file organization</li>
+  <li>See progress reporting and cancellation</li>
+</ul>
+
+<hr>
+
+<h2>49.1 Download Pipeline</h2>
+
+<pre><code><span class="kw">class</span> <span class="cls">ModelDownloader</span>:
+    <span class="str">"""Downloads and manages TTS voice model artifacts."""</span>
+
+    <span class="kw">def</span> <span class="fn">download_variant</span>(self, tts_id, lang, variant_id,
+                         progress=<span class="kw">None</span>, cancel_event=<span class="kw">None</span>):
+        <span class="str">"""Download a voice variant (all its files)."""</span>
+        tts = catalog.find_tts(tts_id)
+        variant = catalog.find_variant(tts, lang, variant_id)
+
+        <span class="cm"># Determine download URL from artifact name</span>
+        artifact = variant.get(<span class="str">"artifact"</span>, <span class="str">""</span>)
+        url = self._build_url(tts_id, lang, artifact)
+
+        <span class="cm"># Download to temp location</span>
+        dest_dir = self.store.variant_dir(tts_id, lang, variant_id)
+        os.makedirs(dest_dir, exist_ok=<span class="kw">True</span>)
+
+        <span class="kw">if</span> artifact.endswith(<span class="str">".tar.bz2"</span>):
+            self._download_and_extract(url, dest_dir, progress, cancel_event)
+        <span class="kw">else</span>:
+            self._download_file(url, dest_dir, progress, cancel_event)
+
+        <span class="cm"># Mark as installed</span>
+        self.store.mark_installed(tts_id, lang, variant_id, dest_dir)
+
+    <span class="kw">def</span> <span class="fn">_download_and_extract</span>(self, url, dest, progress, cancel):
+        <span class="str">"""Download tar.bz2 and extract to destination."""</span>
+        <span class="kw">import</span> tarfile, tempfile
+        <span class="kw">with</span> tempfile.NamedTemporaryFile(suffix=<span class="str">".tar.bz2"</span>) <span class="kw">as</span> tmp:
+            _download_file(url, tmp.name, progress, cancel)
+            <span class="kw">with</span> tarfile.open(tmp.name, <span class="str">"r:bz2"</span>) <span class="kw">as</span> tar:
+                tar.extractall(dest)
+
+    <span class="kw">def</span> <span class="fn">remove_variant</span>(self, tts_id, lang, variant_id):
+        <span class="str">"""Remove a downloaded variant from disk."""</span>
+        dest = self.store.variant_dir(tts_id, lang, variant_id)
+        shutil.rmtree(dest, ignore_errors=<span class="kw">True</span>)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>class ModelDownloader:</code>
+        <br><span class="desc">HTTP download manager. Handles chunked downloads, progress callbacks, and resume support for large model files.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>&quot;&quot;&quot;Downloads and manages TTS voice model artifacts.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Downloads and manages TTS voice model artifacts.</em>. Documents the purpose of the following code block.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>def download_variant(self, tts_id, lang, variant_id,</code>
+        <br><span class="desc">Downloads a voice model variant (e.g. 'en_US/medium') from the catalog URL to the local models directory. Shows progress in the GUI.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>progress=None, cancel_event=None):</code>
+        <br><span class="desc">Assigns <code>None, cancel_event=None):</code> to <code>progress</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>&quot;&quot;&quot;Download a voice variant (all its files).&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Download a voice variant (all its files).</em>. Documents the purpose of the following code block.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>tts = catalog.find_tts(tts_id)</code>
+        <br><span class="desc">Assigns <code>catalog.find_tts(tts_id)</code> to <code>tts</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>variant = catalog.find_variant(tts, lang, variant_id)</code>
+        <br><span class="desc">Assigns <code>catalog.find_variant(tts, lang, variant_id)</code> to <code>variant</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># Determine download URL from artifact name</code>
+        <br><span class="desc">A comment: <em>Determine download URL from artifact name</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>artifact = variant.get(&quot;artifact&quot;, &quot;&quot;)</code>
+        <br><span class="desc">Assigns <code>variant.get(&quot;artifact&quot;, &quot;&quot;)</code> to <code>artifact</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>url = self._build_url(tts_id, lang, artifact)</code>
+        <br><span class="desc">Assigns <code>self._build_url(tts_id, lang, artifact)</code> to <code>url</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># Download to temp location</code>
+        <br><span class="desc">A comment: <em>Download to temp location</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>dest_dir = self.store.variant_dir(tts_id, lang, variant_id)</code>
+        <br><span class="desc">Assigns <code>self.store.variant_dir(tts_id, lang, variant_id)</code> to <code>dest_dir</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>os.makedirs(dest_dir, exist_ok=True)</code>
+        <br><span class="desc"><code>os.makedirs(dest_dir, exist_ok=True)</code></span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>if artifact.endswith(&quot;.tar.bz2&quot;):</code>
+        <br><span class="desc">Checks condition: <code>artifact.endswith(&quot;.tar.bz2&quot;)</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>self._download_and_extract(url, dest_dir, progress, cancel_event)</code>
+        <br><span class="desc">Calls <code>self._download_and_extract()</code> to perform an operation.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>else:</code>
+        <br><span class="desc">Fallback: executes when none of the above conditions matched.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>self._download_file(url, dest_dir, progress, cancel_event)</code>
+        <br><span class="desc">Calls <code>self._download_file()</code> to perform an operation.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code># Mark as installed</code>
+        <br><span class="desc">A comment: <em>Mark as installed</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>self.store.mark_installed(tts_id, lang, variant_id, dest_dir)</code>
+        <br><span class="desc"><code>self.store.mark_installed(tts_id, lang, variant_id, dest_dir)</code></span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>def _download_and_extract(self, url, dest, progress, cancel):</code>
+        <br><span class="desc">Defines function <code>_download_and_extract</code> accepting parameters (self, url, dest, progress, ...).</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>&quot;&quot;&quot;Download tar.bz2 and extract to destination.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Download tar.bz2 and extract to destination.</em>. Documents the purpose of the following code block.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>import tarfile, tempfile</code>
+        <br><span class="desc">Imports the <code>tarfile, tempfile</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>with tempfile.NamedTemporaryFile(suffix=&quot;.tar.bz2&quot;) as tmp:</code>
+        <br><span class="desc">Context manager: <code>tempfile.NamedTemporaryFile(suffix=&quot;.tar.bz2&quot;) as tmp</code>. Automatically manages resource cleanup.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>_download_file(url, tmp.name, progress, cancel)</code>
+        <br><span class="desc">Calls function <code>_download_file()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>with tarfile.open(tmp.name, &quot;r:bz2&quot;) as tar:</code>
+        <br><span class="desc">Context manager: <code>tarfile.open(tmp.name, &quot;r:bz2&quot;) as tar</code>. Automatically manages resource cleanup.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>tar.extractall(dest)</code>
+        <br><span class="desc"><code>tar.extractall(dest)</code></span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>def remove_variant(self, tts_id, lang, variant_id):</code>
+        <br><span class="desc">Defines function <code>remove_variant</code> accepting parameters (self, tts_id, lang, variant_id).</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>&quot;&quot;&quot;Remove a downloaded variant from disk.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Remove a downloaded variant from disk.</em>. Documents the purpose of the following code block.</span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>dest = self.store.variant_dir(tts_id, lang, variant_id)</code>
+        <br><span class="desc">Assigns <code>self.store.variant_dir(tts_id, lang, variant_id)</code> to <code>dest</code>.</span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code>shutil.rmtree(dest, ignore_errors=True)</code>
+        <br><span class="desc"><code>shutil.rmtree(dest, ignore_errors=True)</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>49.2 Artifact Sources</h2>
+
+<pre><code><span class="cm"># Voice models come from two sources:</span>
+
+<span class="cm"># 1. GitHub releases (Piper, Matcha, Kitten)</span>
+url = <span class="str">f"https://github.com/rhasspy/piper/releases/download/..."</span>
+
+<span class="cm"># 2. HuggingFace repos (Kokoro)</span>
+<span class="cm"># Catalog entries specify hf_repo and hf_files:</span>
+{
+    <span class="str">"artifact"</span>: <span class="str">"kokoro-multi-lang-v1_1.tar.bz2"</span>,
+    <span class="str">"hf_repo"</span>: <span class="str">"hexgrad/Kokoro-82M"</span>,
+    <span class="str">"hf_files"</span>: [<span class="str">"kokoro-v1_1.onnx"</span>, ...],
+}
+
+<span class="cm"># 3. Shared artifacts (espeak-ng-data, vocoders)</span>
+{
+    <span class="str">"shared_artifacts"</span>: [
+        {<span class="str">"artifact"</span>: <span class="str">"vocos-22khz-univ.onnx"</span>, <span class="str">"kind"</span>: <span class="str">"file"</span>,
+         <span class="str">"dest"</span>: <span class="str">"shared/vocoders"</span>},
+    ],
+}</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Voice models come from two sources:</code>
+        <br><span class="desc">A comment: <em>Voice models come from two sources:</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># 1. GitHub releases (Piper, Matcha, Kitten)</code>
+        <br><span class="desc">A comment: <em>1. GitHub releases (Piper, Matcha, Kitten)</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>url = f&quot;https://github.com/rhasspy/piper/releases/download/...&quot;</code>
+        <br><span class="desc">Assigns <code>f&quot;https://github.com/rhasspy/piper/releases/download/...&quot;</code> to <code>url</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># 2. HuggingFace repos (Kokoro)</code>
+        <br><span class="desc">A comment: <em>2. HuggingFace repos (Kokoro)</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># Catalog entries specify hf_repo and hf_files:</code>
+        <br><span class="desc">A comment: <em>Catalog entries specify hf_repo and hf_files:</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>{</code>
+        <br><span class="desc"><code>{</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>&quot;artifact&quot;: &quot;kokoro-multi-lang-v1_1.tar.bz2&quot;,</code>
+        <br><span class="desc"><code>&quot;artifact&quot;: &quot;kokoro-multi-lang-v1_1.tar.bz2&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>&quot;hf_repo&quot;: &quot;hexgrad/Kokoro-82M&quot;,</code>
+        <br><span class="desc"><code>&quot;hf_repo&quot;: &quot;hexgrad/Kokoro-82M&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>&quot;hf_files&quot;: [&quot;kokoro-v1_1.onnx&quot;, ...],</code>
+        <br><span class="desc"><code>&quot;hf_files&quot;: [&quot;kokoro-v1_1.onnx&quot;, ...],</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>}</code>
+        <br><span class="desc"><code>}</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># 3. Shared artifacts (espeak-ng-data, vocoders)</code>
+        <br><span class="desc">A comment: <em>3. Shared artifacts (espeak-ng-data, vocoders)</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>{</code>
+        <br><span class="desc"><code>{</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>&quot;shared_artifacts&quot;: [</code>
+        <br><span class="desc"><code>&quot;shared_artifacts&quot;: [</code></span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>{&quot;artifact&quot;: &quot;vocos-22khz-univ.onnx&quot;, &quot;kind&quot;: &quot;file&quot;,</code>
+        <br><span class="desc"><code>{&quot;artifact&quot;: &quot;vocos-22khz-univ.onnx&quot;, &quot;kind&quot;: &quot;file&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>&quot;dest&quot;: &quot;shared/vocoders&quot;},</code>
+        <br><span class="desc"><code>&quot;dest&quot;: &quot;shared/vocoders&quot;},</code></span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>],</code>
+        <br><span class="desc"><code>],</code></span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>}</code>
+        <br><span class="desc"><code>}</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>49.3 Key Takeaways</h2>
+<ul>
+  <li>Models are downloaded as <strong>tar.bz2 archives</strong> and extracted to the models directory</li>
+  <li>The <strong>ModelStore</strong> tracks what's installed via a JSON state file</li>
+  <li><strong>Progress callbacks</strong> update the GUI gauge during download</li>
+  <li><strong>Cancellation</strong> is checked between chunks via threading.Event</li>
+  <li><strong>Shared artifacts</strong> (vocoders, espeak data) are stored once and referenced by multiple voices</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch48_tts_engine.html">← Ch 48</a> &nbsp;|&nbsp; <a href="ch50_compute_detection.html">Ch 50 — Compute →</a></p>
+</div></div></body>
+</html>

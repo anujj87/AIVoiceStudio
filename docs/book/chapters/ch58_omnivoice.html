@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 58: OmniVoice TTS Engine - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part VI</div><ul class="chapters"><li><a href="ch43_architecture.html">Ch 43</a></li><li><a href="ch44_paths_settings.html">Ch 44</a></li><li><a href="ch45_project_model.html">Ch 45</a></li><li><a href="ch46_document_parsing.html">Ch 46</a></li><li><a href="ch47_tts_catalog.html">Ch 47</a></li><li><a href="ch48_tts_engine.html">Ch 48</a></li><li><a href="ch49_downloader.html">Ch 49</a></li><li><a href="ch50_compute_detection.html">Ch 50</a></li><li><a href="ch51_main_frame.html">Ch 51</a></li><li><a href="ch52_settings_dialog.html">Ch 52</a></li><li><a href="ch53_model_panels.html">Ch 53</a></li><li><a href="ch54_new_project_wizard.html">Ch 54</a></li><li><a href="ch55_recording.html">Ch 55</a></li><li><a href="ch56_synthesis_worker.html">Ch 56</a></li><li><a href="ch57_clone_engine.html">Ch 57</a></li><li><a href="ch58_omnivoice.html" class="active">Ch 58: OmniVoice</a></li><li><a href="ch59_daisy_builder.html">Ch 59</a></li><li><a href="ch60_addons.html">Ch 60</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 58</div>
+<h1>OmniVoice TTS Engine</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand the OmniVoice TTS engine (600+ languages)</li>
+  <li>See the two inference modes (triton vs hybrid)</li>
+  <li>Understand the HTTP server variant</li>
+</ul>
+
+<hr>
+
+<h2>58.1 OmniVoice Features</h2>
+
+<ul>
+  <li><strong>600+ languages</strong> — massively multilingual</li>
+  <li><strong>Voice cloning</strong> — zero-shot from 3-15 second sample</li>
+  <li><strong>Voice design</strong> — create voices from text descriptions</li>
+  <li><strong>Triton mode</strong> — stable, ~1.5x faster than stock</li>
+  <li><strong>Hybrid mode</strong> — ~3.4x faster (may leak VRAM)</li>
+</ul>
+
+<hr>
+
+<h2>58.2 OmniVoiceWorker (Subprocess)</h2>
+
+<pre><code><span class="kw">class</span> <span class="cls">OmniVoiceWorker</span>:
+    <span class="str">"""Manages the OmniVoice worker subprocess."""</span>
+
+    <span class="kw">def</span> <span class="fn">_ensure_proc</span>(self):
+        <span class="kw">if</span> self._proc <span class="kw">and</span> self._proc.poll() <span class="kw">is</span> <span class="kw">None</span>:
+            <span class="kw">return</span>
+        <span class="cm"># In frozen app, use managed venv Python</span>
+        <span class="kw">if</span> getattr(sys, <span class="str">"frozen"</span>, <span class="kw">False</span>):
+            <span class="kw">from</span> ..python_runtime <span class="kw">import</span> get_runtime
+            rt = get_runtime()
+            worker_python = rt.python_exe
+            <span class="cm"># Write standalone worker script</span>
+            worker_script = os.path.join(rt.env_dir, <span class="str">"_omnivoice_worker.py"</span>)
+            <span class="kw">if not</span> os.path.isfile(worker_script):
+                <span class="kw">with</span> open(worker_script, <span class="str">"w"</span>) <span class="kw">as</span> f:
+                    f.write(_read_worker_source())
+            cmd = [worker_python, worker_script]
+        <span class="kw">else</span>:
+            cmd = [sys.executable, <span class="str">"worker.py"</span>]
+
+        self._proc = subprocess.Popen(
+            cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL, text=<span class="kw">True</span>,
+        )
+        self._request({<span class="str">"cmd"</span>: <span class="str">"ping"</span>})
+
+    <span class="kw">def</span> <span class="fn">synthesize</span>(self, text, speed=<span class="num">1.0</span>, ref_audio=<span class="str">""</span>,
+                   ref_text=<span class="str">""</span>, instruct=<span class="str">""</span>, language=<span class="str">"auto"</span>):
+        req = {<span class="str">"cmd"</span>: <span class="str">"synthesize"</span>, <span class="str">"text"</span>: text, <span class="str">"speed"</span>: speed}
+        <span class="kw">if</span> ref_audio: req[<span class="str">"ref_audio"</span>] = ref_audio
+        <span class="kw">if</span> instruct: req[<span class="str">"instruct"</span>] = instruct
+        resp = self._request(req)
+        raw = base64.b64decode(resp[<span class="str">"wav"</span>])
+        <span class="kw">return</span> np.frombuffer(raw, dtype=np.int16).copy()</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>class OmniVoiceWorker:</code>
+        <br><span class="desc">Background worker that runs the OmniVoice-Triton inference server. Manages GPU memory and request queue.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>&quot;&quot;&quot;Manages the OmniVoice worker subprocess.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Manages the OmniVoice worker subprocess.</em>. Documents the purpose of the following code block.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>def _ensure_proc(self):</code>
+        <br><span class="desc">Defines function <code>_ensure_proc</code>: Checks if the clone subprocess is running. If not, starts it. If it crashed, restarts it automatically.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>if self._proc and self._proc.poll() is None:</code>
+        <br><span class="desc">Checks condition: <code>self._proc and self._proc.poll() is None</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>return</code>
+        <br><span class="desc">Returns <code>None</code> implicitly (exits the function).</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># In frozen app, use managed venv Python</code>
+        <br><span class="desc">A comment: <em>In frozen app, use managed venv Python</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>if getattr(sys, &quot;frozen&quot;, False):</code>
+        <br><span class="desc">Checks condition: <code>getattr(sys, &quot;frozen&quot;, False)</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>from ..python_runtime import get_runtime</code>
+        <br><span class="desc">Imports <code>get_runtime</code> from the <code>..python_runtime</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>rt = get_runtime()</code>
+        <br><span class="desc">Assigns <code>get_runtime()</code> to <code>rt</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>worker_python = rt.python_exe</code>
+        <br><span class="desc">Assigns <code>rt.python_exe</code> to <code>worker_python</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># Write standalone worker script</code>
+        <br><span class="desc">A comment: <em>Write standalone worker script</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>worker_script = os.path.join(rt.env_dir, &quot;_omnivoice_worker.py&quot;)</code>
+        <br><span class="desc">Assigns <code>os.path.join(rt.env_dir, &quot;_omnivoice_worker.py&quot;)</code> to <code>worker_script</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>if not os.path.isfile(worker_script):</code>
+        <br><span class="desc">Checks condition: <code>not os.path.isfile(worker_script)</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>with open(worker_script, &quot;w&quot;) as f:</code>
+        <br><span class="desc">Context manager: <code>open(worker_script, &quot;w&quot;) as f</code>. Automatically manages resource cleanup.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>f.write(_read_worker_source())</code>
+        <br><span class="desc"><code>f.write(_read_worker_source())</code></span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>cmd = [worker_python, worker_script]</code>
+        <br><span class="desc">Assigns <code>[worker_python, worker_script]</code> to <code>cmd</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>else:</code>
+        <br><span class="desc">Fallback: executes when none of the above conditions matched.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>cmd = [sys.executable, &quot;worker.py&quot;]</code>
+        <br><span class="desc">Assigns <code>[sys.executable, &quot;worker.py&quot;]</code> to <code>cmd</code>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>self._proc = subprocess.Popen(</code>
+        <br><span class="desc">Starts a new process. Used by CloneClient and OmniVoiceWorker to run TTS engines in isolated processes.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,</code>
+        <br><span class="desc"><code>cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,</code></span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>stderr=subprocess.DEVNULL, text=True,</code>
+        <br><span class="desc">Assigns <code>subprocess.DEVNULL, text=True,</code> to <code>stderr</code>.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>self._request({&quot;cmd&quot;: &quot;ping&quot;})</code>
+        <br><span class="desc">Calls <code>self._request()</code> to perform an operation.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>def synthesize(self, text, speed=1.0, ref_audio=&quot;&quot;,</code>
+        <br><span class="desc"><code>def synthesize(self, text, speed=1.0, ref_audio=&quot;&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>ref_text=&quot;&quot;, instruct=&quot;&quot;, language=&quot;auto&quot;):</code>
+        <br><span class="desc">Assigns <code>&quot;&quot;, instruct=&quot;&quot;, language=&quot;auto&quot;):</code> to <code>ref_text</code>.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>req = {&quot;cmd&quot;: &quot;synthesize&quot;, &quot;text&quot;: text, &quot;speed&quot;: speed}</code>
+        <br><span class="desc">Assigns <code>{&quot;cmd&quot;: &quot;synthesize&quot;, &quot;text&quot;: text, &quot;speed&quot;: speed}</code> to <code>req</code>.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>if ref_audio: req[&quot;ref_audio&quot;] = ref_audio</code>
+        <br><span class="desc">Checks condition: <code>ref_audio</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>if instruct: req[&quot;instruct&quot;] = instruct</code>
+        <br><span class="desc">Checks condition: <code>instruct</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>resp = self._request(req)</code>
+        <br><span class="desc">Assigns <code>self._request(req)</code> to <code>resp</code>.</span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code>raw = base64.b64decode(resp[&quot;wav&quot;])</code>
+        <br><span class="desc">Assigns <code>base64.b64decode(resp[&quot;wav&quot;])</code> to <code>raw</code>.</span>
+      </li>
+      <li>
+        <strong>Line 31:</strong> <code>return np.frombuffer(raw, dtype=np.int16).copy()</code>
+        <br><span class="desc">Returns <code>np.frombuffer(raw, dtype=np.int16).copy()</code> to the caller.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>58.3 OmniVoice HTTP Server</h2>
+
+<pre><code><span class="kw">class</span> <span class="cls">OmniVoiceServerManager</span>:
+    <span class="str">"""Manages the omnivoice-server HTTP subprocess."""</span>
+
+    <span class="kw">def</span> <span class="fn">start</span>(self, timeout=<span class="num">120.0</span>):
+        <span class="cm"># Start server subprocess</span>
+        cmd = [rt.python_exe, <span class="str">"-m"</span>, <span class="str">"omnivoice_server"</span>,
+               <span class="str">"--host"</span>, self._host, <span class="str">"--port"</span>, str(self._port)]
+        self._proc = subprocess.Popen(cmd, ...)
+        self._wait_ready(timeout)  <span class="cm"># Poll /health endpoint</span>
+
+    <span class="kw">def</span> <span class="fn">synthesize</span>(self, text, voice=<span class="str">"alloy"</span>, instructions=<span class="str">""</span>, speed=<span class="num">1.0</span>):
+        <span class="cm"># POST to /v1/audio/speech</span>
+        url = <span class="str">f"</span>{self.base_url}<span class="str">/v1/audio/speech"</span>
+        payload = {<span class="str">"model"</span>: <span class="str">"omnivoice"</span>, <span class="str">"input"</span>: text, ...}
+        resp = urllib.request.urlopen(req, timeout=<span class="num">120</span>)
+        <span class="kw">return</span> self._wav_bytes_to_samples(resp.read())</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>class OmniVoiceServerManager:</code>
+        <br><span class="desc">HTTP API server that exposes voice cloning over REST endpoints. Allows multiple clients to clone voices simultaneously.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>&quot;&quot;&quot;Manages the omnivoice-server HTTP subprocess.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Manages the omnivoice-server HTTP subprocess.</em>. Documents the purpose of the following code block.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>def start(self, timeout=120.0):</code>
+        <br><span class="desc">Defines function <code>start</code> accepting parameters (self, timeout).</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># Start server subprocess</code>
+        <br><span class="desc">A comment: <em>Start server subprocess</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>cmd = [rt.python_exe, &quot;-m&quot;, &quot;omnivoice_server&quot;,</code>
+        <br><span class="desc">Assigns <code>[rt.python_exe, &quot;-m&quot;, &quot;omnivoice_server&quot;,</code> to <code>cmd</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>&quot;--host&quot;, self._host, &quot;--port&quot;, str(self._port)]</code>
+        <br><span class="desc"><code>&quot;--host&quot;, self._host, &quot;--port&quot;, str(self._port)]</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>self._proc = subprocess.Popen(cmd, ...)</code>
+        <br><span class="desc">Starts a new process. Used by CloneClient and OmniVoiceWorker to run TTS engines in isolated processes.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>self._wait_ready(timeout)  # Poll /health endpoint</code>
+        <br><span class="desc">Calls <code>self._wait_ready()</code> to perform an operation.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>def synthesize(self, text, voice=&quot;alloy&quot;, instructions=&quot;&quot;, speed=1.0):</code>
+        <br><span class="desc">Defines function <code>synthesize</code>: Core synthesis method. Takes text string, voice ID (sid), speed/pitch/volume floats. Returns a NumPy array of int16 audio samples at the engine's sample_rate.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code># POST to /v1/audio/speech</code>
+        <br><span class="desc">A comment: <em>POST to /v1/audio/speech</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>url = f&quot;{self.base_url}/v1/audio/speech&quot;</code>
+        <br><span class="desc">Assigns <code>f&quot;{self.base_url}/v1/audio/speech&quot;</code> to <code>url</code>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>payload = {&quot;model&quot;: &quot;omnivoice&quot;, &quot;input&quot;: text, ...}</code>
+        <br><span class="desc">Assigns <code>{&quot;model&quot;: &quot;omnivoice&quot;, &quot;input&quot;: text, ...}</code> to <code>payload</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>resp = urllib.request.urlopen(req, timeout=120)</code>
+        <br><span class="desc">Assigns <code>urllib.request.urlopen(req, timeout=120)</code> to <code>resp</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>return self._wav_bytes_to_samples(resp.read())</code>
+        <br><span class="desc">Returns <code>self._wav_bytes_to_samples(resp.read())</code> to the caller.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>58.4 Key Takeaways</h2>
+<ul>
+  <li><strong>OmniVoice</strong> is the most powerful TTS engine — 600+ languages, cloning, design</li>
+  <li>Two modes: <strong>triton</strong> (stable) and <strong>hybrid</strong> (fast, may leak VRAM)</li>
+  <li>The <strong>HTTP server variant</strong> allows network access and OpenAI-compatible API</li>
+  <li>Requires <strong>CUDA GPU</strong> — detected via nvidia-smi</li>
+  <li>Like XTTS, runs in a <strong>separate subprocess</strong> for runtime isolation</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch57_clone_engine.html">← Ch 57</a> &nbsp;|&nbsp; <a href="ch59_daisy_builder.html">Ch 59 — DAISY →</a></p>
+</div></div></body>
+</html>

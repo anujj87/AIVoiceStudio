@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 65: Inno Setup Installers - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part VII</div><ul class="chapters"><li><a href="ch61_unit_testing.html">Ch 61</a></li><li><a href="ch62_mocking.html">Ch 62</a></li><li><a href="ch63_integration.html">Ch 63</a></li><li><a href="ch64_pyinstaller.html">Ch 64</a></li><li><a href="ch65_inno_setup.html" class="active">Ch 65: Inno Setup</a></li><li><a href="ch66_ci_cd.html">Ch 66</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 65</div>
+<h1>Inno Setup Installers</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand the Inno Setup compilation process</li>
+  <li>See the installer configuration</li>
+  <li>Understand the full build pipeline</li>
+</ul>
+
+<hr>
+
+<h2>65.1 Build Pipeline</h2>
+
+<pre><code>Development venv → PyInstaller → dist/AIVS-64/ → Inno Setup → Setup.exe
+
+<span class="cm"># Step 1: PyInstaller bundles the app</span>
+pyinstaller packaging/ai_voice_studio.spec
+
+<span class="cm"># Step 2: Inno Setup wraps it into an installer</span>
+"C:\Program Files\Inno Setup 7\ISCC.exe" packaging/installer_64.iss
+
+<span class="cm"># Output: dist/AI-Voice-Studio-v-2026-2-0-Setup-x64.exe (39 MB)</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>Development venv → PyInstaller → dist/AIVS-64/ → Inno Setup → Setup.exe</code>
+        <br><span class="desc">A tool that packages Python apps into standalone executables. Bundles Python interpreter and all dependencies.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Step 1: PyInstaller bundles the app</code>
+        <br><span class="desc">A comment: <em>Step 1: PyInstaller bundles the app</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>pyinstaller packaging/ai_voice_studio.spec</code>
+        <br><span class="desc">Command-line tool for building executables. Supports --onefile, --windowed, --add-data options.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># Step 2: Inno Setup wraps it into an installer</code>
+        <br><span class="desc">A comment: <em>Step 2: Inno Setup wraps it into an installer</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>&quot;C:\Program Files\Inno Setup 7\ISCC.exe&quot; packaging/installer_64.iss</code>
+        <br><span class="desc">A Windows installer builder. Compiles .iss scripts into setup.exe files.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># Output: dist/AI-Voice-Studio-v-2026-2-0-Setup-x64.exe (39 MB)</code>
+        <br><span class="desc">A comment: <em>Output: dist/AI-Voice-Studio-v-2026-2-0-Setup-x64.exe (39 MB)</em>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>65.2 Installer Features</h2>
+
+<ul>
+  <li><strong>"Install for all users"</strong> / <strong>"for me only"</strong> choice (no admin needed for per-user)</li>
+  <li>Install location picker</li>
+  <li>Start Menu folder choice</li>
+  <li>Optional <strong>desktop icon</strong></li>
+  <li>"Open Read Me after install" checkbox</li>
+  <li>"Launch AI Voice Studio after setup" checkbox</li>
+  <li><strong>GPL-3.0 license</strong> page</li>
+  <li>Uninstaller with clean removal</li>
+</ul>
+
+<hr>
+
+<h2>65.3 Inno Setup Script Structure</h2>
+
+<pre><code><span class="cm">; packaging/installer_64.iss (simplified)</span>
+[Setup]
+AppName=AI Voice Studio
+AppVersion=2.0.0
+DefaultDirName={autopf}\AI Voice Studio
+DefaultGroupName=AI Voice Studio
+LicenseFile=..\LICENSE
+OutputDir=..\dist
+OutputBaseFilename=AI-Voice-Studio-v-2026-2-0-Setup-x64
+Compression=lzma2/ultra64
+SolidCompression=yes
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
+
+[Files]
+Source: "..\dist\AIVS-64\AI-Voice-Studio\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
+
+[Icons]
+Name: "{group}\AI Voice Studio"; Filename: "{app}\AI-Voice-Studio.exe"
+Name: "{autodesktop}\AI Voice Studio"; Filename: "{app}\AI-Voice-Studio.exe"; Tasks: desktopicon
+
+[Run]
+Filename: "{app}\AI-Voice-Studio.exe"; Description: "Launch AI Voice Studio"; Flags: nowait postinstall skipifsilent</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>; packaging/installer_64.iss (simplified)</code>
+        <br><span class="desc">Inno Setup Script file. Defines the installer: files, icons, license, dialogs.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>[Setup]</code>
+        <br><span class="desc">Inno Setup section for installer metadata (name, version, output file).</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>AppName=AI Voice Studio</code>
+        <br><span class="desc">Assigns <code>AI Voice Studio</code> to <code>AppName</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>AppVersion=2.0.0</code>
+        <br><span class="desc">Inno Setup directive setting the application version number.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>DefaultDirName={autopf}\AI Voice Studio</code>
+        <br><span class="desc">Inno Setup directive setting the default installation directory.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>DefaultGroupName=AI Voice Studio</code>
+        <br><span class="desc">Assigns <code>AI Voice Studio</code> to <code>DefaultGroupName</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>LicenseFile=..\LICENSE</code>
+        <br><span class="desc">Assigns <code>..\LICENSE</code> to <code>LicenseFile</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>OutputDir=..\dist</code>
+        <br><span class="desc">Assigns <code>..\dist</code> to <code>OutputDir</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>OutputBaseFilename=AI-Voice-Studio-v-2026-2-0-Setup-x64</code>
+        <br><span class="desc">Inno Setup directive setting the output installer filename.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>Compression=lzma2/ultra64</code>
+        <br><span class="desc">Assigns <code>lzma2/ultra64</code> to <code>Compression</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>SolidCompression=yes</code>
+        <br><span class="desc">Assigns <code>yes</code> to <code>SolidCompression</code>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>ArchitecturesAllowed=x64compatible</code>
+        <br><span class="desc">Assigns <code>x64compatible</code> to <code>ArchitecturesAllowed</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>ArchitecturesInstallIn64BitMode=x64compatible</code>
+        <br><span class="desc">Assigns <code>x64compatible</code> to <code>ArchitecturesInstallIn64BitMode</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>[Files]</code>
+        <br><span class="desc">Inno Setup section listing files to include in the installer.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>Source: &quot;..\dist\AIVS-64\AI-Voice-Studio\*&quot;; DestDir: &quot;{app}&quot;; Flags: ignoreversion recursesubdirs</code>
+        <br><span class="desc"><code>Source: &quot;..\dist\AIVS-64\AI-Voice-Studio\*&quot;; DestDir: &quot;{app}&quot;; Flags: ignoreversion recursesubdirs</code></span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>[Icons]</code>
+        <br><span class="desc">Inno Setup section for Start Menu and desktop shortcuts.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>Name: &quot;{group}\AI Voice Studio&quot;; Filename: &quot;{app}\AI-Voice-Studio.exe&quot;</code>
+        <br><span class="desc"><code>Name: &quot;{group}\AI Voice Studio&quot;; Filename: &quot;{app}\AI-Voice-Studio.exe&quot;</code></span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>Name: &quot;{autodesktop}\AI Voice Studio&quot;; Filename: &quot;{app}\AI-Voice-Studio.exe&quot;; Tasks: desktopicon</code>
+        <br><span class="desc"><code>Name: &quot;{autodesktop}\AI Voice Studio&quot;; Filename: &quot;{app}\AI-Voice-Studio.exe&quot;; Tasks: desktopicon</code></span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>[Run]</code>
+        <br><span class="desc">Inno Setup section for programs to run after installation.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>Filename: &quot;{app}\AI-Voice-Studio.exe&quot;; Description: &quot;Launch AI Voice Studio&quot;; Flags: nowait postinstall skipifsilent</code>
+        <br><span class="desc"><code>Filename: &quot;{app}\AI-Voice-Studio.exe&quot;; Description: &quot;Launch AI Voice Studio&quot;; Flags: nowait postinstall skipifsilent</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>65.4 Key Takeaways</h2>
+<ul>
+  <li><strong>Inno Setup 7</strong> creates professional Windows installers</li>
+  <li>The installer wraps the <strong>PyInstaller output</strong> into a setup.exe</li>
+  <li><strong>LZMA2 compression</strong> reduces the 39 MB installer size</li>
+  <li>The build is automated via <strong>build.ps1</strong> (PowerShell)</li>
+  <li>Output: <strong>AI-Voice-Studio-v-2026-2-0-Setup-x64.exe</strong></li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch64_pyinstaller.html">← Ch 64</a> &nbsp;|&nbsp; <a href="ch66_ci_cd.html">Ch 66 — CI/CD →</a></p>
+</div></div></body>
+</html>

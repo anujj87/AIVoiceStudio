@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 19: Concurrency &amp; Threading - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part III — Advanced</div><ul class="chapters"><li><a href="ch19_concurrency.html" class="active">Ch 19: Concurrency</a></li><li><a href="ch20_multiprocessing.html">Ch 20</a></li><li><a href="ch21_async.html">Ch 21</a></li><li><a href="ch22_type_hints.html">Ch 22</a></li><li><a href="ch23_metaclasses.html">Ch 23</a></li><li><a href="ch24_design_patterns.html">Ch 24</a></li><li><a href="ch25_introspection.html">Ch 25</a></li><li><a href="ch26_c_extensions.html">Ch 26</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="part-divider">
+  <div class="part-number">Part III</div>
+  <h2>Advanced Python</h2>
+</div>
+
+<div class="chapter-number">Chapter 19</div>
+<h1>Concurrency &amp; Threading</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand the GIL (Global Interpreter Lock) and its implications</li>
+  <li>Use <code>threading</code> for I/O-bound concurrency</li>
+  <li>Synchronize access with locks, events, and conditions</li>
+  <li>See threading patterns in AIVS (background TTS, downloads)</li>
+</ul>
+
+<hr>
+
+<h2>19.1 The GIL and When to Use Threads</h2>
+
+<p>
+  Python's <strong>GIL</strong> (Global Interpreter Lock) means only one thread executes
+  Python bytecode at a time. This makes threads unsuitable for CPU-bound work but
+  excellent for <strong>I/O-bound</strong> tasks:
+</p>
+
+<table>
+  <thead><tr><th>Task Type</th><th>Solution</th><th>AIVS Example</th></tr></thead>
+  <tbody>
+    <tr><td>I/O-bound (network, disk)</td><td><code>threading</code></td><td>Downloading models, file I/O</td></tr>
+    <tr><td>CPU-bound (computation)</td><td><code>multiprocessing</code></td><td>N/A (use subprocesses instead)</td></tr>
+    <tr><td>GUI + background work</td><td><code>threading</code></td><td>TTS synthesis + UI updates</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h2>19.2 Basic Threading</h2>
+
+<pre><code><span class="kw">import</span> threading
+
+<span class="cm"># Simple thread</span>
+<span class="kw">def</span> <span class="fn">download_model</span>(url, dest):
+    <span class="kw">import</span> time
+    time.sleep(<span class="num">2</span>)  <span class="cm"># Simulate download</span>
+    <span class="kw">print</span>(<span class="str">f"Downloaded to </span>{dest}<span class="str">"</span>)
+
+t = threading.Thread(target=download_model, args=(<span class="str">"http://..."</span>, <span class="str">"/tmp/model"</span>))
+t.start()   <span class="cm"># Starts in background</span>
+t.join()    <span class="cm"># Wait for completion</span>
+
+<span class="cm"># Daemon thread (dies when main program exits)</span>
+t = threading.Thread(target=background_task, daemon=<span class="kw">True</span>)
+t.start()
+<span class="cm"># No need to join — it dies with the main thread</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>import threading</code>
+        <br><span class="desc">Imports the <code>threading</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Simple thread</code>
+        <br><span class="desc">A comment: <em>Simple thread</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>def download_model(url, dest):</code>
+        <br><span class="desc">Defines function <code>download_model</code> accepting (url, dest).</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>import time</code>
+        <br><span class="desc">Imports the <code>time</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>time.sleep(2)  # Simulate download</code>
+        <br><span class="desc"><code>time.sleep(2)  # Simulate download</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>print(f&quot;Downloaded to {dest}&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>t = threading.Thread(target=download_model, args=(&quot;http://...&quot;, &quot;/tmp/model&quot;))</code>
+        <br><span class="desc">Creates a background thread. Use daemon=True for threads that should not block app exit.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>t.start()   # Starts in background</code>
+        <br><span class="desc"><code>t.start()   # Starts in background</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>t.join()    # Wait for completion</code>
+        <br><span class="desc">Joins an iterable of strings with the calling string as separator. ', '.join(['a','b']) returns 'a, b'.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code># Daemon thread (dies when main program exits)</code>
+        <br><span class="desc">A comment: <em>Daemon thread (dies when main program exits)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>t = threading.Thread(target=background_task, daemon=True)</code>
+        <br><span class="desc">Creates a background thread. Use daemon=True for threads that should not block app exit.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>t.start()</code>
+        <br><span class="desc"><code>t.start()</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code># No need to join — it dies with the main thread</code>
+        <br><span class="desc">A comment: <em>No need to join — it dies with the main thread</em>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>19.3 Thread Synchronization</h2>
+
+<pre><code><span class="kw">import</span> threading
+
+<span class="cm"># Lock — mutual exclusion</span>
+_lock = threading.Lock()
+
+<span class="kw">def</span> <span class="fn">thread_safe_operation</span>():
+    <span class="kw">with</span> _lock:
+        <span class="cm"># Only one thread can execute this block at a time</span>
+        critical_section()
+
+<span class="cm"># RLock — reentrant lock (same thread can acquire multiple times)</span>
+_rlock = threading.RLock()
+
+<span class="cm"># Event — signaling between threads</span>
+cancel_event = threading.Event()
+
+<span class="kw">def</span> <span class="fn">worker</span>():
+    <span class="kw">while not</span> cancel_event.is_set():
+        <span class="cm"># Do work...</span>
+        <span class="kw">if</span> cancel_event.is_set():
+            <span class="kw">break</span>  <span class="cm"># Check between each segment</span>
+
+<span class="cm"># Usage in AIVS — cancel a download</span>
+cancel_event = threading.Event()
+t = threading.Thread(target=download, args=(url, dest, cancel_event))
+t.start()
+
+<span class="cm"># User clicks Cancel</span>
+cancel_event.set()  <span class="cm"># Signal the thread to stop</span>
+t.join()</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>import threading</code>
+        <br><span class="desc">Imports the <code>threading</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Lock — mutual exclusion</code>
+        <br><span class="desc">A comment: <em>Lock — mutual exclusion</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>_lock = threading.Lock()</code>
+        <br><span class="desc">A mutual exclusion lock. Only one thread can hold it at a time. Prevents race conditions.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>def thread_safe_operation():</code>
+        <br><span class="desc">Defines function <code>thread_safe_operation</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>with _lock:</code>
+        <br><span class="desc">Context manager: <code>_lock</code>. Automatically manages resource cleanup.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># Only one thread can execute this block at a time</code>
+        <br><span class="desc">A comment: <em>Only one thread can execute this block at a time</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>critical_section()</code>
+        <br><span class="desc">Calls function <code>critical_section()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># RLock — reentrant lock (same thread can acquire multiple times)</code>
+        <br><span class="desc">A comment: <em>RLock — reentrant lock (same thread can acquire multiple times)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>_rlock = threading.RLock()</code>
+        <br><span class="desc">A reentrant lock that allows the same thread to acquire it multiple times.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code># Event — signaling between threads</code>
+        <br><span class="desc">A comment: <em>Event — signaling between threads</em>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>cancel_event = threading.Event()</code>
+        <br><span class="desc">A flag that threads can wait on. Used for signaling between threads.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>def worker():</code>
+        <br><span class="desc">Defines function <code>worker</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>while not cancel_event.is_set():</code>
+        <br><span class="desc">While loop: repeats as long as <code>not cancel_event.is_set()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code># Do work...</code>
+        <br><span class="desc">A comment: <em>Do work...</em>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>if cancel_event.is_set():</code>
+        <br><span class="desc">Checks condition: <code>cancel_event.is_set()</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>break  # Check between each segment</code>
+        <br><span class="desc"><code>break  # Check between each segment</code></span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code># Usage in AIVS — cancel a download</code>
+        <br><span class="desc">A comment: <em>Usage in AIVS — cancel a download</em>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>cancel_event = threading.Event()</code>
+        <br><span class="desc">A flag that threads can wait on. Used for signaling between threads.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>t = threading.Thread(target=download, args=(url, dest, cancel_event))</code>
+        <br><span class="desc">Creates a background thread. Use daemon=True for threads that should not block app exit.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>t.start()</code>
+        <br><span class="desc"><code>t.start()</code></span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code># User clicks Cancel</code>
+        <br><span class="desc">A comment: <em>User clicks Cancel</em>.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>cancel_event.set()  # Signal the thread to stop</code>
+        <br><span class="desc"><code>cancel_event.set()  # Signal the thread to stop</code></span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>t.join()</code>
+        <br><span class="desc">Joins an iterable of strings with the calling string as separator. ', '.join(['a','b']) returns 'a, b'.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>19.4 Threading in AIVS</h2>
+
+<h3>The Synthesis Worker Pattern</h3>
+
+<pre><code><span class="cm"># From jobs/synthesizer.py — background TTS processing</span>
+<span class="kw">class</span> <span class="cls">SynthesisWorker</span>(threading.Thread):
+    <span class="str">"""Background thread that synthesizes audio segments."""</span>
+
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, segments, voice_entry, params,
+                 output_dir, on_segment_done, on_all_done,
+                 on_error, cancel_event, pause_event, on_status):
+        <span class="kw">super</span>().__init__(daemon=<span class="kw">True</span>)
+        self._segments = segments
+        self._voice_entry = voice_entry
+        self._cancel = cancel_event
+        self._pause = pause_event
+        self._on_done = on_segment_done
+        self._on_all_done = on_all_done
+        self._on_error = on_error
+        self._on_status = on_status
+        self._output_dir = output_dir
+
+    <span class="kw">def</span> <span class="fn">run</span>(self):
+        <span class="str">"""Main thread loop — runs in background thread."""</span>
+        <span class="kw">try</span>:
+            engine = get_engine(self._voice_entry)
+            <span class="kw">for</span> i, seg <span class="kw">in</span> enumerate(self._segments):
+                <span class="cm"># Check for cancellation</span>
+                <span class="kw">if</span> self._cancel.is_set():
+                    <span class="kw">break</span>
+
+                <span class="cm"># Check for pause</span>
+                <span class="kw">while</span> self._pause.is_set():
+                    <span class="kw">if</span> self._cancel.is_set():
+                        <span class="kw">break</span>
+                    time.sleep(<span class="num">0.1</span>)
+
+                <span class="cm"># Synthesize</span>
+                self._on_status(<span class="str">f"Recording segment </span>{i+<span class="num">1</span>}<span class="str">..."</span>)
+                audio = engine.synthesize(
+                    seg.text,
+                    speed=self._params[<span class="str">"rate"</span>],
+                    pitch=self._params[<span class="str">"pitch"</span>],
+                    volume=self._params[<span class="str">"volume"</span>],
+                )
+
+                <span class="cm"># Save to disk immediately</span>
+                path = self._save_audio(seg, audio)
+
+                <span class="cm"># Notify GUI (thread-safe via wx.PostEvent)</span>
+                self._on_done(i, seg.title, path)
+
+            self._on_all_done()
+        <span class="kw">except</span> Exception <span class="kw">as</span> exc:
+            self._on_error(str(exc))
+
+    <span class="kw">def</span> <span class="fn">cancel</span>(self):
+        self._cancel.set()
+
+    <span class="kw">def</span> <span class="fn">pause</span>(self):
+        self._pause.set()
+
+    <span class="kw">def</span> <span class="fn">resume</span>(self):
+        self._pause.clear()</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From jobs/synthesizer.py — background TTS processing</code>
+        <br><span class="desc">A comment: <em>From jobs/synthesizer.py — background TTS processing</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>class SynthesisWorker(threading.Thread):</code>
+        <br><span class="desc">Creates a background thread. Use daemon=True for threads that should not block app exit.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;&quot;&quot;Background thread that synthesizes audio segments.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Background thread that synthesizes audio segments.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>def __init__(self, segments, voice_entry, params,</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>output_dir, on_segment_done, on_all_done,</code>
+        <br><span class="desc"><code>output_dir, on_segment_done, on_all_done,</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>on_error, cancel_event, pause_event, on_status):</code>
+        <br><span class="desc"><code>on_error, cancel_event, pause_event, on_status):</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>super().__init__(daemon=True)</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>self._segments = segments</code>
+        <br><span class="desc">Stores <code>segments</code> in instance attribute <code>_segments</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>self._voice_entry = voice_entry</code>
+        <br><span class="desc">Stores <code>voice_entry</code> in instance attribute <code>_voice_entry</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>self._cancel = cancel_event</code>
+        <br><span class="desc">Stores <code>cancel_event</code> in instance attribute <code>_cancel</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>self._pause = pause_event</code>
+        <br><span class="desc">Stores <code>pause_event</code> in instance attribute <code>_pause</code>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>self._on_done = on_segment_done</code>
+        <br><span class="desc">Stores <code>on_segment_done</code> in instance attribute <code>_on_done</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>self._on_all_done = on_all_done</code>
+        <br><span class="desc">Stores <code>on_all_done</code> in instance attribute <code>_on_all_done</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>self._on_error = on_error</code>
+        <br><span class="desc">Stores <code>on_error</code> in instance attribute <code>_on_error</code>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>self._on_status = on_status</code>
+        <br><span class="desc">Stores <code>on_status</code> in instance attribute <code>_on_status</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>self._output_dir = output_dir</code>
+        <br><span class="desc">Stores <code>output_dir</code> in instance attribute <code>_output_dir</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>def run(self):</code>
+        <br><span class="desc">Defines function <code>run</code> accepting (self).</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>&quot;&quot;&quot;Main thread loop — runs in background thread.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Main thread loop — runs in background thread.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>try:</code>
+        <br><span class="desc">Begins exception handling. Code in this block is monitored for errors.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>engine = get_engine(self._voice_entry)</code>
+        <br><span class="desc">Assigns <code>get_engine(self._voice_entry)</code> to <code>engine</code>.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>for i, seg in enumerate(self._segments):</code>
+        <br><span class="desc">Adds a counter to an iterable, returning (index, value) pairs. Preferred over manual index tracking.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code># Check for cancellation</code>
+        <br><span class="desc">A comment: <em>Check for cancellation</em>.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>if self._cancel.is_set():</code>
+        <br><span class="desc">Checks condition: <code>self._cancel.is_set()</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>break</code>
+        <br><span class="desc">Exits the innermost loop.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code># Check for pause</code>
+        <br><span class="desc">A comment: <em>Check for pause</em>.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>while self._pause.is_set():</code>
+        <br><span class="desc">While loop: repeats as long as <code>self._pause.is_set()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>if self._cancel.is_set():</code>
+        <br><span class="desc">Checks condition: <code>self._cancel.is_set()</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>break</code>
+        <br><span class="desc">Exits the innermost loop.</span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>time.sleep(0.1)</code>
+        <br><span class="desc"><code>time.sleep(0.1)</code></span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code># Synthesize</code>
+        <br><span class="desc">A comment: <em>Synthesize</em>.</span>
+      </li>
+      <li>
+        <strong>Line 31:</strong> <code>self._on_status(f&quot;Recording segment {i+1}...&quot;)</code>
+        <br><span class="desc">Calls <code>self._on_status()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 32:</strong> <code>audio = engine.synthesize(</code>
+        <br><span class="desc">Assigns <code>engine.synthesize(</code> to <code>audio</code>.</span>
+      </li>
+      <li>
+        <strong>Line 33:</strong> <code>seg.text,</code>
+        <br><span class="desc"><code>seg.text,</code></span>
+      </li>
+      <li>
+        <strong>Line 34:</strong> <code>speed=self._params[&quot;rate&quot;],</code>
+        <br><span class="desc">Assigns <code>self._params[&quot;rate&quot;],</code> to <code>speed</code>.</span>
+      </li>
+      <li>
+        <strong>Line 35:</strong> <code>pitch=self._params[&quot;pitch&quot;],</code>
+        <br><span class="desc">Assigns <code>self._params[&quot;pitch&quot;],</code> to <code>pitch</code>.</span>
+      </li>
+      <li>
+        <strong>Line 36:</strong> <code>volume=self._params[&quot;volume&quot;],</code>
+        <br><span class="desc">Assigns <code>self._params[&quot;volume&quot;],</code> to <code>volume</code>.</span>
+      </li>
+      <li>
+        <strong>Line 37:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+      <li>
+        <strong>Line 38:</strong> <code># Save to disk immediately</code>
+        <br><span class="desc">A comment: <em>Save to disk immediately</em>.</span>
+      </li>
+      <li>
+        <strong>Line 39:</strong> <code>path = self._save_audio(seg, audio)</code>
+        <br><span class="desc">Assigns <code>self._save_audio(seg, audio)</code> to <code>path</code>.</span>
+      </li>
+      <li>
+        <strong>Line 40:</strong> <code># Notify GUI (thread-safe via wx.PostEvent)</code>
+        <br><span class="desc">A comment: <em>Notify GUI (thread-safe via wx.PostEvent)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 41:</strong> <code>self._on_done(i, seg.title, path)</code>
+        <br><span class="desc">Calls <code>self._on_done()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 42:</strong> <code>self._on_all_done()</code>
+        <br><span class="desc">Calls <code>self._on_all_done()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 43:</strong> <code>except Exception as exc:</code>
+        <br><span class="desc">Catches <code>Exception</code> exceptions.</span>
+      </li>
+      <li>
+        <strong>Line 44:</strong> <code>self._on_error(str(exc))</code>
+        <br><span class="desc">Converts a value to its string representation. Essential for string concatenation and formatting.</span>
+      </li>
+      <li>
+        <strong>Line 45:</strong> <code>def cancel(self):</code>
+        <br><span class="desc">Defines function <code>cancel</code> accepting (self).</span>
+      </li>
+      <li>
+        <strong>Line 46:</strong> <code>self._cancel.set()</code>
+        <br><span class="desc"><code>self._cancel.set()</code></span>
+      </li>
+      <li>
+        <strong>Line 47:</strong> <code>def pause(self):</code>
+        <br><span class="desc">Defines function <code>pause</code> accepting (self).</span>
+      </li>
+      <li>
+        <strong>Line 48:</strong> <code>self._pause.set()</code>
+        <br><span class="desc"><code>self._pause.set()</code></span>
+      </li>
+      <li>
+        <strong>Line 49:</strong> <code>def resume(self):</code>
+        <br><span class="desc">Defines function <code>resume</code> accepting (self).</span>
+      </li>
+      <li>
+        <strong>Line 50:</strong> <code>self._pause.clear()</code>
+        <br><span class="desc">Removes all items from the dictionary.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>Thread-Safe GUI Communication</h3>
+
+<pre><code><span class="cm"># wxPython requires UI updates on the main thread
+# Workers post events, GUI handles them on the main thread</span>
+
+<span class="cm"># From gui/events.py</span>
+_SYNTH_STATUS = wx.NewEventType()
+EVT_SYNTH_STATUS = wx.PyEventBinder(_SYNTH_STATUS, <span class="num">1</span>)
+
+<span class="kw">class</span> <span class="cls">SynthStatusEvent</span>(wx.PyCommandEvent):
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, message: str):
+        <span class="kw">super</span>().__init__(_SYNTH_STATUS)
+        self.message = message
+
+<span class="cm"># In the worker thread:</span>
+<span class="kw">def</span> <span class="fn">_on_status</span>(self, msg):
+    wx.PostEvent(self, SynthStatusEvent(msg))
+
+<span class="cm"># In the GUI (main thread):</span>
+self.Bind(EVT_SYNTH_STATUS, self._handle_status)
+
+<span class="kw">def</span> <span class="fn">_handle_status</span>(self, evt: SynthStatusEvent):
+    self.status_label.SetLabel(evt.message)  <span class="cm"># Safe — on main thread</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 4)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># wxPython requires UI updates on the main thread</code>
+        <br><span class="desc">A comment: <em>wxPython requires UI updates on the main thread</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Workers post events, GUI handles them on the main thread</code>
+        <br><span class="desc">A comment: <em>Workers post events, GUI handles them on the main thread</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># From gui/events.py</code>
+        <br><span class="desc">A comment: <em>From gui/events.py</em>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>_SYNTH_STATUS = wx.NewEventType()</code>
+        <br><span class="desc">Assigns <code>wx.NewEventType()</code> to <code>_SYNTH_STATUS</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>EVT_SYNTH_STATUS = wx.PyEventBinder(_SYNTH_STATUS, 1)</code>
+        <br><span class="desc">Assigns <code>wx.PyEventBinder(_SYNTH_STATUS, 1)</code> to <code>EVT_SYNTH_STATUS</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>class SynthStatusEvent(wx.PyCommandEvent):</code>
+        <br><span class="desc">Defines class <code>SynthStatusEvent</code> inheriting from <code>wx.PyCommandEvent</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>def __init__(self, message: str):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>super().__init__(_SYNTH_STATUS)</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>self.message = message</code>
+        <br><span class="desc">Stores <code>message</code> in instance attribute <code>message</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code># In the worker thread:</code>
+        <br><span class="desc">A comment: <em>In the worker thread:</em>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>def _on_status(self, msg):</code>
+        <br><span class="desc">Defines function <code>_on_status</code> accepting (self, msg).</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>wx.PostEvent(self, SynthStatusEvent(msg))</code>
+        <br><span class="desc">Creates a wxPython <code>wx.PostEvent</code> widget.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code># In the GUI (main thread):</code>
+        <br><span class="desc">A comment: <em>In the GUI (main thread):</em>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>self.Bind(EVT_SYNTH_STATUS, self._handle_status)</code>
+        <br><span class="desc">Registers an event handler on the frame/window itself. Used for frame-level events.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>def _handle_status(self, evt: SynthStatusEvent):</code>
+        <br><span class="desc">Defines function <code>_handle_status</code> accepting (self, evt).</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>self.status_label.SetLabel(evt.message)  # Safe — on main thread</code>
+        <br><span class="desc"><code>self.status_label.SetLabel(evt.message)  # Safe — on main thread</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>19.5 Download Threading Pattern</h2>
+
+<pre><code><span class="cm"># From gui/model_panels.py — background download</span>
+<span class="kw">def</span> <span class="fn">_on_download</span>(self, _):
+    self._cancel_event = threading.Event()
+    self._thread = threading.Thread(
+        target=self._download_job,
+        args=(tts_id, lang_code, variants),
+        daemon=<span class="kw">True</span>,
+    )
+    self._thread.start()
+
+<span class="kw">def</span> <span class="fn">_download_job</span>(self, tts_id, lang_code, variants):
+    <span class="kw">def</span> <span class="fn">progress</span>(name, done, total):
+        wx.PostEvent(self, DownloadProgressEvent(name, done, total))
+
+    <span class="kw">try</span>:
+        <span class="kw">for</span> variant_id <span class="kw">in</span> variants:
+            self.downloader.download_variant(
+                tts_id, lang_code, variant_id,
+                progress=progress,
+                cancel_event=self._cancel_event,
+            )
+        wx.PostEvent(self, DownloadFinishedEvent(True, <span class="str">"Done!"</span>))
+    <span class="kw">except</span> DownloadCancelled:
+        wx.PostEvent(self, DownloadFinishedEvent(False, <span class="str">"Cancelled"</span>))
+    <span class="kw">except</span> Exception <span class="kw">as</span> exc:
+        wx.PostEvent(self, DownloadFinishedEvent(False, str(exc)))</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 5)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From gui/model_panels.py — background download</code>
+        <br><span class="desc">A comment: <em>From gui/model_panels.py — background download</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def _on_download(self, _):</code>
+        <br><span class="desc">Defines function <code>_on_download</code> accepting (self, _).</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>self._cancel_event = threading.Event()</code>
+        <br><span class="desc">A flag that threads can wait on. Used for signaling between threads.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>self._thread = threading.Thread(</code>
+        <br><span class="desc">Creates a background thread. Use daemon=True for threads that should not block app exit.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>target=self._download_job,</code>
+        <br><span class="desc">Assigns <code>self._download_job,</code> to <code>target</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>args=(tts_id, lang_code, variants),</code>
+        <br><span class="desc">Assigns <code>(tts_id, lang_code, variants),</code> to <code>args</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>daemon=True,</code>
+        <br><span class="desc">Assigns <code>True,</code> to <code>daemon</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>self._thread.start()</code>
+        <br><span class="desc"><code>self._thread.start()</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>def _download_job(self, tts_id, lang_code, variants):</code>
+        <br><span class="desc">Defines function <code>_download_job</code> accepting (self, tts_id, lang_code, variants).</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>def progress(name, done, total):</code>
+        <br><span class="desc">Defines function <code>progress</code> accepting (name, done, total).</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>wx.PostEvent(self, DownloadProgressEvent(name, done, total))</code>
+        <br><span class="desc">Creates a wxPython <code>wx.PostEvent</code> widget.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>try:</code>
+        <br><span class="desc">Begins exception handling. Code in this block is monitored for errors.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>for variant_id in variants:</code>
+        <br><span class="desc">Iterates over <code>variants</code>, assigning each element to <code>variant_id</code>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>self.downloader.download_variant(</code>
+        <br><span class="desc"><code>self.downloader.download_variant(</code></span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>tts_id, lang_code, variant_id,</code>
+        <br><span class="desc"><code>tts_id, lang_code, variant_id,</code></span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>progress=progress,</code>
+        <br><span class="desc">Assigns <code>progress,</code> to <code>progress</code>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>cancel_event=self._cancel_event,</code>
+        <br><span class="desc">Assigns <code>self._cancel_event,</code> to <code>cancel_event</code>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>wx.PostEvent(self, DownloadFinishedEvent(True, &quot;Done!&quot;))</code>
+        <br><span class="desc">Creates a wxPython <code>wx.PostEvent</code> widget.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>except DownloadCancelled:</code>
+        <br><span class="desc">Catches <code>DownloadCancelled</code> exceptions.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>wx.PostEvent(self, DownloadFinishedEvent(False, &quot;Cancelled&quot;))</code>
+        <br><span class="desc">Creates a wxPython <code>wx.PostEvent</code> widget.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>except Exception as exc:</code>
+        <br><span class="desc">Catches <code>Exception</code> exceptions.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>wx.PostEvent(self, DownloadFinishedEvent(False, str(exc)))</code>
+        <br><span class="desc">Converts a value to its string representation. Essential for string concatenation and formatting.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>19.6 Key Takeaways</h2>
+<ul>
+  <li><strong>The GIL</strong> limits true parallelism in threads — use threads for I/O, not CPU work</li>
+  <li><strong>threading.Thread</strong> creates background threads; always use <code>daemon=True</code> for non-critical threads</li>
+  <li><strong>threading.Event</strong> is the primary mechanism for cancellation in AIVS</li>
+  <li><strong>wx.PostEvent()</strong> is the only safe way to update GUI from worker threads</li>
+  <li>The AIVS <strong>SynthesisWorker</strong> pattern: thread + cancel event + pause event + GUI events</li>
+</ul>
+
+<div class="exercise"><strong>Exercise 19.1:</strong> Create a simple download simulator using threads. It should download 5 files concurrently, report progress via events, and support cancellation.</div>
+
+<hr>
+<p style="text-align: center;"><a href="ch18_json_xml.html">← Ch 18</a> &nbsp;|&nbsp; <a href="ch20_multiprocessing.html">Ch 20 — Multiprocessing →</a></p>
+</div></div></body>
+</html>

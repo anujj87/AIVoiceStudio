@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 55: Recording Dialog - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part VI</div><ul class="chapters"><li><a href="ch43_architecture.html">Ch 43</a></li><li><a href="ch44_paths_settings.html">Ch 44</a></li><li><a href="ch45_project_model.html">Ch 45</a></li><li><a href="ch46_document_parsing.html">Ch 46</a></li><li><a href="ch47_tts_catalog.html">Ch 47</a></li><li><a href="ch48_tts_engine.html">Ch 48</a></li><li><a href="ch49_downloader.html">Ch 49</a></li><li><a href="ch50_compute_detection.html">Ch 50</a></li><li><a href="ch51_main_frame.html">Ch 51</a></li><li><a href="ch52_settings_dialog.html">Ch 52</a></li><li><a href="ch53_model_panels.html">Ch 53</a></li><li><a href="ch54_new_project_wizard.html">Ch 54</a></li><li><a href="ch55_recording.html" class="active">Ch 55: Recording</a></li><li><a href="ch56_synthesis_worker.html">Ch 56</a></li><li><a href="ch57_clone_engine.html">Ch 57</a></li><li><a href="ch58_omnivoice.html">Ch 58</a></li><li><a href="ch59_daisy_builder.html">Ch 59</a></li><li><a href="ch60_addons.html">Ch 60</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 55</div>
+<h1>Recording Dialog</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand the Recording Dialog's complete UI</li>
+  <li>See how voice selection cascades with compute mode</li>
+  <li>Understand the recording lifecycle (start → pause → stop → close)</li>
+</ul>
+
+<hr>
+
+<h2>55.1 Recording Dialog Components</h2>
+
+<pre><code><span class="cm"># The Recording Dialog contains:</span>
+<span class="cm"># 1. Project title</span>
+<span class="cm"># 2. Text preview (read-only, multi-line)</span>
+<span class="cm"># 3. Compute back-end selector (ComboBox)</span>
+<span class="cm"># 4. TTS engine selector (ComboBox)</span>
+<span class="cm"># 5. Language selector (ComboBox)</span>
+<span class="cm"># 6. Variant selector (ComboBox)</span>
+<span class="cm"># 7. Voice selector (ComboBox)</span>
+<span class="cm"># 8. Rate, Pitch, Volume sliders</span>
+<span class="cm"># 9. Output format selector (ComboBox)</span>
+<span class="cm"># 10. Start, Pause, Resume, Stop buttons</span>
+<span class="cm"># 11. Progress gauge</span>
+<span class="cm"># 12. Status label</span>
+<span class="cm"># 13. Export DAISY button (conditional)</span>
+<span class="cm"># 14. Close button</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># The Recording Dialog contains:</code>
+        <br><span class="desc">A comment: <em>The Recording Dialog contains:</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># 1. Project title</code>
+        <br><span class="desc">A comment: <em>1. Project title</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># 2. Text preview (read-only, multi-line)</code>
+        <br><span class="desc">A comment: <em>2. Text preview (read-only, multi-line)</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># 3. Compute back-end selector (ComboBox)</code>
+        <br><span class="desc">A comment: <em>3. Compute back-end selector (ComboBox)</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># 4. TTS engine selector (ComboBox)</code>
+        <br><span class="desc">A comment: <em>4. TTS engine selector (ComboBox)</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># 5. Language selector (ComboBox)</code>
+        <br><span class="desc">A comment: <em>5. Language selector (ComboBox)</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># 6. Variant selector (ComboBox)</code>
+        <br><span class="desc">A comment: <em>6. Variant selector (ComboBox)</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># 7. Voice selector (ComboBox)</code>
+        <br><span class="desc">A comment: <em>7. Voice selector (ComboBox)</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code># 8. Rate, Pitch, Volume sliders</code>
+        <br><span class="desc">A comment: <em>8. Rate, Pitch, Volume sliders</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code># 9. Output format selector (ComboBox)</code>
+        <br><span class="desc">A comment: <em>9. Output format selector (ComboBox)</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># 10. Start, Pause, Resume, Stop buttons</code>
+        <br><span class="desc">A comment: <em>10. Start, Pause, Resume, Stop buttons</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code># 11. Progress gauge</code>
+        <br><span class="desc">A comment: <em>11. Progress gauge</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code># 12. Status label</code>
+        <br><span class="desc">A comment: <em>12. Status label</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code># 13. Export DAISY button (conditional)</code>
+        <br><span class="desc">A comment: <em>13. Export DAISY button (conditional)</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code># 14. Close button</code>
+        <br><span class="desc">A comment: <em>14. Close button</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>55.2 Compute-Mode Voice Filtering</h2>
+
+<pre><code><span class="kw">def</span> <span class="fn">_refresh_tts_for_compute</span>(self):
+    <span class="str">"""Show only TTS engines compatible with selected compute."""</span>
+    is_omni = self._is_omnivoice_compute()
+    self._voices = []
+    <span class="kw">for</span> v <span class="kw">in</span> self._all_voices:
+        engine = v.get(<span class="str">"engine"</span>, <span class="str">"vits"</span>)
+        <span class="kw">if</span> is_omni:
+            <span class="kw">if</span> engine <span class="kw">in</span> _OMNIVOICE_ENGINES:
+                self._voices.append(v)
+        <span class="kw">else</span>:
+            <span class="kw">if</span> engine <span class="kw">in</span> _ONNX_TTS_ENGINES:
+                self._voices.append(v)
+    <span class="cm"># Refresh TTS combo with filtered voices</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>def _refresh_tts_for_compute(self):</code>
+        <br><span class="desc">Defines function <code>_refresh_tts_for_compute</code> accepting parameters (self).</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>&quot;&quot;&quot;Show only TTS engines compatible with selected compute.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Show only TTS engines compatible with selected compute.</em>. Documents the purpose of the following code block.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>is_omni = self._is_omnivoice_compute()</code>
+        <br><span class="desc">Assigns <code>self._is_omnivoice_compute()</code> to <code>is_omni</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>self._voices = []</code>
+        <br><span class="desc">Stores <code>[]</code> in the instance attribute <code>_voices</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>for v in self._all_voices:</code>
+        <br><span class="desc">Iterates over <code>self._all_voices</code>, assigning each element to <code>v</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>engine = v.get(&quot;engine&quot;, &quot;vits&quot;)</code>
+        <br><span class="desc">Assigns <code>v.get(&quot;engine&quot;, &quot;vits&quot;)</code> to <code>engine</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>if is_omni:</code>
+        <br><span class="desc">Checks condition: <code>is_omni</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>if engine in _OMNIVOICE_ENGINES:</code>
+        <br><span class="desc">Checks condition: <code>engine in _OMNIVOICE_ENGINES</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>self._voices.append(v)</code>
+        <br><span class="desc"><code>self._voices.append(v)</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>else:</code>
+        <br><span class="desc">Fallback: executes when none of the above conditions matched.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>if engine in _ONNX_TTS_ENGINES:</code>
+        <br><span class="desc">Checks condition: <code>engine in _ONNX_TTS_ENGINES</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>self._voices.append(v)</code>
+        <br><span class="desc"><code>self._voices.append(v)</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code># Refresh TTS combo with filtered voices</code>
+        <br><span class="desc">A comment: <em>Refresh TTS combo with filtered voices</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>55.3 Recording Lifecycle</h2>
+
+<pre><code><span class="cm"># Start → creates SynthesisWorker thread</span>
+<span class="kw">def</span> <span class="fn">_on_start</span>(self, _):
+    voice = self._selected_voice()
+    params = self._current_params()
+    start_index = project.first_pending_index(self.project_dir)
+
+    self._worker = SynthesisWorker(
+        segments=self._segments[start_index:],
+        voice_entry=voice, params=params,
+        output_dir=self.project_dir,
+        start_index=start_index,
+        on_segment_done=<span class="kw">lambda</span> i, t, p: self._segment_done(i, t, p),
+        on_all_done=<span class="kw">lambda</span>: wx.PostEvent(self, SynthFinishedEvent()),
+        on_error=<span class="kw">lambda</span> msg: wx.PostEvent(self, SynthErrorEvent(msg)),
+        cancel_event=self._cancel_event,
+        pause_event=self._pause_event,
+        on_status=<span class="kw">lambda</span> msg: wx.PostEvent(self, SynthStatusEvent(msg)),
+    )
+    self._worker.start()
+
+<span class="cm"># Pause → sets pause event</span>
+<span class="kw">def</span> <span class="fn">_on_pause</span>(self, _):
+    self._worker.pause()
+    self._pause_event.set()
+
+<span class="cm"># Stop → sets cancel event</span>
+<span class="kw">def</span> <span class="fn">_on_stop</span>(self, _):
+    self._worker.cancel()
+    self._cancel_event.set()
+
+<span class="cm"># Close → saves TTS settings, ends modal</span>
+<span class="kw">def</span> <span class="fn">_on_close</span>(self, _):
+    self._save_tts_to_project()
+    self.EndModal(wx.ID_CLOSE)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Start → creates SynthesisWorker thread</code>
+        <br><span class="desc">A comment: <em>Start → creates SynthesisWorker thread</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def _on_start(self, _):</code>
+        <br><span class="desc">Defines function <code>_on_start</code> accepting parameters (self, _).</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>voice = self._selected_voice()</code>
+        <br><span class="desc">Assigns <code>self._selected_voice()</code> to <code>voice</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>params = self._current_params()</code>
+        <br><span class="desc">Assigns <code>self._current_params()</code> to <code>params</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>start_index = project.first_pending_index(self.project_dir)</code>
+        <br><span class="desc">Assigns <code>project.first_pending_index(self.project_dir)</code> to <code>start_index</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>self._worker = SynthesisWorker(</code>
+        <br><span class="desc">Background thread that synthesizes text segments into audio files. Handles progress callbacks and cancellation.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>segments=self._segments[start_index:],</code>
+        <br><span class="desc">Assigns <code>self._segments[start_index:],</code> to <code>segments</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>voice_entry=voice, params=params,</code>
+        <br><span class="desc">Assigns <code>voice, params=params,</code> to <code>voice_entry</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>output_dir=self.project_dir,</code>
+        <br><span class="desc">Assigns <code>self.project_dir,</code> to <code>output_dir</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>start_index=start_index,</code>
+        <br><span class="desc">Assigns <code>start_index,</code> to <code>start_index</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>on_segment_done=lambda i, t, p: self._segment_done(i, t, p),</code>
+        <br><span class="desc">Creates an anonymous function and assigns it to <code>on_segment_done</code>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>on_all_done=lambda: wx.PostEvent(self, SynthFinishedEvent()),</code>
+        <br><span class="desc">Assigns <code>lambda: wx.PostEvent(self, SynthFinishedEvent()),</code> to <code>on_all_done</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>on_error=lambda msg: wx.PostEvent(self, SynthErrorEvent(msg)),</code>
+        <br><span class="desc">Creates an anonymous function and assigns it to <code>on_error</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>cancel_event=self._cancel_event,</code>
+        <br><span class="desc">Assigns <code>self._cancel_event,</code> to <code>cancel_event</code>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>pause_event=self._pause_event,</code>
+        <br><span class="desc">Assigns <code>self._pause_event,</code> to <code>pause_event</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>on_status=lambda msg: wx.PostEvent(self, SynthStatusEvent(msg)),</code>
+        <br><span class="desc">Creates an anonymous function and assigns it to <code>on_status</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>self._worker.start()</code>
+        <br><span class="desc"><code>self._worker.start()</code></span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code># Pause → sets pause event</code>
+        <br><span class="desc">A comment: <em>Pause → sets pause event</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>def _on_pause(self, _):</code>
+        <br><span class="desc">Defines function <code>_on_pause</code> accepting parameters (self, _).</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>self._worker.pause()</code>
+        <br><span class="desc"><code>self._worker.pause()</code></span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>self._pause_event.set()</code>
+        <br><span class="desc"><code>self._pause_event.set()</code></span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code># Stop → sets cancel event</code>
+        <br><span class="desc">A comment: <em>Stop → sets cancel event</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>def _on_stop(self, _):</code>
+        <br><span class="desc">Defines function <code>_on_stop</code> accepting parameters (self, _).</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>self._worker.cancel()</code>
+        <br><span class="desc"><code>self._worker.cancel()</code></span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>self._cancel_event.set()</code>
+        <br><span class="desc"><code>self._cancel_event.set()</code></span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code># Close → saves TTS settings, ends modal</code>
+        <br><span class="desc">A comment: <em>Close → saves TTS settings, ends modal</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>def _on_close(self, _):</code>
+        <br><span class="desc">Defines function <code>_on_close</code> accepting parameters (self, _).</span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>self._save_tts_to_project()</code>
+        <br><span class="desc">Calls <code>self._save_tts_to_project()</code> to perform an operation.</span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code>self.EndModal(wx.ID_CLOSE)</code>
+        <br><span class="desc">Calls <code>self.EndModal()</code> to perform an operation.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>55.4 Key Takeaways</h2>
+<ul>
+  <li>The Recording Dialog is the <strong>most complex GUI component</strong> in AIVS</li>
+  <li><strong>Compute mode</strong> filters which TTS engines are available</li>
+  <li>Segments resume from <strong>first_pending_index</strong> — previously recorded segments are skipped</li>
+  <li><strong>Pause/Resume/Stop</strong> control the background synthesis thread</li>
+  <li>TTS settings are saved to <strong>project.json</strong> on every start and close</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch54_new_project_wizard.html">← Ch 54</a> &nbsp;|&nbsp; <a href="ch56_synthesis_worker.html">Ch 56 — Synthesizer →</a></p>
+</div></div></body>
+</html>

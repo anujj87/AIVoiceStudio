@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 11: Advanced OOP - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part I — Fundamentals</div><ul class="chapters"><li><a href="ch01_introduction.html">Ch 1</a></li><li><a href="ch02_variables.html">Ch 2</a></li><li><a href="ch03_control_flow.html">Ch 3</a></li><li><a href="ch04_functions.html">Ch 4</a></li><li><a href="ch05_strings.html">Ch 5</a></li><li><a href="ch06_collections.html">Ch 6</a></li><li><a href="ch07_file_io.html">Ch 7</a></li><li><a href="ch08_error_handling.html">Ch 8</a></li><li><a href="ch09_modules.html">Ch 9</a></li><li><a href="ch10_oop_basics.html">Ch 10</a></li></ul>
+<div class="part-header">Part II — Intermediate</div><ul class="chapters"><li><a href="ch11_oop_advanced.html" class="active">Ch 11: OOP Advanced</a></li><li><a href="ch12_iterators.html">Ch 12: Iterators</a></li><li><a href="ch13_decorators.html">Ch 13: Decorators</a></li><li><a href="ch14_context.html">Ch 14: Context Mgrs</a></li><li><a href="ch15_regex.html">Ch 15: Regex</a></li><li><a href="ch16_datetime.html">Ch 16: Date/Time</a></li><li><a href="ch17_testing.html">Ch 17: Testing</a></li><li><a href="ch18_json_xml.html">Ch 18: JSON/XML</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="part-divider">
+  <div class="part-number">Part II</div>
+  <h2>Intermediate Python</h2>
+</div>
+
+<div class="chapter-number">Chapter 11</div>
+<h1>Advanced Object-Oriented Programming</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Master inheritance, multiple inheritance, and MRO</li>
+  <li>Use <code>super()</code> correctly</li>
+  <li>Create abstract base classes</li>
+  <li>Understand dataclasses</li>
+  <li>Apply OOP design principles in AIVS</li>
+</ul>
+
+<hr>
+
+<h2>11.1 Inheritance Deep Dive</h2>
+
+<pre><code><span class="kw">class</span> <span class="cls">BaseEngine</span>:
+    <span class="str">"""Base class for all TTS engines."""</span>
+    sample_rate = <span class="num">24000</span>
+
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, voice_entry: dict):
+        self.voice_entry = voice_entry
+
+    <span class="kw">def</span> <span class="fn">synthesize</span>(self, text: str, speed: float = <span class="num">1.0</span>) -> <span class="str">"np.ndarray"</span>:
+        <span class="kw">raise</span> NotImplementedError(<span class="str">"Subclasses must implement synthesize"</span>)
+
+    <span class="kw">def</span> <span class="fn">close</span>(self):
+        <span class="kw">pass</span>  <span class="cm"># Default: no cleanup needed</span>
+
+<span class="kw">class</span> <span class="cls">SherpaEngine</span>(BaseEngine):
+    <span class="str">"""sherpa-onnx based TTS engine."""</span>
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, voice_entry: dict, model_files: dict):
+        <span class="kw">super</span>().__init__(voice_entry)  <span class="cm"># Call parent's __init__</span>
+        self.model_files = model_files
+        self._model = <span class="kw">None</span>
+
+    <span class="kw">def</span> <span class="fn">synthesize</span>(self, text, speed=<span class="num">1.0</span>):
+        <span class="kw">if</span> self._model <span class="kw">is</span> <span class="kw">None</span>:
+            self._model = self._load_model()
+        <span class="kw">return</span> self._model.generate(text, speed=speed)
+
+<span class="kw">class</span> <span class="cls">ClonedVoiceEngine</span>(BaseEngine):
+    <span class="str">"""XTTS v2 voice cloning engine."""</span>
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, voice_entry: dict, client: <span class="str">"CloneClient"</span>):
+        <span class="kw">super</span>().__init__(voice_entry)
+        self._client = client
+        self.sample_wav = voice_entry.get(<span class="str">"sample"</span>)
+
+    <span class="kw">def</span> <span class="fn">synthesize</span>(self, text, speed=<span class="num">1.0</span>):
+        <span class="kw">return</span> self._client.synthesize(text, self.sample_wav, speed=speed)
+
+    <span class="kw">def</span> <span class="fn">close</span>(self):
+        self._client.close()  <span class="cm"># Override: shut down worker process</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>class BaseEngine:</code>
+        <br><span class="desc">Defines class <code>BaseEngine</code>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>&quot;&quot;&quot;Base class for all TTS engines.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Base class for all TTS engines.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>sample_rate = 24000</code>
+        <br><span class="desc">Assigns <code>24000</code> to <code>sample_rate</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>def __init__(self, voice_entry: dict):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>self.voice_entry = voice_entry</code>
+        <br><span class="desc">Stores <code>voice_entry</code> in instance attribute <code>voice_entry</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>def synthesize(self, text: str, speed: float = 1.0) -&gt; &quot;np.ndarray&quot;:</code>
+        <br><span class="desc">Defines function <code>synthesize</code> accepting (self, text, speed), returning <code>&quot;np.ndarray&quot;</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>raise NotImplementedError(&quot;Subclasses must implement synthesize&quot;)</code>
+        <br><span class="desc">Manually raises an exception. Use to signal error conditions to callers.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>def close(self):</code>
+        <br><span class="desc">Defines function <code>close</code> accepting (self).</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>pass  # Default: no cleanup needed</code>
+        <br><span class="desc"><code>pass  # Default: no cleanup needed</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>class SherpaEngine(BaseEngine):</code>
+        <br><span class="desc">Defines class <code>SherpaEngine</code> inheriting from <code>BaseEngine</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>&quot;&quot;&quot;sherpa-onnx based TTS engine.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>sherpa-onnx based TTS engine.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>def __init__(self, voice_entry: dict, model_files: dict):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>super().__init__(voice_entry)  # Call parent&#x27;s __init__</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>self.model_files = model_files</code>
+        <br><span class="desc">Stores <code>model_files</code> in instance attribute <code>model_files</code>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>self._model = None</code>
+        <br><span class="desc">Stores <code>None</code> in instance attribute <code>_model</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>def synthesize(self, text, speed=1.0):</code>
+        <br><span class="desc">Defines function <code>synthesize</code> accepting (self, text, speed).</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>if self._model is None:</code>
+        <br><span class="desc">Checks condition: <code>self._model is None</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>self._model = self._load_model()</code>
+        <br><span class="desc">Stores <code>self._load_model()</code> in instance attribute <code>_model</code>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>return self._model.generate(text, speed=speed)</code>
+        <br><span class="desc">Returns <code>self._model.generate(text, speed=speed)</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>class ClonedVoiceEngine(BaseEngine):</code>
+        <br><span class="desc">Defines class <code>ClonedVoiceEngine</code> inheriting from <code>BaseEngine</code>.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>&quot;&quot;&quot;XTTS v2 voice cloning engine.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>XTTS v2 voice cloning engine.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>def __init__(self, voice_entry: dict, client: &quot;CloneClient&quot;):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>super().__init__(voice_entry)</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>self._client = client</code>
+        <br><span class="desc">Stores <code>client</code> in instance attribute <code>_client</code>.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>self.sample_wav = voice_entry.get(&quot;sample&quot;)</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>def synthesize(self, text, speed=1.0):</code>
+        <br><span class="desc">Defines function <code>synthesize</code> accepting (self, text, speed).</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>return self._client.synthesize(text, self.sample_wav, speed=speed)</code>
+        <br><span class="desc">Returns <code>self._client.synthesize(text, self.sample_wav, speed=speed)</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>def close(self):</code>
+        <br><span class="desc">Defines function <code>close</code> accepting (self).</span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>self._client.close()  # Override: shut down worker process</code>
+        <br><span class="desc">Closes the file and flushes the write buffer. Prefer using 'with' instead.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>11.2 Abstract Base Classes</h2>
+
+<pre><code><span class="kw">from</span> abc <span class="kw">import</span> ABC, abstractmethod
+
+<span class="kw">class</span> <span class="cls">TtsEngine</span>(ABC):
+    <span class="str">"""Abstract base class — cannot be instantiated directly."""</span>
+
+    sample_rate: int = <span class="num">24000</span>
+
+    <span class="dec">@abstractmethod</span>
+    <span class="kw">def</span> <span class="fn">synthesize</span>(self, text: str, sid: int = <span class="num">0</span>,
+                    speed: float = <span class="num">1.0</span>, pitch: float = <span class="num">1.0</span>,
+                    volume: float = <span class="num">1.0</span>) -> <span class="str">"np.ndarray"</span>:
+        <span class="str">"""Synthesize text to audio samples."""</span>
+        ...
+
+    <span class="kw">def</span> <span class="fn">close</span>(self):
+        <span class="str">"""Clean up resources. Override if needed."""</span>
+        <span class="kw">pass</span>
+
+<span class="cm"># This will fail:</span>
+<span class="cm"># engine = TtsEngine()  # TypeError: Can't instantiate abstract class</span>
+
+<span class="cm"># Must implement all abstract methods</span>
+<span class="kw">class</span> <span class="cls">MyEngine</span>(TtsEngine):
+    <span class="kw">def</span> <span class="fn">synthesize</span>(self, text, sid=<span class="num">0</span>, speed=<span class="num">1.0</span>, pitch=<span class="num">1.0</span>, volume=<span class="num">1.0</span>):
+        <span class="cm"># ... actual synthesis</span>
+        <span class="kw">return</span> np.zeros(<span class="num">100</span>, dtype=np.int16)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>from abc import ABC, abstractmethod</code>
+        <br><span class="desc">Imports <code>ABC, abstractmethod</code> from <code>abc</code>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>class TtsEngine(ABC):</code>
+        <br><span class="desc">Defines class <code>TtsEngine</code> inheriting from <code>ABC</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;&quot;&quot;Abstract base class — cannot be instantiated directly.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Abstract base class — cannot be instantiated directly.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>sample_rate: int = 24000</code>
+        <br><span class="desc"><code>sample_rate: int = 24000</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>@abstractmethod</code>
+        <br><span class="desc">Decorator marking a method as abstract. Subclasses must override it.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>def synthesize(self, text: str, sid: int = 0,</code>
+        <br><span class="desc"><code>def synthesize(self, text: str, sid: int = 0,</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>speed: float = 1.0, pitch: float = 1.0,</code>
+        <br><span class="desc"><code>speed: float = 1.0, pitch: float = 1.0,</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>volume: float = 1.0) -&gt; &quot;np.ndarray&quot;:</code>
+        <br><span class="desc"><code>volume: float = 1.0) -&gt; &quot;np.ndarray&quot;:</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>&quot;&quot;&quot;Synthesize text to audio samples.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Synthesize text to audio samples.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>...</code>
+        <br><span class="desc">Ellipsis: abstract method placeholder.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>def close(self):</code>
+        <br><span class="desc">Defines function <code>close</code> accepting (self).</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>&quot;&quot;&quot;Clean up resources. Override if needed.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Clean up resources. Override if needed.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>pass</code>
+        <br><span class="desc">Placeholder: does nothing.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code># This will fail:</code>
+        <br><span class="desc">A comment: <em>This will fail:</em>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code># engine = TtsEngine()  # TypeError: Can&#x27;t instantiate abstract class</code>
+        <br><span class="desc">A comment: <em>engine = TtsEngine()  # TypeError: Can&#x27;t instantiate abstract class</em>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code># Must implement all abstract methods</code>
+        <br><span class="desc">A comment: <em>Must implement all abstract methods</em>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>class MyEngine(TtsEngine):</code>
+        <br><span class="desc">Defines class <code>MyEngine</code> inheriting from <code>TtsEngine</code>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>def synthesize(self, text, sid=0, speed=1.0, pitch=1.0, volume=1.0):</code>
+        <br><span class="desc">Defines function <code>synthesize</code> accepting (self, text, sid, speed, ...).</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code># ... actual synthesis</code>
+        <br><span class="desc">A comment: <em>... actual synthesis</em>.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>return np.zeros(100, dtype=np.int16)</code>
+        <br><span class="desc">Returns <code>np.zeros(100, dtype=np.int16)</code> to the caller.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>11.3 Dataclasses</h2>
+
+<p>Dataclasses auto-generate <code>__init__</code>, <code>__repr__</code>, <code>__eq__</code>, and more:</p>
+
+<pre><code><span class="kw">from</span> dataclasses <span class="kw">import</span> dataclass, field
+
+<span class="dec">@dataclass</span>
+<span class="kw">class</span> <span class="cls">VoiceParams</span>:
+    <span class="str">"""TTS voice parameters for a recording session."""</span>
+    rate: float = <span class="num">1.0</span>
+    pitch: float = <span class="num">1.0</span>
+    volume: float = <span class="num">1.0</span>
+    compute: str = <span class="str">"auto"</span>
+    output_format: str = <span class="str">"wav"</span>
+    punctuation: str = <span class="str">"default"</span>
+
+<span class="cm"># Auto-generated __init__</span>
+params = VoiceParams(rate=<span class="num">1.5</span>, pitch=<span class="num">0.8</span>)
+<span class="kw">print</span>(params)  <span class="cm"># VoiceParams(rate=1.5, pitch=0.8, volume=1.0, ...)</span>
+
+<span class="cm"># Auto-generated __eq__</span>
+params2 = VoiceParams(rate=<span class="num">1.5</span>, pitch=<span class="num">0.8</span>)
+<span class="kw">print</span>(params == params2)  <span class="cm"># True</span>
+
+<span class="dec">@dataclass</span>(frozen=<span class="kw">True</span>)  <span class="cm"># Immutable</span>
+<span class="kw">class</span> <span class="cls">AudioConfig</span>:
+    sample_rate: int = <span class="num">24000</span>
+    channels: int = <span class="num">1</span>
+    sample_width: int = <span class="num">2</span>  <span class="cm"># 16-bit = 2 bytes</span>
+
+<span class="cm"># frozen=True makes it hashable (can be dict key or set member)</span>
+configs = {AudioConfig(): <span class="str">"default"</span>}
+
+<span class="dec">@dataclass</span>
+<span class="kw">class</span> <span class="cls">Segment</span>:
+    index: int
+    title: str
+    text: str
+    status: str = <span class="str">"pending"</span>
+    saved: str | <span class="kw">None</span> = <span class="kw">None</span>
+    duration: float = <span class="num">0.0</span>
+
+    <span class="kw">def</span> <span class="fn">is_done</span>(self) -> bool:
+        <span class="kw">return</span> self.status == <span class="str">"done"</span> <span class="kw">and</span> self.saved <span class="kw">is not</span> <span class="kw">None</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>from dataclasses import dataclass, field</code>
+        <br><span class="desc">Imports <code>dataclass, field</code> from <code>dataclasses</code>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>@dataclass</code>
+        <br><span class="desc">Decorator: <code>@dataclass</code>. Wraps the following function/class.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>class VoiceParams:</code>
+        <br><span class="desc">Defines class <code>VoiceParams</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>&quot;&quot;&quot;TTS voice parameters for a recording session.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>TTS voice parameters for a recording session.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>rate: float = 1.0</code>
+        <br><span class="desc"><code>rate: float = 1.0</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>pitch: float = 1.0</code>
+        <br><span class="desc"><code>pitch: float = 1.0</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>volume: float = 1.0</code>
+        <br><span class="desc"><code>volume: float = 1.0</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>compute: str = &quot;auto&quot;</code>
+        <br><span class="desc"><code>compute: str = &quot;auto&quot;</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>output_format: str = &quot;wav&quot;</code>
+        <br><span class="desc"><code>output_format: str = &quot;wav&quot;</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>punctuation: str = &quot;default&quot;</code>
+        <br><span class="desc"><code>punctuation: str = &quot;default&quot;</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># Auto-generated __init__</code>
+        <br><span class="desc">A comment: <em>Auto-generated __init__</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>params = VoiceParams(rate=1.5, pitch=0.8)</code>
+        <br><span class="desc">Assigns <code>VoiceParams(rate=1.5, pitch=0.8)</code> to <code>params</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>print(params)  # VoiceParams(rate=1.5, pitch=0.8, volume=1.0, ...)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code># Auto-generated __eq__</code>
+        <br><span class="desc">A comment: <em>Auto-generated __eq__</em>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>params2 = VoiceParams(rate=1.5, pitch=0.8)</code>
+        <br><span class="desc">Assigns <code>VoiceParams(rate=1.5, pitch=0.8)</code> to <code>params2</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>print(params == params2)  # True</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>@dataclass(frozen=True)  # Immutable</code>
+        <br><span class="desc">Decorator: <code>@dataclass(frozen=True)  # Immutable</code>. Wraps the following function/class.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>class AudioConfig:</code>
+        <br><span class="desc">Defines class <code>AudioConfig</code>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>sample_rate: int = 24000</code>
+        <br><span class="desc"><code>sample_rate: int = 24000</code></span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>channels: int = 1</code>
+        <br><span class="desc"><code>channels: int = 1</code></span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>sample_width: int = 2  # 16-bit = 2 bytes</code>
+        <br><span class="desc"><code>sample_width: int = 2  # 16-bit = 2 bytes</code></span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code># frozen=True makes it hashable (can be dict key or set member)</code>
+        <br><span class="desc">A comment: <em>frozen=True makes it hashable (can be dict key or set member)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>configs = {AudioConfig(): &quot;default&quot;}</code>
+        <br><span class="desc">Assigns <code>{AudioConfig(): &quot;default&quot;}</code> to <code>configs</code>.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>@dataclass</code>
+        <br><span class="desc">Decorator: <code>@dataclass</code>. Wraps the following function/class.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>class Segment:</code>
+        <br><span class="desc">Defines class <code>Segment</code>.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>index: int</code>
+        <br><span class="desc"><code>index: int</code></span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>title: str</code>
+        <br><span class="desc"><code>title: str</code></span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>text: str</code>
+        <br><span class="desc"><code>text: str</code></span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>status: str = &quot;pending&quot;</code>
+        <br><span class="desc"><code>status: str = &quot;pending&quot;</code></span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code>saved: str | None = None</code>
+        <br><span class="desc"><code>saved: str | None = None</code></span>
+      </li>
+      <li>
+        <strong>Line 31:</strong> <code>duration: float = 0.0</code>
+        <br><span class="desc"><code>duration: float = 0.0</code></span>
+      </li>
+      <li>
+        <strong>Line 32:</strong> <code>def is_done(self) -&gt; bool:</code>
+        <br><span class="desc">Defines function <code>is_done</code> accepting (self), returning <code>bool</code>.</span>
+      </li>
+      <li>
+        <strong>Line 33:</strong> <code>return self.status == &quot;done&quot; and self.saved is not None</code>
+        <br><span class="desc">Returns <code>None</code> (no value).</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>11.4 Mixins</h2>
+
+<pre><code><span class="cm"># Mixins provide reusable behavior</span>
+<span class="kw">class</span> <span class="cls">LoggingMixin</span>:
+    <span class="str">"""Adds a logger to any class."""</span>
+    <span class="dec">@property</span>
+    <span class="kw">def</span> <span class="fn">log</span>(self):
+        <span class="kw">import</span> logging
+        <span class="kw">return</span> logging.getLogger(type(self).__name__)
+
+<span class="kw">class</span> <span class="cls">SingletonMixin</span>:
+    <span class="str">"""Makes a class a singleton."""</span>
+    _instance = <span class="kw">None</span>
+    _lock = threading.Lock()
+
+    <span class="kw">def</span> <span class="fn">__new__</span>(cls, *args, **kwargs):
+        <span class="kw">if</span> cls._instance <span class="kw">is</span> <span class="kw">None</span>:
+            <span class="kw">with</span> cls._lock:
+                <span class="kw">if</span> cls._instance <span class="kw">is</span> <span class="kw">None</span>:
+                    cls._instance = <span class="kw">super</span>().__new__(cls)
+        <span class="kw">return</span> cls._instance
+
+<span class="cm"># Usage</span>
+<span class="kw">class</span> <span class="cls">AddonManager</span>(SingletonMixin, LoggingMixin):
+    <span class="kw">def</span> <span class="fn">discover</span>(self):
+        self.log.info(<span class="str">"Discovering addons..."</span>)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 4)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Mixins provide reusable behavior</code>
+        <br><span class="desc">A comment: <em>Mixins provide reusable behavior</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>class LoggingMixin:</code>
+        <br><span class="desc">Defines class <code>LoggingMixin</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;&quot;&quot;Adds a logger to any class.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Adds a logger to any class.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>@property</code>
+        <br><span class="desc">Decorator that converts a method into a managed attribute. Enables getter/setter syntax.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>def log(self):</code>
+        <br><span class="desc">Defines function <code>log</code> accepting (self).</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>import logging</code>
+        <br><span class="desc">Imports the <code>logging</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>return logging.getLogger(type(self).__name__)</code>
+        <br><span class="desc">Creates or retrieves a logger by name. Hierarchical naming enables per-module log levels.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>class SingletonMixin:</code>
+        <br><span class="desc">Defines class <code>SingletonMixin</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>&quot;&quot;&quot;Makes a class a singleton.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Makes a class a singleton.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>_instance = None</code>
+        <br><span class="desc">Assigns <code>None</code> to <code>_instance</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>_lock = threading.Lock()</code>
+        <br><span class="desc">A mutual exclusion lock. Only one thread can hold it at a time. Prevents race conditions.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>def __new__(cls, *args, **kwargs):</code>
+        <br><span class="desc">Defines function <code>__new__</code> accepting (cls, *args, **kwargs).</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>if cls._instance is None:</code>
+        <br><span class="desc">Checks condition: <code>cls._instance is None</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>with cls._lock:</code>
+        <br><span class="desc">Context manager: <code>cls._lock</code>. Automatically manages resource cleanup.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>if cls._instance is None:</code>
+        <br><span class="desc">Checks condition: <code>cls._instance is None</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>cls._instance = super().__new__(cls)</code>
+        <br><span class="desc">Returns a proxy object that delegates method calls to a parent class. Used in __init__ to call the parent constructor.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>return cls._instance</code>
+        <br><span class="desc">Returns <code>cls._instance</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code># Usage</code>
+        <br><span class="desc">A comment: <em>Usage</em>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>class AddonManager(SingletonMixin, LoggingMixin):</code>
+        <br><span class="desc">Defines class <code>AddonManager</code> inheriting from <code>SingletonMixin, LoggingMixin</code>.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>def discover(self):</code>
+        <br><span class="desc">Defines function <code>discover</code> accepting (self).</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>self.log.info(&quot;Discovering addons...&quot;)</code>
+        <br><span class="desc"><code>self.log.info(&quot;Discovering addons...&quot;)</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>11.5 Enums</h2>
+
+<pre><code><span class="kw">from</span> enum <span class="kw">import</span> Enum, auto
+
+<span class="kw">class</span> <span class="cls">ComputeMode</span>(Enum):
+    CPU = <span class="str">"cpu"</span>
+    CUDA = <span class="str">"cuda"</span>
+    AUTO = <span class="str">"auto"</span>
+
+<span class="kw">class</span> <span class="cls">ProjectType</span>(Enum):
+    AUDIO_PLAYLIST = auto()
+    DAISY_AUDIO = auto()
+    DAISY_AUDIO_TEXT = auto()
+    CLIPBOARD = auto()
+
+<span class="cm"># Usage</span>
+mode = ComputeMode.CUDA
+<span class="kw">print</span>(mode.value)  <span class="cm"># "cuda"</span>
+<span class="kw">print</span>(mode.name)   <span class="cm"># "CUDA"</span>
+
+<span class="kw">if</span> mode == ComputeMode.CUDA:
+    <span class="kw">print</span>(<span class="str">"GPU mode!"</span>)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 5)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>from enum import Enum, auto</code>
+        <br><span class="desc">Imports <code>Enum, auto</code> from <code>enum</code>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>class ComputeMode(Enum):</code>
+        <br><span class="desc">Defines class <code>ComputeMode</code> inheriting from <code>Enum</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>CPU = &quot;cpu&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;cpu&quot;</code> to <code>CPU</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>CUDA = &quot;cuda&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;cuda&quot;</code> to <code>CUDA</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>AUTO = &quot;auto&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;auto&quot;</code> to <code>AUTO</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>class ProjectType(Enum):</code>
+        <br><span class="desc">Defines class <code>ProjectType</code> inheriting from <code>Enum</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>AUDIO_PLAYLIST = auto()</code>
+        <br><span class="desc">Assigns <code>auto()</code> to <code>AUDIO_PLAYLIST</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>DAISY_AUDIO = auto()</code>
+        <br><span class="desc">Assigns <code>auto()</code> to <code>DAISY_AUDIO</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>DAISY_AUDIO_TEXT = auto()</code>
+        <br><span class="desc">Assigns <code>auto()</code> to <code>DAISY_AUDIO_TEXT</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>CLIPBOARD = auto()</code>
+        <br><span class="desc">Assigns <code>auto()</code> to <code>CLIPBOARD</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># Usage</code>
+        <br><span class="desc">A comment: <em>Usage</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>mode = ComputeMode.CUDA</code>
+        <br><span class="desc">Assigns <code>ComputeMode.CUDA</code> to <code>mode</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>print(mode.value)  # &quot;cuda&quot;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>print(mode.name)   # &quot;CUDA&quot;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>if mode == ComputeMode.CUDA:</code>
+        <br><span class="desc">Checks condition: <code>mode == ComputeMode.CUDA</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>print(&quot;GPU mode!&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>11.6 __slots__ for Memory Efficiency</h2>
+
+<pre><code><span class="kw">class</span> <span class="cls">LightweightVoice</span>:
+    <span class="str">"""Uses __slots__ to reduce memory per instance."""</span>
+    __slots__ = (<span class="str">"voice_id"</span>, <span class="str">"name"</span>, <span class="str">"sid"</span>)
+
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, voice_id, name, sid):
+        self.voice_id = voice_id
+        self.name = name
+        self.sid = sid
+
+<span class="cm"># Cannot add arbitrary attributes</span>
+v = LightweightVoice(<span class="str">"af"</span>, <span class="str">"AF"</span>, <span class="num">0</span>)
+<span class="cm"># v.extra = "data"  # AttributeError!</span>
+
+<span class="cm"># Uses ~40% less memory than a regular class</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 6)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>class LightweightVoice:</code>
+        <br><span class="desc">Defines class <code>LightweightVoice</code>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>&quot;&quot;&quot;Uses __slots__ to reduce memory per instance.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Uses __slots__ to reduce memory per instance.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>__slots__ = (&quot;voice_id&quot;, &quot;name&quot;, &quot;sid&quot;)</code>
+        <br><span class="desc">Assigns <code>(&quot;voice_id&quot;, &quot;name&quot;, &quot;sid&quot;)</code> to <code>__slots__</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>def __init__(self, voice_id, name, sid):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>self.voice_id = voice_id</code>
+        <br><span class="desc">Stores <code>voice_id</code> in instance attribute <code>voice_id</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>self.name = name</code>
+        <br><span class="desc">Stores <code>name</code> in instance attribute <code>name</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>self.sid = sid</code>
+        <br><span class="desc">Stores <code>sid</code> in instance attribute <code>sid</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># Cannot add arbitrary attributes</code>
+        <br><span class="desc">A comment: <em>Cannot add arbitrary attributes</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>v = LightweightVoice(&quot;af&quot;, &quot;AF&quot;, 0)</code>
+        <br><span class="desc">Assigns <code>LightweightVoice(&quot;af&quot;, &quot;AF&quot;, 0)</code> to <code>v</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code># v.extra = &quot;data&quot;  # AttributeError!</code>
+        <br><span class="desc">A comment: <em>v.extra = &quot;data&quot;  # AttributeError!</em>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># Uses ~40% less memory than a regular class</code>
+        <br><span class="desc">A comment: <em>Uses ~40% less memory than a regular class</em>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>11.7 Key Takeaways</h2>
+<ul>
+  <li><strong>Abstract base classes</strong> define interfaces that subclasses must implement</li>
+  <li><strong>Dataclasses</strong> auto-generate boilerplate methods — use them for data containers</li>
+  <li><strong>Mixins</strong> provide reusable behavior without deep inheritance hierarchies</li>
+  <li><strong><code>super()</code></strong> should always be used — never hardcode parent class names</li>
+  <li><strong>Enums</strong> represent fixed sets of values (compute modes, project types)</li>
+  <li><strong>Composition over inheritance</strong> remains the golden rule</li>
+</ul>
+
+<div class="exercise"><strong>Exercise 11.1:</strong> Create a <code>@dataclass</code> for a <code>VoiceModel</code> with fields: name, tts_id, language, variant, path, installed (bool). Add a method <code>can_use_compute(mode)</code> that checks compatibility.</div>
+
+<hr>
+<p style="text-align: center;"><a href="ch10_oop_basics.html">← Ch 10</a> &nbsp;|&nbsp; <a href="ch12_iterators.html">Ch 12 — Iterators →</a></p>
+</div></div></body>
+</html>

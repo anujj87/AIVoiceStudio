@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 46: Document Parsing &amp; Splitting - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part VI</div><ul class="chapters"><li><a href="ch43_architecture.html">Ch 43</a></li><li><a href="ch44_paths_settings.html">Ch 44</a></li><li><a href="ch45_project_model.html">Ch 45</a></li><li><a href="ch46_document_parsing.html" class="active">Ch 46: Documents</a></li><li><a href="ch47_tts_catalog.html">Ch 47</a></li><li><a href="ch48_tts_engine.html">Ch 48</a></li><li><a href="ch49_downloader.html">Ch 49</a></li><li><a href="ch50_compute_detection.html">Ch 50</a></li><li><a href="ch51_main_frame.html">Ch 51</a></li><li><a href="ch52_settings_dialog.html">Ch 52</a></li><li><a href="ch53_model_panels.html">Ch 53</a></li><li><a href="ch54_new_project_wizard.html">Ch 54</a></li><li><a href="ch55_recording.html">Ch 55</a></li><li><a href="ch56_synthesis_worker.html">Ch 56</a></li><li><a href="ch57_clone_engine.html">Ch 57</a></li><li><a href="ch58_omnivoice.html">Ch 58</a></li><li><a href="ch59_daisy_builder.html">Ch 59</a></li><li><a href="ch60_addons.html">Ch 60</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 46</div>
+<h1>Document Parsing &amp; Splitting</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand how AIVS parses different document formats</li>
+  <li>Learn the text splitting strategies (page, heading, fixed size)</li>
+  <li>See the complete pipeline from document to segments</li>
+</ul>
+
+<hr>
+
+<h2>46.1 Supported Formats</h2>
+
+<table>
+  <thead><tr><th>Format</th><th>Library</th><th>Extraction Method</th></tr></thead>
+  <tbody>
+    <tr><td>PDF</td><td>pypdf</td><td>Per-page text extraction</td></tr>
+    <tr><td>DOCX</td><td>python-docx</td><td>Paragraph-based with style info</td></tr>
+    <tr><td>TXT</td><td>stdlib</td><td>Direct text reading</td></tr>
+    <tr><td>Markdown</td><td>stdlib + regex</td><td>Heading detection via # patterns</td></tr>
+    <tr><td>HTML/HTM</td><td>BeautifulSoup (optional)</td><td>Tag-based extraction</td></tr>
+    <tr><td>EPUB</td><td>Custom parser</td><td>Chapter-based extraction</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h2>46.2 Splitting Modes</h2>
+
+<pre><code><span class="cm"># From constants.py</span>
+MODE_PAGE_WITH_H1 = <span class="str">"page_with_h1"</span>     <span class="cm"># Split at H1 headings, fallback to pages</span>
+MODE_PAGE_ONLY = <span class="str">"page_only"</span>           <span class="cm"># One segment per page</span>
+MODE_CHAPTER_ONLY = <span class="str">"chapter_only"</span>     <span class="cm"># Split at any heading level</span>
+MODE_FIXED_SIZE = <span class="str">"fixed_size"</span>          <span class="cm"># Fixed character count</span>
+
+AUDIO_MODE_CHOICES = [
+    (MODE_PAGE_WITH_H1, <span class="str">"Pages with H1 headings (Recommended)"</span>),
+    (MODE_PAGE_ONLY, <span class="str">"Pages only"</span>),
+    (MODE_CHAPTER_ONLY, <span class="str">"Chapters/headings only"</span>),
+    (MODE_FIXED_SIZE, <span class="str">"Fixed size chunks"</span>),
+]
+
+<span class="cm"># From splitter.py</span>
+<span class="kw">class</span> <span class="cls">Segment</span>:
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, index: int, title: str, text: str):
+        self.index = index
+        self.title = title
+        self.text = text
+
+<span class="kw">def</span> <span class="fn">split_document</span>(doc: Document, mode: str) -> list[Segment]:
+    <span class="str">"""Split a parsed document into TTS segments."""</span>
+    <span class="kw">if</span> mode == MODE_PAGE_WITH_H1:
+        <span class="kw">return</span> _split_by_h1_then_pages(doc)
+    <span class="kw">elif</span> mode == MODE_PAGE_ONLY:
+        <span class="kw">return</span> _split_by_pages(doc)
+    <span class="kw">elif</span> mode == MODE_CHAPTER_ONLY:
+        <span class="kw">return</span> _split_by_headings(doc)
+    <span class="kw">elif</span> mode == MODE_FIXED_SIZE:
+        <span class="kw">return</span> _split_by_size(doc, chunk_size=<span class="num">2000</span>)
+    <span class="kw">return</span> []</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From constants.py</code>
+        <br><span class="desc">A comment indicating the source file: <em>From constants.py</em>. This helps the reader locate the code in the AIVoiceStudio codebase.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>MODE_PAGE_WITH_H1 = &quot;page_with_h1&quot;     # Split at H1 headings, fallback to pages</code>
+        <br><span class="desc">Assigns <code>&quot;page_with_h1&quot;     # Split at H1 headings, fallback to pages</code> to <code>MODE_PAGE_WITH_H1</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>MODE_PAGE_ONLY = &quot;page_only&quot;           # One segment per page</code>
+        <br><span class="desc">Assigns <code>&quot;page_only&quot;           # One segment per page</code> to <code>MODE_PAGE_ONLY</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>MODE_CHAPTER_ONLY = &quot;chapter_only&quot;     # Split at any heading level</code>
+        <br><span class="desc">Assigns <code>&quot;chapter_only&quot;     # Split at any heading level</code> to <code>MODE_CHAPTER_ONLY</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>MODE_FIXED_SIZE = &quot;fixed_size&quot;          # Fixed character count</code>
+        <br><span class="desc">Assigns <code>&quot;fixed_size&quot;          # Fixed character count</code> to <code>MODE_FIXED_SIZE</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>AUDIO_MODE_CHOICES = [</code>
+        <br><span class="desc">Assigns <code>[</code> to <code>AUDIO_MODE_CHOICES</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>(MODE_PAGE_WITH_H1, &quot;Pages with H1 headings (Recommended)&quot;),</code>
+        <br><span class="desc"><code>(MODE_PAGE_WITH_H1, &quot;Pages with H1 headings (Recommended)&quot;),</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>(MODE_PAGE_ONLY, &quot;Pages only&quot;),</code>
+        <br><span class="desc"><code>(MODE_PAGE_ONLY, &quot;Pages only&quot;),</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>(MODE_CHAPTER_ONLY, &quot;Chapters/headings only&quot;),</code>
+        <br><span class="desc"><code>(MODE_CHAPTER_ONLY, &quot;Chapters/headings only&quot;),</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>(MODE_FIXED_SIZE, &quot;Fixed size chunks&quot;),</code>
+        <br><span class="desc"><code>(MODE_FIXED_SIZE, &quot;Fixed size chunks&quot;),</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>]</code>
+        <br><span class="desc"><code>]</code></span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code># From splitter.py</code>
+        <br><span class="desc">A comment indicating the source file: <em>From splitter.py</em>. This helps the reader locate the code in the AIVoiceStudio codebase.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>class Segment:</code>
+        <br><span class="desc">Defines class <code>Segment</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>def __init__(self, index: int, title: str, text: str):</code>
+        <br><span class="desc">Defines function <code>__init__</code> accepting parameters (self, index, title, text).</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>self.index = index</code>
+        <br><span class="desc">Stores <code>index</code> in the instance attribute <code>index</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>self.title = title</code>
+        <br><span class="desc">Stores <code>title</code> in the instance attribute <code>title</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>self.text = text</code>
+        <br><span class="desc">Stores <code>text</code> in the instance attribute <code>text</code>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>def split_document(doc: Document, mode: str) -&gt; list[Segment]:</code>
+        <br><span class="desc">Defines function <code>split_document</code> accepting parameters (doc, mode), returning <code>list[Segment]</code>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>&quot;&quot;&quot;Split a parsed document into TTS segments.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Split a parsed document into TTS segments.</em>. Documents the purpose of the following code block.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>if mode == MODE_PAGE_WITH_H1:</code>
+        <br><span class="desc">Checks condition: <code>mode == MODE_PAGE_WITH_H1</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>return _split_by_h1_then_pages(doc)</code>
+        <br><span class="desc">Returns <code>_split_by_h1_then_pages(doc)</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>elif mode == MODE_PAGE_ONLY:</code>
+        <br><span class="desc">Alternative condition: <code>mode == MODE_PAGE_ONLY</code>. Checked only if all previous conditions were <code>False</code>.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>return _split_by_pages(doc)</code>
+        <br><span class="desc">Returns <code>_split_by_pages(doc)</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>elif mode == MODE_CHAPTER_ONLY:</code>
+        <br><span class="desc">Alternative condition: <code>mode == MODE_CHAPTER_ONLY</code>. Checked only if all previous conditions were <code>False</code>.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>return _split_by_headings(doc)</code>
+        <br><span class="desc">Returns <code>_split_by_headings(doc)</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>elif mode == MODE_FIXED_SIZE:</code>
+        <br><span class="desc">Alternative condition: <code>mode == MODE_FIXED_SIZE</code>. Checked only if all previous conditions were <code>False</code>.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>return _split_by_size(doc, chunk_size=2000)</code>
+        <br><span class="desc">Returns <code>_split_by_size(doc, chunk_size=2000)</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>return []</code>
+        <br><span class="desc">Returns <code>[]</code> to the caller.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>46.3 The Splitting Algorithms</h2>
+
+<pre><code><span class="kw">def</span> <span class="fn">_split_by_h1_then_pages</span>(doc: Document) -> list[Segment]:
+    <span class="str">"""Split at H1 headings, then at page breaks."""</span>
+    segments = []
+    current_text = []
+    current_title = <span class="str">"Introduction"</span>
+
+    <span class="kw">for</span> block <span class="kw">in</span> doc.blocks:
+        <span class="kw">if</span> block.level == <span class="num">1</span> <span class="kw">and</span> current_text:
+            segments.append(Segment(
+                index=len(segments) + <span class="num">1</span>,
+                title=current_title,
+                text=<span class="str">"\n\n"</span>.join(current_text),
+            ))
+            current_text = []
+        <span class="kw">if</span> block.level == <span class="num">1</span>:
+            current_title = block.heading
+        current_text.append(block.text)
+
+    <span class="kw">if</span> current_text:
+        segments.append(Segment(
+            index=len(segments) + <span class="num">1</span>,
+            title=current_title,
+            text=<span class="str">"\n\n"</span>.join(current_text),
+        ))
+
+    <span class="kw">return</span> segments
+
+<span class="kw">def</span> <span class="fn">_split_by_size</span>(doc: Document, chunk_size: int = <span class="num">2000</span>) -> list[Segment]:
+    <span class="str">"""Split text into fixed-size chunks at sentence boundaries."""</span>
+    <span class="kw">import</span> re
+    full_text = <span class="str">"\n\n"</span>.join(b.text <span class="kw">for</span> b <span class="kw">in</span> doc.blocks)
+    sentences = re.split(<span class="str">r'(?&lt;=[.!?])\s+'</span>, full_text)
+
+    segments = []
+    current_chunk = []
+    current_len = <span class="num">0</span>
+
+    <span class="kw">for</span> sent <span class="kw">in</span> sentences:
+        <span class="kw">if</span> current_len + len(sent) > chunk_size <span class="kw">and</span> current_chunk:
+            segments.append(Segment(
+                index=len(segments) + <span class="num">1</span>,
+                title=<span class="str">f"Chunk </span>{len(segments) + <span class="num">1</span>}<span class="str">"</span>,
+                text=<span class="str">" "</span>.join(current_chunk),
+            ))
+            current_chunk = []
+            current_len = <span class="num">0</span>
+        current_chunk.append(sent)
+        current_len += len(sent)
+
+    <span class="kw">if</span> current_chunk:
+        segments.append(Segment(
+            index=len(segments) + <span class="num">1</span>,
+            title=<span class="str">f"Chunk </span>{len(segments) + <span class="num">1</span>}<span class="str">"</span>,
+            text=<span class="str">" "</span>.join(current_chunk),
+        ))
+
+    <span class="kw">return</span> segments</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>def _split_by_h1_then_pages(doc: Document) -&gt; list[Segment]:</code>
+        <br><span class="desc">Defines function <code>_split_by_h1_then_pages</code> accepting parameters (doc), returning <code>list[Segment]</code>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>&quot;&quot;&quot;Split at H1 headings, then at page breaks.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Split at H1 headings, then at page breaks.</em>. Documents the purpose of the following code block.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>segments = []</code>
+        <br><span class="desc">Assigns <code>[]</code> to <code>segments</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>current_text = []</code>
+        <br><span class="desc">Assigns <code>[]</code> to <code>current_text</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>current_title = &quot;Introduction&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;Introduction&quot;</code> to <code>current_title</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>for block in doc.blocks:</code>
+        <br><span class="desc">Iterates over <code>doc.blocks</code>, assigning each element to <code>block</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>if block.level == 1 and current_text:</code>
+        <br><span class="desc">Checks condition: <code>block.level == 1 and current_text</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>segments.append(Segment(</code>
+        <br><span class="desc"><code>segments.append(Segment(</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>index=len(segments) + 1,</code>
+        <br><span class="desc">Assigns <code>len(segments) + 1,</code> to <code>index</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>title=current_title,</code>
+        <br><span class="desc">Assigns <code>current_title,</code> to <code>title</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>text=&quot;\n\n&quot;.join(current_text),</code>
+        <br><span class="desc">Assigns <code>&quot;\n\n&quot;.join(current_text),</code> to <code>text</code>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>))</code>
+        <br><span class="desc"><code>))</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>current_text = []</code>
+        <br><span class="desc">Assigns <code>[]</code> to <code>current_text</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>if block.level == 1:</code>
+        <br><span class="desc">Checks condition: <code>block.level == 1</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>current_title = block.heading</code>
+        <br><span class="desc">Assigns <code>block.heading</code> to <code>current_title</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>current_text.append(block.text)</code>
+        <br><span class="desc"><code>current_text.append(block.text)</code></span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>if current_text:</code>
+        <br><span class="desc">Checks condition: <code>current_text</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>segments.append(Segment(</code>
+        <br><span class="desc"><code>segments.append(Segment(</code></span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>index=len(segments) + 1,</code>
+        <br><span class="desc">Assigns <code>len(segments) + 1,</code> to <code>index</code>.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>title=current_title,</code>
+        <br><span class="desc">Assigns <code>current_title,</code> to <code>title</code>.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>text=&quot;\n\n&quot;.join(current_text),</code>
+        <br><span class="desc">Assigns <code>&quot;\n\n&quot;.join(current_text),</code> to <code>text</code>.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>))</code>
+        <br><span class="desc"><code>))</code></span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>return segments</code>
+        <br><span class="desc">Returns <code>segments</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>def _split_by_size(doc: Document, chunk_size: int = 2000) -&gt; list[Segment]:</code>
+        <br><span class="desc">Defines function <code>_split_by_size</code> accepting parameters (doc, chunk_size), returning <code>list[Segment]</code>.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>&quot;&quot;&quot;Split text into fixed-size chunks at sentence boundaries.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Split text into fixed-size chunks at sentence boundaries.</em>. Documents the purpose of the following code block.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>import re</code>
+        <br><span class="desc">Imports the <code>re</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>full_text = &quot;\n\n&quot;.join(b.text for b in doc.blocks)</code>
+        <br><span class="desc">Assigns <code>&quot;\n\n&quot;.join(b.text for b in doc.blocks)</code> to <code>full_text</code>.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>sentences = re.split(r&#x27;(?&lt;=[.!?])\s+&#x27;, full_text)</code>
+        <br><span class="desc">Assigns <code>re.split(r&#x27;(?&lt;=[.!?])\s+&#x27;, full_text)</code> to <code>sentences</code>.</span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>segments = []</code>
+        <br><span class="desc">Assigns <code>[]</code> to <code>segments</code>.</span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code>current_chunk = []</code>
+        <br><span class="desc">Assigns <code>[]</code> to <code>current_chunk</code>.</span>
+      </li>
+      <li>
+        <strong>Line 31:</strong> <code>current_len = 0</code>
+        <br><span class="desc">Assigns <code>0</code> to <code>current_len</code>.</span>
+      </li>
+      <li>
+        <strong>Line 32:</strong> <code>for sent in sentences:</code>
+        <br><span class="desc">Iterates over <code>sentences</code>, assigning each element to <code>sent</code>.</span>
+      </li>
+      <li>
+        <strong>Line 33:</strong> <code>if current_len + len(sent) &gt; chunk_size and current_chunk:</code>
+        <br><span class="desc">Checks condition: <code>current_len + len(sent) &gt; chunk_size and current_chunk</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 34:</strong> <code>segments.append(Segment(</code>
+        <br><span class="desc"><code>segments.append(Segment(</code></span>
+      </li>
+      <li>
+        <strong>Line 35:</strong> <code>index=len(segments) + 1,</code>
+        <br><span class="desc">Assigns <code>len(segments) + 1,</code> to <code>index</code>.</span>
+      </li>
+      <li>
+        <strong>Line 36:</strong> <code>title=f&quot;Chunk {len(segments) + 1}&quot;,</code>
+        <br><span class="desc">Assigns <code>f&quot;Chunk {len(segments) + 1}&quot;,</code> to <code>title</code>.</span>
+      </li>
+      <li>
+        <strong>Line 37:</strong> <code>text=&quot; &quot;.join(current_chunk),</code>
+        <br><span class="desc">Assigns <code>&quot; &quot;.join(current_chunk),</code> to <code>text</code>.</span>
+      </li>
+      <li>
+        <strong>Line 38:</strong> <code>))</code>
+        <br><span class="desc"><code>))</code></span>
+      </li>
+      <li>
+        <strong>Line 39:</strong> <code>current_chunk = []</code>
+        <br><span class="desc">Assigns <code>[]</code> to <code>current_chunk</code>.</span>
+      </li>
+      <li>
+        <strong>Line 40:</strong> <code>current_len = 0</code>
+        <br><span class="desc">Assigns <code>0</code> to <code>current_len</code>.</span>
+      </li>
+      <li>
+        <strong>Line 41:</strong> <code>current_chunk.append(sent)</code>
+        <br><span class="desc"><code>current_chunk.append(sent)</code></span>
+      </li>
+      <li>
+        <strong>Line 42:</strong> <code>current_len += len(sent)</code>
+        <br><span class="desc">Updates <code>current_len</code> by += <code>len(sent)</code>.</span>
+      </li>
+      <li>
+        <strong>Line 43:</strong> <code>if current_chunk:</code>
+        <br><span class="desc">Checks condition: <code>current_chunk</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 44:</strong> <code>segments.append(Segment(</code>
+        <br><span class="desc"><code>segments.append(Segment(</code></span>
+      </li>
+      <li>
+        <strong>Line 45:</strong> <code>index=len(segments) + 1,</code>
+        <br><span class="desc">Assigns <code>len(segments) + 1,</code> to <code>index</code>.</span>
+      </li>
+      <li>
+        <strong>Line 46:</strong> <code>title=f&quot;Chunk {len(segments) + 1}&quot;,</code>
+        <br><span class="desc">Assigns <code>f&quot;Chunk {len(segments) + 1}&quot;,</code> to <code>title</code>.</span>
+      </li>
+      <li>
+        <strong>Line 47:</strong> <code>text=&quot; &quot;.join(current_chunk),</code>
+        <br><span class="desc">Assigns <code>&quot; &quot;.join(current_chunk),</code> to <code>text</code>.</span>
+      </li>
+      <li>
+        <strong>Line 48:</strong> <code>))</code>
+        <br><span class="desc"><code>))</code></span>
+      </li>
+      <li>
+        <strong>Line 49:</strong> <code>return segments</code>
+        <br><span class="desc">Returns <code>segments</code> to the caller.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>46.4 DAISY Chapter Splitting</h2>
+
+<pre><code><span class="kw">def</span> <span class="fn">split_daisy_chapters</span>(blocks: list) -> list[Segment]:
+    <span class="str">"""Split document into chapters for DAISY book output."""</span>
+    segments = []
+    <span class="kw">for</span> block <span class="kw">in</span> blocks:
+        <span class="kw">if</span> block.level <= <span class="num">2</span>:  <span class="cm"># H1 and H2 become chapters</span>
+            segments.append(Segment(
+                index=len(segments) + <span class="num">1</span>,
+                title=block.heading,
+                text=block.text,
+            ))
+    <span class="kw">return</span> segments</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>def split_daisy_chapters(blocks: list) -&gt; list[Segment]:</code>
+        <br><span class="desc">Defines function <code>split_daisy_chapters</code> accepting parameters (blocks), returning <code>list[Segment]</code>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>&quot;&quot;&quot;Split document into chapters for DAISY book output.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Split document into chapters for DAISY book output.</em>. Documents the purpose of the following code block.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>segments = []</code>
+        <br><span class="desc">Assigns <code>[]</code> to <code>segments</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>for block in blocks:</code>
+        <br><span class="desc">Iterates over <code>blocks</code>, assigning each element to <code>block</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>if block.level &lt;= 2:  # H1 and H2 become chapters</code>
+        <br><span class="desc">Checks condition: <code>block.level &lt;= 2</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>segments.append(Segment(</code>
+        <br><span class="desc"><code>segments.append(Segment(</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>index=len(segments) + 1,</code>
+        <br><span class="desc">Assigns <code>len(segments) + 1,</code> to <code>index</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>title=block.heading,</code>
+        <br><span class="desc">Assigns <code>block.heading,</code> to <code>title</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>text=block.text,</code>
+        <br><span class="desc">Assigns <code>block.text,</code> to <code>text</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>))</code>
+        <br><span class="desc"><code>))</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>return segments</code>
+        <br><span class="desc">Returns <code>segments</code> to the caller.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>46.5 Key Takeaways</h2>
+<ul>
+  <li><strong>4 splitting modes</strong>: page+heading, page-only, heading-only, fixed-size</li>
+  <li>Each mode produces a list of <strong>Segment</strong> objects (index, title, text)</li>
+  <li>DAISY books use <strong>chapter-level splitting</strong> (H1/H2 headings)</li>
+  <li>Fixed-size splitting <strong>respects sentence boundaries</strong></li>
+  <li>The splitter is <strong>format-agnostic</strong> — it works on parsed Document objects</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch45_project_model.html">← Ch 45</a> &nbsp;|&nbsp; <a href="ch47_tts_catalog.html">Ch 47 — TTS Catalog →</a></p>
+</div></div></body>
+</html>

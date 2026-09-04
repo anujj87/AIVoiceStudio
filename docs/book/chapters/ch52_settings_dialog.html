@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 52: Settings Dialog - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part VI</div><ul class="chapters"><li><a href="ch43_architecture.html">Ch 43</a></li><li><a href="ch44_paths_settings.html">Ch 44</a></li><li><a href="ch45_project_model.html">Ch 45</a></li><li><a href="ch46_document_parsing.html">Ch 46</a></li><li><a href="ch47_tts_catalog.html">Ch 47</a></li><li><a href="ch48_tts_engine.html">Ch 48</a></li><li><a href="ch49_downloader.html">Ch 49</a></li><li><a href="ch50_compute_detection.html">Ch 50</a></li><li><a href="ch51_main_frame.html">Ch 51</a></li><li><a href="ch52_settings_dialog.html" class="active">Ch 52: Settings</a></li><li><a href="ch53_model_panels.html">Ch 53</a></li><li><a href="ch54_new_project_wizard.html">Ch 54</a></li><li><a href="ch55_recording.html">Ch 55</a></li><li><a href="ch56_synthesis_worker.html">Ch 56</a></li><li><a href="ch57_clone_engine.html">Ch 57</a></li><li><a href="ch58_omnivoice.html">Ch 58</a></li><li><a href="ch59_daisy_builder.html">Ch 59</a></li><li><a href="ch60_addons.html">Ch 60</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 52</div>
+<h1>Settings Dialog</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand the multi-tab Settings dialog architecture</li>
+  <li>See how settings panels are loaded and managed</li>
+  <li>Understand the NVDA SettingsPanel pattern</li>
+</ul>
+
+<hr>
+
+<h2>52.1 Settings Dialog Tabs</h2>
+
+<table>
+  <thead><tr><th>Tab</th><th>Panel Class</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td>General</td><td>GeneralPanel</td><td>Theme, developer mode</td></tr>
+    <tr><td>Download and remove</td><td>DownloadPanel</td><td>Download/remove voice models</td></tr>
+    <tr><td>Available TTS</td><td>AvailablePanel</td><td>List installed voices, preview</td></tr>
+    <tr><td>Voice Clone</td><td>ClonePanel</td><td>Create cloned voices (XTTS v2)</td></tr>
+    <tr><td>Compute</td><td>ComputePanel</td><td>GPU detection, OmniVoice install</td></tr>
+    <tr><td>OmniVoice Server</td><td>ServerPanel</td><td>HTTP server configuration</td></tr>
+    <tr><td>DAISY</td><td>DaisyPanel</td><td>DAISY book settings</td></tr>
+    <tr><td>Developer</td><td>DeveloperPanel</td><td>Pip install, log viewer</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h2>52.2 Panel Management Pattern</h2>
+
+<pre><code><span class="cm"># From gui/settings_dialog.py</span>
+<span class="kw">class</span> <span class="cls">SettingsDialog</span>(wx.Dialog):
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, parent, settings, store):
+        <span class="kw">super</span>().__init__(parent, title=<span class="str">"Settings"</span>, size=(<span class="num">800</span>, <span class="num">600</span>))
+
+        <span class="cm"># Create a notebook (tab control)</span>
+        self._notebook = wx.Notebook(self)
+
+        <span class="cm"># Create panels</span>
+        self._panels = []
+        self._add_panel(GeneralPanel(self._notebook, settings))
+        self._add_panel(DownloadPanel(self._notebook, store, downloader))
+        self._add_panel(AvailablePanel(self._notebook, store))
+        <span class="cm"># ... more panels ...</span>
+
+    <span class="kw">def</span> <span class="fn">_add_panel</span>(self, panel):
+        self._notebook.AddPage(panel, panel.title)
+        self._panels.append(panel)
+
+    <span class="kw">def</span> <span class="fn">_on_ok</span>(self, _):
+        <span class="cm"># Apply all panels</span>
+        <span class="kw">for</span> panel <span class="kw">in</span> self._panels:
+            <span class="kw">if</span> hasattr(panel, <span class="str">"apply_to_settings"</span>):
+                panel.apply_to_settings()
+        self.settings.save()
+        self.EndModal(wx.ID_OK)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From gui/settings_dialog.py</code>
+        <br><span class="desc">A comment indicating the source file: <em>From gui/settings_dialog.py</em>. This helps the reader locate the code in the AIVoiceStudio codebase.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>class SettingsDialog(wx.Dialog):</code>
+        <br><span class="desc">Multi-tab dialog for application settings. Tabs: Voice Downloads, Compute Backend, Recording Defaults, Paths, Developer Mode.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>def __init__(self, parent, settings, store):</code>
+        <br><span class="desc">Defines function <code>__init__</code> accepting parameters (self, parent, settings, store).</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>super().__init__(parent, title=&quot;Settings&quot;, size=(800, 600))</code>
+        <br><span class="desc">Calls function <code>super()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># Create a notebook (tab control)</code>
+        <br><span class="desc">A comment: <em>Create a notebook (tab control)</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>self._notebook = wx.Notebook(self)</code>
+        <br><span class="desc">A tabbed container. Each tab is a separate panel. Used in the Settings dialog for tabbed pages.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># Create panels</code>
+        <br><span class="desc">A comment: <em>Create panels</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>self._panels = []</code>
+        <br><span class="desc">Stores <code>[]</code> in the instance attribute <code>_panels</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>self._add_panel(GeneralPanel(self._notebook, settings))</code>
+        <br><span class="desc">Calls <code>self._add_panel()</code> to perform an operation.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>self._add_panel(DownloadPanel(self._notebook, store, downloader))</code>
+        <br><span class="desc">Calls <code>self._add_panel()</code> to perform an operation.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>self._add_panel(AvailablePanel(self._notebook, store))</code>
+        <br><span class="desc">Calls <code>self._add_panel()</code> to perform an operation.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code># ... more panels ...</code>
+        <br><span class="desc">A comment: <em>... more panels ...</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>def _add_panel(self, panel):</code>
+        <br><span class="desc">Defines function <code>_add_panel</code> accepting parameters (self, panel).</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>self._notebook.AddPage(panel, panel.title)</code>
+        <br><span class="desc"><code>self._notebook.AddPage(panel, panel.title)</code></span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>self._panels.append(panel)</code>
+        <br><span class="desc"><code>self._panels.append(panel)</code></span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>def _on_ok(self, _):</code>
+        <br><span class="desc">Defines function <code>_on_ok</code> accepting parameters (self, _).</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code># Apply all panels</code>
+        <br><span class="desc">A comment: <em>Apply all panels</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>for panel in self._panels:</code>
+        <br><span class="desc">Iterates over <code>self._panels</code>, assigning each element to <code>panel</code>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>if hasattr(panel, &quot;apply_to_settings&quot;):</code>
+        <br><span class="desc">Checks condition: <code>hasattr(panel, &quot;apply_to_settings&quot;)</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>panel.apply_to_settings()</code>
+        <br><span class="desc"><code>panel.apply_to_settings()</code></span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>self.settings.save()</code>
+        <br><span class="desc"><code>self.settings.save()</code></span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>self.EndModal(wx.ID_OK)</code>
+        <br><span class="desc">Calls <code>self.EndModal()</code> to perform an operation.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>52.3 Key Takeaways</h2>
+<ul>
+  <li>The Settings dialog uses a <strong>wx.Notebook</strong> with 8 tabs</li>
+  <li>Each tab is a <strong>panel class</strong> with its own UI and logic</li>
+  <li>Panels implement <strong>apply_to_settings()</strong> to save their state</li>
+  <li>The dialog follows the <strong>NVDA SettingsPanel pattern</strong> (title, description, apply)</li>
+  <li>Settings are saved <strong>immediately on OK</strong></li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch51_main_frame.html">← Ch 51</a> &nbsp;|&nbsp; <a href="ch53_model_panels.html">Ch 53 — Model Panels →</a></p>
+</div></div></body>
+</html>

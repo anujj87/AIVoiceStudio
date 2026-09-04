@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 23: Metaclasses &amp; Descriptors - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part III</div><ul class="chapters"><li><a href="ch19_concurrency.html">Ch 19</a></li><li><a href="ch20_multiprocessing.html">Ch 20</a></li><li><a href="ch21_async.html">Ch 21</a></li><li><a href="ch22_type_hints.html">Ch 22</a></li><li><a href="ch23_metaclasses.html" class="active">Ch 23: Metaclasses</a></li><li><a href="ch24_design_patterns.html">Ch 24</a></li><li><a href="ch25_introspection.html">Ch 25</a></li><li><a href="ch26_c_extensions.html">Ch 26</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 23</div>
+<h1>Metaclasses &amp; Descriptors</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand how Python creates classes</li>
+  <li>Use metaclasses for class-level customization</li>
+  <li>Understand descriptors (the mechanism behind @property)</li>
+  <li>Know when to use these advanced features (and when not to)</li>
+</ul>
+
+<hr>
+
+<h2>23.1 How Python Creates Classes</h2>
+
+<pre><code><span class="cm"># Every class has a metaclass — by default it's 'type'</span>
+<span class="kw">class</span> <span class="cls">MyClass</span>:
+    <span class="kw">pass</span>
+
+<span class="kw">print</span>(type(MyClass))     <span class="cm"># &lt;class 'type'&gt;</span>
+<span class="kw">print</span>(type(<span class="num">42</span>))         <span class="cm"># &lt;class 'int'&gt;</span>
+<span class="kw">print</span>(type(MyClass()))   <span class="cm"># &lt;class 'MyClass'&gt;</span>
+
+<span class="cm"># type(name, bases, namespace) creates a class</span>
+MyClass = type(<span class="str">"MyClass"</span>, (), {<span class="str">"x"</span>: <span class="num">42</span>})
+<span class="kw">print</span>(MyClass().x)  <span class="cm"># 42</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Every class has a metaclass — by default it&#x27;s &#x27;type&#x27;</code>
+        <br><span class="desc">A comment: <em>Every class has a metaclass — by default it&#x27;s &#x27;type&#x27;</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>class MyClass:</code>
+        <br><span class="desc">Defines class <code>MyClass</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>pass</code>
+        <br><span class="desc">Placeholder: does nothing.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>print(type(MyClass))     # &lt;class &#x27;type&#x27;&gt;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>print(type(42))         # &lt;class &#x27;int&#x27;&gt;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>print(type(MyClass()))   # &lt;class &#x27;MyClass&#x27;&gt;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># type(name, bases, namespace) creates a class</code>
+        <br><span class="desc">A comment: <em>type(name, bases, namespace) creates a class</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>MyClass = type(&quot;MyClass&quot;, (), {&quot;x&quot;: 42})</code>
+        <br><span class="desc">Returns the type/class of an object. Used for debugging and type checking.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>print(MyClass().x)  # 42</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>23.2 Custom Metaclasses</h2>
+
+<pre><code><span class="kw">class</span> <span class="cls">AutoRegisterMeta</span>(type):
+    <span class="str">"""Automatically register subclasses."""</span>
+    _registry: dict[str, type] = {}
+
+    <span class="kw">def</span> <span class="fn">__new__</span>(mcs, name, bases, namespace):
+        cls = <span class="kw">super</span>().__new__(mcs, name, bases, namespace)
+        <span class="kw">if</span> bases:  <span class="cm"># Don't register the base class itself</span>
+            mcs._registry[name] = cls
+        <span class="kw">return</span> cls
+
+<span class="kw">class</span> <span class="cls">Engine</span>(metaclass=AutoRegisterMeta):
+    <span class="kw">pass</span>
+
+<span class="kw">class</span> <span class="cls">PiperEngine</span>(Engine):
+    <span class="kw">pass</span>  <span class="cm"># Auto-registered!</span>
+
+<span class="kw">class</span> <span class="cls">KokoroEngine</span>(Engine):
+    <span class="kw">pass</span>  <span class="cm"># Auto-registered!</span>
+
+<span class="kw">print</span>(AutoRegisterMeta._registry)
+<span class="cm"># {'PiperEngine': &lt;class 'PiperEngine'&gt;, 'KokoroEngine': &lt;class 'KokoroEngine'&gt;}</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>class AutoRegisterMeta(type):</code>
+        <br><span class="desc">Defines class <code>AutoRegisterMeta</code> inheriting from <code>type</code>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>&quot;&quot;&quot;Automatically register subclasses.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Automatically register subclasses.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>_registry: dict[str, type] = {}</code>
+        <br><span class="desc">Begins exception handling. Code in this block is monitored for errors.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>def __new__(mcs, name, bases, namespace):</code>
+        <br><span class="desc">Defines function <code>__new__</code> accepting (mcs, name, bases, namespace).</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>cls = super().__new__(mcs, name, bases, namespace)</code>
+        <br><span class="desc">Returns a proxy object that delegates method calls to a parent class. Used in __init__ to call the parent constructor.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>if bases:  # Don&#x27;t register the base class itself</code>
+        <br><span class="desc">Checks condition: <code>bases</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>mcs._registry[name] = cls</code>
+        <br><span class="desc"><code>mcs._registry[name] = cls</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>return cls</code>
+        <br><span class="desc">Returns <code>cls</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>class Engine(metaclass=AutoRegisterMeta):</code>
+        <br><span class="desc">Defines class <code>Engine</code> inheriting from <code>metaclass=AutoRegisterMeta</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>pass</code>
+        <br><span class="desc">Placeholder: does nothing.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>class PiperEngine(Engine):</code>
+        <br><span class="desc">Defines class <code>PiperEngine</code> inheriting from <code>Engine</code>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>pass  # Auto-registered!</code>
+        <br><span class="desc"><code>pass  # Auto-registered!</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>class KokoroEngine(Engine):</code>
+        <br><span class="desc">Defines class <code>KokoroEngine</code> inheriting from <code>Engine</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>pass  # Auto-registered!</code>
+        <br><span class="desc"><code>pass  # Auto-registered!</code></span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>print(AutoRegisterMeta._registry)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code># {&#x27;PiperEngine&#x27;: &lt;class &#x27;PiperEngine&#x27;&gt;, &#x27;KokoroEngine&#x27;: &lt;class &#x27;KokoroEngine&#x27;&gt;}</code>
+        <br><span class="desc">A comment: <em>{&#x27;PiperEngine&#x27;: &lt;class &#x27;PiperEngine&#x27;&gt;, &#x27;KokoroEngine&#x27;: &lt;class &#x27;KokoroEngine&#x27;&gt;}</em>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>23.3 Descriptors</h2>
+
+<p>Descriptors are objects that define <code>__get__</code>, <code>__set__</code>, or <code>__delete__</code>. They power <code>@property</code>:</p>
+
+<pre><code><span class="kw">class</span> <span class="cls">Validated</span>:
+    <span class="str">"""Descriptor that validates values on assignment."""</span>
+
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, min_val: float, max_val: float):
+        self.min_val = min_val
+        self.max_val = max_val
+
+    <span class="kw">def</span> <span class="fn">__set_name__</span>(self, owner, name):
+        self.name = name
+
+    <span class="kw">def</span> <span class="fn">__get__</span>(self, obj, objtype=<span class="kw">None</span>):
+        <span class="kw">if</span> obj <span class="kw">is</span> <span class="kw">None</span>:
+            <span class="kw">return</span> self
+        <span class="kw">return</span> obj.__dict__.get(self.name, <span class="num">1.0</span>)
+
+    <span class="kw">def</span> <span class="fn">__set__</span>(self, obj, value):
+        <span class="kw">if not</span> (self.min_val <= value <= self.max_val):
+            <span class="kw">raise</span> ValueError(
+                <span class="str">f"</span>{self.name}<span class="str"> must be between </span>{self.min_val}<span class="str"> and </span>{self.max_val}<span class="str">"</span>
+            )
+        obj.__dict__[self.name] = value
+
+<span class="kw">class</span> <span class="cls">VoiceParams</span>:
+    rate = Validated(<span class="num">0.5</span>, <span class="num">2.0</span>)
+    pitch = Validated(<span class="num">0.5</span>, <span class="num">2.0</span>)
+    volume = Validated(<span class="num">0.0</span>, <span class="num">2.0</span>)
+
+params = VoiceParams()
+params.rate = <span class="num">1.5</span>   <span class="cm"># OK</span>
+<span class="cm"># params.rate = 5.0  # ValueError!</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>class Validated:</code>
+        <br><span class="desc">Defines class <code>Validated</code>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>&quot;&quot;&quot;Descriptor that validates values on assignment.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Descriptor that validates values on assignment.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>def __init__(self, min_val: float, max_val: float):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>self.min_val = min_val</code>
+        <br><span class="desc">Stores <code>min_val</code> in instance attribute <code>min_val</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>self.max_val = max_val</code>
+        <br><span class="desc">Stores <code>max_val</code> in instance attribute <code>max_val</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>def __set_name__(self, owner, name):</code>
+        <br><span class="desc">Defines function <code>__set_name__</code> accepting (self, owner, name).</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>self.name = name</code>
+        <br><span class="desc">Stores <code>name</code> in instance attribute <code>name</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>def __get__(self, obj, objtype=None):</code>
+        <br><span class="desc">Defines function <code>__get__</code> accepting (self, obj, objtype).</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>if obj is None:</code>
+        <br><span class="desc">Checks condition: <code>obj is None</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>return self</code>
+        <br><span class="desc">Returns <code>self</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>return obj.__dict__.get(self.name, 1.0)</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>def __set__(self, obj, value):</code>
+        <br><span class="desc">Defines function <code>__set__</code> accepting (self, obj, value).</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>if not (self.min_val &lt;= value &lt;= self.max_val):</code>
+        <br><span class="desc">Checks condition: <code>not (self.min_val &lt;= value &lt;= self.max_val)</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>raise ValueError(</code>
+        <br><span class="desc">Raised when a function receives an argument of the right type but inappropriate value.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>f&quot;{self.name} must be between {self.min_val} and {self.max_val}&quot;</code>
+        <br><span class="desc"><code>f&quot;{self.name} must be between {self.min_val} and {self.max_val}&quot;</code></span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>obj.__dict__[self.name] = value</code>
+        <br><span class="desc"><code>obj.__dict__[self.name] = value</code></span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>class VoiceParams:</code>
+        <br><span class="desc">Defines class <code>VoiceParams</code>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>rate = Validated(0.5, 2.0)</code>
+        <br><span class="desc">Assigns <code>Validated(0.5, 2.0)</code> to <code>rate</code>.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>pitch = Validated(0.5, 2.0)</code>
+        <br><span class="desc">Assigns <code>Validated(0.5, 2.0)</code> to <code>pitch</code>.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>volume = Validated(0.0, 2.0)</code>
+        <br><span class="desc">Assigns <code>Validated(0.0, 2.0)</code> to <code>volume</code>.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>params = VoiceParams()</code>
+        <br><span class="desc">Assigns <code>VoiceParams()</code> to <code>params</code>.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>params.rate = 1.5   # OK</code>
+        <br><span class="desc">Assigns <code>1.5   # OK</code> to <code>params.rate</code>.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code># params.rate = 5.0  # ValueError!</code>
+        <br><span class="desc">A comment: <em>params.rate = 5.0  # ValueError!</em>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>23.4 Key Takeaways</h2>
+<ul>
+  <li><strong>Metaclasses</strong> customize class creation — powerful but rarely needed</li>
+  <li><strong>Descriptors</strong> power <code>@property</code> and can add validation, caching, etc.</li>
+  <li>In practice, prefer <strong>@property</strong> and <strong>@dataclass</strong> over metaclasses</li>
+  <li>AIVS doesn't use custom metaclasses — it uses <strong>composition</strong> and <strong>decorators</strong> instead</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch22_type_hints.html">← Ch 22</a> &nbsp;|&nbsp; <a href="ch24_design_patterns.html">Ch 24 — Design Patterns →</a></p>
+</div></div></body>
+</html>

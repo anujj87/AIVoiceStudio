@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 25: Introspection &amp; Reflection - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part III</div><ul class="chapters"><li><a href="ch19_concurrency.html">Ch 19</a></li><li><a href="ch20_multiprocessing.html">Ch 20</a></li><li><a href="ch21_async.html">Ch 21</a></li><li><a href="ch22_type_hints.html">Ch 22</a></li><li><a href="ch23_metaclasses.html">Ch 23</a></li><li><a href="ch24_design_patterns.html">Ch 24</a></li><li><a href="ch25_introspection.html" class="active">Ch 25: Introspection</a></li><li><a href="ch26_c_extensions.html">Ch 26</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 25</div>
+<h1>Introspection &amp; Reflection</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Examine objects at runtime with dir(), type(), getattr()</li>
+  <li>Use inspect module for deep code analysis</li>
+  <li>See introspection patterns in AIVS addon system</li>
+</ul>
+
+<hr>
+
+<h2>25.1 Inspecting Objects</h2>
+
+<pre><code><span class="cm"># dir() — list all attributes</span>
+<span class="kw">class</span> <span class="cls">Settings</span>:
+    <span class="kw">def</span> <span class="fn">__init__</span>(self):
+        self.theme = <span class="str">"dark"</span>
+        self._data = {}
+
+s = Settings()
+<span class="kw">print</span>(dir(s))  <span class="cm"># Lists all attributes and methods</span>
+
+<span class="cm"># type() — get the type</span>
+<span class="kw">print</span>(type(s))  <span class="cm"># &lt;class 'Settings'&gt;</span>
+
+<span class="cm"># getattr/setattr — dynamic attribute access</span>
+<span class="kw">print</span>(getattr(s, <span class="str">"theme"</span>))           <span class="cm"># "dark"</span>
+<span class="kw">print</span>(getattr(s, <span class="str">"missing"</span>, <span class="str">"default"</span>))  <span class="cm"># "default"</span>
+setattr(s, <span class="str">"volume"</span>, <span class="num">0.8</span>)
+<span class="kw">print</span>(hasattr(s, <span class="str">"volume"</span>))          <span class="cm"># True</span>
+
+<span class="cm"># inspect module — deep inspection</span>
+<span class="kw">import</span> inspect
+
+<span class="cm"># Get source code</span>
+<span class="kw">print</span>(inspect.getsource(Settings.__init__))
+
+<span class="cm"># Get function signature</span>
+sig = inspect.signature(sanitize_filename)
+<span class="kw">print</span>(sig)  <span class="cm"># (name: str, max_length: int = 80) -> str</span>
+
+<span class="cm"># Get all members of a module</span>
+<span class="kw">for</span> name, obj <span class="kw">in</span> inspect.getmembers(catalog):
+    <span class="kw">if</span> inspect.isfunction(obj):
+        <span class="kw">print</span>(<span class="str">f"Function: </span>{name}<span class="str">"</span>)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># dir() — list all attributes</code>
+        <br><span class="desc">A comment: <em>dir() — list all attributes</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>class Settings:</code>
+        <br><span class="desc">Defines class <code>Settings</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>def __init__(self):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>self.theme = &quot;dark&quot;</code>
+        <br><span class="desc">Stores <code>&quot;dark&quot;</code> in instance attribute <code>theme</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>self._data = {}</code>
+        <br><span class="desc">Stores <code>{}</code> in instance attribute <code>_data</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>s = Settings()</code>
+        <br><span class="desc">Assigns <code>Settings()</code> to <code>s</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>print(dir(s))  # Lists all attributes and methods</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># type() — get the type</code>
+        <br><span class="desc">A comment: <em>type() — get the type</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>print(type(s))  # &lt;class &#x27;Settings&#x27;&gt;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code># getattr/setattr — dynamic attribute access</code>
+        <br><span class="desc">A comment: <em>getattr/setattr — dynamic attribute access</em>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>print(getattr(s, &quot;theme&quot;))           # &quot;dark&quot;</code>
+        <br><span class="desc">Gets an attribute value by name. Supports a default value if the attribute doesn't exist.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>print(getattr(s, &quot;missing&quot;, &quot;default&quot;))  # &quot;default&quot;</code>
+        <br><span class="desc">Gets an attribute value by name. Supports a default value if the attribute doesn't exist.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>setattr(s, &quot;volume&quot;, 0.8)</code>
+        <br><span class="desc">Sets an attribute value by name. Dynamically adds or modifies object attributes.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>print(hasattr(s, &quot;volume&quot;))          # True</code>
+        <br><span class="desc">Returns True if an object has the named attribute. Useful before calling getattr.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code># inspect module — deep inspection</code>
+        <br><span class="desc">A comment: <em>inspect module — deep inspection</em>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>import inspect</code>
+        <br><span class="desc">Imports the <code>inspect</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code># Get source code</code>
+        <br><span class="desc">A comment: <em>Get source code</em>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>print(inspect.getsource(Settings.__init__))</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code># Get function signature</code>
+        <br><span class="desc">A comment: <em>Get function signature</em>.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>sig = inspect.signature(sanitize_filename)</code>
+        <br><span class="desc">Assigns <code>inspect.signature(sanitize_filename)</code> to <code>sig</code>.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>print(sig)  # (name: str, max_length: int = 80) -&gt; str</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code># Get all members of a module</code>
+        <br><span class="desc">A comment: <em>Get all members of a module</em>.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>for name, obj in inspect.getmembers(catalog):</code>
+        <br><span class="desc"><code>for name, obj in inspect.getmembers(catalog):</code></span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>if inspect.isfunction(obj):</code>
+        <br><span class="desc">Checks condition: <code>inspect.isfunction(obj)</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>print(f&quot;Function: {name}&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>25.2 Introspection in the Addon System</h2>
+
+<pre><code><span class="cm"># From addons/__init__.py — dynamic module loading</span>
+<span class="kw">import</span> importlib.util
+
+<span class="kw">def</span> <span class="fn">_register_engine</span>(self, manifest, addon_dir):
+    <span class="str">"""Import and cache the addon's engine class."""</span>
+    module_name, class_name = manifest.engine_entry_point.split(<span class="str">":"</span>)
+    full_path = os.path.join(addon_dir, module_name + <span class="str">".py"</span>)
+
+    <span class="cm"># Dynamic import from file</span>
+    spec = importlib.util.spec_from_file_location(
+        <span class="str">f"_aivs_engine_{manifest.engine_id}"</span>,
+        full_path,
+    )
+    <span class="kw">if</span> spec <span class="kw">and</span> spec.loader:
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[f<span class="str">"_aivs_engine_{manifest.engine_id}"</span>] = module
+        spec.loader.exec_module(module)
+
+        <span class="cm"># Get class by name (introspection)</span>
+        engine_class = getattr(module, class_name, <span class="kw">None</span>)
+        <span class="kw">if</span> engine_class:
+            self._engines[manifest.engine_id] = {
+                <span class="str">"class"</span>: engine_class,
+                <span class="str">"manifest"</span>: manifest,
+            }</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From addons/__init__.py — dynamic module loading</code>
+        <br><span class="desc">A comment: <em>From addons/__init__.py — dynamic module loading</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>import importlib.util</code>
+        <br><span class="desc">Imports the <code>importlib.util</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>def _register_engine(self, manifest, addon_dir):</code>
+        <br><span class="desc">Defines function <code>_register_engine</code> accepting (self, manifest, addon_dir).</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>&quot;&quot;&quot;Import and cache the addon&#x27;s engine class.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Import and cache the addon&#x27;s engine class.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>module_name, class_name = manifest.engine_entry_point.split(&quot;:&quot;)</code>
+        <br><span class="desc">Splits a string into a list by the given delimiter. Without arguments, splits on whitespace.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>full_path = os.path.join(addon_dir, module_name + &quot;.py&quot;)</code>
+        <br><span class="desc">OS-agnostic path manipulation. Use join(), exists(), dirname(), basename(), splitext().</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># Dynamic import from file</code>
+        <br><span class="desc">A comment: <em>Dynamic import from file</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>spec = importlib.util.spec_from_file_location(</code>
+        <br><span class="desc">Assigns <code>importlib.util.spec_from_file_location(</code> to <code>spec</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>f&quot;_aivs_engine_{manifest.engine_id}&quot;,</code>
+        <br><span class="desc"><code>f&quot;_aivs_engine_{manifest.engine_id}&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>full_path,</code>
+        <br><span class="desc"><code>full_path,</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>if spec and spec.loader:</code>
+        <br><span class="desc">Checks condition: <code>spec and spec.loader</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>module = importlib.util.module_from_spec(spec)</code>
+        <br><span class="desc">Assigns <code>importlib.util.module_from_spec(spec)</code> to <code>module</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>sys.modules[f&quot;_aivs_engine_{manifest.engine_id}&quot;] = module</code>
+        <br><span class="desc"><code>sys.modules[f&quot;_aivs_engine_{manifest.engine_id}&quot;] = module</code></span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>spec.loader.exec_module(module)</code>
+        <br><span class="desc"><code>spec.loader.exec_module(module)</code></span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code># Get class by name (introspection)</code>
+        <br><span class="desc">A comment: <em>Get class by name (introspection)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>engine_class = getattr(module, class_name, None)</code>
+        <br><span class="desc">Gets an attribute value by name. Supports a default value if the attribute doesn't exist.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>if engine_class:</code>
+        <br><span class="desc">Checks condition: <code>engine_class</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>self._engines[manifest.engine_id] = {</code>
+        <br><span class="desc"><code>self._engines[manifest.engine_id] = {</code></span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>&quot;class&quot;: engine_class,</code>
+        <br><span class="desc"><code>&quot;class&quot;: engine_class,</code></span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>&quot;manifest&quot;: manifest,</code>
+        <br><span class="desc"><code>&quot;manifest&quot;: manifest,</code></span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>}</code>
+        <br><span class="desc"><code>}</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>25.3 Key Takeaways</h2>
+<ul>
+  <li><strong><code>dir()</code></strong> lists attributes; <strong><code>getattr()</code></strong> accesses them dynamically</li>
+  <li><strong><code>inspect</code></strong> module provides deep reflection (source code, signatures, members)</li>
+  <li>The AIVS addon system uses <strong>importlib</strong> for dynamic module loading</li>
+  <li>Introspection is powerful but should be used judiciously</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch24_design_patterns.html">← Ch 24</a> &nbsp;|&nbsp; <a href="ch26_c_extensions.html">Ch 26 — C Extensions →</a></p>
+</div></div></body>
+</html>

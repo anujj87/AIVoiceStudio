@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Appendix B: AIVS API Reference - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Appendices</div><ul class="chapters"><li><a href="appendix_a_reference.html">A: Reference</a></li><li><a href="appendix_b_api.html" class="active">B: API</a></li><li><a href="appendix_c_glossary.html">C: Glossary</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Appendix B</div>
+<h1>AIVS API Reference</h1>
+
+<h2>B.1 Core Modules</h2>
+
+<h3>paths.py</h3>
+<table>
+  <thead><tr><th>Function</th><th>Returns</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>user_data_dir()</code></td><td>str</td><td>%APPDATA%/AIVoiceStudio</td></tr>
+    <tr><td><code>models_dir()</code></td><td>str</td><td>Models directory</td></tr>
+    <tr><td><code>project_dir(name)</code></td><td>str</td><td>Project directory by name</td></tr>
+    <tr><td><code>settings_file()</code></td><td>str</td><td>Path to settings.json</td></tr>
+    <tr><td><code>log_file()</code></td><td>str</td><td>Path to app.log</td></tr>
+  </tbody>
+</table>
+
+<h3>settings.py — Settings</h3>
+<table>
+  <thead><tr><th>Method</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>get(key, default)</code></td><td>Get setting value</td></tr>
+    <tr><td><code>set(key, value)</code></td><td>Set and save</td></tr>
+    <tr><td><code>save()</code></td><td>Save to disk</td></tr>
+    <tr><td><code>add_recent_project(name, path)</code></td><td>Add to recent list</td></tr>
+  </tbody>
+</table>
+
+<h3>project.py</h3>
+<table>
+  <thead><tr><th>Function</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>create_project(dir, name, source, mode, segments)</code></td><td>Create new project</td></tr>
+    <tr><td><code>load_project(dir)</code></td><td>Load project.json</td></tr>
+    <tr><td><code>save_project(dir, data)</code></td><td>Atomic JSON save</td></tr>
+    <tr><td><code>mark_segment_done(dir, index, path)</code></td><td>Mark segment recorded</td></tr>
+    <tr><td><code>first_pending_index(dir)</code></td><td>First unrecorded segment</td></tr>
+  </tbody>
+</table>
+
+<h2>B.2 TTS Modules</h2>
+
+<h3>tts/catalog.py</h3>
+<table>
+  <thead><tr><th>Function</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>get_tts_list()</code></td><td>All TTS engines</td></tr>
+    <tr><td><code>find_tts(tts_id)</code></td><td>Find engine by ID</td></tr>
+    <tr><td><code>find_language(tts, code)</code></td><td>Find language in engine</td></tr>
+    <tr><td><code>find_variant(tts, lang, var)</code></td><td>Find variant</td></tr>
+    <tr><td><code>find_voice(tts, lang, var, voice)</code></td><td>Find specific voice</td></tr>
+  </tbody>
+</table>
+
+<h3>tts/engine.py</h3>
+<table>
+  <thead><tr><th>Function/Class</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>get_engine(voice_entry)</code></td><td>Factory: get/create TTS engine</td></tr>
+    <tr><td><code>TtsEngine.synthesize(text, sid, speed, pitch, volume)</code></td><td>Synthesize speech</td></tr>
+    <tr><td><code>_shift_pitch(samples, pitch)</code></td><td>Resample for pitch shift</td></tr>
+    <tr><td><code>_apply_volume(samples, volume)</code></td><td>Scale amplitude</td></tr>
+  </tbody>
+</table>
+
+<h3>tts/models.py — ModelStore</h3>
+<table>
+  <thead><tr><th>Method</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>variant_dir(tts, lang, var)</code></td><td>Disk path for variant</td></tr>
+    <tr><td><code>is_variant_installed(tts, lang, var)</code></td><td>Check if on disk</td></tr>
+    <tr><td><code>mark_installed(tts, lang, var, path)</code></td><td>Register as installed</td></tr>
+    <tr><td><code>installed_voices()</code></td><td>List all installed voices</td></tr>
+    <tr><td><code>custom_voices()</code></td><td>List cloned voices</td></tr>
+  </tbody>
+</table>
+
+<h2>B.3 Document Modules</h2>
+
+<h3>documents/parsers.py</h3>
+<table>
+  <thead><tr><th>Function</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>parse_document(path)</code></td><td>Parse any supported file</td></tr>
+    <tr><td><code>ParseError</code></td><td>Exception for parse failures</td></tr>
+  </tbody>
+</table>
+
+<h3>documents/splitter.py</h3>
+<table>
+  <thead><tr><th>Function/Class</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>Segment(index, title, text)</code></td><td>Data class for a text segment</td></tr>
+    <tr><td><code>split_document(doc, mode)</code></td><td>Split document into segments</td></tr>
+    <tr><td><code>split_daisy_chapters(blocks)</code></td><td>Split for DAISY output</td></tr>
+  </tbody>
+</table>
+
+<h2>B.4 GUI Modules</h2>
+
+<h3>gui/events.py</h3>
+<table>
+  <thead><tr><th>Event</th><th>Data</th></tr></thead>
+  <tbody>
+    <tr><td><code>SynthStatusEvent</code></td><td>message: str</td></tr>
+    <tr><td><code>SynthSegmentDoneEvent</code></td><td>index, title, path</td></tr>
+    <tr><td><code>SynthFinishedEvent</code></td><td>(none)</td></tr>
+    <tr><td><code>SynthErrorEvent</code></td><td>message: str</td></tr>
+    <tr><td><code>DownloadProgressEvent</code></td><td>name, done, total</td></tr>
+    <tr><td><code>DownloadFinishedEvent</code></td><td>success, message</td></tr>
+  </tbody>
+</table>
+
+<h3>gui/a11y.py</h3>
+<table>
+  <thead><tr><th>Function</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>add_labeled(parent, sizer, text, ctrl)</code></td><td>Label+control with a11y name</td></tr>
+    <tr><td><code>add_check(parent, sizer, text)</code></td><td>Accessible checkbox</td></tr>
+    <tr><td><code>set_accessible_name(ctrl, name)</code></td><td>Set screen reader name</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<p style="text-align: center;">
+  <a href="appendix_a_reference.html">← Appendix A</a> &nbsp;|&nbsp;
+  <a href="appendix_c_glossary.html">Appendix C →</a>
+</p>
+
+</div></div></body>
+</html>

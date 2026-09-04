@@ -1,0 +1,1542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 3: Control Flow - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar">
+  <h2>📖 Table of Contents</h2>
+  <div class="part-header">Part I — Python Fundamentals</div>
+  <ul class="chapters">
+    <li><a href="ch01_introduction.html">Ch 1: Introduction</a></li>
+    <li><a href="ch02_variables.html">Ch 2: Variables</a></li>
+    <li><a href="ch03_control_flow.html" class="active">Ch 3: Control Flow</a></li>
+    <li><a href="ch04_functions.html">Ch 4: Functions</a></li>
+    <li><a href="ch05_strings.html">Ch 5: Strings</a></li>
+    <li><a href="ch06_collections.html">Ch 6: Collections</a></li>
+    <li><a href="ch07_file_io.html">Ch 7: File I/O</a></li>
+    <li><a href="ch08_error_handling.html">Ch 8: Error Handling</a></li>
+    <li><a href="ch09_modules.html">Ch 9: Modules</a></li>
+    <li><a href="ch10_oop_basics.html">Ch 10: OOP Basics</a></li>
+  </ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 3</div>
+<h1>Control Flow</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Master <code>if</code>, <code>elif</code>, <code>else</code> branching</li>
+  <li>Use <code>for</code> and <code>while</code> loops effectively</li>
+  <li>Understand <code>break</code>, <code>continue</code>, and <code>else</code> on loops</li>
+  <li>Apply the Python 3.10+ <code>match/case</code> statement</li>
+  <li>See control flow patterns in AI Voice Studio</li>
+</ul>
+
+<hr>
+
+<h2>3.1 if / elif / else</h2>
+
+<p>The <code>if</code> statement executes code based on a boolean condition:</p>
+
+<pre><code><span class="cm"># Basic if</span>
+has_gpu = <span class="kw">True</span>
+<span class="kw">if</span> has_gpu:
+    <span class="kw">print</span>(<span class="str">"Using CUDA GPU"</span>)
+
+<span class="cm"># if / else</span>
+compute = <span class="str">"cpu"</span>
+<span class="kw">if</span> compute == <span class="str">"cuda"</span>:
+    <span class="kw">print</span>(<span class="str">"GPU mode"</span>)
+<span class="kw">else</span>:
+    <span class="kw">print</span>(<span class="str">"CPU mode"</span>)
+
+<span class="cm"># if / elif / else (chain multiple conditions)</span>
+quality = <span class="str">"medium"</span>
+<span class="kw">if</span> quality == <span class="str">"low"</span>:
+    size_mb = <span class="num">50</span>
+<span class="kw">elif</span> quality == <span class="str">"medium"</span>:
+    size_mb = <span class="num">200</span>
+<span class="kw">elif</span> quality == <span class="str">"high"</span>:
+    size_mb = <span class="num">500</span>
+<span class="kw">else</span>:
+    <span class="kw">raise</span> ValueError(<span class="str">f"Unknown quality: </span>{quality}<span class="str">"</span>)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Basic if</code>
+        <br><span class="desc">A comment: <em>Basic if</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>has_gpu = True</code>
+        <br><span class="desc">Assigns <code>True</code> to <code>has_gpu</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>if has_gpu:</code>
+        <br><span class="desc">Checks condition: <code>has_gpu</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>print(&quot;Using CUDA GPU&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># if / else</code>
+        <br><span class="desc">A comment: <em>if / else</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>compute = &quot;cpu&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;cpu&quot;</code> to <code>compute</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>if compute == &quot;cuda&quot;:</code>
+        <br><span class="desc">Checks condition: <code>compute == &quot;cuda&quot;</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>print(&quot;GPU mode&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>else:</code>
+        <br><span class="desc">Fallback: executes when none of the above conditions matched.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>print(&quot;CPU mode&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># if / elif / else (chain multiple conditions)</code>
+        <br><span class="desc">A comment: <em>if / elif / else (chain multiple conditions)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>quality = &quot;medium&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;medium&quot;</code> to <code>quality</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>if quality == &quot;low&quot;:</code>
+        <br><span class="desc">Checks condition: <code>quality == &quot;low&quot;</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>size_mb = 50</code>
+        <br><span class="desc">Assigns <code>50</code> to <code>size_mb</code>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>elif quality == &quot;medium&quot;:</code>
+        <br><span class="desc">Alternative condition: <code>quality == &quot;medium&quot;</code>. Checked only if all previous conditions were <code>False</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>size_mb = 200</code>
+        <br><span class="desc">Assigns <code>200</code> to <code>size_mb</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>elif quality == &quot;high&quot;:</code>
+        <br><span class="desc">Alternative condition: <code>quality == &quot;high&quot;</code>. Checked only if all previous conditions were <code>False</code>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>size_mb = 500</code>
+        <br><span class="desc">Assigns <code>500</code> to <code>size_mb</code>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>else:</code>
+        <br><span class="desc">Fallback: executes when none of the above conditions matched.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>raise ValueError(f&quot;Unknown quality: {quality}&quot;)</code>
+        <br><span class="desc">Raised when a function receives an argument of the right type but inappropriate value.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>Important: No Parentheses or Braces</h3>
+
+<pre><code><span class="cm"># Python style — NO parentheses around conditions</span>
+<span class="kw">if</span> x > <span class="num">5</span>:          <span class="cm"># ✓ Correct</span>
+    <span class="kw">pass</span>
+
+<span class="cm"># if (x > 5):      # ✗ Works but un-Pythonic</span>
+<span class="cm">#     pass</span>
+
+<span class="cm"># Indentation defines the block (4 spaces standard)</span>
+<span class="kw">if</span> <span class="kw">True</span>:
+    <span class="kw">print</span>(<span class="str">"line 1"</span>)
+    <span class="kw">print</span>(<span class="str">"line 2"</span>)  <span class="cm"># Still inside the if</span>
+<span class="kw">print</span>(<span class="str">"line 3"</span>)     <span class="cm"># Outside the if</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Python style — NO parentheses around conditions</code>
+        <br><span class="desc">A comment: <em>Python style — NO parentheses around conditions</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>if x &gt; 5:          # ✓ Correct</code>
+        <br><span class="desc">Checks condition: <code>x &gt; 5</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>pass</code>
+        <br><span class="desc">Placeholder: does nothing.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># if (x &gt; 5):      # ✗ Works but un-Pythonic</code>
+        <br><span class="desc">A comment: <em>if (x &gt; 5):      # ✗ Works but un-Pythonic</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>#     pass</code>
+        <br><span class="desc">A comment: <em>pass</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># Indentation defines the block (4 spaces standard)</code>
+        <br><span class="desc">A comment: <em>Indentation defines the block (4 spaces standard)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>if True:</code>
+        <br><span class="desc">Checks condition: <code>True</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>print(&quot;line 1&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>print(&quot;line 2&quot;)  # Still inside the if</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>print(&quot;line 3&quot;)     # Outside the if</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>Conditional Expressions (Ternary Operator)</h3>
+
+<pre><code><span class="cm"># One-line if/else</span>
+format_label = <span class="str">"WAV"</span> <span class="kw">if</span> fmt == <span class="str">"wav"</span> <span class="kw">else</span> fmt.upper()
+
+<span class="cm"># Used frequently in AIVS for default values</span>
+display_name = voice.get(<span class="str">"name"</span>) <span class="kw">or</span> voice[<span class="str">"id"</span>]  <span class="cm"># fallback</span>
+
+<span class="cm"># Nested ternary (avoid this — hard to read)</span>
+label = <span class="str">"A"</span> <span class="kw">if</span> x < <span class="num">10</span> <span class="kw">else</span> <span class="str">"B"</span> <span class="kw">if</span> x < <span class="num">100</span> <span class="kw">else</span> <span class="str">"C"</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># One-line if/else</code>
+        <br><span class="desc">A comment: <em>One-line if/else</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>format_label = &quot;WAV&quot; if fmt == &quot;wav&quot; else fmt.upper()</code>
+        <br><span class="desc">Converts all characters to uppercase. Returns a new string (strings are immutable).</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># Used frequently in AIVS for default values</code>
+        <br><span class="desc">A comment: <em>Used frequently in AIVS for default values</em>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>display_name = voice.get(&quot;name&quot;) or voice[&quot;id&quot;]  # fallback</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># Nested ternary (avoid this — hard to read)</code>
+        <br><span class="desc">A comment: <em>Nested ternary (avoid this — hard to read)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>label = &quot;A&quot; if x &lt; 10 else &quot;B&quot; if x &lt; 100 else &quot;C&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;A&quot; if x &lt; 10 else &quot;B&quot; if x &lt; 100 else &quot;C&quot;</code> to <code>label</code>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>3.2 for Loops</h2>
+
+<p>
+  Python's <code>for</code> loop iterates over any <strong>iterable</strong> — lists,
+  strings, tuples, dicts, sets, ranges, files, generators, and more:
+</p>
+
+<pre><code><span class="cm"># Iterate over a list</span>
+engines = [<span class="str">"Piper"</span>, <span class="str">"Kokoro"</span>, <span class="str">"Matcha"</span>]
+<span class="kw">for</span> engine <span class="kw">in</span> engines:
+    <span class="kw">print</span>(<span class="str">f"Loading </span>{engine}<span class="str">..."</span>)
+
+<span class="cm"># Iterate over a string</span>
+<span class="kw">for</span> char <span class="kw">in</span> <span class="str">"hello"</span>:
+    <span class="kw">print</span>(char, end=<span class="str">" "</span>)  <span class="cm"># h e l l o</span>
+
+<span class="cm"># range() — generate number sequences</span>
+<span class="kw">for</span> i <span class="kw">in</span> range(<span class="num">5</span>):        <span class="cm"># 0, 1, 2, 3, 4</span>
+    <span class="kw">print</span>(i)
+
+<span class="kw">for</span> i <span class="kw">in</span> range(<span class="num">2</span>, <span class="num">10</span>, <span class="num">3</span>): <span class="cm"># start, stop, step: 2, 5, 8</span>
+    <span class="kw">print</span>(i)
+
+<span class="cm"># Iterate with index using enumerate()</span>
+<span class="kw">for</span> idx, engine <span class="kw">in</span> enumerate(engines):
+    <span class="kw">print</span>(<span class="str">f"</span>{idx}<span class="str">: </span>{engine}<span class="str">"</span>)
+<span class="cm"># 0: Piper</span>
+<span class="cm"># 1: Kokoro</span>
+<span class="cm"># 2: Matcha</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 4)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Iterate over a list</code>
+        <br><span class="desc">A comment: <em>Iterate over a list</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>engines = [&quot;Piper&quot;, &quot;Kokoro&quot;, &quot;Matcha&quot;]</code>
+        <br><span class="desc">Assigns <code>[&quot;Piper&quot;, &quot;Kokoro&quot;, &quot;Matcha&quot;]</code> to <code>engines</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>for engine in engines:</code>
+        <br><span class="desc">Iterates over <code>engines</code>, assigning each element to <code>engine</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>print(f&quot;Loading {engine}...&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># Iterate over a string</code>
+        <br><span class="desc">A comment: <em>Iterate over a string</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>for char in &quot;hello&quot;:</code>
+        <br><span class="desc">Iterates over <code>&quot;hello&quot;</code>, assigning each element to <code>char</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>print(char, end=&quot; &quot;)  # h e l l o</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># range() — generate number sequences</code>
+        <br><span class="desc">A comment: <em>range() — generate number sequences</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>for i in range(5):        # 0, 1, 2, 3, 4</code>
+        <br><span class="desc">Generates a sequence of integers. Commonly used in for loops.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>print(i)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>for i in range(2, 10, 3): # start, stop, step: 2, 5, 8</code>
+        <br><span class="desc">Generates a sequence of integers. Commonly used in for loops.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>print(i)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code># Iterate with index using enumerate()</code>
+        <br><span class="desc">A comment: <em>Iterate with index using enumerate()</em>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>for idx, engine in enumerate(engines):</code>
+        <br><span class="desc">Adds a counter to an iterable, returning (index, value) pairs. Preferred over manual index tracking.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>print(f&quot;{idx}: {engine}&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code># 0: Piper</code>
+        <br><span class="desc">A comment: <em>0: Piper</em>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code># 1: Kokoro</code>
+        <br><span class="desc">A comment: <em>1: Kokoro</em>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code># 2: Matcha</code>
+        <br><span class="desc">A comment: <em>2: Matcha</em>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>Iterating Over Dictionaries</h3>
+
+<pre><code>voices = {
+    <span class="str">"piper"</span>: <span class="str">"English"</span>,
+    <span class="str">"kokoro"</span>: <span class="str">"Multilingual"</span>,
+    <span class="str">"matcha"</span>: <span class="str">"English"</span>,
+}
+
+<span class="cm"># Iterate over keys (default)</span>
+<span class="kw">for</span> tts_id <span class="kw">in</span> voices:
+    <span class="kw">print</span>(tts_id)
+
+<span class="cm"># Iterate over key-value pairs (most common)</span>
+<span class="kw">for</span> tts_id, language <span class="kw">in</span> voices.items():
+    <span class="kw">print</span>(<span class="str">f"</span>{tts_id}<span class="str"> → </span>{language}<span class="str">"</span>)
+
+<span class="cm"># Iterate over values only</span>
+<span class="kw">for</span> lang <span class="kw">in</span> voices.values():
+    <span class="kw">print</span>(lang)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 5)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>voices = {</code>
+        <br><span class="desc">Assigns <code>{</code> to <code>voices</code>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>&quot;piper&quot;: &quot;English&quot;,</code>
+        <br><span class="desc"><code>&quot;piper&quot;: &quot;English&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;kokoro&quot;: &quot;Multilingual&quot;,</code>
+        <br><span class="desc"><code>&quot;kokoro&quot;: &quot;Multilingual&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>&quot;matcha&quot;: &quot;English&quot;,</code>
+        <br><span class="desc"><code>&quot;matcha&quot;: &quot;English&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>}</code>
+        <br><span class="desc"><code>}</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># Iterate over keys (default)</code>
+        <br><span class="desc">A comment: <em>Iterate over keys (default)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>for tts_id in voices:</code>
+        <br><span class="desc">Iterates over <code>voices</code>, assigning each element to <code>tts_id</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>print(tts_id)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code># Iterate over key-value pairs (most common)</code>
+        <br><span class="desc">A comment: <em>Iterate over key-value pairs (most common)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>for tts_id, language in voices.items():</code>
+        <br><span class="desc">Returns a view of the dictionary's (key, value) pairs.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>print(f&quot;{tts_id} → {language}&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code># Iterate over values only</code>
+        <br><span class="desc">A comment: <em>Iterate over values only</em>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>for lang in voices.values():</code>
+        <br><span class="desc">Returns a view of the dictionary's values.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>print(lang)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>Loop Patterns in AI Voice Studio</h3>
+
+<pre><code><span class="cm"># From tts/catalog.py — iterating through nested catalog structure</span>
+<span class="kw">for</span> tts <span class="kw">in</span> catalog.get_tts_list():
+    <span class="kw">for</span> lang <span class="kw">in</span> tts.get(<span class="str">"languages"</span>, []):
+        <span class="kw">for</span> variant <span class="kw">in</span> lang.get(<span class="str">"variants"</span>, []):
+            <span class="kw">for</span> voice <span class="kw">in</span> variant.get(<span class="str">"voices"</span>, []):
+                <span class="kw">print</span>(<span class="str">f"</span>{tts[<span class="str">'id'</span>]}<span class="str"> / </span>{lang[<span class="str">'code'</span>]}<span class="str"> / </span>{voice[<span class="str">'id'</span>]}<span class="str">"</span>)
+
+<span class="cm"># From tts/models.py — iterating installed voices to build a list</span>
+voices = []
+<span class="kw">for</span> tts <span class="kw">in</span> catalog.get_tts_list():
+    <span class="kw">for</span> lang <span class="kw">in</span> tts.get(<span class="str">"languages"</span>, []):
+        <span class="kw">for</span> variant <span class="kw">in</span> lang.get(<span class="str">"variants"</span>, []):
+            <span class="kw">for</span> voice <span class="kw">in</span> variant.get(<span class="str">"voices"</span>, []):
+                <span class="cm"># Build a flat list of voice entries</span>
+                voices.append({
+                    <span class="str">"tts"</span>: tts[<span class="str">"id"</span>],
+                    <span class="str">"language"</span>: lang[<span class="str">"code"</span>],
+                    <span class="str">"voice"</span>: voice[<span class="str">"id"</span>],
+                    <span class="str">"sid"</span>: voice.get(<span class="str">"sid"</span>, <span class="num">0</span>),
+                })</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 6)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From tts/catalog.py — iterating through nested catalog structure</code>
+        <br><span class="desc">A comment: <em>From tts/catalog.py — iterating through nested catalog structure</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>for tts in catalog.get_tts_list():</code>
+        <br><span class="desc">Iterates over <code>catalog.get_tts_list()</code>, assigning each element to <code>tts</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>for lang in tts.get(&quot;languages&quot;, []):</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>for variant in lang.get(&quot;variants&quot;, []):</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>for voice in variant.get(&quot;voices&quot;, []):</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>print(f&quot;{tts[&#x27;id&#x27;]} / {lang[&#x27;code&#x27;]} / {voice[&#x27;id&#x27;]}&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># From tts/models.py — iterating installed voices to build a list</code>
+        <br><span class="desc">A comment: <em>From tts/models.py — iterating installed voices to build a list</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>voices = []</code>
+        <br><span class="desc">Assigns <code>[]</code> to <code>voices</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>for tts in catalog.get_tts_list():</code>
+        <br><span class="desc">Iterates over <code>catalog.get_tts_list()</code>, assigning each element to <code>tts</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>for lang in tts.get(&quot;languages&quot;, []):</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>for variant in lang.get(&quot;variants&quot;, []):</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>for voice in variant.get(&quot;voices&quot;, []):</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code># Build a flat list of voice entries</code>
+        <br><span class="desc">A comment: <em>Build a flat list of voice entries</em>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>voices.append({</code>
+        <br><span class="desc">Adds a single item to the end of the list.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>&quot;tts&quot;: tts[&quot;id&quot;],</code>
+        <br><span class="desc"><code>&quot;tts&quot;: tts[&quot;id&quot;],</code></span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>&quot;language&quot;: lang[&quot;code&quot;],</code>
+        <br><span class="desc"><code>&quot;language&quot;: lang[&quot;code&quot;],</code></span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>&quot;voice&quot;: voice[&quot;id&quot;],</code>
+        <br><span class="desc"><code>&quot;voice&quot;: voice[&quot;id&quot;],</code></span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>&quot;sid&quot;: voice.get(&quot;sid&quot;, 0),</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>})</code>
+        <br><span class="desc"><code>})</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>3.3 while Loops</h2>
+
+<p><code>while</code> loops repeat as long as a condition is true:</p>
+
+<pre><code><span class="cm"># Basic while loop</span>
+countdown = <span class="num">5</span>
+<span class="kw">while</span> countdown > <span class="num">0</span>:
+    <span class="kw">print</span>(<span class="str">f"</span>{countdown}<span class="str">..."</span>)
+    countdown -= <span class="num">1</span>
+<span class="kw">print</span>(<span class="str">"Go!"</span>)
+
+<span class="cm"># Reading input until a sentinel value</span>
+<span class="kw">while</span> <span class="kw">True</span>:
+    line = input(<span class="str">"Enter command (or 'quit'): "</span>)
+    <span class="kw">if</span> line == <span class="str">"quit"</span>:
+        <span class="kw">break</span>
+    <span class="kw">print</span>(<span class="str">f"Executing: </span>{line}<span class="str">"</span>)
+
+<span class="cm"># Polling pattern (used in AIVS server health checks)</span>
+<span class="kw">import</span> time
+timeout = <span class="num">30</span>
+deadline = time.monotonic() + timeout
+<span class="kw">while</span> time.monotonic() < deadline:
+    <span class="kw">if</span> health_check():
+        <span class="kw">print</span>(<span class="str">"Server is ready!"</span>)
+        <span class="kw">break</span>
+    time.sleep(<span class="num">1.0</span>)
+<span class="kw">else</span>:
+    <span class="kw">print</span>(<span class="str">"Server did not start in time"</span>)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 7)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Basic while loop</code>
+        <br><span class="desc">A comment: <em>Basic while loop</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>countdown = 5</code>
+        <br><span class="desc">Assigns <code>5</code> to <code>countdown</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>while countdown &gt; 0:</code>
+        <br><span class="desc">While loop: repeats as long as <code>countdown &gt; 0</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>print(f&quot;{countdown}...&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>countdown -= 1</code>
+        <br><span class="desc">Updates <code>countdown</code> by -= <code>1</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>print(&quot;Go!&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># Reading input until a sentinel value</code>
+        <br><span class="desc">A comment: <em>Reading input until a sentinel value</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>while True:</code>
+        <br><span class="desc">While loop: repeats as long as <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>line = input(&quot;Enter command (or &#x27;quit&#x27;): &quot;)</code>
+        <br><span class="desc">Reads a line of text from the user via the console. Always returns a string.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>if line == &quot;quit&quot;:</code>
+        <br><span class="desc">Checks condition: <code>line == &quot;quit&quot;</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>break</code>
+        <br><span class="desc">Exits the innermost loop.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>print(f&quot;Executing: {line}&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code># Polling pattern (used in AIVS server health checks)</code>
+        <br><span class="desc">A comment: <em>Polling pattern (used in AIVS server health checks)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>import time</code>
+        <br><span class="desc">Imports the <code>time</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>timeout = 30</code>
+        <br><span class="desc">Assigns <code>30</code> to <code>timeout</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>deadline = time.monotonic() + timeout</code>
+        <br><span class="desc">Assigns <code>time.monotonic() + timeout</code> to <code>deadline</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>while time.monotonic() &lt; deadline:</code>
+        <br><span class="desc">While loop: repeats as long as <code>time.monotonic() &lt; deadline</code>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>if health_check():</code>
+        <br><span class="desc">Checks condition: <code>health_check()</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>print(&quot;Server is ready!&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>break</code>
+        <br><span class="desc">Exits the innermost loop.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>time.sleep(1.0)</code>
+        <br><span class="desc"><code>time.sleep(1.0)</code></span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>else:</code>
+        <br><span class="desc">Fallback: executes when none of the above conditions matched.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>print(&quot;Server did not start in time&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>The while-else Pattern</h3>
+
+<p>
+  When a <code>while</code> loop finishes normally (condition becomes false), the
+  <code>else</code> block runs. If the loop exits via <code>break</code>, the
+  <code>else</code> is skipped:
+</p>
+
+<pre><code><span class="cm"># From omnivoice_server/__init__.py — health check polling</span>
+<span class="kw">while</span> time.monotonic() < deadline:
+    <span class="kw">try</span>:
+        <span class="kw">with</span> urllib.request.urlopen(url, timeout=<span class="num">5</span>) <span class="kw">as</span> resp:
+            <span class="kw">if</span> resp.status == <span class="num">200</span>:
+                self._ready.set()
+                <span class="kw">return</span>  <span class="cm"># Success — else block is skipped</span>
+    <span class="kw">except</span> (urllib.error.URLError, OSError):
+        <span class="kw">pass</span>
+    time.sleep(<span class="num">1.0</span>)
+<span class="kw">raise</span> OmniVoiceServerError(
+    <span class="str">f"Server did not become ready within </span>{timeout}<span class="str}s."</span>
+)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 8)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From omnivoice_server/__init__.py — health check polling</code>
+        <br><span class="desc">A comment: <em>From omnivoice_server/__init__.py — health check polling</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>while time.monotonic() &lt; deadline:</code>
+        <br><span class="desc">While loop: repeats as long as <code>time.monotonic() &lt; deadline</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>try:</code>
+        <br><span class="desc">Begins exception handling. Code in this block is monitored for errors.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>with urllib.request.urlopen(url, timeout=5) as resp:</code>
+        <br><span class="desc">Opens a file and returns a file object. Supports modes: 'r' (read), 'w' (write), 'a' (append), 'b' (binary).</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>if resp.status == 200:</code>
+        <br><span class="desc">Checks condition: <code>resp.status == 200</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>self._ready.set()</code>
+        <br><span class="desc"><code>self._ready.set()</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>return  # Success — else block is skipped</code>
+        <br><span class="desc">Returns <code># Success — else block is skipped</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>except (urllib.error.URLError, OSError):</code>
+        <br><span class="desc"><code>except (urllib.error.URLError, OSError):</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>pass</code>
+        <br><span class="desc">Placeholder: does nothing.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>time.sleep(1.0)</code>
+        <br><span class="desc"><code>time.sleep(1.0)</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>raise OmniVoiceServerError(</code>
+        <br><span class="desc">Manually raises an exception. Use to signal error conditions to callers.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>f&quot;Server did not become ready within {timeout}</code>
+        <br><span class="desc"><code>f&quot;Server did not become ready within {timeout}</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>3.4 break, continue, and pass</h2>
+
+<pre><code><span class="cm"># break — exit the loop immediately</span>
+<span class="kw">for</span> engine <span class="kw">in</span> [<span class="str">"piper"</span>, <span class="str">"kokoro"</span>, <span class="str">"matcha"</span>]:
+    <span class="kw">if</span> engine_is_available(engine):
+        chosen = engine
+        <span class="kw">break</span>  <span class="cm"># Stop searching once we find one</span>
+<span class="kw">else</span>:
+    <span class="kw">raise</span> RuntimeError(<span class="str">"No TTS engine available!"</span>)
+
+<span class="cm"># continue — skip to the next iteration</span>
+<span class="kw">for</span> voice <span class="kw">in</span> all_voices:
+    <span class="kw">if</span> <span class="kw">not</span> voice.get(<span class="str">"enabled"</span>, <span class="kw">True</span>):
+        <span class="kw">continue</span>  <span class="cm"># Skip disabled voices</span>
+    <span class="kw">print</span>(voice[<span class="str">"name"</span>])
+
+<span class="cm"># pass — do nothing (placeholder)</span>
+<span class="kw">class</span> <span class="cls">NotImplementedEngine</span>:
+    <span class="kw">pass</span>  <span class="cm"># Will implement later</span>
+
+<span class="cm"># pass is used when syntax requires a block</span>
+<span class="kw">for</span> i <span class="kw">in</span> range(<span class="num">10</span>):
+    <span class="kw">if</span> i % <span class="num">2</span> == <span class="num">0</span>:
+        <span class="kw">pass</span>  <span class="cm"># TODO: handle even numbers later</span>
+    <span class="kw">else</span>:
+        <span class="kw">print</span>(i)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 9)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># break — exit the loop immediately</code>
+        <br><span class="desc">A comment: <em>break — exit the loop immediately</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>for engine in [&quot;piper&quot;, &quot;kokoro&quot;, &quot;matcha&quot;]:</code>
+        <br><span class="desc">Iterates over <code>[&quot;piper&quot;, &quot;kokoro&quot;, &quot;matcha&quot;]</code>, assigning each element to <code>engine</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>if engine_is_available(engine):</code>
+        <br><span class="desc">Checks condition: <code>engine_is_available(engine)</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>chosen = engine</code>
+        <br><span class="desc">Assigns <code>engine</code> to <code>chosen</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>break  # Stop searching once we find one</code>
+        <br><span class="desc"><code>break  # Stop searching once we find one</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>else:</code>
+        <br><span class="desc">Fallback: executes when none of the above conditions matched.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>raise RuntimeError(&quot;No TTS engine available!&quot;)</code>
+        <br><span class="desc">Raised when an error doesn't fall into any other category.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># continue — skip to the next iteration</code>
+        <br><span class="desc">A comment: <em>continue — skip to the next iteration</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>for voice in all_voices:</code>
+        <br><span class="desc">Iterates over <code>all_voices</code>, assigning each element to <code>voice</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>if not voice.get(&quot;enabled&quot;, True):</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>continue  # Skip disabled voices</code>
+        <br><span class="desc"><code>continue  # Skip disabled voices</code></span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>print(voice[&quot;name&quot;])</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code># pass — do nothing (placeholder)</code>
+        <br><span class="desc">A comment: <em>pass — do nothing (placeholder)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>class NotImplementedEngine:</code>
+        <br><span class="desc">Defines class <code>NotImplementedEngine</code>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>pass  # Will implement later</code>
+        <br><span class="desc"><code>pass  # Will implement later</code></span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code># pass is used when syntax requires a block</code>
+        <br><span class="desc">A comment: <em>pass is used when syntax requires a block</em>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>for i in range(10):</code>
+        <br><span class="desc">Generates a sequence of integers. Commonly used in for loops.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>if i % 2 == 0:</code>
+        <br><span class="desc">Checks condition: <code>i % 2 == 0</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>pass  # TODO: handle even numbers later</code>
+        <br><span class="desc"><code>pass  # TODO: handle even numbers later</code></span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>else:</code>
+        <br><span class="desc">Fallback: executes when none of the above conditions matched.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>print(i)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>3.5 List Comprehensions</h2>
+
+<p>
+  List comprehensions are a concise way to create lists. They combine a loop and
+  an expression into a single line:
+</p>
+
+<pre><code><span class="cm"># Traditional loop</span>
+squares = []
+<span class="kw">for</span> x <span class="kw">in</span> range(<span class="num">10</span>):
+    squares.append(x ** <span class="num">2</span>)
+
+<span class="cm"># List comprehension (equivalent, more Pythonic)</span>
+squares = [x ** <span class="num">2</span> <span class="kw">for</span> x <span class="kw">in</span> range(<span class="num">10</span>)]
+<span class="cm"># [0, 1, 4, 9, 16, 25, 36, 49, 64, 81]</span>
+
+<span class="cm"># With filtering</span>
+even_squares = [x ** <span class="num">2</span> <span class="kw">for</span> x <span class="kw">in</span> range(<span class="num">10</span>) <span class="kw">if</span> x % <span class="num">2</span> == <span class="num">0</span>]
+<span class="cm"># [0, 4, 16, 36, 64]</span>
+
+<span class="cm"># Dict comprehension</span>
+engine_names = {t[<span class="str">"id"</span>]: t[<span class="str">"name"</span>] <span class="kw">for</span> t <span class="kw">in</span> tts_list}
+<span class="cm"># {"piper": "Piper TTS", "kokoro": "Kokoro TTS", ...}</span>
+
+<span class="cm"># Set comprehension</span>
+languages = {v[<span class="str">"language"</span>] <span class="kw">for</span> v <span class="kw">in</span> installed_voices}
+<span class="cm"># {"en", "zh", "ja", "multi", ...}</span>
+
+<span class="cm"># Generator expression (lazy — doesn't create list in memory)</span>
+total = sum(len(v[<span class="str">"text"</span>]) <span class="kw">for</span> v <span class="kw">in</span> segments)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 10)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Traditional loop</code>
+        <br><span class="desc">A comment: <em>Traditional loop</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>squares = []</code>
+        <br><span class="desc">Assigns <code>[]</code> to <code>squares</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>for x in range(10):</code>
+        <br><span class="desc">Generates a sequence of integers. Commonly used in for loops.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>squares.append(x ** 2)</code>
+        <br><span class="desc">Adds a single item to the end of the list.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># List comprehension (equivalent, more Pythonic)</code>
+        <br><span class="desc">A comment: <em>List comprehension (equivalent, more Pythonic)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>squares = [x ** 2 for x in range(10)]</code>
+        <br><span class="desc">Generates a sequence of integers. Commonly used in for loops.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># [0, 1, 4, 9, 16, 25, 36, 49, 64, 81]</code>
+        <br><span class="desc">A comment: <em>[0, 1, 4, 9, 16, 25, 36, 49, 64, 81]</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># With filtering</code>
+        <br><span class="desc">A comment: <em>With filtering</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>even_squares = [x ** 2 for x in range(10) if x % 2 == 0]</code>
+        <br><span class="desc">Generates a sequence of integers. Commonly used in for loops.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code># [0, 4, 16, 36, 64]</code>
+        <br><span class="desc">A comment: <em>[0, 4, 16, 36, 64]</em>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># Dict comprehension</code>
+        <br><span class="desc">A comment: <em>Dict comprehension</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>engine_names = {t[&quot;id&quot;]: t[&quot;name&quot;] for t in tts_list}</code>
+        <br><span class="desc">Assigns <code>{t[&quot;id&quot;]: t[&quot;name&quot;] for t in tts_list}</code> to <code>engine_names</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code># {&quot;piper&quot;: &quot;Piper TTS&quot;, &quot;kokoro&quot;: &quot;Kokoro TTS&quot;, ...}</code>
+        <br><span class="desc">A comment: <em>{&quot;piper&quot;: &quot;Piper TTS&quot;, &quot;kokoro&quot;: &quot;Kokoro TTS&quot;, ...}</em>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code># Set comprehension</code>
+        <br><span class="desc">A comment: <em>Set comprehension</em>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>languages = {v[&quot;language&quot;] for v in installed_voices}</code>
+        <br><span class="desc">Assigns <code>{v[&quot;language&quot;] for v in installed_voices}</code> to <code>languages</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code># {&quot;en&quot;, &quot;zh&quot;, &quot;ja&quot;, &quot;multi&quot;, ...}</code>
+        <br><span class="desc">A comment: <em>{&quot;en&quot;, &quot;zh&quot;, &quot;ja&quot;, &quot;multi&quot;, ...}</em>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code># Generator expression (lazy — doesn&#x27;t create list in memory)</code>
+        <br><span class="desc">A comment: <em>Generator expression (lazy — doesn&#x27;t create list in memory)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>total = sum(len(v[&quot;text&quot;]) for v in segments)</code>
+        <br><span class="desc">Returns the number of items in a sequence (string, list, dict, tuple). Essential for loop bounds and validation.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>Comprehensions in AIVS</h3>
+
+<pre><code><span class="cm"># From tts/catalog.py</span>
+<span class="kw">def</span> <span class="fn">get_tts_list</span>():
+    <span class="str">"""Return all TTS engines from the catalog."""</span>
+    <span class="kw">return</span> list(_CATALOG)  <span class="cm"># Convert tuple to list</span>
+
+<span class="cm"># From gui/recording_dialog.py</span>
+tts_ids = sorted({v[<span class="str">"tts"</span>] <span class="kw">for</span> v <span class="kw">in</span> self._voices})
+<span class="cm"># Set comprehension inside sorted() — collect unique TTS IDs</span>
+
+<span class="cm"># From tts/models.py — filtering installed variants</span>
+missing = [
+    v <span class="kw">for</span> v <span class="kw">in</span> variants
+    <span class="kw">if not</span> self.store.is_variant_installed(tts_id, lang_code, v)
+]
+<span class="cm"># List comprehension with negated condition</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 11)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From tts/catalog.py</code>
+        <br><span class="desc">A comment: <em>From tts/catalog.py</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def get_tts_list():</code>
+        <br><span class="desc">Defines function <code>get_tts_list</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;&quot;&quot;Return all TTS engines from the catalog.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Return all TTS engines from the catalog.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>return list(_CATALOG)  # Convert tuple to list</code>
+        <br><span class="desc">Returns <code>list(_CATALOG)  # Convert tuple to list</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># From gui/recording_dialog.py</code>
+        <br><span class="desc">A comment: <em>From gui/recording_dialog.py</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>tts_ids = sorted({v[&quot;tts&quot;] for v in self._voices})</code>
+        <br><span class="desc">Returns a new sorted list from any iterable. Does not modify the original. Accepts a key= parameter for custom sorting.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># Set comprehension inside sorted() — collect unique TTS IDs</code>
+        <br><span class="desc">A comment: <em>Set comprehension inside sorted() — collect unique TTS IDs</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># From tts/models.py — filtering installed variants</code>
+        <br><span class="desc">A comment: <em>From tts/models.py — filtering installed variants</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>missing = [</code>
+        <br><span class="desc">Assigns <code>[</code> to <code>missing</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>v for v in variants</code>
+        <br><span class="desc"><code>v for v in variants</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>if not self.store.is_variant_installed(tts_id, lang_code, v)</code>
+        <br><span class="desc"><code>if not self.store.is_variant_installed(tts_id, lang_code, v)</code></span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>]</code>
+        <br><span class="desc"><code>]</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code># List comprehension with negated condition</code>
+        <br><span class="desc">A comment: <em>List comprehension with negated condition</em>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>3.6 match/case (Python 3.10+)</h2>
+
+<p>
+  Python 3.10 introduced <code>match/case</code>, similar to <code>switch/case</code>
+  in other languages but much more powerful:
+</p>
+
+<pre><code><span class="cm"># Basic match/case</span>
+command = <span class="str">"synthesize"</span>
+
+<span class="kw">match</span> command:
+    <span class="kw">case</span> <span class="str">"ping"</span>:
+        <span class="kw">print</span>(<span class="str">"Pong!"</span>)
+    <span class="kw">case</span> <span class="str">"synthesize"</span>:
+        <span class="kw">print</span>(<span class="str">"Generating audio..."</span>)
+    <span class="kw">case</span> <span class="str">"quit"</span>:
+        <span class="kw">print</span>(<span class="str">"Goodbye!"</span>)
+    <span class="kw">case</span> _:
+        <span class="kw">print</span>(<span class="str">f"Unknown command: </span>{command}<span class="str">"</span>)  <span class="cm"># _ is wildcard</span>
+
+<span class="cm"># Matching with capture variables</span>
+<span class="kw">match</span> request:
+    <span class="kw">case</span> {<span class="str">"cmd"</span>: <span class="str">"synthesize"</span>, <span class="str">"text"</span>: text}:
+        process_text(text)
+    <span class="kw">case</span> {<span class="str">"cmd"</span>: <span class="str">"ping"</span>}:
+        respond_ok()
+    <span class="kw">case</span> _:
+        respond_error(<span class="str">"Unknown command"</span>)
+
+<span class="cm"># Matching with guards (extra conditions)</span>
+<span class="kw">match</span> quality:
+    <span class="kw">case</span> q <span class="kw">if</span> q < <span class="num">50</span>:
+        <span class="kw">print</span>(<span class="str">"Low quality"</span>)
+    <span class="kw">case</span> q <span class="kw">if</span> q < <span class="num">200</span>:
+        <span class="kw">print</span>(<span class="str">"Medium quality"</span>)
+    <span class="kw">case</span> _:
+        <span class="kw">print</span>(<span class="str">"High quality"</span>)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 12)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Basic match/case</code>
+        <br><span class="desc">A comment: <em>Basic match/case</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>command = &quot;synthesize&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;synthesize&quot;</code> to <code>command</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>match command:</code>
+        <br><span class="desc"><code>match command:</code></span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>case &quot;ping&quot;:</code>
+        <br><span class="desc"><code>case &quot;ping&quot;:</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>print(&quot;Pong!&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>case &quot;synthesize&quot;:</code>
+        <br><span class="desc"><code>case &quot;synthesize&quot;:</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>print(&quot;Generating audio...&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>case &quot;quit&quot;:</code>
+        <br><span class="desc"><code>case &quot;quit&quot;:</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>print(&quot;Goodbye!&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>case _:</code>
+        <br><span class="desc"><code>case _:</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>print(f&quot;Unknown command: {command}&quot;)  # _ is wildcard</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code># Matching with capture variables</code>
+        <br><span class="desc">A comment: <em>Matching with capture variables</em>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>match request:</code>
+        <br><span class="desc"><code>match request:</code></span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>case {&quot;cmd&quot;: &quot;synthesize&quot;, &quot;text&quot;: text}:</code>
+        <br><span class="desc"><code>case {&quot;cmd&quot;: &quot;synthesize&quot;, &quot;text&quot;: text}:</code></span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>process_text(text)</code>
+        <br><span class="desc">Calls function <code>process_text()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>case {&quot;cmd&quot;: &quot;ping&quot;}:</code>
+        <br><span class="desc"><code>case {&quot;cmd&quot;: &quot;ping&quot;}:</code></span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>respond_ok()</code>
+        <br><span class="desc">Calls function <code>respond_ok()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>case _:</code>
+        <br><span class="desc"><code>case _:</code></span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>respond_error(&quot;Unknown command&quot;)</code>
+        <br><span class="desc">Calls function <code>respond_error()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code># Matching with guards (extra conditions)</code>
+        <br><span class="desc">A comment: <em>Matching with guards (extra conditions)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>match quality:</code>
+        <br><span class="desc"><code>match quality:</code></span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>case q if q &lt; 50:</code>
+        <br><span class="desc"><code>case q if q &lt; 50:</code></span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>print(&quot;Low quality&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>case q if q &lt; 200:</code>
+        <br><span class="desc"><code>case q if q &lt; 200:</code></span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>print(&quot;Medium quality&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>case _:</code>
+        <br><span class="desc"><code>case _:</code></span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>print(&quot;High quality&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<div class="note">
+  <strong>Note:</strong> AI Voice Studio uses traditional <code>if/elif/else</code>
+  chains rather than <code>match/case</code> because it must support Python 3.9+.
+  When Python 3.10+ is guaranteed, <code>match/case</code> with dictionary patterns
+  is ideal for processing JSON commands like the TTS worker protocol.
+</div>
+
+<hr>
+
+<h2>3.7 Nested Loops and Loop else</h2>
+
+<pre><code><span class="cm"># Nested loops — common in catalog traversal</span>
+<span class="kw">for</span> tts <span class="kw">in</span> tts_list:
+    <span class="kw">for</span> lang <span class="kw">in</span> tts.get(<span class="str">"languages"</span>, []):
+        <span class="kw">for</span> variant <span class="kw">in</span> lang.get(<span class="str">"variants"</span>, []):
+            <span class="kw">if</span> variant[<span class="str">"id"</span>] == target:
+                <span class="kw">print</span>(<span class="str">f"Found: </span>{tts[<span class="str">'id'</span>]}<span class="str"> / </span>{lang[<span class="str">'code'</span>]}<span class="str"> / </span>{target}<span class="str">"</span>)
+                <span class="kw">break</span>
+        <span class="kw">else</span>:
+            <span class="kw">continue</span>  <span class="cm"># Only reached if inner loop didn't break</span>
+        <span class="kw">break</span>  <span class="cm"># Break outer loop too</span>
+    <span class="kw">else</span>:
+        <span class="kw">print</span>(<span class="str">"Not found"</span>)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 13)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Nested loops — common in catalog traversal</code>
+        <br><span class="desc">A comment: <em>Nested loops — common in catalog traversal</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>for tts in tts_list:</code>
+        <br><span class="desc">Iterates over <code>tts_list</code>, assigning each element to <code>tts</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>for lang in tts.get(&quot;languages&quot;, []):</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>for variant in lang.get(&quot;variants&quot;, []):</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>if variant[&quot;id&quot;] == target:</code>
+        <br><span class="desc">Checks condition: <code>variant[&quot;id&quot;] == target</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>print(f&quot;Found: {tts[&#x27;id&#x27;]} / {lang[&#x27;code&#x27;]} / {target}&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>break</code>
+        <br><span class="desc">Exits the innermost loop.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>else:</code>
+        <br><span class="desc">Fallback: executes when none of the above conditions matched.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>continue  # Only reached if inner loop didn&#x27;t break</code>
+        <br><span class="desc"><code>continue  # Only reached if inner loop didn&#x27;t break</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>break  # Break outer loop too</code>
+        <br><span class="desc"><code>break  # Break outer loop too</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>else:</code>
+        <br><span class="desc">Fallback: executes when none of the above conditions matched.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>print(&quot;Not found&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>For-Else Pattern</h3>
+
+<pre><code><span class="cm"># The "else" after a for loop runs only if the loop completes without break</span>
+<span class="kw">for</span> file <span class="kw">in</span> candidates:
+    <span class="kw">if</span> os.path.isfile(file):
+        <span class="kw">print</span>(<span class="str">f"Using: </span>{file}<span class="str">"</span>)
+        <span class="kw">break</span>
+<span class="kw">else</span>:
+    <span class="kw">raise</span> FileNotFoundError(<span class="str">"No suitable file found"</span>)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 14)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># The &quot;else&quot; after a for loop runs only if the loop completes without break</code>
+        <br><span class="desc">A comment: <em>The &quot;else&quot; after a for loop runs only if the loop completes without break</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>for file in candidates:</code>
+        <br><span class="desc">Iterates over <code>candidates</code>, assigning each element to <code>file</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>if os.path.isfile(file):</code>
+        <br><span class="desc">OS-agnostic path manipulation. Use join(), exists(), dirname(), basename(), splitext().</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>print(f&quot;Using: {file}&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>break</code>
+        <br><span class="desc">Exits the innermost loop.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>else:</code>
+        <br><span class="desc">Fallback: executes when none of the above conditions matched.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>raise FileNotFoundError(&quot;No suitable file found&quot;)</code>
+        <br><span class="desc">Raised when a file or directory is requested but doesn't exist.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>3.8 Ternary Expressions in Comprehensions</h2>
+
+<pre><code><span class="cm"># Map-and-filter in one expression</span>
+<span class="cm"># Get all voice names, or "unnamed" if name is missing</span>
+names = [v.get(<span class="str">"name"</span>, <span class="str">"unnamed"</span>) <span class="kw">for</span> v <span class="kw">in</span> voices]
+
+<span class="cm"># Conditional transformation</span>
+labels = [
+    <span class="str">f"✅ </span>{v[<span class="str">'name'</span>]}<span class="str">"</span> <span class="kw">if</span> v.get(<span class="str">"installed"</span>) <span class="kw">else</span> <span class="str">f"⬜ </span>{v[<span class="str">'name'</span>]}<span class="str">"</span>
+    <span class="kw">for</span> v <span class="kw">in</span> all_voices
+]</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 15)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Map-and-filter in one expression</code>
+        <br><span class="desc">A comment: <em>Map-and-filter in one expression</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Get all voice names, or &quot;unnamed&quot; if name is missing</code>
+        <br><span class="desc">A comment: <em>Get all voice names, or &quot;unnamed&quot; if name is missing</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>names = [v.get(&quot;name&quot;, &quot;unnamed&quot;) for v in voices]</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># Conditional transformation</code>
+        <br><span class="desc">A comment: <em>Conditional transformation</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>labels = [</code>
+        <br><span class="desc">Assigns <code>[</code> to <code>labels</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>f&quot;✅ {v[&#x27;name&#x27;]}&quot; if v.get(&quot;installed&quot;) else f&quot;⬜ {v[&#x27;name&#x27;]}&quot;</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>for v in all_voices</code>
+        <br><span class="desc"><code>for v in all_voices</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>]</code>
+        <br><span class="desc"><code>]</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>3.9 Key Takeaways</h2>
+
+<ul>
+  <li><strong>Indentation</strong> defines blocks — use 4 spaces consistently</li>
+  <li><strong><code>for</code></strong> iterates over any iterable; use <code>enumerate()</code> for index + value</li>
+  <li><strong><code>while</code></strong> repeats while a condition is true</li>
+  <li><strong><code>break</code></strong> exits the innermost loop; <strong><code>continue</code></strong> skips to next iteration</li>
+  <li><strong>Loop <code>else</code></strong> runs when the loop completes without <code>break</code></li>
+  <li><strong>List comprehensions</strong> are concise and often faster than equivalent loops</li>
+  <li><strong><code>match/case</code></strong> (3.10+) is powerful for pattern matching on dicts and sequences</li>
+  <li>The AIVS catalog uses <strong>nested for loops</strong> to traverse TTS → language → variant → voice hierarchies</li>
+</ul>
+
+<hr>
+
+<div class="exercise">
+  <strong>Exercise 3.1:</strong> Write a list comprehension that generates all
+  possible TTS engine / language combinations from a nested list structure.
+</div>
+
+<div class="exercise">
+  <strong>Exercise 3.2:</strong> Rewrite the health-check polling loop from Section
+  3.3 as a function <code>wait_for_server(url, timeout)</code> that returns
+  <code>True</code> if the server started, <code>False</code> on timeout.
+</div>
+
+<hr>
+
+<p style="text-align: center;">
+  <a href="ch02_variables.html">← Chapter 2</a> &nbsp;|&nbsp;
+  <a href="ch04_functions.html">Chapter 4 — Functions →</a>
+</p>
+
+</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 70: Performance Optimization - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part VIII</div><ul class="chapters"><li><a href="ch67_python_runtime.html">Ch 67</a></li><li><a href="ch68_subprocess.html">Ch 68</a></li><li><a href="ch69_logging.html">Ch 69</a></li><li><a href="ch70_performance.html" class="active">Ch 70: Performance</a></li><li><a href="ch71_security.html">Ch 71</a></li><li><a href="ch72_roadmap.html">Ch 72</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 70</div>
+<h1>Performance Optimization</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand AIVS performance considerations</li>
+  <li>See lazy loading, caching, and thread optimization</li>
+  <li>Understand memory management for audio processing</li>
+</ul>
+
+<hr>
+
+<h2>70.1 Lazy Loading</h2>
+
+<pre><code><span class="cm"># Heavy imports are deferred until needed</span>
+<span class="kw">def</span> <span class="fn">heavy_function</span>():
+    <span class="kw">import</span> numpy  <span class="cm"># Only imported when function is called</span>
+    <span class="kw">return</span> np.array([<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>])
+
+<span class="cm"># TTS engines are loaded on first use</span>
+_engine_cache: dict[str, TtsEngine] = {}
+
+<span class="kw">def</span> <span class="fn">get_engine</span>(voice_entry):
+    key = voice_entry[<span class="str">"voice"</span>]
+    <span class="kw">if</span> key <span class="kw">not in</span> _engine_cache:
+        _engine_cache[key] = TtsEngine(voice_entry)  <span class="cm"># Expensive!</span>
+    <span class="kw">return</span> _engine_cache[key]</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Heavy imports are deferred until needed</code>
+        <br><span class="desc">A comment: <em>Heavy imports are deferred until needed</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def heavy_function():</code>
+        <br><span class="desc">Defines a function.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>import numpy  # Only imported when function is called</code>
+        <br><span class="desc">Imports a module.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>return np.array([1, 2, 3])</code>
+        <br><span class="desc">Creates a NumPy array from a list or tuple. The dtype parameter specifies the data type (e.g., np.int16 for 16-bit audio samples).</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># TTS engines are loaded on first use</code>
+        <br><span class="desc">A comment: <em>TTS engines are loaded on first use</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>_engine_cache: dict[str, TtsEngine] = {}</code>
+        <br><span class="desc"><code>_engine_cache: dict[str, TtsEngine] = {}</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>def get_engine(voice_entry):</code>
+        <br><span class="desc">Defines a function.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>key = voice_entry[&quot;voice&quot;]</code>
+        <br><span class="desc">Assigns <code>voice_entry[&quot;voice&quot;]</code> to <code>key</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>if key not in _engine_cache:</code>
+        <br><span class="desc">Conditional check.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>_engine_cache[key] = TtsEngine(voice_entry)  # Expensive!</code>
+        <br><span class="desc"><code>_engine_cache[key] = TtsEngine(voice_entry)  # Expensive!</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>return _engine_cache[key]</code>
+        <br><span class="desc">Returns a value from a function.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>70.2 Caching</h2>
+
+<pre><code><span class="cm"># functools.lru_cache for expensive lookups</span>
+<span class="dec">@functools.lru_cache</span>(maxsize=<span class="num">128</span>)
+<span class="kw">def</span> <span class="fn">find_tts_cached</span>(tts_id: str):
+    <span class="kw">return</span> catalog.find_tts(tts_id)
+
+<span class="cm"># Engine caching prevents reloading models</span>
+<span class="cm"># (Models can be 50-500 MB, loading takes seconds)</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># functools.lru_cache for expensive lookups</code>
+        <br><span class="desc">A comment: <em>functools.lru_cache for expensive lookups</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>@functools.lru_cache(maxsize=128)</code>
+        <br><span class="desc">Decorator that caches function results. Reduces repeated expensive computations. maxsize controls cache size.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>def find_tts_cached(tts_id: str):</code>
+        <br><span class="desc">Defines a function.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>return catalog.find_tts(tts_id)</code>
+        <br><span class="desc">Returns a value from a function.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># Engine caching prevents reloading models</code>
+        <br><span class="desc">A comment: <em>Engine caching prevents reloading models</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># (Models can be 50-500 MB, loading takes seconds)</code>
+        <br><span class="desc">A comment: <em>(Models can be 50-500 MB, loading takes seconds)</em>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>70.3 Audio Memory Management</h2>
+
+<pre><code><span class="cm"># Audio arrays can be large (1 sec = 48KB at 24kHz/16-bit)</span>
+<span class="cm"># A 10-minute recording = ~28 MB</span>
+
+<span class="cm"># Use appropriate dtypes</span>
+samples = np.zeros(<span class="num">240000</span>, dtype=np.int16)  <span class="cm"># 10 sec = 480 KB</span>
+
+<span class="cm"># Release memory promptly</span>
+<span class="kw">del</span> large_array
+gc.collect()
+
+<span class="cm"># Base64 encoding doubles size temporarily</span>
+wav_b64 = base64.b64encode(samples.tobytes())  <span class="cm"># 2x memory</span>
+<span class="cm"># Decode immediately after receiving</span>
+samples = np.frombuffer(base64.b64decode(wav_b64), dtype=np.int16)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Audio arrays can be large (1 sec = 48KB at 24kHz/16-bit)</code>
+        <br><span class="desc">A comment: <em>Audio arrays can be large (1 sec = 48KB at 24kHz/16-bit)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># A 10-minute recording = ~28 MB</code>
+        <br><span class="desc">A comment: <em>A 10-minute recording = ~28 MB</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># Use appropriate dtypes</code>
+        <br><span class="desc">A comment: <em>Use appropriate dtypes</em>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>samples = np.zeros(240000, dtype=np.int16)  # 10 sec = 480 KB</code>
+        <br><span class="desc">Creates an array filled with zeros. Shape is specified as (rows, cols) or (length,).</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># Release memory promptly</code>
+        <br><span class="desc">A comment: <em>Release memory promptly</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>del large_array</code>
+        <br><span class="desc"><code>del large_array</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>gc.collect()</code>
+        <br><span class="desc"><code>gc.collect()</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># Base64 encoding doubles size temporarily</code>
+        <br><span class="desc">A comment: <em>Base64 encoding doubles size temporarily</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>wav_b64 = base64.b64encode(samples.tobytes())  # 2x memory</code>
+        <br><span class="desc">Assigns <code>base64.b64encode(samples.tobytes())  # 2x memory</code> to <code>wav_b64</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code># Decode immediately after receiving</code>
+        <br><span class="desc">A comment: <em>Decode immediately after receiving</em>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>samples = np.frombuffer(base64.b64decode(wav_b64), dtype=np.int16)</code>
+        <br><span class="desc">Creates an array from a binary buffer. Used for decoding raw audio data.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>70.4 Thread Optimization</h2>
+
+<pre><code><span class="cm"># Daemon threads die with the main process (no zombie processes)</span>
+t = threading.Thread(target=work, daemon=<span class="kw">True</span>)
+
+<span class="cm"># Lock granularity — don't hold locks longer than needed</span>
+<span class="kw">with</span> self._lock:
+    <span class="cm"># Minimal critical section</span>
+    self._proc.stdin.write(data)
+
+<span class="cm"># Use time.sleep(0.1) in poll loops to avoid CPU spinning</span>
+<span class="kw">while</span> self._pause_event.is_set():
+    time.sleep(<span class="num">0.1</span>)  <span class="cm"># Don't burn CPU while paused</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 4)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Daemon threads die with the main process (no zombie processes)</code>
+        <br><span class="desc">A comment: <em>Daemon threads die with the main process (no zombie processes)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>t = threading.Thread(target=work, daemon=True)</code>
+        <br><span class="desc">Creates a background thread.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># Lock granularity — don&#x27;t hold locks longer than needed</code>
+        <br><span class="desc">A comment: <em>Lock granularity — don&#x27;t hold locks longer than needed</em>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>with self._lock:</code>
+        <br><span class="desc">Context manager: <code>self._lock</code>. Auto-manages cleanup.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># Minimal critical section</code>
+        <br><span class="desc">A comment: <em>Minimal critical section</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>self._proc.stdin.write(data)</code>
+        <br><span class="desc"><code>self._proc.stdin.write(data)</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># Use time.sleep(0.1) in poll loops to avoid CPU spinning</code>
+        <br><span class="desc">A comment: <em>Use time.sleep(0.1) in poll loops to avoid CPU spinning</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>while self._pause_event.is_set():</code>
+        <br><span class="desc">While loop.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>time.sleep(0.1)  # Don&#x27;t burn CPU while paused</code>
+        <br><span class="desc">While loop.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>70.5 Key Takeaways</h2>
+<ul>
+  <li><strong>Lazy loading</strong> defers expensive imports until needed</li>
+  <li><strong>Engine caching</strong> prevents reloading 50-500 MB models</li>
+  <li><strong>int16 dtype</strong> is the standard for audio (2 bytes per sample)</li>
+  <li><strong>Daemon threads</strong> prevent zombie processes</li>
+  <li><strong>Lock granularity</strong> — hold locks for minimal time</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch69_logging.html">← Ch 69</a> &nbsp;|&nbsp; <a href="ch71_security.html">Ch 71 — Security →</a></p>
+</div></div></body>
+</html>

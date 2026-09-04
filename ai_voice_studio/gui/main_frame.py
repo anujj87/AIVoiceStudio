@@ -38,6 +38,7 @@ ID_README = wx.NewIdRef()
 ID_USER_GUIDE = wx.NewIdRef()
 ID_ADDON_GUIDE = wx.NewIdRef()
 ID_ACCESSIBILITY_GUIDE = wx.NewIdRef()
+ID_PYTHON_BOOK = wx.NewIdRef()
 ID_ABOUT = wx.NewIdRef()
 ID_RESUME_RECORDING = wx.NewIdRef()
 ID_RESTART_PROJECT = wx.NewIdRef()
@@ -94,6 +95,8 @@ class MainFrame(wx.Frame):
         help_menu.Append(ID_USER_GUIDE, "&User Guide")
         help_menu.Append(ID_ADDON_GUIDE, "&Addon Development Guide")
         help_menu.Append(ID_ACCESSIBILITY_GUIDE, "&Accessibility Guidelines")
+        help_menu.AppendSeparator()
+        help_menu.Append(ID_PYTHON_BOOK, "Python & wxPython Book	F1")
         help_menu.Append(ID_ABOUT, "&About AI Voice Studio")
         menubar.Append(help_menu, "&Help")
 
@@ -107,6 +110,7 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, lambda _: self._user_guide(), id=ID_USER_GUIDE)
         self.Bind(wx.EVT_MENU, lambda _: self._addon_guide(), id=ID_ADDON_GUIDE)
         self.Bind(wx.EVT_MENU, lambda _: self._accessibility_guide(), id=ID_ACCESSIBILITY_GUIDE)
+        self.Bind(wx.EVT_MENU, lambda _: self._python_book(), id=ID_PYTHON_BOOK)
         self.Bind(wx.EVT_MENU, lambda _: self._about(), id=ID_ABOUT)
         self.Bind(wx.EVT_MENU, lambda _: self._resume_recording(), id=ID_RESUME_RECORDING)
         self.Bind(wx.EVT_MENU, lambda _: self._restart_project(), id=ID_RESTART_PROJECT)
@@ -445,6 +449,36 @@ class MainFrame(wx.Frame):
 
     def _accessibility_guide(self):
         self._open_doc("AccessibilityGuide.html", "Accessibility Guidelines - AI Voice Studio")
+
+    def _python_book(self):
+        """Open the Python & wxPython book in the default browser."""
+        import webbrowser  # noqa: PLC0415
+
+        here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        # In PyInstaller bundles, docs live next to the package folder
+        # (e.g. _internal/docs/), so also check one level up from the package.
+        parent = os.path.dirname(here)
+        candidates = [
+            os.path.join(here, "docs", "book", "index.html"),
+            os.path.join(parent, "docs", "book", "index.html"),
+            os.path.join(os.getcwd(), "docs", "book", "index.html"),
+        ]
+        path = ""
+        for candidate in candidates:
+            if os.path.isfile(candidate):
+                path = candidate
+                break
+        if not path:
+            wx.MessageBox(
+                "The Python & wxPython book (docs/book/index.html) was not found.\n"
+                "Please reinstall AI Voice Studio to get the book.",
+                "Python & wxPython Book", style=wx.OK | wx.ICON_INFORMATION,
+            )
+            return
+        try:
+            webbrowser.open("file:///" + path.replace("\\", "/"))
+        except Exception:  # noqa: BLE001
+            os.startfile(path)  # type: ignore[attr-defined]  # noqa: SIM115
 
     def _about(self):
         import wx.adv  # noqa: PLC0415

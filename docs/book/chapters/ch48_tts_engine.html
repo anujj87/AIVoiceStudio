@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 48: TTS Engine Integration - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part VI</div><ul class="chapters"><li><a href="ch43_architecture.html">Ch 43</a></li><li><a href="ch44_paths_settings.html">Ch 44</a></li><li><a href="ch45_project_model.html">Ch 45</a></li><li><a href="ch46_document_parsing.html">Ch 46</a></li><li><a href="ch47_tts_catalog.html">Ch 47</a></li><li><a href="ch48_tts_engine.html" class="active">Ch 48: TTS Engine</a></li><li><a href="ch49_downloader.html">Ch 49</a></li><li><a href="ch50_compute_detection.html">Ch 50</a></li><li><a href="ch51_main_frame.html">Ch 51</a></li><li><a href="ch52_settings_dialog.html">Ch 52</a></li><li><a href="ch53_model_panels.html">Ch 53</a></li><li><a href="ch54_new_project_wizard.html">Ch 54</a></li><li><a href="ch55_recording.html">Ch 55</a></li><li><a href="ch56_synthesis_worker.html">Ch 56</a></li><li><a href="ch57_clone_engine.html">Ch 57</a></li><li><a href="ch58_omnivoice.html">Ch 58</a></li><li><a href="ch59_daisy_builder.html">Ch 59</a></li><li><a href="ch60_addons.html">Ch 60</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 48</div>
+<h1>TTS Engine Integration</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand how multiple TTS engines are unified under one interface</li>
+  <li>See the engine factory pattern in action</li>
+  <li>Understand pitch, volume, and speed post-processing</li>
+</ul>
+
+<hr>
+
+<h2>48.1 Engine Interface</h2>
+
+<pre><code><span class="cm"># All engines implement the same contract:</span>
+<span class="kw">class</span> <span class="cls">TtsEngine</span>:
+    sample_rate: int = <span class="num">24000</span>
+
+    <span class="kw">def</span> <span class="fn">synthesize</span>(
+        self, text: str, sid: int = <span class="num">0</span>,
+        speed: float = <span class="num">1.0</span>, pitch: float = <span class="num">1.0</span>,
+        volume: float = <span class="num">1.0</span>,
+    ) -> np.ndarray:
+        <span class="str">"""Return int16 audio samples at sample_rate."""</span>
+        ...
+
+    <span class="kw">def</span> <span class="fn">close</span>(self):
+        <span class="str">"""Clean up resources."""</span>
+        <span class="kw">pass</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># All engines implement the same contract:</code>
+        <br><span class="desc">A comment: <em>All engines implement the same contract:</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>class TtsEngine:</code>
+        <br><span class="desc">Abstract base class that all TTS engines must implement. Defines the synthesize() contract: takes text + parameters, returns int16 audio samples.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>sample_rate: int = 24000</code>
+        <br><span class="desc"><code>sample_rate: int = 24000</code></span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>def synthesize(</code>
+        <br><span class="desc"><code>def synthesize(</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>self, text: str, sid: int = 0,</code>
+        <br><span class="desc"><code>self, text: str, sid: int = 0,</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>speed: float = 1.0, pitch: float = 1.0,</code>
+        <br><span class="desc"><code>speed: float = 1.0, pitch: float = 1.0,</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>volume: float = 1.0,</code>
+        <br><span class="desc"><code>volume: float = 1.0,</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>) -&gt; np.ndarray:</code>
+        <br><span class="desc"><code>) -&gt; np.ndarray:</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>&quot;&quot;&quot;Return int16 audio samples at sample_rate.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Return int16 audio samples at sample_rate.</em>. Documents the purpose of the following code block.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>...</code>
+        <br><span class="desc">Ellipsis placeholder: indicates an abstract method that subclasses must implement.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>def close(self):</code>
+        <br><span class="desc">Defines function <code>close</code>: Releases engine resources (loaded models, subprocess handles). Called when switching voices or shutting down.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>&quot;&quot;&quot;Clean up resources.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Clean up resources.</em>. Documents the purpose of the following code block.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>pass</code>
+        <br><span class="desc">Placeholder: does nothing. Used where Python requires a statement syntactically.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>Four Engine Implementations</h3>
+
+<table>
+  <thead><tr><th>Engine</th><th>Library</th><th>Runs In</th><th>Voice Cloning?</th></tr></thead>
+  <tbody>
+    <tr><td><strong>SherpaEngine</strong></td><td>sherpa-onnx</td><td>Main process</td><td>No</td></tr>
+    <tr><td><strong>XtTsCloneEngine</strong></td><td>coqui-tts</td><td>Subprocess</td><td>Yes (XTTS v2)</td></tr>
+    <tr><td><strong>OmniVoiceEngine</strong></td><td>omnivoice-triton</td><td>Subprocess</td><td>Yes (zero-shot)</td></tr>
+    <tr><td><strong>OmniVoiceServerEngine</strong></td><td>omnivoice-server</td><td>HTTP server</td><td>Yes (server-side)</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h2>48.2 Engine Factory</h2>
+
+<pre><code><span class="kw">def</span> <span class="fn">get_engine</span>(voice_entry: dict) -> TtsEngine:
+    <span class="str">"""Factory: create the right engine for a voice."""</span>
+    engine_type = voice_entry.get(<span class="str">"engine"</span>, <span class="str">"vits"</span>)
+
+    <span class="kw">if</span> engine_type == <span class="str">"xtts"</span>:
+        <span class="kw">from</span> ..clone <span class="kw">import</span> CloneClient, XtTsCloneEngine
+        client = CloneClient()
+        <span class="kw">return</span> XtTsCloneEngine(voice_entry, client)
+
+    <span class="kw">elif</span> engine_type == <span class="str">"omnivoice"</span>:
+        <span class="kw">from</span> ..omnivoice <span class="kw">import</span> OmniVoiceEngine
+        <span class="kw">return</span> OmniVoiceEngine(voice_entry)
+
+    <span class="kw">elif</span> engine_type == <span class="str">"omnivoice_server"</span>:
+        <span class="kw">from</span> ..omnivoice_server <span class="kw">import</span> OmniVoiceServerEngine
+        <span class="kw">return</span> OmniVoiceServerEngine(voice_entry)
+
+    <span class="kw">else</span>:
+        <span class="kw">return</span> SherpaEngine(voice_entry)  <span class="cm"># Default: sherpa-onnx</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>def get_engine(voice_entry: dict) -&gt; TtsEngine:</code>
+        <br><span class="desc">Abstract base class that all TTS engines must implement. Defines the synthesize() contract: takes text + parameters, returns int16 audio samples.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>&quot;&quot;&quot;Factory: create the right engine for a voice.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Factory: create the right engine for a voice.</em>. Documents the purpose of the following code block.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>engine_type = voice_entry.get(&quot;engine&quot;, &quot;vits&quot;)</code>
+        <br><span class="desc">Assigns <code>voice_entry.get(&quot;engine&quot;, &quot;vits&quot;)</code> to <code>engine_type</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>if engine_type == &quot;xtts&quot;:</code>
+        <br><span class="desc">Checks condition: <code>engine_type == &quot;xtts&quot;</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>from ..clone import CloneClient, XtTsCloneEngine</code>
+        <br><span class="desc">Voice cloning engine using Coqui TTS (XTTS v2). Runs in a separate subprocess for isolation. Requires a reference audio sample.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>client = CloneClient()</code>
+        <br><span class="desc">Manages the XTTS v2 subprocess. Starts the clone server process, sends synthesis requests, and receives audio back.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>return XtTsCloneEngine(voice_entry, client)</code>
+        <br><span class="desc">Voice cloning engine using Coqui TTS (XTTS v2). Runs in a separate subprocess for isolation. Requires a reference audio sample.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>elif engine_type == &quot;omnivoice&quot;:</code>
+        <br><span class="desc">Alternative condition: <code>engine_type == &quot;omnivoice&quot;</code>. Checked only if all previous conditions were <code>False</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>from ..omnivoice import OmniVoiceEngine</code>
+        <br><span class="desc">Zero-shot voice cloning engine using OmniVoice-Triton. Runs in a subprocess. Can clone any voice from a short audio clip.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>return OmniVoiceEngine(voice_entry)</code>
+        <br><span class="desc">Zero-shot voice cloning engine using OmniVoice-Triton. Runs in a subprocess. Can clone any voice from a short audio clip.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>elif engine_type == &quot;omnivoice_server&quot;:</code>
+        <br><span class="desc">Alternative condition: <code>engine_type == &quot;omnivoice_server&quot;</code>. Checked only if all previous conditions were <code>False</code>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>from ..omnivoice_server import OmniVoiceServerEngine</code>
+        <br><span class="desc">Voice cloning via a remote OmniVoice HTTP server. Communicates over HTTP API instead of subprocess.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>return OmniVoiceServerEngine(voice_entry)</code>
+        <br><span class="desc">Voice cloning via a remote OmniVoice HTTP server. Communicates over HTTP API instead of subprocess.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>else:</code>
+        <br><span class="desc">Fallback: executes when none of the above conditions matched.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>return SherpaEngine(voice_entry)  # Default: sherpa-onnx</code>
+        <br><span class="desc">The primary TTS engine using sherpa-onnx. Runs in-process (no subprocess). Supports VITS, Kokoro, and Matcha voice models. No voice cloning.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>48.3 Post-Processing Pipeline</h2>
+
+<pre><code><span class="cm"># After synthesis, audio goes through post-processing:</span>
+<span class="kw">def</span> <span class="fn">synthesize</span>(self, text, sid=<span class="num">0</span>, speed=<span class="num">1.0</span>, pitch=<span class="num">1.0</span>, volume=<span class="num">1.0</span>):
+    <span class="cm"># 1. Core synthesis (sherpa-onnx / subprocess)</span>
+    audio = self._tts.generate(text=text, sid=sid, speed=speed)
+    samples = np.array(audio.samples, dtype=np.int16)
+
+    <span class="cm"># 2. Pitch adjustment</span>
+    <span class="kw">if</span> pitch != <span class="num">1.0</span>:
+        samples = _shift_pitch(samples, pitch)
+
+    <span class="cm"># 3. Volume adjustment</span>
+    <span class="kw">if</span> volume != <span class="num">1.0</span>:
+        samples = _apply_volume(samples, volume)
+
+    <span class="kw">return</span> samples
+
+<span class="cm"># Pitch shifting via resampling</span>
+<span class="kw">def</span> <span class="fn">_shift_pitch</span>(samples, pitch):
+    new_length = int(len(samples) / pitch)
+    indices = np.linspace(<span class="num">0</span>, len(samples) - <span class="num">1</span>, new_length)
+    shifted = np.interp(indices, np.arange(len(samples)),
+                        samples.astype(np.float64))
+    <span class="kw">return</span> shifted.astype(np.int16)
+
+<span class="cm"># Volume scaling with clipping</span>
+<span class="kw">def</span> <span class="fn">_apply_volume</span>(samples, volume):
+    scaled = samples.astype(np.float64) * volume
+    <span class="kw">return</span> np.clip(scaled, -<span class="num">32768</span>, <span class="num">32767</span>).astype(np.int16)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># After synthesis, audio goes through post-processing:</code>
+        <br><span class="desc">A comment: <em>After synthesis, audio goes through post-processing:</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def synthesize(self, text, sid=0, speed=1.0, pitch=1.0, volume=1.0):</code>
+        <br><span class="desc">Defines function <code>synthesize</code>: Core synthesis method. Takes text string, voice ID (sid), speed/pitch/volume floats. Returns a NumPy array of int16 audio samples at the engine's sample_rate.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># 1. Core synthesis (sherpa-onnx / subprocess)</code>
+        <br><span class="desc">A comment: <em>1. Core synthesis (sherpa-onnx / subprocess)</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>audio = self._tts.generate(text=text, sid=sid, speed=speed)</code>
+        <br><span class="desc">Assigns <code>self._tts.generate(text=text, sid=sid, speed=speed)</code> to <code>audio</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>samples = np.array(audio.samples, dtype=np.int16)</code>
+        <br><span class="desc">Assigns <code>np.array(audio.samples, dtype=np.int16)</code> to <code>samples</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># 2. Pitch adjustment</code>
+        <br><span class="desc">A comment: <em>2. Pitch adjustment</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>if pitch != 1.0:</code>
+        <br><span class="desc">Checks condition: <code>pitch != 1.0</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>samples = _shift_pitch(samples, pitch)</code>
+        <br><span class="desc">Assigns <code>_shift_pitch(samples, pitch)</code> to <code>samples</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code># 3. Volume adjustment</code>
+        <br><span class="desc">A comment: <em>3. Volume adjustment</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>if volume != 1.0:</code>
+        <br><span class="desc">Checks condition: <code>volume != 1.0</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>samples = _apply_volume(samples, volume)</code>
+        <br><span class="desc">Assigns <code>_apply_volume(samples, volume)</code> to <code>samples</code>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>return samples</code>
+        <br><span class="desc">Returns <code>samples</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code># Pitch shifting via resampling</code>
+        <br><span class="desc">A comment: <em>Pitch shifting via resampling</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>def _shift_pitch(samples, pitch):</code>
+        <br><span class="desc">Defines function <code>_shift_pitch</code> accepting parameters (samples, pitch).</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>new_length = int(len(samples) / pitch)</code>
+        <br><span class="desc">Assigns <code>int(len(samples) / pitch)</code> to <code>new_length</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>indices = np.linspace(0, len(samples) - 1, new_length)</code>
+        <br><span class="desc">Assigns <code>np.linspace(0, len(samples) - 1, new_length)</code> to <code>indices</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>shifted = np.interp(indices, np.arange(len(samples)),</code>
+        <br><span class="desc">Assigns <code>np.interp(indices, np.arange(len(samples)),</code> to <code>shifted</code>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>samples.astype(np.float64))</code>
+        <br><span class="desc"><code>samples.astype(np.float64))</code></span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>return shifted.astype(np.int16)</code>
+        <br><span class="desc">Returns <code>shifted.astype(np.int16)</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code># Volume scaling with clipping</code>
+        <br><span class="desc">A comment: <em>Volume scaling with clipping</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>def _apply_volume(samples, volume):</code>
+        <br><span class="desc">Defines function <code>_apply_volume</code> accepting parameters (samples, volume).</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>scaled = samples.astype(np.float64) * volume</code>
+        <br><span class="desc">Assigns <code>samples.astype(np.float64) * volume</code> to <code>scaled</code>.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>return np.clip(scaled, -32768, 32767).astype(np.int16)</code>
+        <br><span class="desc">Returns <code>np.clip(scaled, -32768, 32767).astype(np.int16)</code> to the caller.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>48.4 Key Takeaways</h2>
+<ul>
+  <li>All engines implement the <strong>same interface</strong> (synthesize → int16 numpy array)</li>
+  <li>The <strong>factory pattern</strong> selects the engine based on voice_entry["engine"]</li>
+  <li>Heavy engines (XTTS, OmniVoice) run in <strong>subprocesses</strong></li>
+  <li><strong>Post-processing</strong> (pitch, volume) happens after synthesis, before saving</li>
+  <li>Engine instances are <strong>cached</strong> to avoid reloading models</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch47_tts_catalog.html">← Ch 47</a> &nbsp;|&nbsp; <a href="ch49_downloader.html">Ch 49 — Downloader →</a></p>
+</div></div></body>
+</html>

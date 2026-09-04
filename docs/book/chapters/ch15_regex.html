@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 15: Regular Expressions - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part II</div><ul class="chapters"><li><a href="ch11_oop_advanced.html">Ch 11</a></li><li><a href="ch12_iterators.html">Ch 12</a></li><li><a href="ch13_decorators.html">Ch 13</a></li><li><a href="ch14_context.html">Ch 14</a></li><li><a href="ch15_regex.html" class="active">Ch 15: Regex</a></li><li><a href="ch16_datetime.html">Ch 16</a></li><li><a href="ch17_testing.html">Ch 17</a></li><li><a href="ch18_json_xml.html">Ch 18</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 15</div>
+<h1>Regular Expressions</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand regex syntax and patterns</li>
+  <li>Use Python's <code>re</code> module for search, match, and substitution</li>
+  <li>Apply regex for text processing in AIVS</li>
+</ul>
+
+<hr>
+
+<h2>15.1 Regex Basics</h2>
+
+<pre><code><span class="kw">import</span> re
+
+<span class="cm"># Simple patterns</span>
+text = <span class="str">"Voice af_bella has sample rate 24000"</span>
+
+<span class="cm"># re.search — find first match anywhere in string</span>
+match = re.search(r<span class="str">'\d+'</span>, text)
+<span class="kw">print</span>(match.group())  <span class="cm"># "24000"</span>
+
+<span class="cm"># re.findall — find ALL matches as strings</span>
+numbers = re.findall(r<span class="str">'\d+'</span>, text)
+<span class="kw">print</span>(numbers)  <span class="cm"># ["24000"]</span>
+
+<span class="cm"># re.match — match only at the START of string</span>
+match = re.match(r<span class="str">'Voice (\w+)'</span>, text)
+<span class="kw">print</span>(match.group(<span class="num">1</span>))  <span class="cm"># "af_bella" (captured group)</span>
+
+<span class="cm"># re.sub — substitute matches</span>
+clean = re.sub(r<span class="str">'\s+'</span>, <span class="str">' '</span>, <span class="str">"too   many    spaces"</span>)
+<span class="kw">print</span>(clean)  <span class="cm"># "too many spaces"</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>import re</code>
+        <br><span class="desc">Imports the <code>re</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Simple patterns</code>
+        <br><span class="desc">A comment: <em>Simple patterns</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>text = &quot;Voice af_bella has sample rate 24000&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;Voice af_bella has sample rate 24000&quot;</code> to <code>text</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># re.search — find first match anywhere in string</code>
+        <br><span class="desc">A comment: <em>re.search — find first match anywhere in string</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>match = re.search(r&#x27;\d+&#x27;, text)</code>
+        <br><span class="desc">Searches anywhere in the string for a match.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>print(match.group())  # &quot;24000&quot;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># re.findall — find ALL matches as strings</code>
+        <br><span class="desc">A comment: <em>re.findall — find ALL matches as strings</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>numbers = re.findall(r&#x27;\d+&#x27;, text)</code>
+        <br><span class="desc">Returns all non-overlapping matches as a list of strings.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>print(numbers)  # [&quot;24000&quot;]</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code># re.match — match only at the START of string</code>
+        <br><span class="desc">A comment: <em>re.match — match only at the START of string</em>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>match = re.match(r&#x27;Voice (\w+)&#x27;, text)</code>
+        <br><span class="desc">Checks for a match only at the beginning of the string.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>print(match.group(1))  # &quot;af_bella&quot; (captured group)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code># re.sub — substitute matches</code>
+        <br><span class="desc">A comment: <em>re.sub — substitute matches</em>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>clean = re.sub(r&#x27;\s+&#x27;, &#x27; &#x27;, &quot;too   many    spaces&quot;)</code>
+        <br><span class="desc">Replaces all matches with the replacement string.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>print(clean)  # &quot;too many spaces&quot;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>15.2 Pattern Syntax</h2>
+
+<table>
+  <thead><tr><th>Pattern</th><th>Meaning</th><th>Example</th></tr></thead>
+  <tbody>
+    <tr><td><code>.</code></td><td>Any character</td><td><code>r'h.t'</code> → "hat", "hot"</td></tr>
+    <tr><td><code>\d</code></td><td>Digit [0-9]</td><td><code>r'\d\d'</code> → "42"</td></tr>
+    <tr><td><code>\w</code></td><td>Word char [a-zA-Z0-9_]</td><td><code>r'\w+'</code> → "hello"</td></tr>
+    <tr><td><code>\s</code></td><td>Whitespace</td><td><code>r'\s+'</code> → "  "</td></tr>
+    <tr><td><code>*</code></td><td>Zero or more</td><td><code>r'ab*c'</code> → "ac", "abc"</td></tr>
+    <tr><td><code>+</code></td><td>One or more</td><td><code>r'ab+c'</code> → "abc"</td></tr>
+    <tr><td><code>?</code></td><td>Zero or one</td><td><code>r'colou?r'</code> → "color"</td></tr>
+    <tr><td><code>{n,m}</code></td><td>n to m repetitions</td><td><code>r'\d{2,4}'</code> → "12", "1234"</td></tr>
+    <tr><td><code>[abc]</code></td><td>Character set</td><td><code>r'[aeiou]'</code> → vowels</td></tr>
+    <tr><td><code>[^abc]</code></td><td>Negated set</td><td><code>r'[^0-9]'</code> → non-digits</td></tr>
+    <tr><td><code>|</code></td><td>Alternation (or)</td><td><code>r'cat|dog'</code></td></tr>
+    <tr><td><code>()</code></td><td>Capture group</td><td><code>r'(\w+)@(\w+)'</code></td></tr>
+    <tr><td><code>(?:)</code></td><td>Non-capturing group</td><td><code>r'(?:http|https)'</code></td></tr>
+    <tr><td><code>\b</code></td><td>Word boundary</td><td><code>r'\bcat\b'</code></td></tr>
+    <tr><td><code>^</code></td><td>Start of string</td><td><code>r'^Hello'</code></td></tr>
+    <tr><td><code>$</code></td><td>End of string</td><td><code>r'\.txt$'</code></td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h2>15.3 Common Patterns</h2>
+
+<pre><code><span class="cm"># Validate file extension</span>
+<span class="kw">def</span> <span class="fn">is_valid_docx</span>(path: str) -> bool:
+    <span class="kw">return</span> bool(re.match(r<span class="str">'\.docx$'</span>, path, re.IGNORECASE))
+
+<span class="cm"># Extract version numbers</span>
+text = <span class="str">"Version 2.0.1 (build 20260822)"</span>
+version = re.search(r<span class="str">'Version (\d+\.\d+\.\d+)'</span>, text)
+<span class="kw">print</span>(version.group(<span class="num">1</span>))  <span class="cm"># "2.0.1"</span>
+
+<span class="cm"># Split on multiple delimiters</span>
+parts = re.split(r<span class="str">'[;,\s]+'</span>, <span class="str">"Piper, Kokoro ; Matcha"</span>)
+<span class="kw">print</span>(parts)  <span class="cm"># ['Piper', 'Kokoro', 'Matcha']</span>
+
+<span class="cm"># Clean up whitespace in text</span>
+text = <span class="str">"Too\n\n\nmany\n\nnewlines"</span>
+clean = re.sub(r<span class="str">'\n{3,}'</span>, <span class="str">'\n\n'</span>, text)
+
+<span class="cm"># Named groups</span>
+pattern = r<span class="str">'(?P&lt;tts&gt;\w+)/(?P&lt;lang&gt;\w+)/(?P&lt;variant&gt;\w+)'</span>
+match = re.match(pattern, <span class="str">"piper/en_US/medium"</span>)
+<span class="kw">if</span> match:
+    <span class="kw">print</span>(match.group(<span class="str">"tts"</span>))      <span class="cm"># "piper"</span>
+    <span class="kw">print</span>(match.group(<span class="str">"lang"</span>))     <span class="cm"># "en_US"</span>
+    <span class="kw">print</span>(match.group(<span class="str">"variant"</span>))  <span class="cm"># "medium"</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Validate file extension</code>
+        <br><span class="desc">A comment: <em>Validate file extension</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def is_valid_docx(path: str) -&gt; bool:</code>
+        <br><span class="desc">Defines function <code>is_valid_docx</code> accepting (path), returning <code>bool</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>return bool(re.match(r&#x27;\.docx$&#x27;, path, re.IGNORECASE))</code>
+        <br><span class="desc">Checks for a match only at the beginning of the string.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># Extract version numbers</code>
+        <br><span class="desc">A comment: <em>Extract version numbers</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>text = &quot;Version 2.0.1 (build 20260822)&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;Version 2.0.1 (build 20260822)&quot;</code> to <code>text</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>version = re.search(r&#x27;Version (\d+\.\d+\.\d+)&#x27;, text)</code>
+        <br><span class="desc">Searches anywhere in the string for a match.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>print(version.group(1))  # &quot;2.0.1&quot;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># Split on multiple delimiters</code>
+        <br><span class="desc">A comment: <em>Split on multiple delimiters</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>parts = re.split(r&#x27;[;,\s]+&#x27;, &quot;Piper, Kokoro ; Matcha&quot;)</code>
+        <br><span class="desc">Splits a string into a list by the given delimiter. Without arguments, splits on whitespace.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>print(parts)  # [&#x27;Piper&#x27;, &#x27;Kokoro&#x27;, &#x27;Matcha&#x27;]</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># Clean up whitespace in text</code>
+        <br><span class="desc">A comment: <em>Clean up whitespace in text</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>text = &quot;Too\n\n\nmany\n\nnewlines&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;Too\n\n\nmany\n\nnewlines&quot;</code> to <code>text</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>clean = re.sub(r&#x27;\n{3,}&#x27;, &#x27;\n\n&#x27;, text)</code>
+        <br><span class="desc">Replaces all matches with the replacement string.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code># Named groups</code>
+        <br><span class="desc">A comment: <em>Named groups</em>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>pattern = r&#x27;(?P&lt;tts&gt;\w+)/(?P&lt;lang&gt;\w+)/(?P&lt;variant&gt;\w+)&#x27;</code>
+        <br><span class="desc">Assigns <code>r&#x27;(?P&lt;tts&gt;\w+)/(?P&lt;lang&gt;\w+)/(?P&lt;variant&gt;\w+)&#x27;</code> to <code>pattern</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>match = re.match(pattern, &quot;piper/en_US/medium&quot;)</code>
+        <br><span class="desc">Checks for a match only at the beginning of the string.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>if match:</code>
+        <br><span class="desc">Checks condition: <code>match</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>print(match.group(&quot;tts&quot;))      # &quot;piper&quot;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>print(match.group(&quot;lang&quot;))     # &quot;en_US&quot;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>print(match.group(&quot;variant&quot;))  # &quot;medium&quot;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>15.4 Regex in AIVS</h2>
+
+<pre><code><span class="cm"># From util.py — filename sanitization</span>
+<span class="kw">import</span> re
+<span class="kw">def</span> <span class="fn">sanitize_filename</span>(name: str, max_length: int = <span class="num">80</span>) -> str:
+    name = re.sub(r'[&lt;&gt;:"/\\|?*]', <span class="str">'_'</span>, name)
+    name = re.sub(r'\s+', <span class="str">' '</span>, name).strip()
+    <span class="kw">if</span> len(name) > max_length:
+        name = name[:max_length].rstrip()
+    <span class="kw">return</span> name
+
+<span class="cm"># From documents/daisy_builder.py — DAISY ID sanitization</span>
+<span class="kw">def</span> <span class="fn">_sanitize_id</span>(text: str) -> str:
+    s = re.sub(r<span class="str">"[^a-zA-Z0-9_-]"</span>, <span class="str">"_"</span>, text.lower())
+    s = re.sub(r<span class="str">"_+"</span>, <span class="str">"_"</span>, s).strip(<span class="str">"_"</span>)
+    <span class="kw">return</span> s[:<span class="num">60</span>] <span class="kw">or</span> <span class="str">"item"</span>
+
+<span class="cm"># From documents/splitter.py — sentence splitting</span>
+<span class="kw">def</span> <span class="fn">_split_sentences</span>(text: str) -> list[str]:
+    sentences = re.split(r<span class="str">'(?&lt;=[.!?])\s+'</span>, text)
+    <span class="kw">return</span> [s.strip() <span class="kw">for</span> s <span class="kw">in</span> sentences <span class="kw">if</span> s.strip()]
+
+<span class="cm"># Compiled patterns (faster for repeated use)</span>
+_FILE_EXT = re.compile(r<span class="str">'(\.\w+)$'</span>)
+<span class="kw">def</span> <span class="fn">get_extension</span>(path: str) -> str:
+    m = _FILE_EXT.search(path)
+    <span class="kw">return</span> m.group(<span class="num">1</span>) <span class="kw">if</span> m <span class="kw">else</span> <span class="str">""</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From util.py — filename sanitization</code>
+        <br><span class="desc">A comment: <em>From util.py — filename sanitization</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>import re</code>
+        <br><span class="desc">Imports the <code>re</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>def sanitize_filename(name: str, max_length: int = 80) -&gt; str:</code>
+        <br><span class="desc">Defines function <code>sanitize_filename</code> accepting (name, max_length), returning <code>str</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>name = re.sub(r&#x27;[&lt;&gt;:&quot;/\\|?*]&#x27;, &#x27;_&#x27;, name)</code>
+        <br><span class="desc">Replaces all matches with the replacement string.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>name = re.sub(r&#x27;\s+&#x27;, &#x27; &#x27;, name).strip()</code>
+        <br><span class="desc">Removes leading and trailing whitespace (or specified characters). Returns a new string.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>if len(name) &gt; max_length:</code>
+        <br><span class="desc">Returns the number of items in a sequence (string, list, dict, tuple). Essential for loop bounds and validation.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>name = name[:max_length].rstrip()</code>
+        <br><span class="desc">Removes trailing whitespace only.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>return name</code>
+        <br><span class="desc">Returns <code>name</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code># From documents/daisy_builder.py — DAISY ID sanitization</code>
+        <br><span class="desc">A comment: <em>From documents/daisy_builder.py — DAISY ID sanitization</em>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>def _sanitize_id(text: str) -&gt; str:</code>
+        <br><span class="desc">Returns the unique identity of an object (memory address in CPython). Used with 'is' for identity checks.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>s = re.sub(r&quot;[^a-zA-Z0-9_-]&quot;, &quot;_&quot;, text.lower())</code>
+        <br><span class="desc">Converts all characters to lowercase. Returns a new string.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>s = re.sub(r&quot;_+&quot;, &quot;_&quot;, s).strip(&quot;_&quot;)</code>
+        <br><span class="desc">Removes leading and trailing whitespace (or specified characters). Returns a new string.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>return s[:60] or &quot;item&quot;</code>
+        <br><span class="desc">Returns <code>s[:60] or &quot;item&quot;</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code># From documents/splitter.py — sentence splitting</code>
+        <br><span class="desc">A comment: <em>From documents/splitter.py — sentence splitting</em>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>def _split_sentences(text: str) -&gt; list[str]:</code>
+        <br><span class="desc">Defines function <code>_split_sentences</code> accepting (text), returning <code>list[str]</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>sentences = re.split(r&#x27;(?&lt;=[.!?])\s+&#x27;, text)</code>
+        <br><span class="desc">Splits a string into a list by the given delimiter. Without arguments, splits on whitespace.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>return [s.strip() for s in sentences if s.strip()]</code>
+        <br><span class="desc">Removes leading and trailing whitespace (or specified characters). Returns a new string.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code># Compiled patterns (faster for repeated use)</code>
+        <br><span class="desc">A comment: <em>Compiled patterns (faster for repeated use)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>_FILE_EXT = re.compile(r&#x27;(\.\w+)$&#x27;)</code>
+        <br><span class="desc">Assigns <code>re.compile(r&#x27;(\.\w+)$&#x27;)</code> to <code>_FILE_EXT</code>.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>def get_extension(path: str) -&gt; str:</code>
+        <br><span class="desc">Defines function <code>get_extension</code> accepting (path), returning <code>str</code>.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>m = _FILE_EXT.search(path)</code>
+        <br><span class="desc">Assigns <code>_FILE_EXT.search(path)</code> to <code>m</code>.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>return m.group(1) if m else &quot;&quot;</code>
+        <br><span class="desc">Returns <code>m.group(1) if m else &quot;&quot;</code> to the caller.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>15.5 Key Takeaways</h2>
+<ul>
+  <li><strong><code>re.search()</code></strong> finds anywhere; <strong><code>re.match()</code></strong> finds at start; <strong><code>re.findall()</code></strong> finds all</li>
+  <li><strong>Raw strings</strong> (<code>r'...'</code>) are essential for regex patterns</li>
+  <li><strong>Compiled patterns</strong> (<code>re.compile()</code>) are faster for repeated use</li>
+  <li>AIVS uses regex for <strong>filename sanitization</strong>, <strong>text splitting</strong>, and <strong>pattern matching</strong></li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch14_context.html">← Ch 14</a> &nbsp;|&nbsp; <a href="ch16_datetime.html">Ch 16 — Date/Time →</a></p>
+</div></div></body>
+</html>

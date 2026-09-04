@@ -1,0 +1,398 @@
+/* ============================================================
+   Building AI Voice Studio - Complete Python & wxPython Guide
+   Textbook Stylesheet
+   ============================================================ */
+
+:root {
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --accent: #2563eb;
+  --accent-light: #dbeafe;
+  --accent-dark: #1e40af;
+  --border: #d1d5db;
+  --code-bg: #f3f4f6;
+  --code-fg: #1f2937;
+  --sidebar-bg: #f8fafc;
+  --sidebar-w: 300px;
+  --header-h: 60px;
+  --max-w: 900px;
+  --note-bg: #fef9c3;
+  --note-border: #ca8a04;
+  --tip-bg: #d1fae5;
+  --tip-border: #059669;
+  --warning-bg: #fee2e2;
+  --warning-border: #dc2626;
+  --info-bg: #dbeafe;
+  --info-border: #2563eb;
+}
+
+/* ---- Reset & base ---- */
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; font-size: 17px; }
+body {
+  margin: 0; padding: 0;
+  font-family: "Georgia", "Cambria", "Times New Roman", serif;
+  color: var(--fg);
+  background: var(--bg);
+  line-height: 1.75;
+}
+
+/* ---- Layout ---- */
+.book-container {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ---- Sidebar / Table of Contents ---- */
+.sidebar {
+  position: fixed;
+  top: 0; left: 0;
+  width: var(--sidebar-w);
+  height: 100vh;
+  overflow-y: auto;
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--border);
+  padding: 20px 16px;
+  font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  font-size: 0.85rem;
+  z-index: 100;
+}
+.sidebar h2 {
+  font-size: 1.1rem;
+  margin: 0 0 12px;
+  color: var(--accent-dark);
+}
+.sidebar ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.sidebar li {
+  margin: 0;
+  padding: 0;
+}
+.sidebar a {
+  display: block;
+  padding: 4px 8px;
+  color: var(--fg);
+  text-decoration: none;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+.sidebar a:hover,
+.sidebar a.active {
+  background: var(--accent-light);
+  color: var(--accent-dark);
+}
+.sidebar .part-header {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--accent);
+  margin: 14px 0 4px;
+  padding: 4px 8px;
+}
+.sidebar .chapters {
+  padding-left: 16px;
+}
+.sidebar .chapters a {
+  font-size: 0.82rem;
+}
+
+/* ---- Main content ---- */
+.main-content {
+  margin-left: var(--sidebar-w);
+  flex: 1;
+  padding: 40px 48px 80px;
+  max-width: calc(var(--max-w) + 96px);
+}
+
+/* ---- Typography ---- */
+h1, h2, h3, h4, h5, h6 {
+  font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  color: var(--accent-dark);
+  line-height: 1.3;
+}
+h1 {
+  font-size: 2.4rem;
+  margin: 0 0 24px;
+  padding-bottom: 12px;
+  border-bottom: 3px solid var(--accent);
+}
+h2 {
+  font-size: 1.7rem;
+  margin: 40px 0 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+h3 {
+  font-size: 1.3rem;
+  margin: 32px 0 12px;
+}
+h4 {
+  font-size: 1.1rem;
+  margin: 24px 0 8px;
+}
+p {
+  margin: 0 0 16px;
+}
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+/* ---- Code ---- */
+code {
+  font-family: "Fira Code", "Consolas", "Monaco", monospace;
+  font-size: 0.88em;
+  background: var(--code-bg);
+  padding: 2px 6px;
+  border-radius: 3px;
+  color: var(--code-fg);
+}
+pre {
+  background: #1e293b;
+  color: #e2e8f0;
+  padding: 16px 20px;
+  border-radius: 8px;
+  overflow-x: auto;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin: 0 0 20px;
+}
+pre code {
+  background: none;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+}
+.kw { color: #c084fc; }  /* keyword */
+.fn { color: #67e8f9; }  /* function */
+.str { color: #86efac; } /* string */
+.cm { color: #94a3b8; font-style: italic; } /* comment */
+.num { color: #fbbf24; } /* number */
+.dec { color: #f472b6; } /* decorator */
+.cls { color: #fbbf24; } /* class name */
+.op { color: #e2e8f0; }  /* operator */
+
+/* ---- Tables ---- */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 24px;
+  font-size: 0.92rem;
+}
+th, td {
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  text-align: left;
+}
+th {
+  background: var(--accent-light);
+  font-weight: 600;
+  font-family: "Segoe UI", sans-serif;
+}
+tr:nth-child(even) {
+  background: #f9fafb;
+}
+
+/* ---- Admonition boxes ---- */
+.note, .tip, .warning, .info, .exercise, .project {
+  border-left: 4px solid;
+  padding: 12px 16px;
+  margin: 0 0 20px;
+  border-radius: 0 6px 6px 0;
+  font-size: 0.94rem;
+}
+.note    { background: var(--note-bg);    border-color: var(--note-border); }
+.tip     { background: var(--tip-bg);     border-color: var(--tip-border); }
+.warning { background: var(--warning-bg); border-color: var(--warning-border); }
+.info    { background: var(--info-bg);    border-color: var(--info-border); }
+.exercise {
+  background: #f0e6ff;
+  border-color: #7c3aed;
+}
+.project {
+  background: #fef3c7;
+  border-color: #d97706;
+}
+.note::before    { content: "📝 Note: "; font-weight: 700; }
+.tip::before     { content: "💡 Tip: "; font-weight: 700; }
+.warning::before { content: "⚠️ Warning: "; font-weight: 700; }
+.info::before    { content: "ℹ️ Info: "; font-weight: 700; }
+.exercise::before { content: "✏️ Exercise: "; font-weight: 700; }
+.project::before  { content: "🔧 Project: "; font-weight: 700; }
+
+/* ---- Lists ---- */
+ul, ol {
+  margin: 0 0 16px;
+  padding-left: 28px;
+}
+li {
+  margin-bottom: 4px;
+}
+
+/* ---- Figures ---- */
+figure {
+  margin: 0 0 24px;
+  text-align: center;
+}
+figcaption {
+  font-style: italic;
+  font-size: 0.88rem;
+  color: #6b7280;
+  margin-top: 8px;
+}
+
+/* ---- Blockquote ---- */
+blockquote {
+  margin: 0 0 20px;
+  padding: 12px 20px;
+  border-left: 4px solid var(--accent);
+  background: var(--accent-light);
+  color: #334155;
+  border-radius: 0 6px 6px 0;
+}
+blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+/* ---- Horizontal rule ---- */
+hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 40px 0;
+}
+
+/* ---- Book cover page ---- */
+.book-cover {
+  text-align: center;
+  padding: 80px 20px;
+}
+.book-cover h1 {
+  font-size: 3rem;
+  border: none;
+  color: var(--accent-dark);
+}
+.book-cover .subtitle {
+  font-size: 1.3rem;
+  color: #6b7280;
+  margin: 16px 0 40px;
+}
+.book-cover .edition {
+  font-size: 1rem;
+  color: #9ca3af;
+}
+
+/* ---- Part divider pages ---- */
+.part-divider {
+  text-align: center;
+  padding: 80px 20px 40px;
+  margin-bottom: 40px;
+  border-bottom: 3px solid var(--accent);
+}
+.part-divider .part-number {
+  font-size: 1.1rem;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  margin-bottom: 8px;
+}
+.part-divider h2 {
+  font-size: 2.2rem;
+  border: none;
+  margin: 0;
+}
+
+/* ---- Chapter number ---- */
+.chapter-number {
+  font-size: 0.95rem;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 4px;
+}
+
+/* ---- Line-by-line code explanations ---- */
+.line-explanation {
+  background: #f0f9ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin: 0 0 24px;
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+.line-explanation h4 {
+  margin: 0 0 12px;
+  color: var(--accent-dark);
+  font-size: 1.05rem;
+  border-bottom: 2px solid var(--accent);
+  padding-bottom: 8px;
+}
+.line-explanation ol {
+  margin: 0;
+  padding-left: 24px;
+}
+.line-explanation li {
+  margin-bottom: 10px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+.line-explanation li:hover {
+  background: #dbeafe;
+}
+.line-explanation li strong {
+  color: var(--accent-dark);
+  font-family: "Fira Code", "Consolas", monospace;
+  font-size: 0.85em;
+}
+.line-explanation li code {
+  background: #1e293b;
+  color: #e2e8f0;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.88em;
+  display: inline-block;
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.line-explanation .desc {
+  display: block;
+  margin-top: 4px;
+  color: #374151;
+  font-size: 0.92em;
+  line-height: 1.5;
+  padding-left: 4px;
+  border-left: 2px solid var(--accent-light);
+  margin-left: 0;
+}
+.line-explanation .desc code {
+  background: var(--code-bg);
+  color: var(--code-fg);
+}
+.line-explanation.diagram {
+  background: #f0fdf4;
+  border-color: #86efac;
+}
+.line-explanation.diagram h4 {
+  color: #166534;
+  border-bottom-color: #86efac;
+}
+
+/* ---- Responsive (print-friendly) ---- */
+
+@media print {
+  .sidebar { display: none; }
+  .main-content { margin-left: 0; padding: 20px; }
+  pre { font-size: 0.75rem; }
+}
+@media (max-width: 1024px) {
+  .sidebar { display: none; }
+  .main-content { margin-left: 0; padding: 20px; }
+}

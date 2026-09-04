@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 51: Main Frame &amp; Menu System - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part VI</div><ul class="chapters"><li><a href="ch43_architecture.html">Ch 43</a></li><li><a href="ch44_paths_settings.html">Ch 44</a></li><li><a href="ch45_project_model.html">Ch 45</a></li><li><a href="ch46_document_parsing.html">Ch 46</a></li><li><a href="ch47_tts_catalog.html">Ch 47</a></li><li><a href="ch48_tts_engine.html">Ch 48</a></li><li><a href="ch49_downloader.html">Ch 49</a></li><li><a href="ch50_compute_detection.html">Ch 50</a></li><li><a href="ch51_main_frame.html" class="active">Ch 51: Main Frame</a></li><li><a href="ch52_settings_dialog.html">Ch 52</a></li><li><a href="ch53_model_panels.html">Ch 53</a></li><li><a href="ch54_new_project_wizard.html">Ch 54</a></li><li><a href="ch55_recording.html">Ch 55</a></li><li><a href="ch56_synthesis_worker.html">Ch 56</a></li><li><a href="ch57_clone_engine.html">Ch 57</a></li><li><a href="ch58_omnivoice.html">Ch 58</a></li><li><a href="ch59_daisy_builder.html">Ch 59</a></li><li><a href="ch60_addons.html">Ch 60</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 51</div>
+<h1>Main Frame &amp; Menu System</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand the MainFrame class and its responsibilities</li>
+  <li>See the menu system, keyboard shortcuts, and recent projects</li>
+  <li>Understand the application lifecycle</li>
+</ul>
+
+<hr>
+
+<h2>51.1 MainFrame Structure</h2>
+
+<pre><code><span class="cm"># From gui/main_frame.py</span>
+<span class="kw">class</span> <span class="cls">MainFrame</span>(wx.Frame):
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, parent, settings: Settings, store: ModelStore):
+        <span class="kw">super</span>().__init__(parent, title=<span class="str">f"</span>{APP_NAME}<span class="str"> v</span>{APP_VERSION}<span class="str">"</span>, size=(<span class="num">800</span>, <span class="num">600</span>))
+        self.settings = settings
+        self.store = store
+        self._build_menu()
+        self._build_ui()
+        self._bind_events()
+        self.Centre()
+        self.SetStatusText(<span class="str">"Ready"</span>)
+
+    <span class="kw">def</span> <span class="fn">_build_menu</span>(self):
+        <span class="cm"># File menu with New, Open, Recent, Exit</span>
+        <span class="cm"># Edit menu (future)</span>
+        <span class="cm"># Tools menu with Record</span>
+        <span class="cm"># Settings menu with Settings dialog</span>
+        <span class="cm"># Help menu with About</span>
+
+    <span class="kw">def</span> <span class="fn">_build_ui</span>(self):
+        <span class="cm"># Welcome panel with project info</span>
+        panel = wx.Panel(self)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        welcome = wx.StaticText(panel, label=<span class="str">"Welcome to AI Voice Studio"</span>)
+        sizer.Add(welcome, <span class="num">0</span>, wx.ALL | wx.ALIGN_CENTER, <span class="num">20</span>)
+        panel.SetSizer(sizer)
+
+    <span class="kw">def</span> <span class="fn">_bind_events</span>(self):
+        <span class="cm"># Menu event handlers</span>
+        self.Bind(wx.EVT_MENU, self._on_new_project, id=ID_NEW_PROJECT)
+        self.Bind(wx.EVT_MENU, self._on_open_project, id=ID_OPEN_PROJECT)
+        self.Bind(wx.EVT_MENU, self._on_settings, id=ID_SETTINGS)
+        self.Bind(wx.EVT_MENU, self._on_record, id=ID_RECORD)
+        self.Bind(wx.EVT_MENU, self._on_exit, id=wx.ID_EXIT)
+        self.Bind(wx.EVT_MENU, self._on_about, id=wx.ID_ABOUT)
+
+    <span class="kw">def</span> <span class="fn">_on_new_project</span>(self, _):
+        dlg = NewProjectWizard(self, self.settings, self.store)
+        dlg.ShowModal()
+        dlg.Destroy()
+
+    <span class="kw">def</span> <span class="fn">_on_settings</span>(self, _):
+        dlg = SettingsDialog(self, self.settings, self.store)
+        dlg.ShowModal()
+        dlg.Destroy()
+        apply_theme(self, self.settings.theme)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From gui/main_frame.py</code>
+        <br><span class="desc">A comment indicating the source file: <em>From gui/main_frame.py</em>. This helps the reader locate the code in the AIVoiceStudio codebase.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>class MainFrame(wx.Frame):</code>
+        <br><span class="desc">The main application window. Contains the menu bar, welcome panel, and status bar. Entry point for all user actions.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>def __init__(self, parent, settings: Settings, store: ModelStore):</code>
+        <br><span class="desc">Manages downloaded voice models on disk. Tracks which voices are installed, their file paths, and total disk usage.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>super().__init__(parent, title=f&quot;{APP_NAME} v{APP_VERSION}&quot;, size=(800, 600))</code>
+        <br><span class="desc">Calls function <code>super()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>self.settings = settings</code>
+        <br><span class="desc">Stores <code>settings</code> in the instance attribute <code>settings</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>self.store = store</code>
+        <br><span class="desc">Stores <code>store</code> in the instance attribute <code>store</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>self._build_menu()</code>
+        <br><span class="desc">Calls <code>self._build_menu()</code> to perform an operation.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>self._build_ui()</code>
+        <br><span class="desc">Calls <code>self._build_ui()</code> to perform an operation.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>self._bind_events()</code>
+        <br><span class="desc">Calls <code>self._bind_events()</code> to perform an operation.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>self.Centre()</code>
+        <br><span class="desc">Calls <code>self.Centre()</code> to perform an operation.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>self.SetStatusText(&quot;Ready&quot;)</code>
+        <br><span class="desc">Calls <code>self.SetStatusText()</code> to perform an operation.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>def _build_menu(self):</code>
+        <br><span class="desc">Defines function <code>_build_menu</code>: Constructs the menu bar with File (New/Open/Recent/Exit), Edit (Resume/Restart/Remove), Tools (Record/Settings), and Help menus.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code># File menu with New, Open, Recent, Exit</code>
+        <br><span class="desc">A comment: <em>File menu with New, Open, Recent, Exit</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code># Edit menu (future)</code>
+        <br><span class="desc">A comment: <em>Edit menu (future)</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code># Tools menu with Record</code>
+        <br><span class="desc">A comment: <em>Tools menu with Record</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code># Settings menu with Settings dialog</code>
+        <br><span class="desc">A comment: <em>Settings menu with Settings dialog</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code># Help menu with About</code>
+        <br><span class="desc">A comment: <em>Help menu with About</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>def _build_ui(self):</code>
+        <br><span class="desc">Defines function <code>_build_ui</code> accepting parameters (self).</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code># Welcome panel with project info</code>
+        <br><span class="desc">A comment: <em>Welcome panel with project info</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>panel = wx.Panel(self)</code>
+        <br><span class="desc">A container window that sits inside a Frame. Used to group child controls and manage tab traversal.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>sizer = wx.BoxSizer(wx.VERTICAL)</code>
+        <br><span class="desc">A layout manager that arranges child windows in a horizontal or vertical line. The primary layout mechanism in wxPython.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>welcome = wx.StaticText(panel, label=&quot;Welcome to AI Voice Studio&quot;)</code>
+        <br><span class="desc">A non-editable text label. Used for displaying information to the user.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>sizer.Add(welcome, 0, wx.ALL | wx.ALIGN_CENTER, 20)</code>
+        <br><span class="desc"><code>sizer.Add(welcome, 0, wx.ALL | wx.ALIGN_CENTER, 20)</code></span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>panel.SetSizer(sizer)</code>
+        <br><span class="desc"><code>panel.SetSizer(sizer)</code></span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>def _bind_events(self):</code>
+        <br><span class="desc">Defines function <code>_bind_events</code> accepting parameters (self).</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code># Menu event handlers</code>
+        <br><span class="desc">A comment: <em>Menu event handlers</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>self.Bind(wx.EVT_MENU, self._on_new_project, id=ID_NEW_PROJECT)</code>
+        <br><span class="desc">Event type triggered when a menu item is clicked. Bind handlers with frame.Bind(wx.EVT_MENU, handler, id=item_id).</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>self.Bind(wx.EVT_MENU, self._on_open_project, id=ID_OPEN_PROJECT)</code>
+        <br><span class="desc">Event type triggered when a menu item is clicked. Bind handlers with frame.Bind(wx.EVT_MENU, handler, id=item_id).</span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>self.Bind(wx.EVT_MENU, self._on_settings, id=ID_SETTINGS)</code>
+        <br><span class="desc">Event type triggered when a menu item is clicked. Bind handlers with frame.Bind(wx.EVT_MENU, handler, id=item_id).</span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code>self.Bind(wx.EVT_MENU, self._on_record, id=ID_RECORD)</code>
+        <br><span class="desc">Event type triggered when a menu item is clicked. Bind handlers with frame.Bind(wx.EVT_MENU, handler, id=item_id).</span>
+      </li>
+      <li>
+        <strong>Line 31:</strong> <code>self.Bind(wx.EVT_MENU, self._on_exit, id=wx.ID_EXIT)</code>
+        <br><span class="desc">Event type triggered when a menu item is clicked. Bind handlers with frame.Bind(wx.EVT_MENU, handler, id=item_id).</span>
+      </li>
+      <li>
+        <strong>Line 32:</strong> <code>self.Bind(wx.EVT_MENU, self._on_about, id=wx.ID_ABOUT)</code>
+        <br><span class="desc">Event type triggered when a menu item is clicked. Bind handlers with frame.Bind(wx.EVT_MENU, handler, id=item_id).</span>
+      </li>
+      <li>
+        <strong>Line 33:</strong> <code>def _on_new_project(self, _):</code>
+        <br><span class="desc">Defines function <code>_on_new_project</code>: Opens the New Project wizard dialog. The wizard guides the user through document import and voice selection.</span>
+      </li>
+      <li>
+        <strong>Line 34:</strong> <code>dlg = NewProjectWizard(self, self.settings, self.store)</code>
+        <br><span class="desc">Two-page wizard for creating a new TTS project. Page 1: import document (PDF/DOCX/TXT). Page 2: select voice and split settings.</span>
+      </li>
+      <li>
+        <strong>Line 35:</strong> <code>dlg.ShowModal()</code>
+        <br><span class="desc">Displays a dialog modally (blocks input to the parent window until the dialog is closed). Returns wx.ID_OK or wx.ID_CANCEL.</span>
+      </li>
+      <li>
+        <strong>Line 36:</strong> <code>dlg.Destroy()</code>
+        <br><span class="desc">Destroys the dialog window and frees its resources. Must be called after ShowModal() returns.</span>
+      </li>
+      <li>
+        <strong>Line 37:</strong> <code>def _on_settings(self, _):</code>
+        <br><span class="desc">Defines function <code>_on_settings</code>: Opens the Settings dialog. Allows the user to download voices, change compute backend, and adjust preferences.</span>
+      </li>
+      <li>
+        <strong>Line 38:</strong> <code>dlg = SettingsDialog(self, self.settings, self.store)</code>
+        <br><span class="desc">Multi-tab dialog for application settings. Tabs: Voice Downloads, Compute Backend, Recording Defaults, Paths, Developer Mode.</span>
+      </li>
+      <li>
+        <strong>Line 39:</strong> <code>dlg.ShowModal()</code>
+        <br><span class="desc">Displays a dialog modally (blocks input to the parent window until the dialog is closed). Returns wx.ID_OK or wx.ID_CANCEL.</span>
+      </li>
+      <li>
+        <strong>Line 40:</strong> <code>dlg.Destroy()</code>
+        <br><span class="desc">Destroys the dialog window and frees its resources. Must be called after ShowModal() returns.</span>
+      </li>
+      <li>
+        <strong>Line 41:</strong> <code>apply_theme(self, self.settings.theme)</code>
+        <br><span class="desc">Applies the selected theme (light/dark/system) to the entire wxPython application by updating system colours and font settings.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>51.2 Keyboard Shortcuts</h2>
+
+<table>
+  <thead><tr><th>Shortcut</th><th>Action</th></tr></thead>
+  <tbody>
+    <tr><td>Ctrl+Shift+N</td><td>New Project</td></tr>
+    <tr><td>Ctrl+O</td><td>Open Project</td></tr>
+    <tr><td>Ctrl+Shift+R</td><td>Record</td></tr>
+    <tr><td>Ctrl+,</td><td>Settings</td></tr>
+    <tr><td>Alt+F4</td><td>Exit</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h2>51.3 Application Lifecycle</h2>
+
+<pre><code><span class="cm"># From main.py</span>
+<span class="kw">def</span> <span class="fn">main</span>() -> int:
+    settings = Settings()
+    developer_mode = settings.get(<span class="str">"developer_mode"</span>, <span class="kw">False</span>)
+    _setup_logging(developer_mode)
+    _init_python_runtime()
+    _init_addons()
+
+    app = wx.App(<span class="kw">False</span>)
+    store = ModelStore()
+    frame = MainFrame(<span class="kw">None</span>, settings, store)
+    apply_theme(frame, settings.theme)
+    frame.Show()
+    result = app.MainLoop()
+    <span class="kw">return</span> result <span class="kw">or</span> <span class="num">0</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From main.py</code>
+        <br><span class="desc">A comment indicating the source file: <em>From main.py</em>. This helps the reader locate the code in the AIVoiceStudio codebase.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def main() -&gt; int:</code>
+        <br><span class="desc">Defines function <code>main</code>, returning <code>int</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>settings = Settings()</code>
+        <br><span class="desc">Loads the persistent application settings from settings.json. Thread-safe; defaults are defined in _DEFAULTS. Provides get/set/reset methods.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>developer_mode = settings.get(&quot;developer_mode&quot;, False)</code>
+        <br><span class="desc">Assigns <code>settings.get(&quot;developer_mode&quot;, False)</code> to <code>developer_mode</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>_setup_logging(developer_mode)</code>
+        <br><span class="desc">Calls function <code>_setup_logging()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>_init_python_runtime()</code>
+        <br><span class="desc">Calls function <code>_init_python_runtime()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>_init_addons()</code>
+        <br><span class="desc">Calls function <code>_init_addons()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>app = wx.App(False)</code>
+        <br><span class="desc">Assigns <code>wx.App(False)</code> to <code>app</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>store = ModelStore()</code>
+        <br><span class="desc">Manages downloaded voice models on disk. Tracks which voices are installed, their file paths, and total disk usage.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>frame = MainFrame(None, settings, store)</code>
+        <br><span class="desc">The main application window. Contains the menu bar, welcome panel, and status bar. Entry point for all user actions.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>apply_theme(frame, settings.theme)</code>
+        <br><span class="desc">Applies the selected theme (light/dark/system) to the entire wxPython application by updating system colours and font settings.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>frame.Show()</code>
+        <br><span class="desc"><code>frame.Show()</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>result = app.MainLoop()</code>
+        <br><span class="desc">Assigns <code>app.MainLoop()</code> to <code>result</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>return result or 0</code>
+        <br><span class="desc">Returns <code>result or 0</code> to the caller.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>51.4 Key Takeaways</h2>
+<ul>
+  <li><strong>MainFrame</strong> is the application hub — menus, status bar, event routing</li>
+  <li>Five menus: <strong>File, Edit, Tools, Settings, Help</strong></li>
+  <li><strong>Keyboard shortcuts</strong> follow Windows conventions (Ctrl+key)</li>
+  <li>The application starts: <strong>Settings → Logging → Runtime → Addons → wx.App → MainFrame</strong></li>
+  <li><strong>apply_theme()</strong> is called after settings changes to update the UI</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch50_compute_detection.html">← Ch 50</a> &nbsp;|&nbsp; <a href="ch52_settings_dialog.html">Ch 52 — Settings Dialog →</a></p>
+</div></div></body>
+</html>

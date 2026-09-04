@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 13: Decorators - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part II</div><ul class="chapters"><li><a href="ch11_oop_advanced.html">Ch 11</a></li><li><a href="ch12_iterators.html">Ch 12</a></li><li><a href="ch13_decorators.html" class="active">Ch 13: Decorators</a></li><li><a href="ch14_context.html">Ch 14</a></li><li><a href="ch15_regex.html">Ch 15</a></li><li><a href="ch16_datetime.html">Ch 16</a></li><li><a href="ch17_testing.html">Ch 17</a></li><li><a href="ch18_json_xml.html">Ch 18</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 13</div>
+<h1>Decorators</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand how decorators work (functions wrapping functions)</li>
+  <li>Create custom decorators with and without parameters</li>
+  <li>Use functools.wraps to preserve metadata</li>
+  <li>See decorator patterns in AIVS (property, classmethod, etc.)</li>
+</ul>
+
+<hr>
+
+<h2>13.1 Function Basics — Functions Are Objects</h2>
+
+<pre><code><span class="cm"># Functions are first-class objects in Python</span>
+<span class="kw">def</span> <span class="fn">greet</span>(name):
+    <span class="kw">return</span> <span class="str">f"Hello, </span>{name}<span class="str">!"</span>
+
+<span class="cm"># Assign to a variable</span>
+say_hello = greet
+<span class="kw">print</span>(say_hello(<span class="str">"World"</span>))  <span class="cm"># "Hello, World!"</span>
+
+<span class="cm"># Pass as argument</span>
+<span class="kw">def</span> <span class="fn">apply</span>(func, value):
+    <span class="kw">return</span> func(value)
+
+<span class="kw">print</span>(apply(greet, <span class="str">"Python"</span>))  <span class="cm"># "Hello, Python!"</span>
+
+<span class="cm"># Return from another function</span>
+<span class="kw">def</span> <span class="fn">make_greeting</span>(greeting):
+    <span class="kw">def</span> <span class="fn">inner</span>(name):
+        <span class="kw">return</span> <span class="str">f"</span>{greeting}<span class="str">, </span>{name}<span class="str">!"</span>
+    <span class="kw">return</span> inner
+
+hello = make_greeting(<span class="str">"Hello"</span>)
+hola = make_greeting(<span class="str">"Hola"</span>)
+<span class="kw">print</span>(hello(<span class="str">"Alice"</span>))  <span class="cm"># "Hello, Alice!"</span>
+<span class="kw">print</span>(hola(<span class="str">"Bob"</span>))    <span class="cm"># "Hola, Bob!"</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Functions are first-class objects in Python</code>
+        <br><span class="desc">A comment: <em>Functions are first-class objects in Python</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def greet(name):</code>
+        <br><span class="desc">Defines function <code>greet</code> accepting (name).</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>return f&quot;Hello, {name}!&quot;</code>
+        <br><span class="desc">Returns <code>f&quot;Hello, {name}!&quot;</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># Assign to a variable</code>
+        <br><span class="desc">A comment: <em>Assign to a variable</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>say_hello = greet</code>
+        <br><span class="desc">Assigns <code>greet</code> to <code>say_hello</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>print(say_hello(&quot;World&quot;))  # &quot;Hello, World!&quot;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># Pass as argument</code>
+        <br><span class="desc">A comment: <em>Pass as argument</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>def apply(func, value):</code>
+        <br><span class="desc">Defines function <code>apply</code> accepting (func, value).</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>return func(value)</code>
+        <br><span class="desc">Returns <code>func(value)</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>print(apply(greet, &quot;Python&quot;))  # &quot;Hello, Python!&quot;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># Return from another function</code>
+        <br><span class="desc">A comment: <em>Return from another function</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>def make_greeting(greeting):</code>
+        <br><span class="desc">Defines function <code>make_greeting</code> accepting (greeting).</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>def inner(name):</code>
+        <br><span class="desc">Defines function <code>inner</code> accepting (name).</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>return f&quot;{greeting}, {name}!&quot;</code>
+        <br><span class="desc">Returns <code>f&quot;{greeting}, {name}!&quot;</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>return inner</code>
+        <br><span class="desc">Returns <code>inner</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>hello = make_greeting(&quot;Hello&quot;)</code>
+        <br><span class="desc">Assigns <code>make_greeting(&quot;Hello&quot;)</code> to <code>hello</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>hola = make_greeting(&quot;Hola&quot;)</code>
+        <br><span class="desc">Assigns <code>make_greeting(&quot;Hola&quot;)</code> to <code>hola</code>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>print(hello(&quot;Alice&quot;))  # &quot;Hello, Alice!&quot;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>print(hola(&quot;Bob&quot;))    # &quot;Hola, Bob!&quot;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>13.2 Writing Your First Decorator</h2>
+
+<pre><code><span class="cm"># A decorator is a function that takes a function and returns a new function</span>
+<span class="kw">import</span> functools
+
+<span class="kw">def</span> <span class="fn">timer</span>(func):
+    <span class="str">"""Decorator that prints how long a function takes."""</span>
+    <span class="dec">@functools.wraps</span>(func)  <span class="cm"># Preserves the original function's name/docstring</span>
+    <span class="kw">def</span> <span class="fn">wrapper</span>(*args, **kwargs):
+        <span class="kw">import</span> time
+        start = time.perf_counter()
+        result = func(*args, **kwargs)
+        elapsed = time.perf_counter() - start
+        <span class="kw">print</span>(<span class="str">f"</span>{func.__name__}<span class="str"> took </span>{elapsed:<span class="num">.3f</span>}<span class="str">s"</span>)
+        <span class="kw">return</span> result
+    <span class="kw">return</span> wrapper
+
+<span class="cm"># Apply with @ syntax</span>
+<span class="dec">@timer</span>
+<span class="kw">def</span> <span class="fn">load_model</span>(path):
+    <span class="kw">import</span> time; time.sleep(<span class="num">0.1</span>)  <span class="cm"># Simulate loading</span>
+    <span class="kw">return</span> <span class="str">"model"</span>
+
+result = load_model(<span class="str">"model.onnx"</span>)
+<span class="cm"># Output: load_model took 0.102s</span>
+
+<span class="cm"># Equivalent without @ syntax</span>
+<span class="kw">def</span> <span class="fn">load_model2</span>(path):
+    <span class="kw">return</span> <span class="str">"model"</span>
+load_model2 = timer(load_model2)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># A decorator is a function that takes a function and returns a new function</code>
+        <br><span class="desc">A comment: <em>A decorator is a function that takes a function and returns a new function</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>import functools</code>
+        <br><span class="desc">Imports the <code>functools</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>def timer(func):</code>
+        <br><span class="desc">Defines function <code>timer</code> accepting (func).</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>&quot;&quot;&quot;Decorator that prints how long a function takes.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Decorator that prints how long a function takes.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>@functools.wraps(func)  # Preserves the original function&#x27;s name/docstring</code>
+        <br><span class="desc">Decorator that preserves the wrapped function's name, docstring, and other metadata.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>def wrapper(*args, **kwargs):</code>
+        <br><span class="desc">Defines function <code>wrapper</code> accepting (*args, **kwargs).</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>import time</code>
+        <br><span class="desc">Imports the <code>time</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>start = time.perf_counter()</code>
+        <br><span class="desc">Assigns <code>time.perf_counter()</code> to <code>start</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>result = func(*args, **kwargs)</code>
+        <br><span class="desc">Assigns <code>func(*args, **kwargs)</code> to <code>result</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>elapsed = time.perf_counter() - start</code>
+        <br><span class="desc">Assigns <code>time.perf_counter() - start</code> to <code>elapsed</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>print(f&quot;{func.__name__} took {elapsed:.3f}s&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>return result</code>
+        <br><span class="desc">Returns <code>result</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>return wrapper</code>
+        <br><span class="desc">Returns <code>wrapper</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code># Apply with @ syntax</code>
+        <br><span class="desc">A comment: <em>Apply with @ syntax</em>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>@timer</code>
+        <br><span class="desc">Decorator: <code>@timer</code>. Wraps the following function/class.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>def load_model(path):</code>
+        <br><span class="desc">Defines function <code>load_model</code> accepting (path).</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>import time; time.sleep(0.1)  # Simulate loading</code>
+        <br><span class="desc">Imports the <code>time; time.sleep(0.1)  # Simulate loading</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>return &quot;model&quot;</code>
+        <br><span class="desc">Returns <code>&quot;model&quot;</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>result = load_model(&quot;model.onnx&quot;)</code>
+        <br><span class="desc">Assigns <code>load_model(&quot;model.onnx&quot;)</code> to <code>result</code>.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code># Output: load_model took 0.102s</code>
+        <br><span class="desc">A comment: <em>Output: load_model took 0.102s</em>.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code># Equivalent without @ syntax</code>
+        <br><span class="desc">A comment: <em>Equivalent without @ syntax</em>.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>def load_model2(path):</code>
+        <br><span class="desc">Defines function <code>load_model2</code> accepting (path).</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>return &quot;model&quot;</code>
+        <br><span class="desc">Returns <code>&quot;model&quot;</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>load_model2 = timer(load_model2)</code>
+        <br><span class="desc">Assigns <code>timer(load_model2)</code> to <code>load_model2</code>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>13.3 Decorators with Arguments</h2>
+
+<pre><code><span class="kw">def</span> <span class="fn">retry</span>(max_attempts=<span class="num">3</span>, delay=<span class="num">1.0</span>):
+    <span class="str">"""Decorator that retries a function on failure."""</span>
+    <span class="kw">def</span> <span class="fn">decorator</span>(func):
+        <span class="dec">@functools.wraps</span>(func)
+        <span class="kw">def</span> <span class="fn">wrapper</span>(*args, **kwargs):
+            <span class="kw">for</span> attempt <span class="kw">in</span> range(max_attempts):
+                <span class="kw">try</span>:
+                    <span class="kw">return</span> func(*args, **kwargs)
+                <span class="kw">except</span> Exception <span class="kw">as</span> exc:
+                    <span class="kw">if</span> attempt == max_attempts - <span class="num">1</span>:
+                        <span class="kw">raise</span>
+                    <span class="kw">print</span>(<span class="str">f"Attempt </span>{attempt+<span class="num">1</span>}<span class="str"> failed, retrying..."</span>)
+                    time.sleep(delay)
+        <span class="kw">return</span> wrapper
+    <span class="kw">return</span> decorator
+
+<span class="dec">@retry</span>(max_attempts=<span class="num">5</span>, delay=<span class="num">2.0</span>)
+<span class="kw">def</span> <span class="fn">download_model</span>(url):
+    <span class="kw">import</span> requests
+    <span class="kw">return</span> requests.get(url, timeout=<span class="num">30</span>)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>def retry(max_attempts=3, delay=1.0):</code>
+        <br><span class="desc">Defines function <code>retry</code> accepting (max_attempts, delay).</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>&quot;&quot;&quot;Decorator that retries a function on failure.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Decorator that retries a function on failure.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>def decorator(func):</code>
+        <br><span class="desc">Defines function <code>decorator</code> accepting (func).</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>@functools.wraps(func)</code>
+        <br><span class="desc">Decorator that preserves the wrapped function's name, docstring, and other metadata.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>def wrapper(*args, **kwargs):</code>
+        <br><span class="desc">Defines function <code>wrapper</code> accepting (*args, **kwargs).</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>for attempt in range(max_attempts):</code>
+        <br><span class="desc">Generates a sequence of integers. Commonly used in for loops.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>try:</code>
+        <br><span class="desc">Begins exception handling. Code in this block is monitored for errors.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>return func(*args, **kwargs)</code>
+        <br><span class="desc">Returns <code>func(*args, **kwargs)</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>except Exception as exc:</code>
+        <br><span class="desc">Catches <code>Exception</code> exceptions.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>if attempt == max_attempts - 1:</code>
+        <br><span class="desc">Checks condition: <code>attempt == max_attempts - 1</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>raise</code>
+        <br><span class="desc"><code>raise</code></span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>print(f&quot;Attempt {attempt+1} failed, retrying...&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>time.sleep(delay)</code>
+        <br><span class="desc"><code>time.sleep(delay)</code></span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>return wrapper</code>
+        <br><span class="desc">Returns <code>wrapper</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>return decorator</code>
+        <br><span class="desc">Returns <code>decorator</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>@retry(max_attempts=5, delay=2.0)</code>
+        <br><span class="desc">Decorator: <code>@retry(max_attempts=5, delay=2.0)</code>. Wraps the following function/class.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>def download_model(url):</code>
+        <br><span class="desc">Defines function <code>download_model</code> accepting (url).</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>import requests</code>
+        <br><span class="desc">Imports the <code>requests</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>return requests.get(url, timeout=30)</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>13.4 Common Built-in Decorators</h2>
+
+<pre><code><span class="kw">class</span> <span class="cls">MyClass</span>:
+    <span class="cm"># @property — computed attribute</span>
+    <span class="dec">@property</span>
+    <span class="kw">def</span> <span class="fn">display_name</span>(self):
+        <span class="kw">return</span> <span class="str">f"</span>{self._name}<span class="str"> v</span>{self._version}<span class="str">"</span>
+
+    <span class="cm"># @classmethod — receives class instead of instance</span>
+    <span class="dec">@classmethod</span>
+    <span class="kw">def</span> <span class="fn">from_dict</span>(cls, data: dict):
+        <span class="kw">return</span> cls(data[<span class="str">"name"</span>], data[<span class="str">"version"</span>])
+
+    <span class="cm"># @staticmethod — no access to self or cls</span>
+    <span class="dec">@staticmethod</span>
+    <span class="kw">def</span> <span class="fn">is_valid</span>(name: str) -> bool:
+        <span class="kw">return</span> bool(name.strip())
+
+<span class="cm"># functools.lru_cache — memoization</span>
+<span class="dec">@functools.lru_cache</span>(maxsize=<span class="num">128</span>)
+<span class="kw">def</span> <span class="fn">expensive_lookup</span>(voice_id: str) -> dict:
+    <span class="str">"""Cache expensive database queries."""</span>
+    <span class="kw">return</span> db.query(voice_id)  <span class="cm"># Only runs once per voice_id</span>
+
+<span class="cm"># functools.cache (Python 3.9+) — unlimited cache</span>
+<span class="dec">@functools.cache</span>
+<span class="kw">def</span> <span class="fn">parse_version</span>(version_str: str) -> tuple:
+    <span class="kw">return</span> tuple(int(x) <span class="kw">for</span> x <span class="kw">in</span> version_str.split(<span class="str">"."</span>))</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 4)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>class MyClass:</code>
+        <br><span class="desc">Defines class <code>MyClass</code>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># @property — computed attribute</code>
+        <br><span class="desc">A comment: <em>@property — computed attribute</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>@property</code>
+        <br><span class="desc">Decorator that converts a method into a managed attribute. Enables getter/setter syntax.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>def display_name(self):</code>
+        <br><span class="desc">Defines function <code>display_name</code> accepting (self).</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>return f&quot;{self._name} v{self._version}&quot;</code>
+        <br><span class="desc">Returns <code>f&quot;{self._name} v{self._version}&quot;</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># @classmethod — receives class instead of instance</code>
+        <br><span class="desc">A comment: <em>@classmethod — receives class instead of instance</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>@classmethod</code>
+        <br><span class="desc">Decorator that receives the class (cls) as the first argument instead of the instance.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>def from_dict(cls, data: dict):</code>
+        <br><span class="desc">Defines function <code>from_dict</code> accepting (cls, data).</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>return cls(data[&quot;name&quot;], data[&quot;version&quot;])</code>
+        <br><span class="desc">Returns <code>cls(data[&quot;name&quot;], data[&quot;version&quot;])</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code># @staticmethod — no access to self or cls</code>
+        <br><span class="desc">A comment: <em>@staticmethod — no access to self or cls</em>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>@staticmethod</code>
+        <br><span class="desc">Decorator that creates a method without 'self' or 'cls' parameter. Called on the class, not an instance.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>def is_valid(name: str) -&gt; bool:</code>
+        <br><span class="desc">Returns the unique identity of an object (memory address in CPython). Used with 'is' for identity checks.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>return bool(name.strip())</code>
+        <br><span class="desc">Removes leading and trailing whitespace (or specified characters). Returns a new string.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code># functools.lru_cache — memoization</code>
+        <br><span class="desc">A comment: <em>functools.lru_cache — memoization</em>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>@functools.lru_cache(maxsize=128)</code>
+        <br><span class="desc">Decorator that caches function results based on arguments.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>def expensive_lookup(voice_id: str) -&gt; dict:</code>
+        <br><span class="desc">Defines function <code>expensive_lookup</code> accepting (voice_id), returning <code>dict</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>&quot;&quot;&quot;Cache expensive database queries.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Cache expensive database queries.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>return db.query(voice_id)  # Only runs once per voice_id</code>
+        <br><span class="desc">Returns <code>db.query(voice_id)  # Only runs once per voice_id</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code># functools.cache (Python 3.9+) — unlimited cache</code>
+        <br><span class="desc">A comment: <em>functools.cache (Python 3.9+) — unlimited cache</em>.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>@functools.cache</code>
+        <br><span class="desc">Decorator: <code>@functools.cache</code>. Wraps the following function/class.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>def parse_version(version_str: str) -&gt; tuple:</code>
+        <br><span class="desc">Defines function <code>parse_version</code> accepting (version_str), returning <code>tuple</code>.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>return tuple(int(x) for x in version_str.split(&quot;.&quot;))</code>
+        <br><span class="desc">Splits a string into a list by the given delimiter. Without arguments, splits on whitespace.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>13.5 Decorator Patterns in AIVS</h2>
+
+<pre><code><span class="cm"># The @property decorator pattern used throughout AIVS:</span>
+<span class="kw">class</span> <span class="cls">Settings</span>:
+    <span class="dec">@property</span>
+    <span class="kw">def</span> <span class="fn">theme</span>(self) -> str:
+        <span class="kw">return</span> self._data.get(<span class="str">"theme"</span>, <span class="str">"system"</span>)
+
+    <span class="dec">@property</span>
+    <span class="kw">def</span> <span class="fn">compute</span>(self) -> str:
+        <span class="kw">return</span> self._data.get(<span class="str">"compute"</span>, <span class="str">"auto"</span>)
+
+<span class="cm"># Context manager decorator pattern:</span>
+<span class="kw">from</span> contextlib <span class="kw">import</span> contextmanager
+
+<span class="dec">@contextmanager</span>
+<span class="kw">def</span> <span class="fn">busy_cursor</span>():
+    <span class="str">"""Show busy cursor during an operation."""</span>
+    wx.BeginBusyCursor()
+    <span class="kw">try</span>:
+        <span class="kw">yield</span>
+    <span class="kw">finally</span>:
+        wx.EndBusyCursor()</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 5)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># The @property decorator pattern used throughout AIVS:</code>
+        <br><span class="desc">A comment: <em>The @property decorator pattern used throughout AIVS:</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>class Settings:</code>
+        <br><span class="desc">Defines class <code>Settings</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>@property</code>
+        <br><span class="desc">Decorator that converts a method into a managed attribute. Enables getter/setter syntax.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>def theme(self) -&gt; str:</code>
+        <br><span class="desc">Defines function <code>theme</code> accepting (self), returning <code>str</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>return self._data.get(&quot;theme&quot;, &quot;system&quot;)</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>@property</code>
+        <br><span class="desc">Decorator that converts a method into a managed attribute. Enables getter/setter syntax.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>def compute(self) -&gt; str:</code>
+        <br><span class="desc">Defines function <code>compute</code> accepting (self), returning <code>str</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>return self._data.get(&quot;compute&quot;, &quot;auto&quot;)</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code># Context manager decorator pattern:</code>
+        <br><span class="desc">A comment: <em>Context manager decorator pattern:</em>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>from contextlib import contextmanager</code>
+        <br><span class="desc">Imports <code>contextmanager</code> from <code>contextlib</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>@contextmanager</code>
+        <br><span class="desc">Decorator: <code>@contextmanager</code>. Wraps the following function/class.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>def busy_cursor():</code>
+        <br><span class="desc">Defines function <code>busy_cursor</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>&quot;&quot;&quot;Show busy cursor during an operation.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Show busy cursor during an operation.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>wx.BeginBusyCursor()</code>
+        <br><span class="desc">Changes the cursor to a busy indicator (hourglass).</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>try:</code>
+        <br><span class="desc">Begins exception handling. Code in this block is monitored for errors.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>yield</code>
+        <br><span class="desc"><code>yield</code></span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>finally:</code>
+        <br><span class="desc">Always executes for cleanup code, whether or not an exception occurred.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>wx.EndBusyCursor()</code>
+        <br><span class="desc">Restores the cursor to normal after BeginBusyCursor().</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>13.6 Key Takeaways</h2>
+<ul>
+  <li>A decorator is a <strong>function that wraps another function</strong>, modifying its behavior</li>
+  <li>Always use <strong><code>@functools.wraps(func)</code></strong> to preserve the original function's metadata</li>
+  <li>Decorators with arguments need <strong>three levels</strong> of nesting</li>
+  <li>Built-in decorators: <code>@property</code>, <code>@classmethod</code>, <code>@staticmethod</code>, <code>@lru_cache</code></li>
+  <li>Decorators are used in AIVS for caching, timing, and GUI cursor management</li>
+</ul>
+
+<div class="exercise"><strong>Exercise 13.1:</strong> Write a <code>@log_calls</code> decorator that prints the function name and all arguments before each call.</div>
+
+<hr>
+<p style="text-align: center;"><a href="ch12_iterators.html">← Ch 12</a> &nbsp;|&nbsp; <a href="ch14_context.html">Ch 14 — Context Managers →</a></p>
+</div></div></body>
+</html>

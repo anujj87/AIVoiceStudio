@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 42: Virtual Environments &amp; Packaging - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part V</div><ul class="chapters"><li><a href="ch37_numpy.html">Ch 37</a></li><li><a href="ch38_requests.html">Ch 38</a></li><li><a href="ch39_sherpa_onnx.html">Ch 39</a></li><li><a href="ch40_pypdf_docx.html">Ch 40</a></li><li><a href="ch41_ffmpeg.html">Ch 41</a></li><li><a href="ch42_virtualenvs.html" class="active">Ch 42: Virtual Envs</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 42</div>
+<h1>Virtual Environments &amp; Packaging</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand virtual environments and why they matter</li>
+  <li>Create and manage venvs</li>
+  <li>See the AIVS PythonRuntime managed environment</li>
+</ul>
+
+<hr>
+
+<h2>42.1 Why Virtual Environments?</h2>
+
+<p>
+  Without venvs, installing <code>wxPython</code> for one project might overwrite
+  a package needed by another. Virtual environments create isolated Python installations:
+</p>
+
+<pre><code><span class="cm"># Create</span>
+python -m venv .venv
+
+<span class="cm"># Activate (Windows)</span>
+.venv\Scripts\activate
+
+<span class="cm"># Activate (macOS/Linux)</span>
+source .venv/bin/activate
+
+<span class="cm"># Install packages (only in this venv)</span>
+pip install wxPython numpy sherpa-onnx
+
+<span class="cm"># Deactivate</span>
+deactivate</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Create</code>
+        <br><span class="desc">A comment: <em>Create</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>python -m venv .venv</code>
+        <br><span class="desc"><code>python -m venv .venv</code></span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># Activate (Windows)</code>
+        <br><span class="desc">A comment: <em>Activate (Windows)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>.venv\Scripts\activate</code>
+        <br><span class="desc"><code>.venv\Scripts\activate</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># Activate (macOS/Linux)</code>
+        <br><span class="desc">A comment: <em>Activate (macOS/Linux)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>source .venv/bin/activate</code>
+        <br><span class="desc"><code>source .venv/bin/activate</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># Install packages (only in this venv)</code>
+        <br><span class="desc">A comment: <em>Install packages (only in this venv)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>pip install wxPython numpy sherpa-onnx</code>
+        <br><span class="desc"><code>pip install wxPython numpy sherpa-onnx</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code># Deactivate</code>
+        <br><span class="desc">A comment: <em>Deactivate</em>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>deactivate</code>
+        <br><span class="desc"><code>deactivate</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>42.2 AIVS PythonRuntime</h2>
+
+<pre><code><span class="cm"># From python_runtime/__init__.py</span>
+<span class="kw">class</span> <span class="cls">PythonRuntime</span>:
+    <span class="str">"""Manages a separate Python venv for addons and optional engines."""</span>
+
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, env_dir=None):
+        self._env_dir = env_dir or os.path.join(
+            paths.user_data_dir(), <span class="str">"addon_env"</span>
+        )
+
+    <span class="kw">def</span> <span class="fn">ensure_env</span>(self) -> str:
+        <span class="str">"""Create the venv if it doesn't exist."""</span>
+        <span class="kw">if</span> self.is_created:
+            <span class="kw">return</span> self._env_dir
+        subprocess.run(
+            [self.system_python, <span class="str">"-m"</span>, <span class="str">"venv"</span>, self._env_dir, <span class="str">"--clear"</span>],
+            check=<span class="kw">True</span>,
+        )
+        <span class="kw">return</span> self._env_dir
+
+    <span class="kw">def</span> <span class="fn">pip_install</span>(self, packages, progress=<span class="kw">None</span>, cancel_event=<span class="kw">None</span>):
+        <span class="str">"""Install packages into the managed venv."""</span>
+        pip = self.ensure_pip()
+        cmd = [pip, <span class="str">"install"</span>, <span class="str">"--no-warn-script-location"</span>] + packages
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, text=<span class="kw">True</span>)
+        <span class="kw">for</span> line <span class="kw">in</span> proc.stdout:
+            <span class="kw">if</span> progress:
+                progress(line, <span class="num">0</span>, <span class="num">0</span>)
+            <span class="kw">if</span> cancel_event <span class="kw">and</span> cancel_event.is_set():
+                proc.terminate()
+                <span class="kw">return</span> {<span class="str">"ok"</span>: <span class="kw">False</span>, <span class="str">"error"</span>: <span class="str">"Cancelled"</span>}
+        proc.wait()
+        <span class="kw">return</span> {<span class="str">"ok"</span>: proc.returncode == <span class="num">0</span>}
+
+    <span class="kw">def</span> <span class="fn">run_in_env</span>(self, script: str):
+        <span class="str">"""Run a Python script inside the managed venv."""</span>
+        <span class="kw">return</span> subprocess.run(
+            [self.python_exe, <span class="str">"-c"</span>, script],
+            capture_output=<span class="kw">True</span>, text=<span class="kw">True</span>,
+        )</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From python_runtime/__init__.py</code>
+        <br><span class="desc">A comment: <em>From python_runtime/__init__.py</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>class PythonRuntime:</code>
+        <br><span class="desc">Manages the embedded Python interpreter for addons. Creates isolated venvs.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;&quot;&quot;Manages a separate Python venv for addons and optional engines.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Manages a separate Python venv for addons and optional engines.</em>. Documents the following code.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>def __init__(self, env_dir=None):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>self._env_dir = env_dir or os.path.join(</code>
+        <br><span class="desc">Stores <code>env_dir or os.path.join(</code> in instance attribute <code>_env_dir</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>paths.user_data_dir(), &quot;addon_env&quot;</code>
+        <br><span class="desc"><code>paths.user_data_dir(), &quot;addon_env&quot;</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>def ensure_env(self) -&gt; str:</code>
+        <br><span class="desc">Defines a function.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>&quot;&quot;&quot;Create the venv if it doesn&#x27;t exist.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Create the venv if it doesn&#x27;t exist.</em>. Documents the following code.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>if self.is_created:</code>
+        <br><span class="desc">Conditional check.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>return self._env_dir</code>
+        <br><span class="desc">Returns a value from a function.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>subprocess.run(</code>
+        <br><span class="desc">Runs a command, waits for completion. Returns CompletedProcess. Use capture_output=True to capture stdout/stderr.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>[self.system_python, &quot;-m&quot;, &quot;venv&quot;, self._env_dir, &quot;--clear&quot;],</code>
+        <br><span class="desc"><code>[self.system_python, &quot;-m&quot;, &quot;venv&quot;, self._env_dir, &quot;--clear&quot;],</code></span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>check=True,</code>
+        <br><span class="desc">Assigns <code>True,</code> to <code>check</code>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>return self._env_dir</code>
+        <br><span class="desc">Returns a value from a function.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>def pip_install(self, packages, progress=None, cancel_event=None):</code>
+        <br><span class="desc">Returns True if all elements in the iterable are truthy.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>&quot;&quot;&quot;Install packages into the managed venv.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Install packages into the managed venv.</em>. Documents the following code.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>pip = self.ensure_pip()</code>
+        <br><span class="desc">Assigns <code>self.ensure_pip()</code> to <code>pip</code>.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>cmd = [pip, &quot;install&quot;, &quot;--no-warn-script-location&quot;] + packages</code>
+        <br><span class="desc">Assigns <code>[pip, &quot;install&quot;, &quot;--no-warn-script-location&quot;] + packages</code> to <code>cmd</code>.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, text=True)</code>
+        <br><span class="desc">Starts a process. More control than run() — can read stdout/stderr asynchronously.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>for line in proc.stdout:</code>
+        <br><span class="desc">For loop iteration.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>if progress:</code>
+        <br><span class="desc">Conditional check.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>progress(line, 0, 0)</code>
+        <br><span class="desc">Calls function <code>progress()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>if cancel_event and cancel_event.is_set():</code>
+        <br><span class="desc">Conditional check.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>proc.terminate()</code>
+        <br><span class="desc"><code>proc.terminate()</code></span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>return {&quot;ok&quot;: False, &quot;error&quot;: &quot;Cancelled&quot;}</code>
+        <br><span class="desc">Returns a value from a function.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>proc.wait()</code>
+        <br><span class="desc"><code>proc.wait()</code></span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>return {&quot;ok&quot;: proc.returncode == 0}</code>
+        <br><span class="desc">Returns a value from a function.</span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code>def run_in_env(self, script: str):</code>
+        <br><span class="desc">Defines a function.</span>
+      </li>
+      <li>
+        <strong>Line 31:</strong> <code>&quot;&quot;&quot;Run a Python script inside the managed venv.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Run a Python script inside the managed venv.</em>. Documents the following code.</span>
+      </li>
+      <li>
+        <strong>Line 32:</strong> <code>return subprocess.run(</code>
+        <br><span class="desc">Runs a command, waits for completion. Returns CompletedProcess. Use capture_output=True to capture stdout/stderr.</span>
+      </li>
+      <li>
+        <strong>Line 33:</strong> <code>[self.python_exe, &quot;-c&quot;, script],</code>
+        <br><span class="desc"><code>[self.python_exe, &quot;-c&quot;, script],</code></span>
+      </li>
+      <li>
+        <strong>Line 34:</strong> <code>capture_output=True, text=True,</code>
+        <br><span class="desc">Captures stdout and stderr. Available in subprocess.run().</span>
+      </li>
+      <li>
+        <strong>Line 35:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>42.3 Key Takeaways</h2>
+<ul>
+  <li><strong>Virtual environments</strong> isolate project dependencies</li>
+  <li>AIVS has <strong>two venvs</strong>: the development venv (requirements.txt) and the managed addon venv</li>
+  <li>The <strong>PythonRuntime</strong> manages the addon venv for pip-installed engines (OmniVoice)</li>
+  <li><strong>run_in_env()</strong> executes scripts inside the managed venv without affecting the main process</li>
+</ul>
+
+<hr>
+
+<p style="text-align: center;">
+  <a href="ch41_ffmpeg.html">← Ch 41</a> &nbsp;|&nbsp;
+  <strong>End of Part V</strong> &nbsp;|&nbsp;
+  <a href="ch43_architecture.html">Part VI — Ch 43: Architecture →</a>
+</p>
+
+</div></div></body>
+</html>

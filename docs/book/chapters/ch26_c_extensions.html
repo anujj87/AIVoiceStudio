@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 26: C Extensions &amp; ctypes - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part III</div><ul class="chapters"><li><a href="ch19_concurrency.html">Ch 19</a></li><li><a href="ch20_multiprocessing.html">Ch 20</a></li><li><a href="ch21_async.html">Ch 21</a></li><li><a href="ch22_type_hints.html">Ch 22</a></li><li><a href="ch23_metaclasses.html">Ch 23</a></li><li><a href="ch24_design_patterns.html">Ch 24</a></li><li><a href="ch25_introspection.html">Ch 25</a></li><li><a href="ch26_c_extensions.html" class="active">Ch 26: C Extensions</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 26</div>
+<h1>C Extensions &amp; ctypes</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand how Python interfaces with C libraries</li>
+  <li>Use <code>ctypes</code> to call shared libraries</li>
+  <li>See how sherpa-onnx is accessed in AIVS</li>
+</ul>
+
+<hr>
+
+<h2>26.1 ctypes Basics</h2>
+
+<pre><code><span class="kw">import</span> ctypes
+
+<span class="cm"># Load a shared library</span>
+libc = ctypes.CDLL(<span class="str">"libc.so.6"</span>)  <span class="cm"># Linux</span>
+<span class="cm"># libc = ctypes.CDLL("msvcrt.dll")  # Windows</span>
+
+<span class="cm"># Call C functions</span>
+libc.printf(b<span class="str">"Hello from C!\n"</span>)
+
+<span class="cm"># Type mapping</span>
+ctypes.c_int(<span class="num">42</span>)        <span class="cm"># C int</span>
+ctypes.c_double(<span class="num">3.14</span>)   <span class="cm"># C double</span>
+ctypes.c_char_p(b<span class="str">"hi"</span>)  <span class="cm"># C char*</span>
+ctypes.c_bool(<span class="kw">True</span>)     <span class="cm"># C bool</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>import ctypes</code>
+        <br><span class="desc">Imports the <code>ctypes</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Load a shared library</code>
+        <br><span class="desc">A comment: <em>Load a shared library</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>libc = ctypes.CDLL(&quot;libc.so.6&quot;)  # Linux</code>
+        <br><span class="desc">Assigns <code>ctypes.CDLL(&quot;libc.so.6&quot;)  # Linux</code> to <code>libc</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># libc = ctypes.CDLL(&quot;msvcrt.dll&quot;)  # Windows</code>
+        <br><span class="desc">A comment: <em>libc = ctypes.CDLL(&quot;msvcrt.dll&quot;)  # Windows</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># Call C functions</code>
+        <br><span class="desc">A comment: <em>Call C functions</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>libc.printf(b&quot;Hello from C!\n&quot;)</code>
+        <br><span class="desc"><code>libc.printf(b&quot;Hello from C!\n&quot;)</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># Type mapping</code>
+        <br><span class="desc">A comment: <em>Type mapping</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>ctypes.c_int(42)        # C int</code>
+        <br><span class="desc">Converts a value to an integer. Truncates floats toward zero. Raises ValueError for invalid strings.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>ctypes.c_double(3.14)   # C double</code>
+        <br><span class="desc"><code>ctypes.c_double(3.14)   # C double</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>ctypes.c_char_p(b&quot;hi&quot;)  # C char*</code>
+        <br><span class="desc"><code>ctypes.c_char_p(b&quot;hi&quot;)  # C char*</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>ctypes.c_bool(True)     # C bool</code>
+        <br><span class="desc">Converts a value to its boolean equivalent. Zero, empty strings, None, and empty collections are False; everything else is True.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>26.2 How sherpa-onnx Works</h2>
+
+<pre><code><span class="cm"># sherpa-onnx is a Python package wrapping C++ ONNX inference</span>
+<span class="cm"># AIVS accesses it like any Python library:</span>
+<span class="kw">import</span> sherpa_onnx
+
+<span class="cm"># Create TTS config</span>
+config = sherpa_onnx.OfflineTtsConfig(
+    model=sherpa_onnx.OfflineTtsModelConfig(
+        vits=sherpa_onnx.OfflineTtsVitsModelConfig(
+            model=<span class="str">"model.onnx"</span>,
+            tokens=<span class="str">"tokens.txt"</span>,
+            data_dir=<span class="str">"espeak-ng-data"</span>,
+        ),
+    ),
+)
+
+<span class="cm"># Create engine and synthesize</span>
+tts = sherpa_onnx.OfflineTts(config)
+audio = tts.generate(text=<span class="str">"Hello world"</span>, sid=<span class="num">0</span>, speed=<span class="num">1.0</span>)
+
+<span class="cm"># audio.samples is a numpy array</span>
+<span class="kw">import</span> numpy <span class="kw">as</span> np
+samples = np.array(audio.samples, dtype=np.int16)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># sherpa-onnx is a Python package wrapping C++ ONNX inference</code>
+        <br><span class="desc">A comment: <em>sherpa-onnx is a Python package wrapping C++ ONNX inference</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># AIVS accesses it like any Python library:</code>
+        <br><span class="desc">A comment: <em>AIVS accesses it like any Python library:</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>import sherpa_onnx</code>
+        <br><span class="desc">Imports the <code>sherpa_onnx</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># Create TTS config</code>
+        <br><span class="desc">A comment: <em>Create TTS config</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>config = sherpa_onnx.OfflineTtsConfig(</code>
+        <br><span class="desc">Assigns <code>sherpa_onnx.OfflineTtsConfig(</code> to <code>config</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>model=sherpa_onnx.OfflineTtsModelConfig(</code>
+        <br><span class="desc">Assigns <code>sherpa_onnx.OfflineTtsModelConfig(</code> to <code>model</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>vits=sherpa_onnx.OfflineTtsVitsModelConfig(</code>
+        <br><span class="desc">Assigns <code>sherpa_onnx.OfflineTtsVitsModelConfig(</code> to <code>vits</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>model=&quot;model.onnx&quot;,</code>
+        <br><span class="desc">Assigns <code>&quot;model.onnx&quot;,</code> to <code>model</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>tokens=&quot;tokens.txt&quot;,</code>
+        <br><span class="desc">Assigns <code>&quot;tokens.txt&quot;,</code> to <code>tokens</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>data_dir=&quot;espeak-ng-data&quot;,</code>
+        <br><span class="desc">Assigns <code>&quot;espeak-ng-data&quot;,</code> to <code>data_dir</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>),</code>
+        <br><span class="desc"><code>),</code></span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>),</code>
+        <br><span class="desc"><code>),</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code># Create engine and synthesize</code>
+        <br><span class="desc">A comment: <em>Create engine and synthesize</em>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>tts = sherpa_onnx.OfflineTts(config)</code>
+        <br><span class="desc">Assigns <code>sherpa_onnx.OfflineTts(config)</code> to <code>tts</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>audio = tts.generate(text=&quot;Hello world&quot;, sid=0, speed=1.0)</code>
+        <br><span class="desc">Assigns <code>tts.generate(text=&quot;Hello world&quot;, sid=0, speed=1.0)</code> to <code>audio</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code># audio.samples is a numpy array</code>
+        <br><span class="desc">A comment: <em>audio.samples is a numpy array</em>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>import numpy as np</code>
+        <br><span class="desc">Imports the <code>numpy as np</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>samples = np.array(audio.samples, dtype=np.int16)</code>
+        <br><span class="desc">Assigns <code>np.array(audio.samples, dtype=np.int16)</code> to <code>samples</code>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>26.3 NumPy and C</h2>
+
+<pre><code><span class="cm"># NumPy arrays are stored as C arrays in memory</span>
+<span class="kw">import</span> numpy <span class="kw">as</span> np
+
+arr = np.array([<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">4</span>], dtype=np.int16)
+
+<span class="cm"># Access the C pointer</span>
+ptr = arr.ctypes.data  <span class="cm"># Memory address</span>
+<span class="kw">print</span>(<span class="str">f"Array at </span>{ptr}<span class="str">, </span>{arr.shape}<span class="str"> elements of </span>{arr.dtype}<span class="str">"</span>)
+
+<span class="cm"># This is how audio data flows through the system:</span>
+<span class="cm"># sherpa-onnx → C++ inference → numpy array → wxPython playback</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># NumPy arrays are stored as C arrays in memory</code>
+        <br><span class="desc">A comment: <em>NumPy arrays are stored as C arrays in memory</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>import numpy as np</code>
+        <br><span class="desc">Imports the <code>numpy as np</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>arr = np.array([1, 2, 3, 4], dtype=np.int16)</code>
+        <br><span class="desc">Assigns <code>np.array([1, 2, 3, 4], dtype=np.int16)</code> to <code>arr</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># Access the C pointer</code>
+        <br><span class="desc">A comment: <em>Access the C pointer</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>ptr = arr.ctypes.data  # Memory address</code>
+        <br><span class="desc">Assigns <code>arr.ctypes.data  # Memory address</code> to <code>ptr</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>print(f&quot;Array at {ptr}, {arr.shape} elements of {arr.dtype}&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># This is how audio data flows through the system:</code>
+        <br><span class="desc">A comment: <em>This is how audio data flows through the system:</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># sherpa-onnx → C++ inference → numpy array → wxPython playback</code>
+        <br><span class="desc">A comment: <em>sherpa-onnx → C++ inference → numpy array → wxPython playback</em>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>26.4 Key Takeaways</h2>
+<ul>
+  <li><strong>ctypes</strong> enables calling C shared libraries from Python</li>
+  <li><strong>NumPy</strong> provides the bridge between Python and C-level array operations</li>
+  <li>AIVS uses <strong>sherpa-onnx</strong> (C++ ONNX inference) and <strong>NumPy</strong> for audio processing</li>
+  <li>The audio pipeline: <strong>Text → sherpa-onnx (C++) → numpy array → WAV file</strong></li>
+</ul>
+
+<hr>
+
+<p style="text-align: center;">
+  <a href="ch25_introspection.html">← Ch 25</a> &nbsp;|&nbsp;
+  <strong>End of Part III</strong> &nbsp;|&nbsp;
+  <a href="ch27_wxpython_intro.html">Part IV — Ch 27: wxPython →</a>
+</p>
+
+</div></div></body>
+</html>

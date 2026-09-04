@@ -1,0 +1,1246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 10: OOP Basics - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2><div class="part-header">Part I</div><ul class="chapters"><li><a href="ch01_introduction.html">Ch 1</a></li><li><a href="ch02_variables.html">Ch 2</a></li><li><a href="ch03_control_flow.html">Ch 3</a></li><li><a href="ch04_functions.html">Ch 4</a></li><li><a href="ch05_strings.html">Ch 5</a></li><li><a href="ch06_collections.html">Ch 6</a></li><li><a href="ch07_file_io.html">Ch 7</a></li><li><a href="ch08_error_handling.html">Ch 8</a></li><li><a href="ch09_modules.html">Ch 9</a></li><li><a href="ch10_oop_basics.html" class="active">Ch 10: OOP Basics</a></li></ul></nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 10</div>
+<h1>Object-Oriented Programming Basics</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand classes, objects, and the <code>__init__</code> method</li>
+  <li>Master instance attributes vs. class attributes</li>
+  <li>Implement methods (instance, class, static)</li>
+  <li>Understand <code>self</code> and the class-object relationship</li>
+  <li>See OOP patterns throughout AI Voice Studio</li>
+</ul>
+
+<hr>
+
+<h2>10.1 Classes and Objects</h2>
+
+<pre><code><span class="kw">class</span> <span class="cls">TtsVoice</span>:
+    <span class="str">"""Represents a single TTS voice."""</span>
+
+    <span class="cm"># Class attribute (shared by all instances)</span>
+    sample_rate = <span class="num">24000</span>
+
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, voice_id: str, name: str, sid: int = <span class="num">0</span>):
+        <span class="str">"""Initialize a new TtsVoice instance."""</span>
+        <span class="cm"># Instance attributes (unique to each object)</span>
+        self.voice_id = voice_id
+        self.name = name
+        self.sid = sid
+        self.is_loaded = <span class="kw">False</span>
+
+    <span class="kw">def</span> <span class="fn">__repr__</span>(self) -> str:
+        <span class="str">"""Developer-friendly string representation."""</span>
+        <span class="kw">return</span> <span class="str">f"TtsVoice(</span>{self.voice_id!r}<span class="str">, </span>{self.name!r}<span class="str">, sid=</span>{self.sid}<span class="str">)"</span>
+
+    <span class="kw">def</span> <span class="fn">load</span>(self):
+        <span class="str">"""Load the voice model."""</span>
+        <span class="kw">print</span>(<span class="str">f"Loading </span>{self.name}<span class="str"> (sid=</span>{self.sid}<span class="str">)..."</span>)
+        self.is_loaded = <span class="kw">True</span>
+
+    <span class="kw">def</span> <span class="fn">synthesize</span>(self, text: str) -> <span class="str">"np.ndarray"</span>:
+        <span class="str">"""Synthesize text using this voice."""</span>
+        <span class="kw">if not</span> self.is_loaded:
+            self.load()
+        <span class="kw">print</span>(<span class="str">f"Synthesizing '</span>{text[:<span class="num">30</span>]}<span class="str">' with </span>{self.name}<span class="str">"</span>)
+        <span class="cm"># ... actual synthesis logic</span>
+
+<span class="cm"># Creating objects (instances)</span>
+bella = TtsVoice(<span class="str">"af_bella"</span>, <span class="str">"Bella"</span>, sid=<span class="num">2</span>)
+adam = TtsVoice(<span class="str">"am_adam"</span>, <span class="str">"Adam"</span>, sid=<span class="num">1</span>)
+
+<span class="cm"># Using objects</span>
+bella.load()
+bella.synthesize(<span class="str">"Hello world"</span>)
+
+<span class="cm"># Class attribute shared by all instances</span>
+<span class="kw">print</span>(TtsVoice.sample_rate)      <span class="cm"># 24000</span>
+<span class="kw">print</span>(bella.sample_rate)         <span class="cm"># 24000 (same)</span>
+
+<span class="cm"># Check type</span>
+<span class="kw">print</span>(isinstance(bella, TtsVoice))  <span class="cm"># True</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>class TtsVoice:</code>
+        <br><span class="desc">Defines class <code>TtsVoice</code>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>&quot;&quot;&quot;Represents a single TTS voice.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Represents a single TTS voice.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># Class attribute (shared by all instances)</code>
+        <br><span class="desc">A comment: <em>Class attribute (shared by all instances)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>sample_rate = 24000</code>
+        <br><span class="desc">Assigns <code>24000</code> to <code>sample_rate</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>def __init__(self, voice_id: str, name: str, sid: int = 0):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>&quot;&quot;&quot;Initialize a new TtsVoice instance.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Initialize a new TtsVoice instance.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># Instance attributes (unique to each object)</code>
+        <br><span class="desc">A comment: <em>Instance attributes (unique to each object)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>self.voice_id = voice_id</code>
+        <br><span class="desc">Stores <code>voice_id</code> in instance attribute <code>voice_id</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>self.name = name</code>
+        <br><span class="desc">Stores <code>name</code> in instance attribute <code>name</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>self.sid = sid</code>
+        <br><span class="desc">Stores <code>sid</code> in instance attribute <code>sid</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>self.is_loaded = False</code>
+        <br><span class="desc">Stores <code>False</code> in instance attribute <code>is_loaded</code>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>def __repr__(self) -&gt; str:</code>
+        <br><span class="desc">Returns a developer-friendly string representation. Called by repr() and in the interactive console.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>&quot;&quot;&quot;Developer-friendly string representation.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Developer-friendly string representation.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>return f&quot;TtsVoice({self.voice_id!r}, {self.name!r}, sid={self.sid})&quot;</code>
+        <br><span class="desc">Returns <code>f&quot;TtsVoice({self.voice_id!r}, {self.name!r}, sid={self.sid})&quot;</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>def load(self):</code>
+        <br><span class="desc">Defines function <code>load</code> accepting (self).</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>&quot;&quot;&quot;Load the voice model.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Load the voice model.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>print(f&quot;Loading {self.name} (sid={self.sid})...&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>self.is_loaded = True</code>
+        <br><span class="desc">Stores <code>True</code> in instance attribute <code>is_loaded</code>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>def synthesize(self, text: str) -&gt; &quot;np.ndarray&quot;:</code>
+        <br><span class="desc">Defines function <code>synthesize</code> accepting (self, text), returning <code>&quot;np.ndarray&quot;</code>.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>&quot;&quot;&quot;Synthesize text using this voice.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Synthesize text using this voice.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>if not self.is_loaded:</code>
+        <br><span class="desc">Checks condition: <code>not self.is_loaded</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>self.load()</code>
+        <br><span class="desc">Calls <code>self.load()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>print(f&quot;Synthesizing &#x27;{text[:30]}&#x27; with {self.name}&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code># ... actual synthesis logic</code>
+        <br><span class="desc">A comment: <em>... actual synthesis logic</em>.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code># Creating objects (instances)</code>
+        <br><span class="desc">A comment: <em>Creating objects (instances)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>bella = TtsVoice(&quot;af_bella&quot;, &quot;Bella&quot;, sid=2)</code>
+        <br><span class="desc">Assigns <code>TtsVoice(&quot;af_bella&quot;, &quot;Bella&quot;, sid=2)</code> to <code>bella</code>.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>adam = TtsVoice(&quot;am_adam&quot;, &quot;Adam&quot;, sid=1)</code>
+        <br><span class="desc">Assigns <code>TtsVoice(&quot;am_adam&quot;, &quot;Adam&quot;, sid=1)</code> to <code>adam</code>.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code># Using objects</code>
+        <br><span class="desc">A comment: <em>Using objects</em>.</span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>bella.load()</code>
+        <br><span class="desc"><code>bella.load()</code></span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code>bella.synthesize(&quot;Hello world&quot;)</code>
+        <br><span class="desc"><code>bella.synthesize(&quot;Hello world&quot;)</code></span>
+      </li>
+      <li>
+        <strong>Line 31:</strong> <code># Class attribute shared by all instances</code>
+        <br><span class="desc">A comment: <em>Class attribute shared by all instances</em>.</span>
+      </li>
+      <li>
+        <strong>Line 32:</strong> <code>print(TtsVoice.sample_rate)      # 24000</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 33:</strong> <code>print(bella.sample_rate)         # 24000 (same)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 34:</strong> <code># Check type</code>
+        <br><span class="desc">A comment: <em>Check type</em>.</span>
+      </li>
+      <li>
+        <strong>Line 35:</strong> <code>print(isinstance(bella, TtsVoice))  # True</code>
+        <br><span class="desc">Checks if an object is an instance of a class. Preferred over type() for type checking.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>10.2 The __init__ Method</h2>
+
+<p><code>__init__</code> is the constructor — it runs when you create a new object:</p>
+
+<pre><code><span class="kw">class</span> <span class="cls">Settings</span>:
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, path: str | <span class="kw">None</span> = <span class="kw">None</span>):
+        <span class="str">"""Initialize settings with optional file path."""</span>
+        self._path = path
+        self._data: dict = {}
+        self._load()
+
+    <span class="kw">def</span> <span class="fn">_load</span>(self):
+        <span class="str">"""Load settings from disk."""</span>
+        <span class="kw">if</span> self._path <span class="kw">and</span> os.path.isfile(self._path):
+            <span class="kw">with</span> open(self._path, <span class="str">"r"</span>) <span class="kw">as</span> f:
+                self._data = json.load(f)
+
+<span class="cm"># __init__ parameters have default values</span>
+s1 = Settings()                    <span class="cm"># No path</span>
+s2 = Settings(<span class="str">"/path/to/settings.json"</span>)  <span class="cm"># With path</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>class Settings:</code>
+        <br><span class="desc">Defines class <code>Settings</code>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def __init__(self, path: str | None = None):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;&quot;&quot;Initialize settings with optional file path.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Initialize settings with optional file path.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>self._path = path</code>
+        <br><span class="desc">Stores <code>path</code> in instance attribute <code>_path</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>self._data: dict = {}</code>
+        <br><span class="desc"><code>self._data: dict = {}</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>self._load()</code>
+        <br><span class="desc">Calls <code>self._load()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>def _load(self):</code>
+        <br><span class="desc">Defines function <code>_load</code> accepting (self).</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>&quot;&quot;&quot;Load settings from disk.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Load settings from disk.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>if self._path and os.path.isfile(self._path):</code>
+        <br><span class="desc">OS-agnostic path manipulation. Use join(), exists(), dirname(), basename(), splitext().</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>with open(self._path, &quot;r&quot;) as f:</code>
+        <br><span class="desc">Opens a file using a context manager. The file is automatically closed when the block exits, even if an error occurs.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>self._data = json.load(f)</code>
+        <br><span class="desc">Deserializes JSON from a file into a Python object.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code># __init__ parameters have default values</code>
+        <br><span class="desc">A comment: <em>__init__ parameters have default values</em>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>s1 = Settings()                    # No path</code>
+        <br><span class="desc">Assigns <code>Settings()                    # No path</code> to <code>s1</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>s2 = Settings(&quot;/path/to/settings.json&quot;)  # With path</code>
+        <br><span class="desc">Assigns <code>Settings(&quot;/path/to/settings.json&quot;)  # With path</code> to <code>s2</code>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>10.3 Instance vs. Class Attributes</h2>
+
+<pre><code><span class="kw">class</span> <span class="cls">Engine</span>:
+    <span class="cm"># Class attributes — shared by ALL instances</span>
+    version = <span class="str">"1.0"</span>
+    _cache = {}  <span class="cm"># Shared cache</span>
+
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, engine_id: str):
+        <span class="cm"># Instance attributes — unique per instance</span>
+        self.engine_id = engine_id
+        self.is_ready = <span class="kw">False</span>
+
+e1 = Engine(<span class="str">"piper"</span>)
+e2 = Engine(<span class="str">"kokoro"</span>)
+
+<span class="cm"># Instance attributes differ</span>
+<span class="kw">print</span>(e1.engine_id)  <span class="cm"># "piper"</span>
+<span class="kw">print</span>(e2.engine_id)  <span class="cm"># "kokoro"</span>
+
+<span class="cm"># Class attributes are shared</span>
+<span class="kw">print</span>(e1.version)    <span class="cm"># "1.0"</span>
+<span class="kw">print</span>(e2.version)    <span class="cm"># "1.0"</span>
+
+<span class="cm"># Modifying a class attribute on an instance creates an instance attribute</span>
+e1.version = <span class="str">"2.0"</span>   <span class="cm"># Only e1 is affected</span>
+<span class="kw">print</span>(e1.version)    <span class="cm"># "2.0"</span>
+<span class="kw">print</span>(e2.version)    <span class="cm"># "1.0" (still uses class attribute)</span>
+<span class="kw">print</span>(Engine.version) <span class="cm"># "1.0" (class attribute unchanged)</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>class Engine:</code>
+        <br><span class="desc">Defines class <code>Engine</code>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Class attributes — shared by ALL instances</code>
+        <br><span class="desc">A comment: <em>Class attributes — shared by ALL instances</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>version = &quot;1.0&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;1.0&quot;</code> to <code>version</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>_cache = {}  # Shared cache</code>
+        <br><span class="desc">Assigns <code>{}  # Shared cache</code> to <code>_cache</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>def __init__(self, engine_id: str):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># Instance attributes — unique per instance</code>
+        <br><span class="desc">A comment: <em>Instance attributes — unique per instance</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>self.engine_id = engine_id</code>
+        <br><span class="desc">Stores <code>engine_id</code> in instance attribute <code>engine_id</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>self.is_ready = False</code>
+        <br><span class="desc">Stores <code>False</code> in instance attribute <code>is_ready</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>e1 = Engine(&quot;piper&quot;)</code>
+        <br><span class="desc">Assigns <code>Engine(&quot;piper&quot;)</code> to <code>e1</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>e2 = Engine(&quot;kokoro&quot;)</code>
+        <br><span class="desc">Assigns <code>Engine(&quot;kokoro&quot;)</code> to <code>e2</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># Instance attributes differ</code>
+        <br><span class="desc">A comment: <em>Instance attributes differ</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>print(e1.engine_id)  # &quot;piper&quot;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>print(e2.engine_id)  # &quot;kokoro&quot;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code># Class attributes are shared</code>
+        <br><span class="desc">A comment: <em>Class attributes are shared</em>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>print(e1.version)    # &quot;1.0&quot;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>print(e2.version)    # &quot;1.0&quot;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code># Modifying a class attribute on an instance creates an instance attribute</code>
+        <br><span class="desc">A comment: <em>Modifying a class attribute on an instance creates an instance attribute</em>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>e1.version = &quot;2.0&quot;   # Only e1 is affected</code>
+        <br><span class="desc">Assigns <code>&quot;2.0&quot;   # Only e1 is affected</code> to <code>e1.version</code>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>print(e1.version)    # &quot;2.0&quot;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>print(e2.version)    # &quot;1.0&quot; (still uses class attribute)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>print(Engine.version) # &quot;1.0&quot; (class attribute unchanged)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>10.4 Types of Methods</h2>
+
+<pre><code><span class="kw">class</span> <span class="cls">AudioFile</span>:
+    <span class="cm"># Class attribute</span>
+    MAX_SIZE_MB = <span class="num">100</span>
+
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, path: str, data: bytes):
+        self.path = path
+        self.data = data
+
+    <span class="cm"># Instance method — accesses 'self'</span>
+    <span class="kw">def</span> <span class="fn">size_mb</span>(self) -> float:
+        <span class="kw">return</span> len(self.data) / (<span class="num">1024</span> * <span class="num">1024</span>)
+
+    <span class="cm"># Class method — accesses 'cls' (the class itself)</span>
+    <span class="kw">@classmethod</span>
+    <span class="kw">def</span> <span class="fn">from_file</span>(cls, path: str) -> <span class="str">"AudioFile"</span>:
+        <span class="str">"""Alternative constructor from a file path."""</span>
+        <span class="kw">with</span> open(path, <span class="str">"rb"</span>) <span class="kw">as</span> f:
+            data = f.read()
+        <span class="kw">return</span> cls(path, data)  <span class="cm"># cls() = AudioFile()</span>
+
+    <span class="cm"># Static method — no access to self or cls</span>
+    <span class="kw">@staticmethod</span>
+    <span class="kw">def</span> <span class="fn">is_valid_format</span>(path: str) -> bool:
+        <span class="str">"""Check if file extension is supported."""</span>
+        <span class="kw">return</span> path.lower().endswith((<span class="str">".wav"</span>, <span class="str">".mp3"</span>, <span class="str">".flac"</span>))
+
+<span class="cm"># Using all three types</span>
+f1 = AudioFile(<span class="str">"output.wav"</span>, audio_bytes)    <span class="cm"># Regular constructor</span>
+f2 = AudioFile.from_file(<span class="str">"output.wav"</span>)       <span class="cm"># Class method constructor</span>
+<span class="kw">print</span>(f1.size_mb())                            <span class="cm"># Instance method</span>
+<span class="kw">print</span>(AudioFile.is_valid_format(<span class="str">"test.wav"</span>))  <span class="cm"># Static method</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 4)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>class AudioFile:</code>
+        <br><span class="desc">Defines class <code>AudioFile</code>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Class attribute</code>
+        <br><span class="desc">A comment: <em>Class attribute</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>MAX_SIZE_MB = 100</code>
+        <br><span class="desc">Assigns <code>100</code> to <code>MAX_SIZE_MB</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>def __init__(self, path: str, data: bytes):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>self.path = path</code>
+        <br><span class="desc">Stores <code>path</code> in instance attribute <code>path</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>self.data = data</code>
+        <br><span class="desc">Stores <code>data</code> in instance attribute <code>data</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># Instance method — accesses &#x27;self&#x27;</code>
+        <br><span class="desc">A comment: <em>Instance method — accesses &#x27;self&#x27;</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>def size_mb(self) -&gt; float:</code>
+        <br><span class="desc">Defines function <code>size_mb</code> accepting (self), returning <code>float</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>return len(self.data) / (1024 * 1024)</code>
+        <br><span class="desc">Returns the number of items in a sequence (string, list, dict, tuple). Essential for loop bounds and validation.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code># Class method — accesses &#x27;cls&#x27; (the class itself)</code>
+        <br><span class="desc">A comment: <em>Class method — accesses &#x27;cls&#x27; (the class itself)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>@classmethod</code>
+        <br><span class="desc">Decorator that receives the class (cls) as the first argument instead of the instance.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>def from_file(cls, path: str) -&gt; &quot;AudioFile&quot;:</code>
+        <br><span class="desc">Defines function <code>from_file</code> accepting (cls, path), returning <code>&quot;AudioFile&quot;</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>&quot;&quot;&quot;Alternative constructor from a file path.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Alternative constructor from a file path.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>with open(path, &quot;rb&quot;) as f:</code>
+        <br><span class="desc">Opens a file using a context manager. The file is automatically closed when the block exits, even if an error occurs.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>data = f.read()</code>
+        <br><span class="desc">Reads the entire file contents as a string.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>return cls(path, data)  # cls() = AudioFile()</code>
+        <br><span class="desc">Returns <code>cls(path, data)  # cls() = AudioFile()</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code># Static method — no access to self or cls</code>
+        <br><span class="desc">A comment: <em>Static method — no access to self or cls</em>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>@staticmethod</code>
+        <br><span class="desc">Decorator that creates a method without 'self' or 'cls' parameter. Called on the class, not an instance.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>def is_valid_format(path: str) -&gt; bool:</code>
+        <br><span class="desc">Formats a value according to a format specification. Used in f-strings and .format() method.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>&quot;&quot;&quot;Check if file extension is supported.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Check if file extension is supported.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>return path.lower().endswith((&quot;.wav&quot;, &quot;.mp3&quot;, &quot;.flac&quot;))</code>
+        <br><span class="desc">Returns True if the string ends with the given suffix.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code># Using all three types</code>
+        <br><span class="desc">A comment: <em>Using all three types</em>.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>f1 = AudioFile(&quot;output.wav&quot;, audio_bytes)    # Regular constructor</code>
+        <br><span class="desc">Assigns <code>AudioFile(&quot;output.wav&quot;, audio_bytes)    # Regular constructor</code> to <code>f1</code>.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>f2 = AudioFile.from_file(&quot;output.wav&quot;)       # Class method constructor</code>
+        <br><span class="desc">Assigns <code>AudioFile.from_file(&quot;output.wav&quot;)       # Class method constructor</code> to <code>f2</code>.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>print(f1.size_mb())                            # Instance method</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>print(AudioFile.is_valid_format(&quot;test.wav&quot;))  # Static method</code>
+        <br><span class="desc">Formats a value according to a format specification. Used in f-strings and .format() method.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>10.5 Special (Dunder) Methods</h2>
+
+<pre><code><span class="kw">class</span> <span class="cls">Segment</span>:
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, index: int, title: str, text: str):
+        self.index = index
+        self.title = title
+        self.text = text
+
+    <span class="kw">def</span> <span class="fn">__repr__</span>(self) -> str:
+        <span class="str">"""Developer string: Segment(1, 'Chapter 1')"""</span>
+        <span class="kw">return</span> <span class="str">f"Segment(</span>{self.index}<span class="str">, </span>{self.title!r}<span class="str">)"</span>
+
+    <span class="kw">def</span> <span class="fn">__str__</span>(self) -> str:
+        <span class="str">"""User-facing string: "Chapter 1" """</span>
+        <span class="kw">return</span> self.title
+
+    <span class="kw">def</span> <span class="fn">__eq__</span>(self, other) -> bool:
+        <span class="str">"""Equality comparison."""</span>
+        <span class="kw">if not</span> isinstance(other, Segment):
+            <span class="kw">return</span> <span class="kw">NotImplemented</span>
+        <span class="kw">return</span> self.index == other.index
+
+    <span class="kw">def</span> <span class="fn">__lt__</span>(self, other) -> bool:
+        <span class="str">"""Less-than comparison (enables sorting)."""</span>
+        <span class="kw">return</span> self.index < other.index
+
+    <span class="kw">def</span> <span class="fn">__len__</span>(self) -> int:
+        <span class="str">"""len(segment) returns text length."""</span>
+        <span class="kw">return</span> len(self.text)
+
+    <span class="kw">def</span> <span class="fn">__bool__</span>(self) -> bool:
+        <span class="str">"""bool(segment) is True if text is non-empty."""</span>
+        <span class="kw">return</span> bool(self.text.strip())
+
+<span class="cm"># Usage</span>
+seg = Segment(<span class="num">1</span>, <span class="str">"Chapter 1"</span>, <span class="str">"Once upon a time..."</span>)
+<span class="kw">print</span>(repr(seg))  <span class="cm"># Segment(1, 'Chapter 1')</span>
+<span class="kw">print</span>(str(seg))   <span class="cm"># Chapter 1</span>
+<span class="kw">print</span>(len(seg))   <span class="cm"># 22</span>
+
+segments = [seg2, seg1]
+sorted_segs = sorted(segments)  <span class="cm"># Works because of __lt__</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 5)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>class Segment:</code>
+        <br><span class="desc">Defines class <code>Segment</code>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def __init__(self, index: int, title: str, text: str):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>self.index = index</code>
+        <br><span class="desc">Stores <code>index</code> in instance attribute <code>index</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>self.title = title</code>
+        <br><span class="desc">Stores <code>title</code> in instance attribute <code>title</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>self.text = text</code>
+        <br><span class="desc">Stores <code>text</code> in instance attribute <code>text</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>def __repr__(self) -&gt; str:</code>
+        <br><span class="desc">Returns a developer-friendly string representation. Called by repr() and in the interactive console.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>&quot;&quot;&quot;Developer string: Segment(1, &#x27;Chapter 1&#x27;)&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Developer string: Segment(1, &#x27;Chapter 1&#x27;)</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>return f&quot;Segment({self.index}, {self.title!r})&quot;</code>
+        <br><span class="desc">Returns <code>f&quot;Segment({self.index}, {self.title!r})&quot;</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>def __str__(self) -&gt; str:</code>
+        <br><span class="desc">Returns a human-readable string representation. Called by print() and str().</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>&quot;&quot;&quot;User-facing string: &quot;Chapter 1&quot; &quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>User-facing string: &quot;Chapter 1&quot;</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>return self.title</code>
+        <br><span class="desc">Returns <code>self.title</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>def __eq__(self, other) -&gt; bool:</code>
+        <br><span class="desc">Defines equality comparison (==). Called when comparing two objects.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>&quot;&quot;&quot;Equality comparison.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Equality comparison.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>if not isinstance(other, Segment):</code>
+        <br><span class="desc">Checks if an object is an instance of a class. Preferred over type() for type checking.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>return NotImplemented</code>
+        <br><span class="desc">Returns <code>NotImplemented</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>return self.index == other.index</code>
+        <br><span class="desc">Returns <code>self.index == other.index</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>def __lt__(self, other) -&gt; bool:</code>
+        <br><span class="desc">Defines less-than comparison (<). Used for sorting.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>&quot;&quot;&quot;Less-than comparison (enables sorting).&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Less-than comparison (enables sorting).</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>return self.index &lt; other.index</code>
+        <br><span class="desc">Returns <code>self.index &lt; other.index</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>def __len__(self) -&gt; int:</code>
+        <br><span class="desc">Returns the length of the object. Called by len().</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>&quot;&quot;&quot;len(segment) returns text length.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>len(segment) returns text length.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>return len(self.text)</code>
+        <br><span class="desc">Returns the number of items in a sequence (string, list, dict, tuple). Essential for loop bounds and validation.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>def __bool__(self) -&gt; bool:</code>
+        <br><span class="desc">Defines truth value for use in if statements and boolean operations.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>&quot;&quot;&quot;bool(segment) is True if text is non-empty.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>bool(segment) is True if text is non-empty.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>return bool(self.text.strip())</code>
+        <br><span class="desc">Removes leading and trailing whitespace (or specified characters). Returns a new string.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code># Usage</code>
+        <br><span class="desc">A comment: <em>Usage</em>.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>seg = Segment(1, &quot;Chapter 1&quot;, &quot;Once upon a time...&quot;)</code>
+        <br><span class="desc">Assigns <code>Segment(1, &quot;Chapter 1&quot;, &quot;Once upon a time...&quot;)</code> to <code>seg</code>.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>print(repr(seg))  # Segment(1, &#x27;Chapter 1&#x27;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>print(str(seg))   # Chapter 1</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code>print(len(seg))   # 22</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 31:</strong> <code>segments = [seg2, seg1]</code>
+        <br><span class="desc">Assigns <code>[seg2, seg1]</code> to <code>segments</code>.</span>
+      </li>
+      <li>
+        <strong>Line 32:</strong> <code>sorted_segs = sorted(segments)  # Works because of __lt__</code>
+        <br><span class="desc">Returns a new sorted list from any iterable. Does not modify the original. Accepts a key= parameter for custom sorting.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>10.6 Properties</h2>
+
+<pre><code><span class="kw">class</span> <span class="cls">VoiceEntry</span>:
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, voice_id: str, sid: int):
+        self._voice_id = voice_id
+        self._sid = sid
+
+    <span class="cm">@property</span>
+    <span class="kw">def</span> <span class="fn">voice_id</span>(self) -> str:
+        <span class="str">"""Read-only property."""</span>
+        <span class="kw">return</span> self._voice_id
+
+    <span class="cm">@property</span>
+    <span class="kw">def</span> <span class="fn">display_name</span>(self) -> str:
+        <span class="str">"""Computed property — not stored, calculated on access."""</span>
+        <span class="kw">return</span> <span class="str">f"</span>{self._voice_id}<span class="str"> (sid=</span>{self._sid}<span class="str">)"</span>
+
+    <span class="cm">@property</span>
+    <span class="kw">def</span> <span class="fn">sid</span>(self) -> int:
+        <span class="kw">return</span> self._sid
+
+    <span class="cm">@sid.setter</span>
+    <span class="kw">def</span> <span class="fn">sid</span>(self, value: int):
+        <span class="kw">if</span> value < <span class="num">0</span>:
+            <span class="kw">raise</span> ValueError(<span class="str">"SID must be non-negative"</span>)
+        self._sid = value
+
+v = VoiceEntry(<span class="str">"af_bella"</span>, <span class="num">2</span>)
+<span class="kw">print</span>(v.display_name)  <span class="cm"># "af_bella (sid=2)" — computed, not stored</span>
+v.sid = <span class="num">5</span>              <span class="cm"># Uses setter with validation</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 6)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>class VoiceEntry:</code>
+        <br><span class="desc">Begins exception handling. Code in this block is monitored for errors.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def __init__(self, voice_id: str, sid: int):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>self._voice_id = voice_id</code>
+        <br><span class="desc">Stores <code>voice_id</code> in instance attribute <code>_voice_id</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>self._sid = sid</code>
+        <br><span class="desc">Stores <code>sid</code> in instance attribute <code>_sid</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>@property</code>
+        <br><span class="desc">Decorator that converts a method into a managed attribute. Enables getter/setter syntax.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>def voice_id(self) -&gt; str:</code>
+        <br><span class="desc">Returns the unique identity of an object (memory address in CPython). Used with 'is' for identity checks.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>&quot;&quot;&quot;Read-only property.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Read-only property.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>return self._voice_id</code>
+        <br><span class="desc">Returns <code>self._voice_id</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>@property</code>
+        <br><span class="desc">Decorator that converts a method into a managed attribute. Enables getter/setter syntax.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>def display_name(self) -&gt; str:</code>
+        <br><span class="desc">Defines function <code>display_name</code> accepting (self), returning <code>str</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>&quot;&quot;&quot;Computed property — not stored, calculated on access.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Computed property — not stored, calculated on access.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>return f&quot;{self._voice_id} (sid={self._sid})&quot;</code>
+        <br><span class="desc">Returns <code>f&quot;{self._voice_id} (sid={self._sid})&quot;</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>@property</code>
+        <br><span class="desc">Decorator that converts a method into a managed attribute. Enables getter/setter syntax.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>def sid(self) -&gt; int:</code>
+        <br><span class="desc">Returns the unique identity of an object (memory address in CPython). Used with 'is' for identity checks.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>return self._sid</code>
+        <br><span class="desc">Returns <code>self._sid</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>@sid.setter</code>
+        <br><span class="desc">Decorator: <code>@sid.setter</code>. Wraps the following function/class.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>def sid(self, value: int):</code>
+        <br><span class="desc">Returns the unique identity of an object (memory address in CPython). Used with 'is' for identity checks.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>if value &lt; 0:</code>
+        <br><span class="desc">Checks condition: <code>value &lt; 0</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>raise ValueError(&quot;SID must be non-negative&quot;)</code>
+        <br><span class="desc">Raised when a function receives an argument of the right type but inappropriate value.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>self._sid = value</code>
+        <br><span class="desc">Stores <code>value</code> in instance attribute <code>_sid</code>.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>v = VoiceEntry(&quot;af_bella&quot;, 2)</code>
+        <br><span class="desc">Assigns <code>VoiceEntry(&quot;af_bella&quot;, 2)</code> to <code>v</code>.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>print(v.display_name)  # &quot;af_bella (sid=2)&quot; — computed, not stored</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>v.sid = 5              # Uses setter with validation</code>
+        <br><span class="desc">Assigns <code>5              # Uses setter with validation</code> to <code>v.sid</code>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>10.7 OOP Patterns in AIVS</h2>
+
+<pre><code><span class="cm"># From tts/models.py — ModelStore manages voice models on disk</span>
+<span class="kw">class</span> <span class="cls">ModelStore</span>:
+    <span class="str">"""Manages downloaded TTS voice models."""</span>
+
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, state_file: str | <span class="kw">None</span> = <span class="kw">None</span>):
+        self._state_file = state_file or self._default_state_file()
+        self._state: dict = self._load_state()
+
+    <span class="kw">def</span> <span class="fn">variant_dir</span>(self, tts_id: str, lang: str, variant: str) -> str:
+        <span class="str">"""Return the disk path for a voice variant."""</span>
+        <span class="kw">return</span> os.path.join(paths.models_dir(), tts_id, lang, variant)
+
+    <span class="kw">def</span> <span class="fn">is_variant_installed</span>(self, tts_id, lang, variant) -> bool:
+        <span class="str">"""Check if a variant is installed on disk."""</span>
+        <span class="kw">return</span> os.path.isdir(self.variant_dir(tts_id, lang, variant))
+
+    <span class="kw">def</span> <span class="fn">installed_voices</span>(self) -> list[dict]:
+        <span class="str">"""Return list of all installed voice entries."""</span>
+        ...
+
+<span class="cm"># From clone/__init__.py — CloneClient manages a subprocess</span>
+<span class="kw">class</span> <span class="cls">CloneClient</span>:
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, timeout: float = <span class="num">600.0</span>):
+        self._proc: subprocess.Popen | <span class="kw">None</span> = <span class="kw">None</span>
+        self._lock = threading.RLock()
+        self._timeout = timeout
+        self._next_id = <span class="num">0</span>
+
+    <span class="kw">def</span> <span class="fn">_ensure_proc</span>(self):
+        <span class="str">"""Start the worker subprocess if not running."""</span>
+        <span class="kw">if</span> self._proc <span class="kw">is not</span> <span class="kw">None</span> <span class="kw">and</span> self._proc.poll() <span class="kw">is</span> <span class="kw">None</span>:
+            <span class="kw">return</span>  <span class="cm"># Already running</span>
+        <span class="cm"># Start new subprocess...</span>
+
+    <span class="kw">def</span> <span class="fn">synthesize</span>(self, text, sample_wav, language=<span class="str">"en"</span>, speed=<span class="num">1.0</span>):
+        <span class="str">"""Synthesize text using the worker subprocess."""</span>
+        self._ensure_proc()
+        resp = self._request({<span class="str">"cmd"</span>: <span class="str">"synthesize"</span>, <span class="str">"text"</span>: text, ...})
+        <span class="kw">return</span> np.frombuffer(base64.b64decode(resp[<span class="str">"wav"</span>]), dtype=np.int16)
+
+    <span class="kw">def</span> <span class="fn">close</span>(self):
+        <span class="str">"""Shut down the worker subprocess."""</span>
+        <span class="kw">with</span> self._lock:
+            <span class="kw">if</span> self._proc:
+                self._proc.stdin.write(json.dumps({<span class="str">"cmd"</span>: <span class="str">"quit"</span>}) + <span class="str">"\n"</span>)
+                self._proc.terminate()</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 7)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From tts/models.py — ModelStore manages voice models on disk</code>
+        <br><span class="desc">A comment: <em>From tts/models.py — ModelStore manages voice models on disk</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>class ModelStore:</code>
+        <br><span class="desc">Defines class <code>ModelStore</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;&quot;&quot;Manages downloaded TTS voice models.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Manages downloaded TTS voice models.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>def __init__(self, state_file: str | None = None):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>self._state_file = state_file or self._default_state_file()</code>
+        <br><span class="desc">Stores <code>state_file or self._default_state_file()</code> in instance attribute <code>_state_file</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>self._state: dict = self._load_state()</code>
+        <br><span class="desc"><code>self._state: dict = self._load_state()</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>def variant_dir(self, tts_id: str, lang: str, variant: str) -&gt; str:</code>
+        <br><span class="desc">Returns a list of attributes and methods of an object. Useful for exploration and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>&quot;&quot;&quot;Return the disk path for a voice variant.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Return the disk path for a voice variant.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>return os.path.join(paths.models_dir(), tts_id, lang, variant)</code>
+        <br><span class="desc">OS-agnostic path manipulation. Use join(), exists(), dirname(), basename(), splitext().</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>def is_variant_installed(self, tts_id, lang, variant) -&gt; bool:</code>
+        <br><span class="desc">Defines function <code>is_variant_installed</code> accepting (self, tts_id, lang, variant), returning <code>bool</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>&quot;&quot;&quot;Check if a variant is installed on disk.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Check if a variant is installed on disk.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>return os.path.isdir(self.variant_dir(tts_id, lang, variant))</code>
+        <br><span class="desc">OS-agnostic path manipulation. Use join(), exists(), dirname(), basename(), splitext().</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>def installed_voices(self) -&gt; list[dict]:</code>
+        <br><span class="desc">Defines function <code>installed_voices</code> accepting (self), returning <code>list[dict]</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>&quot;&quot;&quot;Return list of all installed voice entries.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Return list of all installed voice entries.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>...</code>
+        <br><span class="desc">Ellipsis: abstract method placeholder.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code># From clone/__init__.py — CloneClient manages a subprocess</code>
+        <br><span class="desc">A comment: <em>From clone/__init__.py — CloneClient manages a subprocess</em>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>class CloneClient:</code>
+        <br><span class="desc">Defines class <code>CloneClient</code>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>def __init__(self, timeout: float = 600.0):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>self._proc: subprocess.Popen | None = None</code>
+        <br><span class="desc">Starts a process. More control than run() — can read stdout/stderr asynchronously.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>self._lock = threading.RLock()</code>
+        <br><span class="desc">A reentrant lock that allows the same thread to acquire it multiple times.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>self._timeout = timeout</code>
+        <br><span class="desc">Stores <code>timeout</code> in instance attribute <code>_timeout</code>.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>self._next_id = 0</code>
+        <br><span class="desc">Stores <code>0</code> in instance attribute <code>_next_id</code>.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>def _ensure_proc(self):</code>
+        <br><span class="desc">Defines function <code>_ensure_proc</code> accepting (self).</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>&quot;&quot;&quot;Start the worker subprocess if not running.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Start the worker subprocess if not running.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>if self._proc is not None and self._proc.poll() is None:</code>
+        <br><span class="desc">Checks condition: <code>self._proc is not None and self._proc.poll() is None</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>return  # Already running</code>
+        <br><span class="desc">Returns <code># Already running</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code># Start new subprocess...</code>
+        <br><span class="desc">A comment: <em>Start new subprocess...</em>.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>def synthesize(self, text, sample_wav, language=&quot;en&quot;, speed=1.0):</code>
+        <br><span class="desc">Defines function <code>synthesize</code> accepting (self, text, sample_wav, language, ...).</span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>&quot;&quot;&quot;Synthesize text using the worker subprocess.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Synthesize text using the worker subprocess.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code>self._ensure_proc()</code>
+        <br><span class="desc">Calls <code>self._ensure_proc()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 31:</strong> <code>resp = self._request({&quot;cmd&quot;: &quot;synthesize&quot;, &quot;text&quot;: text, ...})</code>
+        <br><span class="desc">Assigns <code>self._request({&quot;cmd&quot;: &quot;synthesize&quot;, &quot;text&quot;: text, ...})</code> to <code>resp</code>.</span>
+      </li>
+      <li>
+        <strong>Line 32:</strong> <code>return np.frombuffer(base64.b64decode(resp[&quot;wav&quot;]), dtype=np.int16)</code>
+        <br><span class="desc">Returns <code>np.frombuffer(base64.b64decode(resp[&quot;wav&quot;]), dtype=np.int16)</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 33:</strong> <code>def close(self):</code>
+        <br><span class="desc">Defines function <code>close</code> accepting (self).</span>
+      </li>
+      <li>
+        <strong>Line 34:</strong> <code>&quot;&quot;&quot;Shut down the worker subprocess.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Shut down the worker subprocess.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 35:</strong> <code>with self._lock:</code>
+        <br><span class="desc">Context manager: <code>self._lock</code>. Automatically manages resource cleanup.</span>
+      </li>
+      <li>
+        <strong>Line 36:</strong> <code>if self._proc:</code>
+        <br><span class="desc">Checks condition: <code>self._proc</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 37:</strong> <code>self._proc.stdin.write(json.dumps({&quot;cmd&quot;: &quot;quit&quot;}) + &quot;\n&quot;)</code>
+        <br><span class="desc">Serializes a Python object to a JSON string.</span>
+      </li>
+      <li>
+        <strong>Line 38:</strong> <code>self._proc.terminate()</code>
+        <br><span class="desc"><code>self._proc.terminate()</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>10.8 Composition vs. Inheritance</h2>
+
+<pre><code><span class="cm"># Composition (preferred): objects contain other objects</span>
+<span class="kw">class</span> <span class="cls">RecordingDialog</span>:
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, parent, project_dir, settings, store):
+        self.settings = settings    <span class="cm"># Has-a Settings</span>
+        self.store = store          <span class="cm"># Has-a ModelStore</span>
+        self._worker = <span class="kw">None</span>        <span class="cm"># Will have-a SynthesisWorker</span>
+
+<span class="cm"># Inheritance (less common): is-a relationship</span>
+<span class="kw">class</span> <span class="cls">DownloadPanel</span>(wx.Panel):    <span class="cm"># DownloadPanel IS-A wx.Panel</span>
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, parent, store, downloader):
+        <span class="kw">super</span>().__init__(parent)  <span class="cm"># Call parent's __init__</span>
+        self.store = store</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 8)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Composition (preferred): objects contain other objects</code>
+        <br><span class="desc">A comment: <em>Composition (preferred): objects contain other objects</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>class RecordingDialog:</code>
+        <br><span class="desc">Defines class <code>RecordingDialog</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>def __init__(self, parent, project_dir, settings, store):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>self.settings = settings    # Has-a Settings</code>
+        <br><span class="desc">Stores <code>settings    # Has-a Settings</code> in instance attribute <code>settings</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>self.store = store          # Has-a ModelStore</code>
+        <br><span class="desc">Stores <code>store          # Has-a ModelStore</code> in instance attribute <code>store</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>self._worker = None        # Will have-a SynthesisWorker</code>
+        <br><span class="desc">Stores <code>None        # Will have-a SynthesisWorker</code> in instance attribute <code>_worker</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># Inheritance (less common): is-a relationship</code>
+        <br><span class="desc">A comment: <em>Inheritance (less common): is-a relationship</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>class DownloadPanel(wx.Panel):    # DownloadPanel IS-A wx.Panel</code>
+        <br><span class="desc">A container that sits inside a Frame. Groups controls and provides a background for drawing.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>def __init__(self, parent, store, downloader):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>super().__init__(parent)  # Call parent&#x27;s __init__</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>self.store = store</code>
+        <br><span class="desc">Stores <code>store</code> in instance attribute <code>store</code>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<div class="tip">
+  <strong>Prefer composition over inheritance.</strong> AIVS uses inheritance mainly
+  for wxPython widgets (because wx requires it), and composition for everything else.
+  Composition is more flexible and easier to test.
+</div>
+
+<hr>
+
+<h2>10.9 Key Takeaways</h2>
+<ul>
+  <li><strong>Classes</strong> define blueprints; <strong>objects</strong> are instances of classes</li>
+  <li><strong><code>__init__</code></strong> initializes new objects — it is NOT the constructor (the constructor is <code>__new__</code>)</li>
+  <li><strong><code>self</code></strong> refers to the current instance — always the first parameter</li>
+  <li><strong>Instance attributes</strong> are per-object; <strong>class attributes</strong> are shared</li>
+  <li><strong>@property</strong> provides computed/validated attribute access</li>
+  <li><strong>Dunder methods</strong> (<code>__repr__</code>, <code>__eq__</code>, <code>__len__</code>) make objects integrate with Python's built-in functions</li>
+  <li><strong>Prefer composition</strong> — objects contain other objects rather than inheriting from them</li>
+  <li>The AIVS project has classes for every major subsystem: Settings, ModelStore, CloneClient, RecordingDialog, etc.</li>
+</ul>
+
+<div class="exercise"><strong>Exercise 10.1:</strong> Create a <code>VoiceCatalog</code> class that wraps the TTS catalog data. It should have methods: <code>get_engines()</code>, <code>get_voices(engine_id)</code>, and <code>find_voice(voice_id)</code>. Include <code>__repr__</code> and <code>__len__</code>.</div>
+
+<hr>
+
+<p style="text-align: center;">
+  <a href="ch09_modules.html">← Ch 9</a> &nbsp;|&nbsp;
+  <strong>End of Part I</strong> &nbsp;|&nbsp;
+  <a href="ch11_oop_advanced.html">Part II — Ch 11: OOP Advanced →</a>
+</p>
+
+</div></div></body>
+</html>

@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 50: Compute Back-end Detection - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part VI</div><ul class="chapters"><li><a href="ch43_architecture.html">Ch 43</a></li><li><a href="ch44_paths_settings.html">Ch 44</a></li><li><a href="ch45_project_model.html">Ch 45</a></li><li><a href="ch46_document_parsing.html">Ch 46</a></li><li><a href="ch47_tts_catalog.html">Ch 47</a></li><li><a href="ch48_tts_engine.html">Ch 48</a></li><li><a href="ch49_downloader.html">Ch 49</a></li><li><a href="ch50_compute_detection.html" class="active">Ch 50: Compute</a></li><li><a href="ch51_main_frame.html">Ch 51</a></li><li><a href="ch52_settings_dialog.html">Ch 52</a></li><li><a href="ch53_model_panels.html">Ch 53</a></li><li><a href="ch54_new_project_wizard.html">Ch 54</a></li><li><a href="ch55_recording.html">Ch 55</a></li><li><a href="ch56_synthesis_worker.html">Ch 56</a></li><li><a href="ch57_clone_engine.html">Ch 57</a></li><li><a href="ch58_omnivoice.html">Ch 58</a></li><li><a href="ch59_daisy_builder.html">Ch 59</a></li><li><a href="ch60_addons.html">Ch 60</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 50</div>
+<h1>Compute Back-end Detection</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand how AIVS detects available compute back-ends</li>
+  <li>See the GPU detection logic and its implications</li>
+  <li>Understand the compute mode resolution</li>
+</ul>
+
+<hr>
+
+<h2>50.1 Compute Modes</h2>
+
+<pre><code><span class="cm"># From compute.py</span>
+COMPUTE_AUTO = <span class="str">"auto"</span>
+COMPUTE_CPU = <span class="str">"cpu"</span>
+COMPUTE_CUDA = <span class="str">"cuda"</span>
+COMPUTE_DML = <span class="str">"dml"</span>  <span class="cm"># DirectML (deprecated)</span>
+
+<span class="kw">def</span> <span class="fn">detect</span>(force=<span class="kw">False</span>) -> dict:
+    <span class="str">"""Detect available compute back-ends."""</span>
+    result = {<span class="str">"cpu"</span>: <span class="kw">True</span>, <span class="str">"cuda"</span>: <span class="kw">False</span>, <span class="str">"dml"</span>: <span class="kw">False</span>}
+
+    <span class="cm"># CUDA requires both NVIDIA GPU AND downloaded runtime</span>
+    <span class="kw">if</span> _has_nvidia_gpu() <span class="kw">and</span> _runtime_installed():
+        result[<span class="str">"cuda"</span>] = <span class="kw">True</span>
+
+    <span class="kw">return</span> result
+
+<span class="kw">def</span> <span class="fn">_has_nvidia_gpu</span>() -> bool:
+    <span class="str">"""Check for NVIDIA GPU via nvidia-smi."""</span>
+    <span class="kw">try</span>:
+        result = subprocess.run(
+            [<span class="str">"nvidia-smi"</span>, <span class="str">"--query-gpu=name"</span>, <span class="str">"--format=csv,noheader"</span>],
+            capture_output=<span class="kw">True</span>, text=<span class="kw">True</span>, timeout=<span class="num">10</span>,
+        )
+        <span class="kw">return</span> result.returncode == <span class="num">0</span> <span class="kw">and</span> bool(result.stdout.strip())
+    <span class="kw">except</span> Exception:
+        <span class="kw">return</span> <span class="kw">False</span>
+
+<span class="kw">def</span> <span class="fn">resolve_compute</span>(mode: str) -> str:
+    <span class="str">"""Resolve 'auto' to the best available mode."""</span>
+    <span class="kw">if</span> mode != COMPUTE_AUTO:
+        <span class="kw">return</span> mode
+    det = detect()
+    <span class="kw">if</span> det[<span class="str">"cuda"</span>]:
+        <span class="kw">return</span> COMPUTE_CUDA
+    <span class="kw">return</span> COMPUTE_CPU
+
+<span class="kw">def</span> <span class="fn">available_compute</span>() -> list[str]:
+    <span class="str">"""Return list of available compute modes."""</span>
+    det = detect()
+    modes = [COMPUTE_CPU]
+    <span class="kw">if</span> det[<span class="str">"cuda"</span>]:
+        modes.append(COMPUTE_CUDA)
+    <span class="kw">return</span> modes
+
+<span class="kw">def</span> <span class="fn">provider_for</span>(mode: str) -> str:
+    <span class="str">"""Map compute mode to sherpa-onnx provider name."""</span>
+    <span class="kw">return</span> {COMPUTE_CUDA: <span class="str">"cuda"</span>, COMPUTE_CPU: <span class="str">"cpu"</span>}.get(mode, <span class="str">"cpu"</span>)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From compute.py</code>
+        <br><span class="desc">A comment indicating the source file: <em>From compute.py</em>. This helps the reader locate the code in the AIVoiceStudio codebase.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>COMPUTE_AUTO = &quot;auto&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;auto&quot;</code> to <code>COMPUTE_AUTO</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>COMPUTE_CPU = &quot;cpu&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;cpu&quot;</code> to <code>COMPUTE_CPU</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>COMPUTE_CUDA = &quot;cuda&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;cuda&quot;</code> to <code>COMPUTE_CUDA</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>COMPUTE_DML = &quot;dml&quot;  # DirectML (deprecated)</code>
+        <br><span class="desc">Assigns <code>&quot;dml&quot;  # DirectML (deprecated)</code> to <code>COMPUTE_DML</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>def detect(force=False) -&gt; dict:</code>
+        <br><span class="desc">Defines function <code>detect</code>: Probes the system for available compute backends. Returns a dict like {'cpu': True, 'cuda': False, 'dml': False}.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>&quot;&quot;&quot;Detect available compute back-ends.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Detect available compute back-ends.</em>. Documents the purpose of the following code block.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>result = {&quot;cpu&quot;: True, &quot;cuda&quot;: False, &quot;dml&quot;: False}</code>
+        <br><span class="desc">Assigns <code>{&quot;cpu&quot;: True, &quot;cuda&quot;: False, &quot;dml&quot;: False}</code> to <code>result</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code># CUDA requires both NVIDIA GPU AND downloaded runtime</code>
+        <br><span class="desc">A comment: <em>CUDA requires both NVIDIA GPU AND downloaded runtime</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>if _has_nvidia_gpu() and _runtime_installed():</code>
+        <br><span class="desc">Checks condition: <code>_has_nvidia_gpu() and _runtime_installed()</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>result[&quot;cuda&quot;] = True</code>
+        <br><span class="desc"><code>result[&quot;cuda&quot;] = True</code></span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>return result</code>
+        <br><span class="desc">Returns <code>result</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>def _has_nvidia_gpu() -&gt; bool:</code>
+        <br><span class="desc">Defines function <code>_has_nvidia_gpu</code>, returning <code>bool</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>&quot;&quot;&quot;Check for NVIDIA GPU via nvidia-smi.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Check for NVIDIA GPU via nvidia-smi.</em>. Documents the purpose of the following code block.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>try:</code>
+        <br><span class="desc">Begins exception handling. Errors in this block will be caught below.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>result = subprocess.run(</code>
+        <br><span class="desc">Assigns <code>subprocess.run(</code> to <code>result</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>[&quot;nvidia-smi&quot;, &quot;--query-gpu=name&quot;, &quot;--format=csv,noheader&quot;],</code>
+        <br><span class="desc"><code>[&quot;nvidia-smi&quot;, &quot;--query-gpu=name&quot;, &quot;--format=csv,noheader&quot;],</code></span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>capture_output=True, text=True, timeout=10,</code>
+        <br><span class="desc">Assigns <code>True, text=True, timeout=10,</code> to <code>capture_output</code>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>return result.returncode == 0 and bool(result.stdout.strip())</code>
+        <br><span class="desc">Returns <code>result.returncode == 0 and bool(result.stdout.strip())</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>except Exception:</code>
+        <br><span class="desc">Catches <code>Exception</code> exceptions.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>return False</code>
+        <br><span class="desc">Returns <code>False</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>def resolve_compute(mode: str) -&gt; str:</code>
+        <br><span class="desc">Defines function <code>resolve_compute</code> accepting parameters (mode), returning <code>str</code>.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>&quot;&quot;&quot;Resolve &#x27;auto&#x27; to the best available mode.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Resolve &#x27;auto&#x27; to the best available mode.</em>. Documents the purpose of the following code block.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>if mode != COMPUTE_AUTO:</code>
+        <br><span class="desc">Checks condition: <code>mode != COMPUTE_AUTO</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>return mode</code>
+        <br><span class="desc">Returns <code>mode</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>det = detect()</code>
+        <br><span class="desc">Assigns <code>detect()</code> to <code>det</code>.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>if det[&quot;cuda&quot;]:</code>
+        <br><span class="desc">Checks condition: <code>det[&quot;cuda&quot;]</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>return COMPUTE_CUDA</code>
+        <br><span class="desc">Returns <code>COMPUTE_CUDA</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code>return COMPUTE_CPU</code>
+        <br><span class="desc">Returns <code>COMPUTE_CPU</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 31:</strong> <code>def available_compute() -&gt; list[str]:</code>
+        <br><span class="desc">Defines function <code>available_compute</code>, returning <code>list[str]</code>.</span>
+      </li>
+      <li>
+        <strong>Line 32:</strong> <code>&quot;&quot;&quot;Return list of available compute modes.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Return list of available compute modes.</em>. Documents the purpose of the following code block.</span>
+      </li>
+      <li>
+        <strong>Line 33:</strong> <code>det = detect()</code>
+        <br><span class="desc">Assigns <code>detect()</code> to <code>det</code>.</span>
+      </li>
+      <li>
+        <strong>Line 34:</strong> <code>modes = [COMPUTE_CPU]</code>
+        <br><span class="desc">Assigns <code>[COMPUTE_CPU]</code> to <code>modes</code>.</span>
+      </li>
+      <li>
+        <strong>Line 35:</strong> <code>if det[&quot;cuda&quot;]:</code>
+        <br><span class="desc">Checks condition: <code>det[&quot;cuda&quot;]</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 36:</strong> <code>modes.append(COMPUTE_CUDA)</code>
+        <br><span class="desc"><code>modes.append(COMPUTE_CUDA)</code></span>
+      </li>
+      <li>
+        <strong>Line 37:</strong> <code>return modes</code>
+        <br><span class="desc">Returns <code>modes</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 38:</strong> <code>def provider_for(mode: str) -&gt; str:</code>
+        <br><span class="desc">Defines function <code>provider_for</code> accepting parameters (mode), returning <code>str</code>.</span>
+      </li>
+      <li>
+        <strong>Line 39:</strong> <code>&quot;&quot;&quot;Map compute mode to sherpa-onnx provider name.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Map compute mode to sherpa-onnx provider name.</em>. Documents the purpose of the following code block.</span>
+      </li>
+      <li>
+        <strong>Line 40:</strong> <code>return {COMPUTE_CUDA: &quot;cuda&quot;, COMPUTE_CPU: &quot;cpu&quot;}.get(mode, &quot;cpu&quot;)</code>
+        <br><span class="desc">Returns <code>{COMPUTE_CUDA: &quot;cuda&quot;, COMPUTE_CPU: &quot;cpu&quot;}.get(mode, &quot;cpu&quot;)</code> to the caller.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>50.2 Two-Step GPU Requirement</h2>
+
+<div class="info">
+  <strong>Key design decision:</strong> Even with an NVIDIA GPU, CUDA compute is NOT
+  offered until the user explicitly downloads the GPU runtime from Settings → Compute.
+  This prevents the app from failing on machines with NVIDIA GPUs but without the
+  required CUDA libraries.
+</div>
+
+<pre><code><span class="cm"># Test from test_compute.py</span>
+<span class="kw">def</span> <span class="fn">test_cuda_not_offered_without_downloaded_runtime</span>():
+    <span class="cm"># Even with NVIDIA GPU, no GPU option until runtime is downloaded</span>
+    self._patch(runtime_installed=<span class="kw">False</span>, nvidia=<span class="kw">True</span>)
+    det = compute.detect(force=<span class="kw">True</span>)
+    self.assertFalse(det[<span class="str">"cuda"</span>])
+    self.assertNotIn(<span class="str">"cuda"</span>, compute.available_compute())</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Test from test_compute.py</code>
+        <br><span class="desc">A comment indicating the source file: <em>Test from test_compute.py</em>. This helps the reader locate the code in the AIVoiceStudio codebase.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def test_cuda_not_offered_without_downloaded_runtime():</code>
+        <br><span class="desc">Defines function <code>test_cuda_not_offered_without_downloaded_runtime</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># Even with NVIDIA GPU, no GPU option until runtime is downloaded</code>
+        <br><span class="desc">A comment: <em>Even with NVIDIA GPU, no GPU option until runtime is downloaded</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>self._patch(runtime_installed=False, nvidia=True)</code>
+        <br><span class="desc">Calls <code>self._patch()</code> to perform an operation.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>det = compute.detect(force=True)</code>
+        <br><span class="desc">Assigns <code>compute.detect(force=True)</code> to <code>det</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>self.assertFalse(det[&quot;cuda&quot;])</code>
+        <br><span class="desc">Calls <code>self.assertFalse()</code> to perform an operation.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>self.assertNotIn(&quot;cuda&quot;, compute.available_compute())</code>
+        <br><span class="desc">Calls <code>self.assertNotIn()</code> to perform an operation.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>50.3 Key Takeaways</h2>
+<ul>
+  <li><strong>GPU detection</strong> uses nvidia-smi subprocess call</li>
+  <li><strong>CUDA requires two conditions</strong>: NVIDIA GPU present AND runtime downloaded</li>
+  <li><strong>resolve_compute("auto")</strong> picks the best available mode</li>
+  <li>The Recording Dialog shows a <strong>CUDA GPU (OmniVoice)</strong> option when NVIDIA is detected</li>
+  <li><strong>DML (DirectML)</strong> is no longer offered</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch49_downloader.html">← Ch 49</a> &nbsp;|&nbsp; <a href="ch51_main_frame.html">Ch 51 — Main Frame →</a></p>
+</div></div></body>
+</html>

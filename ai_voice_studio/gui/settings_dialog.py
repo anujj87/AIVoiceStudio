@@ -878,6 +878,14 @@ class _PunctuationPanel(_SettingsPanel):
         self._populate_voices()
         self._update_example()
 
+    def on_activated(self):
+        """Refresh the preview voice cascade when the category is opened so
+        voices created elsewhere (e.g. the OmniVoice voice library) appear
+        without closing the dialog."""
+        super().on_activated()
+        self._populate_voices()
+        self._update_example()
+
     # -- voice cascade ------------------------------------------------------
     def _populate_voices(self):
         self._voices = self.store.installed_voices()
@@ -895,6 +903,17 @@ class _PunctuationPanel(_SettingsPanel):
                 "reference": voice.get("reference", ""),
                 "xtts_lang": voice.get("language", "en"),
             })
+        # Universal OmniVoice voice library: created voices are engine
+        # agnostic, so register them under every installed OmniVoice engine.
+        try:
+            from ..omnivoice import voice_store  # noqa: PLC0415
+            if voice_store.omni_custom_voices(self.store):
+                installed = voice_store.engine_ids_installed()
+                self._voices.extend(
+                    voice_store.consumer_entries(self.store, installed)
+                )
+        except Exception:  # noqa: BLE001
+            pass
         tts_ids = sorted({v["tts"] for v in self._voices})
         self.tts_combo.Clear()
         for tts_id in tts_ids:
@@ -1195,43 +1214,51 @@ class _DaisySettingsPanel(_SettingsPanel):
 class _OmniVoiceEnginesPanel(_SettingsPanel):
     title = "OmniVoice engines"
     description = (
-        "GPU-accelerated TTS engines: OmniVoice Server (HTTP API), "
-        "Triton (stable), and Hybrid (fast). "
-        "Requires NVIDIA GPU and pip packages installed in Compute tab."
+        "Create reusable OmniVoice voices (voice clone or voice design) that "
+        "work with every OmniVoice engine, and check the engine install status."
     )
 
     """OmniVoice Engines panel.
 
-    Shows all OmniVoice engine variants (Server, Triton, Hybrid) with
-    their features, install status, and preview capability.  Replaces
-    the old XTTS voice clone panel.
+    Two parts:
+
+    1. **Voice library** - create reusable voices by *cloning* a reference
+       sample or by *describing* the voice, then rename / delete / preview
+       them.  The library is universal: one created voice is usable through
+       every OmniVoice engine (direct ``omnivoice`` and ``omnivoice_server``)
+       and appears in Available TTS, Punctuation and the Recording window.
+
+    2. **Engine cards** - the OmniVoice engine variants (Server, Triton,
+       Hybrid) with their features and install status.
     """
+
+    _PREVIEW_DEFAULT = "Welcome to AI Voice Studio. This is a preview of your created voice."
 
     def __init__(self, parent, settings: Settings, store: ModelStore):
         super().__init__(parent)
         self.settings = settings
         self.store = store
         self._thread: threading.Thread | None = None
+        self._preview_sound = None
+        self._library: list = []  # ModelStore custom voices (omni kinds)
+        self._lib_names: list[str] = []  # parallel display list
+        self._installed: list = []  # engine ids with packages installed
 
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(
             wx.StaticText(
                 self,
-                label="GPU-accelerated TTS engines for high-quality voice synthesis."
-                      " OmniVoice supports 600+ languages with voice design."
+                label="Create reusable OmniVoice voices (voice clone or voice design) "
+                      "and check the engine install status.",
             ),
             0, wx.ALL, 6,
         )
-        sizer.Add(
-            wx.StaticText(
-                self,
-                label="Install engines from the Compute tab. Each engine variant "
-                      "has different speed/quality trade-offs."
-            ),
-            0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 6,
-        )
+
+        # -- Voice library (universal, both engines) -----------------------
+        self._build_voice_library(sizer)
 
         # -- Engine cards -------------------------------------------------
+        sizer.Add(wx.StaticLine(self), 0, wx.EXPAND | wx.ALL, 6)
         self._engines = []  # list of dicts for each engine variant
         self._build_engine_cards(sizer)
 
@@ -1256,6 +1283,477 @@ class _OmniVoiceEnginesPanel(_SettingsPanel):
             )
 
         self.SetSizer(sizer)
+        self._refresh_library()
+
+    # ------------------------------------------------------------------ UI
+    def _build_voice_library(self, sizer):
+        """The voice clone / voice design studio with the universal voice list."""
+        from ..omnivoice import voice_store  # noqa: PLC0415
+
+        title = wx.StaticText(self, label="Create a reusable voice")
+        title.SetFont(title.GetFont().Bold())
+        sizer.Add(title, 0, wx.LEFT | wx.RIGHT | wx.TOP, 6)
+        hint = wx.StaticText(
+            self,
+            label="Voices you create here are saved in your voice library and work "
+                  "with every OmniVoice engine - choose the engine that will preview "
+                  "them, then either clone a voice from a short sample or describe one.",
+        )
+        hint.Wrap(640)
+        sizer.Add(hint, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 4)
+
+        # -- engine + mode selectors --------------------------------------
+        grid = wx.FlexGridSizer(cols=2, vgap=6, hgap=8)
+        grid.AddGrowableCol(1)
+        self.engine_combo = wx.ComboBox(self, style=wx.CB_READONLY,
+                                        name="TTS version for voices")
+        for label, engine_id in (
+            ("OmniVoice Server", "omnivoice_server"),
+            ("OmniVoice (direct, Triton)", "omnivoice"),
+        ):
+            self.engine_combo.Append(label, engine_id)
+        self.engine_combo.SetSelection(0)
+        add_labeled(self, grid, "1. TTS version", self.engine_combo,
+                    flag=wx.LEFT | wx.RIGHT, border=2)
+        self.mode_combo = wx.ComboBox(self, style=wx.CB_READONLY,
+                                      name="Voice creation mode")
+        self.mode_combo.Append("Clone a voice from a sample", "clone")
+        self.mode_combo.Append("Describe a new voice", "design")
+        self.mode_combo.SetSelection(0)
+        add_labeled(self, grid, "2. Creation mode", self.mode_combo,
+                    flag=wx.LEFT | wx.RIGHT, border=2)
+        sizer.Add(grid, 0, wx.EXPAND | wx.ALL, 6)
+
+        self.mode_tip = wx.StaticText(self, label="")
+        self.mode_tip.Wrap(640)
+        sizer.Add(self.mode_tip, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 4)
+
+        # -- clone group (sample -> name -> transcript) --------------------
+        # Rows follow the order the user asked for (voice name right after
+        # the sample, with the optional transcript last) so each labelled
+        # box is unambiguous; every row uses one label directly to the
+        # left of its box.
+        self.clone_panel = wx.Panel(self)
+        c_sizer = wx.BoxSizer(wx.VERTICAL)
+
+        # 1) voice sample (file + Browse) ---------------------------------
+        sample_row = wx.FlexGridSizer(cols=2, vgap=6, hgap=8)
+        sample_row.AddGrowableCol(1)
+        self.sample_ctrl = wx.TextCtrl(self.clone_panel)
+        self.sample_ctrl.SetName("Voice sample")
+        sample_box = wx.BoxSizer(wx.HORIZONTAL)
+        sample_box.Add(self.sample_ctrl, 1, wx.EXPAND)
+        browse_btn = wx.Button(self.clone_panel, label="Browse...")
+        browse_btn.SetName("Browse voice sample")
+        sample_box.Add(browse_btn, 0, wx.LEFT, 4)
+        sample_row.Add(
+            wx.StaticText(
+                self.clone_panel,
+                label="Voice sample:",
+            ),
+            0, wx.LEFT | wx.RIGHT | wx.ALIGN_CENTER_VERTICAL, 2,
+        )
+        sample_row.Add(sample_box, 1, wx.EXPAND)
+        c_sizer.Add(sample_row, 0, wx.EXPAND | wx.ALL, 4)
+        sample_hint = wx.StaticText(
+            self.clone_panel,
+            label="3-15 second recording of the voice to copy (WAV/MP3/OGG/FLAC).",
+        )
+        c_sizer.Add(sample_hint, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 4)
+
+        # 2) voice name (+ create) -----------------------------------------
+        name_grid = wx.FlexGridSizer(cols=2, vgap=6, hgap=8)
+        name_grid.AddGrowableCol(1)
+        self.clone_name_ctrl = wx.TextCtrl(self.clone_panel)
+        self.clone_name_ctrl.SetName("Voice name")
+        add_labeled(self.clone_panel, name_grid, "Voice name", self.clone_name_ctrl,
+                    flag=wx.LEFT | wx.RIGHT, border=2)
+        self.clone_create_btn = wx.Button(self.clone_panel, label="Create voice")
+        self.clone_create_btn.SetName("Create clone voice")
+        name_grid.Add(self.clone_create_btn, 0, wx.ALL, 2)
+        c_sizer.Add(name_grid, 0, wx.EXPAND | wx.ALL, 4)
+
+        # 3) optional transcript -------------------------------------------
+        ref_grid = wx.FlexGridSizer(cols=2, vgap=6, hgap=8)
+        ref_grid.AddGrowableCol(1)
+        self.ref_text_ctrl = wx.TextCtrl(self.clone_panel)
+        self.ref_text_ctrl.SetName("Transcript of the sample (optional)")
+        add_labeled(
+            self.clone_panel, ref_grid,
+            "Transcript of the sample (optional)", self.ref_text_ctrl,
+            flag=wx.LEFT | wx.RIGHT, border=2,
+        )
+        c_sizer.Add(ref_grid, 0, wx.EXPAND | wx.ALL, 4)
+        self.clone_status = wx.StaticText(self.clone_panel, label="")
+        self.clone_status.SetName("Clone voice status")
+        c_sizer.Add(self.clone_status, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 4)
+        self.clone_panel.SetSizer(c_sizer)
+        sizer.Add(self.clone_panel, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 2)
+
+        # -- design group (description -> name -> create) ------------------
+        self.design_panel = wx.Panel(self)
+        d_sizer = wx.BoxSizer(wx.VERTICAL)
+        desc_grid = wx.FlexGridSizer(cols=2, vgap=6, hgap=8)
+        desc_grid.AddGrowableCol(1)
+        self.design_desc_ctrl = wx.TextCtrl(
+            self.design_panel, style=wx.TE_MULTILINE, size=(-1, 70),
+            value="female, young adult, british accent",
+        )
+        self.design_desc_ctrl.SetName("Voice description")
+        add_labeled(self.design_panel, desc_grid, "Voice description", self.design_desc_ctrl,
+                    flag=wx.LEFT | wx.RIGHT, border=2)
+        d_sizer.Add(desc_grid, 0, wx.EXPAND | wx.ALL, 4)
+        d_tip = wx.StaticText(
+            self.design_panel,
+            label="Example: female, young adult, british accent. Attributes: "
+                  "male/female, child/teenager/young adult/middle-aged/elderly, "
+                  "pitch levels, whisper, accents (american, british, indian, ...).",
+        )
+        d_tip.Wrap(640)
+        d_sizer.Add(d_tip, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 4)
+        dname_grid = wx.FlexGridSizer(cols=2, vgap=6, hgap=8)
+        dname_grid.AddGrowableCol(1)
+        self.design_name_ctrl = wx.TextCtrl(self.design_panel)
+        self.design_name_ctrl.SetName("Voice name")
+        add_labeled(self.design_panel, dname_grid, "Voice name", self.design_name_ctrl,
+                    flag=wx.LEFT | wx.RIGHT, border=2)
+        self.design_create_btn = wx.Button(self.design_panel, label="Create voice")
+        self.design_create_btn.SetName("Create design voice")
+        dname_grid.Add(self.design_create_btn, 0, wx.ALL, 2)
+        d_sizer.Add(dname_grid, 0, wx.EXPAND | wx.ALL, 4)
+        self.design_status = wx.StaticText(self.design_panel, label="")
+        self.design_status.SetName("Design voice status")
+        d_sizer.Add(self.design_status, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 4)
+        self.design_panel.SetSizer(d_sizer)
+        sizer.Add(self.design_panel, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 2)
+
+        # -- voice library list -------------------------------------------
+        lib_box = wx.StaticBox(self, label="My OmniVoice voices (shared by both engines)")
+        lib = wx.StaticBoxSizer(lib_box, wx.VERTICAL)
+        lib_hint = wx.StaticText(
+            lib_box,
+            label="These voices work with every OmniVoice engine and appear in "
+                  "Available TTS, Punctuation and the Recording window - no matter "
+                  "which TTS version you select.",
+        )
+        lib_hint.Wrap(640)
+        lib.Add(lib_hint, 0, wx.LEFT | wx.RIGHT | wx.TOP, 4)
+        self.voices_list = wx.ListBox(lib_box, size=(-1, 130),
+                                      name="My OmniVoice voices")
+        lib.Add(self.voices_list, 1, wx.EXPAND | wx.ALL, 4)
+
+        action_row = wx.BoxSizer(wx.HORIZONTAL)
+        self.rename_btn = wx.Button(lib_box, label="Rename...")
+        self.rename_btn.SetName("Rename selected voice")
+        self.delete_btn = wx.Button(lib_box, label="Delete")
+        self.delete_btn.SetName("Delete selected voice")
+        action_row.Add(self.rename_btn, 0, wx.ALL, 2)
+        action_row.Add(self.delete_btn, 0, wx.ALL, 2)
+        lib.Add(action_row, 0, wx.LEFT, 2)
+
+        pv_grid = wx.FlexGridSizer(cols=2, vgap=6, hgap=8)
+        pv_grid.AddGrowableCol(1)
+        self.preview_text = wx.TextCtrl(lib_box, value=self._PREVIEW_DEFAULT)
+        self.preview_text.SetName("Preview text")
+        add_labeled(lib_box, pv_grid, "Preview text", self.preview_text,
+                    flag=wx.LEFT | wx.RIGHT, border=2)
+        self.preview_btn = wx.Button(lib_box, label="Preview selected voice")
+        self.preview_btn.SetName("Preview voice library voice")
+        pv_grid.Add(self.preview_btn, 0, wx.ALL, 2)
+        lib.Add(pv_grid, 0, wx.EXPAND | wx.ALL, 4)
+        self.lib_status = wx.StaticText(lib_box, label="")
+        self.lib_status.SetName("Voice library status")
+        lib.Add(self.lib_status, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 4)
+        sizer.Add(lib, 0, wx.EXPAND | wx.ALL, 6)
+
+        # -- events ---------------------------------------------------------
+        self.engine_combo.Bind(wx.EVT_COMBOBOX, self._on_engine_change)
+        self.mode_combo.Bind(wx.EVT_COMBOBOX, self._on_mode_change)
+        browse_btn.Bind(wx.EVT_BUTTON, self._on_browse)
+        self.clone_create_btn.Bind(wx.EVT_BUTTON, lambda _e: self._on_create("clone"))
+        self.design_create_btn.Bind(wx.EVT_BUTTON, lambda _e: self._on_create("design"))
+        self.voices_list.Bind(wx.EVT_LISTBOX, self._on_library_select)
+        self.rename_btn.Bind(wx.EVT_BUTTON, self._on_rename)
+        self.delete_btn.Bind(wx.EVT_BUTTON, self._on_delete)
+        self.preview_btn.Bind(wx.EVT_BUTTON, self._on_preview)
+
+        self.design_panel.Hide()
+        self._on_engine_change(None)
+        self._on_mode_change(None)
+        self.rename_btn.Disable()
+        self.delete_btn.Disable()
+        self.preview_btn.Disable()
+
+    # ------------------------------------------------------------- helpers
+    def _selected_engine_id(self):
+        sel = self.engine_combo.GetSelection()
+        return self.engine_combo.GetClientData(sel) if sel >= 0 else "omnivoice_server"
+
+    def _selected_library_voice(self):
+        sel = self.voices_list.GetSelection()
+        if sel < 0 or sel >= len(self._library):
+            return None
+        return self._library[sel]
+
+    def _refresh_library(self):
+        from ..omnivoice import voice_store  # noqa: PLC0415
+
+        old = self._selected_library_voice()
+        self._library = voice_store.omni_custom_voices(self.store)
+        self._lib_names = [
+            f"{v['name']} — {'clone' if v.get('mode') == 'clone' else 'design'}"
+            for v in self._library
+        ]
+        self.voices_list.Clear()
+        for label in self._lib_names:
+            self.voices_list.Append(label)
+        if old:
+            for index, voice in enumerate(self._library):
+                if voice["name"] == old["name"]:
+                    self.voices_list.SetSelection(index)
+                    break
+        self._on_library_select(None)
+        count = len(self._library)
+        self.lib_status.SetLabel(
+            f"{count} voice{'s' if count != 1 else ''} in your library - shared by "
+            "both OmniVoice engines."
+            if count
+            else "No voices yet. Create one above."
+        )
+
+    def _on_library_select(self, _evt):
+        has = self._selected_library_voice() is not None
+        for btn in (self.rename_btn, self.delete_btn, self.preview_btn):
+            if has:
+                btn.Enable()
+            else:
+                btn.Disable()
+
+    def _on_engine_change(self, _evt):
+        from ..omnivoice import voice_store  # noqa: PLC0415
+
+        engine_id = self._selected_engine_id()
+        label, pkg = voice_store.ENGINE_INFO.get(engine_id, (engine_id, ""))
+        if engine_id in self._installed:
+            tip = f"Preview will use {label} ({pkg} is installed)."
+        else:
+            tip = f"{label} is not installed yet (pip package {pkg}). " \
+                  "Created voices still work with the other engine; install " \
+                  "this one from the Compute tab to preview with it."
+        self.mode_tip.SetLabel(self._mode_tip_text() + "\n" + tip)
+        self.mode_tip.Wrap(640)
+        self.Layout()
+
+    def _mode_tip_text(self):
+        mode = self.mode_combo.GetClientData(self.mode_combo.GetSelection())
+        if mode == "clone":
+            return ("Clone: pick a 3-15 second recording of the voice to copy "
+                    "(the optional transcript improves cloning accuracy).")
+        return ("Design: describe the voice with attributes such as "
+                "'female, young adult, british accent'.")
+
+    def _on_mode_change(self, _evt):
+        mode = self.mode_combo.GetClientData(self.mode_combo.GetSelection())
+        self.clone_panel.Show(mode == "clone")
+        self.design_panel.Show(mode != "clone")
+        self.mode_tip.SetLabel(self._mode_tip_text())
+        self.mode_tip.Wrap(640)
+        self.Layout()
+
+    def _on_browse(self, _evt):
+        dlg = wx.FileDialog(
+            self,
+            "Choose a voice sample",
+            wildcard="Audio files (*.wav;*.mp3;*.flac;*.ogg)|*.wav;*.mp3;*.flac;*.ogg|"
+                     "All files (*.*)|*.*",
+            style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST,
+        )
+        try:
+            if dlg.ShowModal() == wx.ID_OK:
+                self.sample_ctrl.SetValue(dlg.GetPath())
+        finally:
+            dlg.Destroy()
+
+    # -------------------------------------------------------------- actions
+    def _on_create(self, mode: str):
+        from ..omnivoice import voice_store  # noqa: PLC0415
+
+        if mode == "clone":
+            name = self.clone_name_ctrl.GetValue().strip()
+            ref_audio = self.sample_ctrl.GetValue().strip()
+            ref_text = self.ref_text_ctrl.GetValue().strip()
+            instruct = ""
+            status = self.clone_status
+        else:
+            name = self.design_name_ctrl.GetValue().strip()
+            ref_audio = ""
+            ref_text = ""
+            instruct = self.design_desc_ctrl.GetValue().strip()
+            status = self.design_status
+        if not name:
+            wx.MessageBox("Type a voice name first.", "Create voice",
+                          style=wx.OK | wx.ICON_INFORMATION)
+            return
+        if mode == "clone" and (not ref_audio or not os.path.isfile(ref_audio)):
+            wx.MessageBox(
+                "Choose a voice sample file first (Browse...).",
+                "Create voice", style=wx.OK | wx.ICON_INFORMATION,
+            )
+            return
+        try:
+            entry = voice_store.create_voice(
+                self.store, name=name, mode=mode,
+                ref_audio=ref_audio, ref_text=ref_text, instruct=instruct,
+            )
+        except ValueError as exc:
+            status.SetLabel("")
+            wx.MessageBox(str(exc), "Create voice",
+                          style=wx.OK | wx.ICON_ERROR)
+            return
+        # Success: clear the form, refresh and select the new voice.
+        status.SetLabel(
+            f"Voice '{entry['name']}' created - it now works with both "
+            "OmniVoice engines (see the list below)."
+        )
+        if mode == "clone":
+            self.clone_name_ctrl.SetValue("")
+            self.sample_ctrl.SetValue("")
+            self.ref_text_ctrl.SetValue("")
+        else:
+            self.design_name_ctrl.SetValue("")
+        self._refresh_library()
+        for index, voice in enumerate(self._library):
+            if voice["name"] == entry["name"]:
+                self.voices_list.SetSelection(index)
+                break
+        self._on_library_select(None)
+        self.Layout()
+
+    def _on_rename(self, _evt):
+        from ..omnivoice import voice_store  # noqa: PLC0415
+
+        voice = self._selected_library_voice()
+        if not voice:
+            return
+        dlg = wx.TextEntryDialog(
+            self, f"New name for '{voice['name']}':", "Rename voice",
+            value=voice["name"],
+        )
+        try:
+            if dlg.ShowModal() != wx.ID_OK:
+                return
+            new_name = dlg.GetValue().strip()
+        finally:
+            dlg.Destroy()
+        if not new_name or new_name == voice["name"]:
+            return
+        try:
+            renamed = voice_store.rename_voice(self.store, voice["name"], new_name)
+        except ValueError as exc:
+            wx.MessageBox(str(exc), "Rename voice", style=wx.OK | wx.ICON_ERROR)
+            return
+        self._refresh_library()
+        for index, entry in enumerate(self._library):
+            if entry["name"] == renamed["name"]:
+                self.voices_list.SetSelection(index)
+                break
+        self._on_library_select(None)
+        self.lib_status.SetLabel(f"Renamed to '{renamed['name']}'.")
+
+    def _on_delete(self, _evt):
+        from ..omnivoice import voice_store  # noqa: PLC0415
+
+        voice = self._selected_library_voice()
+        if not voice:
+            return
+        answer = wx.MessageBox(
+            f"Delete voice '{voice['name']}'? Its sample audio will also be "
+            "removed from the voice library.",
+            "Delete voice", style=wx.YES_NO | wx.ICON_QUESTION,
+        )
+        if answer != wx.YES:
+            return
+        if voice_store.delete_voice(self.store, voice["name"]):
+            self._refresh_library()
+            self.lib_status.SetLabel(f"Deleted '{voice['name']}'.")
+
+    # -------------------------------------------------------------- preview
+    def _on_preview(self, _evt):
+        from ..omnivoice import voice_store  # noqa: PLC0415
+
+        voice = self._selected_library_voice()
+        if not voice:
+            return
+        engine_id = self._selected_engine_id()
+        label, _pkg = voice_store.ENGINE_INFO.get(engine_id, (engine_id, ""))
+        entry = voice_store.preview_entry(voice, engine_id)
+        text = self.preview_text.GetValue().strip() or self._PREVIEW_DEFAULT
+        self.preview_btn.Disable()
+        self.preview_status_label = label
+        self.lib_status.SetLabel(
+            f"Synthesizing a preview with {label}... (first use loads the "
+            "model and can take a minute or two.)"
+        )
+        threading.Thread(
+            target=self._preview_job, args=(entry, text, label),
+            daemon=True,
+        ).start()
+
+    def _preview_job(self, entry, text, engine_label):
+        from .. import compute  # noqa: PLC0415
+        from ..audio.output import write_wav  # noqa: PLC0415
+        from ..tts.engine import (  # noqa: PLC0415
+            EngineUnavailableError,
+            get_engine,
+            process_punctuation,
+        )
+
+        try:
+            engine = get_engine(
+                entry, provider=compute.provider_for("cuda")
+            )
+            punct = self.settings.get("recording.punctuation", "default")
+            samples = engine.synthesize(
+                process_punctuation(text, punct), sid=0, speed=1.0
+            )
+            import tempfile  # noqa: PLC0415
+
+            fd, tmp = tempfile.mkstemp(prefix="aivs_voice_preview_", suffix=".wav")
+            os.close(fd)
+            write_wav(samples, engine.sample_rate, tmp)
+            wx.CallAfter(self._preview_done, tmp, None, engine_label)
+        except EngineUnavailableError as exc:
+            wx.CallAfter(self._preview_done, None, str(exc), engine_label)
+        except Exception as exc:  # noqa: BLE001
+            wx.CallAfter(self._preview_done, None, f"Preview failed: {exc}", engine_label)
+
+    def _preview_done(self, tmp, error, engine_label):
+        import wx.adv  # noqa: PLC0415
+
+        self.preview_btn.Enable()
+        if error:
+            self.lib_status.SetLabel(error)
+            wx.MessageBox(error, "Preview failed", style=wx.OK | wx.ICON_ERROR)
+            return
+        self._stop_preview_sound()
+        sound = wx.adv.Sound(tmp)
+        if sound.IsOk():
+            # Keep a reference: wxSound must outlive Play(SOUND_ASYNC) or the
+            # preview is cut off before it is heard (garbage collection bug).
+            self._preview_sound = sound
+            sound.Play(wx.adv.SOUND_ASYNC)
+            self.lib_status.SetLabel(f"Playing preview ({engine_label}).")
+        else:
+            self.lib_status.SetLabel("Preview file could not be played.")
+
+    def _stop_preview_sound(self):
+        sound = getattr(self, "_preview_sound", None)
+        if sound is not None:
+            try:
+                sound.Stop()
+            except Exception:  # noqa: BLE001
+                pass
+            self._preview_sound = None
 
     def _build_engine_cards(self, sizer):
         """Build status cards for each OmniVoice engine variant."""
@@ -1354,6 +1852,13 @@ class _OmniVoiceEnginesPanel(_SettingsPanel):
 
     def on_activated(self):
         super().on_activated()
+        from ..omnivoice import voice_store  # noqa: PLC0415
+
+        # Cache which OmniVoice engines are installed and refresh the voice
+        # library (voices can also be created by other panels/windows).
+        self._installed = voice_store.engine_ids_installed()
+        self._refresh_library()
+        self._on_engine_change(None)
         # Refresh install status
         from ..python_runtime import get_runtime  # noqa: PLC0415
         rt = get_runtime()
@@ -1578,6 +2083,9 @@ class _OmniVoiceServerPanel(_SettingsPanel):
 
         sizer.Add(q_grid, 0, wx.EXPAND | wx.ALL, 6)
 
+        # -- Voice profiles (server-stored clones) -------------------------
+        self._build_profiles_ui(sizer)
+
         # -- Info --------------------------------------------------------
         sizer.Add(wx.StaticLine(self), 0, wx.EXPAND | wx.ALL, 6)
         sizer.Add(
@@ -1610,24 +2118,30 @@ class _OmniVoiceServerPanel(_SettingsPanel):
             self.host_ctrl.SetValue("127.0.0.1")
 
     def _refresh_status(self):
-        """Check if the server is running and update the status label."""
+        """Check if the server is running and update the status label and the
+        voice-profile controls."""
+        running = False
         try:
             from ..omnivoice_server import get_server_manager  # noqa: PLC0415
             host = self.host_ctrl.GetValue().strip() or "127.0.0.1"
             port = self.port_ctrl.GetValue()
             mgr = get_server_manager(host=host, port=port)
-            if mgr.is_running:
-                self.status_label.SetLabel(f"Server status: Running at http://{host}:{port}")
-                self.start_btn.Disable()
-                self.stop_btn.Enable()
-            else:
-                self.status_label.SetLabel("Server status: Not running")
-                self.start_btn.Enable()
-                self.stop_btn.Disable()
+            running = bool(mgr.is_running)
         except Exception:  # noqa: BLE001
+            running = False
+        if running:
+            host = self.host_ctrl.GetValue().strip() or "127.0.0.1"
+            port = self.port_ctrl.GetValue()
+            self.status_label.SetLabel(f"Server status: Running at http://{host}:{port}")
+            self.start_btn.Disable()
+            self.stop_btn.Enable()
+        else:
             self.status_label.SetLabel("Server status: Not running")
             self.start_btn.Enable()
             self.stop_btn.Disable()
+        self._set_profiles_enabled(running)
+        if running:
+            self._on_refresh_profiles(None)
 
     def _on_start(self, _):
         """Start the OmniVoice server in a background thread."""
@@ -1661,7 +2175,11 @@ class _OmniVoiceServerPanel(_SettingsPanel):
         self.status_label.SetLabel(f"Server status: {message}")
         self.start_btn.Enable(not success)
         self.stop_btn.Enable(success)
-        if not success:
+        if success:
+            self._set_profiles_enabled(True)
+            self._on_refresh_profiles(None)
+        else:
+            self._set_profiles_enabled(False)
             wx.MessageBox(message, "OmniVoice Server",
                           style=wx.OK | wx.ICON_ERROR)
 
@@ -1674,6 +2192,7 @@ class _OmniVoiceServerPanel(_SettingsPanel):
             self.status_label.SetLabel("Server status: Stopped")
             self.start_btn.Enable()
             self.stop_btn.Disable()
+            self._set_profiles_enabled(False)
         except Exception as exc:  # noqa: BLE001
             self.status_label.SetLabel(f"Server status: Error stopping: {exc}")
 
@@ -1707,6 +2226,284 @@ class _OmniVoiceServerPanel(_SettingsPanel):
                 "Server test failed",
                 style=wx.OK | wx.ICON_ERROR,
             )
+
+    # -- Voice profiles (server-stored clones) ------------------------------
+
+    def _build_profiles_ui(self, sizer):
+        """Build the "Voice profiles" section (list / create / delete)."""
+        self._profiles: list = []
+        box = wx.StaticBoxSizer(
+            wx.StaticBox(self, label="Voice profiles (clones stored on the server)"),
+            wx.VERTICAL,
+        )
+        box.Add(
+            wx.StaticText(
+                box.GetStaticBox(),
+                label="Profiles save a cloned voice (reference audio) on the server so any "
+                      "app on the network can reuse it by profile id. For recordings in this "
+                      "studio you can also clone per project from the Recording window's "
+                      "OmniVoice voice options.",
+            ),
+            0, wx.LEFT | wx.RIGHT | wx.TOP, 6,
+        )
+
+        # -- create row ----------------------------------------------------
+        grid = wx.FlexGridSizer(cols=2, vgap=6, hgap=8)
+        grid.AddGrowableCol(1)
+
+        self.profile_id_ctrl = wx.TextCtrl(box.GetStaticBox())
+        self.profile_id_ctrl.SetName("Profile id")
+        self.profile_id_ctrl.SetToolTip(
+            "Unique profile id (letters, digits, dashes, underscores), e.g. "
+            "my_narrator."
+        )
+        add_labeled(box.GetStaticBox(), grid, "Profile id", self.profile_id_ctrl,
+                    flag=wx.LEFT | wx.RIGHT, border=2)
+
+        self.profile_audio_ctrl = wx.TextCtrl(box.GetStaticBox())
+        self.profile_audio_ctrl.SetName("Reference audio")
+        browse_btn = wx.Button(box.GetStaticBox(), label="Browse...")
+        browse_btn.SetName("Browse reference audio for profile")
+        browse_btn.Bind(wx.EVT_BUTTON, lambda _e: self._on_profile_browse())
+        audio_box = wx.BoxSizer(wx.HORIZONTAL)
+        audio_box.Add(self.profile_audio_ctrl, 1, wx.EXPAND)
+        audio_box.Add(browse_btn, 0, wx.LEFT, 4)
+        grid.Add(
+            wx.StaticText(box.GetStaticBox(), label="Reference audio:"),
+            0, wx.LEFT | wx.RIGHT | wx.ALIGN_CENTER_VERTICAL, 2,
+        )
+        grid.Add(audio_box, 1, wx.EXPAND)
+
+        self.profile_ref_text_ctrl = wx.TextCtrl(box.GetStaticBox())
+        self.profile_ref_text_ctrl.SetName("Reference text")
+        self.profile_ref_text_ctrl.SetToolTip(
+            "Transcript of the sample (optional; empty lets the engine "
+            "auto-transcribe)."
+        )
+        add_labeled(box.GetStaticBox(), grid, "Reference text",
+                    self.profile_ref_text_ctrl, flag=wx.LEFT | wx.RIGHT, border=2)
+
+        self.profile_overwrite_cb = wx.CheckBox(
+            box.GetStaticBox(), label="Overwrite if the id already exists"
+        )
+        self.profile_overwrite_cb.SetName("Overwrite existing profile")
+        grid.Add((1, 1))
+        grid.Add(self.profile_overwrite_cb, 0, wx.ALL, 2)
+
+        box.Add(grid, 0, wx.EXPAND | wx.ALL, 4)
+        self.add_profile_btn = wx.Button(box.GetStaticBox(), label="Add profile")
+        self.add_profile_btn.SetName("Add voice profile")
+        self.add_profile_btn.SetToolTip(
+            "Save the reference audio as a named profile on the server."
+        )
+        box.Add(self.add_profile_btn, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 6)
+
+        # -- list row -------------------------------------------------------
+        self.profile_list = wx.ListCtrl(
+            box.GetStaticBox(),
+            style=wx.LC_REPORT | wx.LC_SINGLE_SEL,
+            size=(-1, 120),
+        )
+        self.profile_list.SetName("Voice profiles on server")
+        self.profile_list.InsertColumn(0, "Profile id", width=200)
+        self.profile_list.InsertColumn(1, "Description", width=320)
+        box.Add(self.profile_list, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, 6)
+
+        row = wx.BoxSizer(wx.HORIZONTAL)
+        self.refresh_profiles_btn = wx.Button(box.GetStaticBox(), label="Refresh list")
+        self.refresh_profiles_btn.SetName("Refresh voice profiles")
+        self.delete_profile_btn = wx.Button(box.GetStaticBox(), label="Delete selected")
+        self.delete_profile_btn.SetName("Delete selected voice profile")
+        row.Add(self.refresh_profiles_btn, 0, wx.ALL, 4)
+        row.Add(self.delete_profile_btn, 0, wx.ALL, 4)
+        self.profiles_status = wx.StaticText(box.GetStaticBox(), label="")
+        self.profiles_status.SetName("Voice profiles status")
+        row.Add(self.profiles_status, 1, wx.ALL | wx.ALIGN_CENTER_VERTICAL, 4)
+        box.Add(row, 0, wx.EXPAND | wx.LEFT, 2)
+
+        sizer.Add(box, 0, wx.EXPAND | wx.ALL, 6)
+
+        self.add_profile_btn.Bind(wx.EVT_BUTTON, self._on_add_profile)
+        self.refresh_profiles_btn.Bind(wx.EVT_BUTTON, lambda _e: self._on_refresh_profiles(None))
+        self.delete_profile_btn.Bind(wx.EVT_BUTTON, self._on_delete_profile)
+        self.profile_list.Bind(wx.EVT_LIST_ITEM_SELECTED, self._on_profile_selected)
+        self.profile_list.Bind(wx.EVT_LIST_ITEM_DESELECTED, self._on_profile_selected)
+
+    def _server_manager(self):
+        """Manager for the currently configured host/port (as other methods
+        on this panel resolve it)."""
+        from ..omnivoice_server import get_server_manager  # noqa: PLC0415
+        host = self.host_ctrl.GetValue().strip() or "127.0.0.1"
+        port = self.port_ctrl.GetValue()
+        return get_server_manager(host=host, port=port)
+
+    def _selected_profile_id(self):
+        sel = self.profile_list.GetFirstSelected()
+        if sel < 0 or sel >= len(self._profiles):
+            return None
+        return self._profiles[sel].get("profile_id")
+
+    def _set_profiles_enabled(self, running: bool):
+        """Enable/disable the profile controls depending on the server."""
+        self.add_profile_btn.Enable(running)
+        self.refresh_profiles_btn.Enable(running)
+        self.delete_profile_btn.Enable(
+            running and self._selected_profile_id() is not None
+        )
+        if not running:
+            self.profile_list.DeleteAllItems()
+            self._profiles = []
+            self.profiles_status.SetLabel(
+                "Start the server to manage voice profiles."
+            )
+
+    def _on_profile_selected(self, _):
+        self.delete_profile_btn.Enable(
+            self._selected_profile_id() is not None
+        )
+
+    def _on_profile_browse(self):
+        with wx.FileDialog(
+            self,
+            "Choose the reference voice sample (3-15 seconds)",
+            wildcard="Audio files (*.wav;*.mp3;*.flac;*.ogg;*.m4a;*.aac)|"
+                     "*.wav;*.mp3;*.flac;*.ogg;*.m4a;*.aac|All files (*.*)|*.*",
+            style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST,
+        ) as dlg:
+            if dlg.ShowModal() == wx.ID_OK:
+                self.profile_audio_ctrl.SetValue(dlg.GetPath())
+
+    def _on_refresh_profiles(self, _):
+        """Fetch the profile list from the server (background thread)."""
+        self.refresh_profiles_btn.Disable()
+        self.profiles_status.SetLabel("Refreshing profiles...")
+        threading.Thread(target=self._refresh_profiles_job, daemon=True).start()
+
+    def _refresh_profiles_job(self):
+        try:
+            mgr = self._server_manager()
+            entries = mgr.list_profiles()
+            wx.CallAfter(self._profiles_loaded, entries, None)
+        except Exception as exc:  # noqa: BLE001
+            wx.CallAfter(self._profiles_loaded, None, str(exc))
+
+    def _profiles_loaded(self, entries, error):
+        self.refresh_profiles_btn.Enable(True)
+        self._profiles = [e for e in (entries or []) if e.get("profile_id")]
+        self.profile_list.DeleteAllItems()
+        for i, entry in enumerate(self._profiles):
+            self.profile_list.InsertItem(i, entry.get("profile_id", ""))
+            self.profile_list.SetItem(i, 1, entry.get("description") or "")
+        if error:
+            self.profiles_status.SetLabel("Could not load profiles.")
+            wx.MessageBox(
+                f"Could not load voice profiles: {error}",
+                "OmniVoice profiles", style=wx.OK | wx.ICON_ERROR,
+            )
+        else:
+            self.profiles_status.SetLabel(
+                f"{len(self._profiles)} profile(s) stored on the server."
+            )
+        self.delete_profile_btn.Enable(
+            self._selected_profile_id() is not None
+        )
+
+    def _on_add_profile(self, _):
+        """Save the reference audio as a named profile on the server."""
+        import re  # noqa: PLC0415
+
+        profile_id = self.profile_id_ctrl.GetValue().strip()
+        if not profile_id:
+            wx.MessageBox("Enter a profile id first.", "Add voice profile",
+                          style=wx.OK | wx.ICON_INFORMATION)
+            return
+        if not re.fullmatch(r"[A-Za-z0-9_-]+", profile_id):
+            wx.MessageBox(
+                "Profile ids may contain letters, digits, dashes and "
+                "underscores only.",
+                "Add voice profile", style=wx.OK | wx.ICON_INFORMATION,
+            )
+            return
+        ref_audio = self.profile_audio_ctrl.GetValue().strip()
+        if not ref_audio or not os.path.isfile(ref_audio):
+            wx.MessageBox(
+                "Choose a reference audio file for the profile first.",
+                "Add voice profile", style=wx.OK | wx.ICON_INFORMATION,
+            )
+            return
+        self.add_profile_btn.Disable()
+        self.profiles_status.SetLabel(f"Saving profile '{profile_id}'...")
+        threading.Thread(
+            target=self._add_profile_job,
+            args=(profile_id, ref_audio,
+                  self.profile_ref_text_ctrl.GetValue().strip(),
+                  self.profile_overwrite_cb.GetValue()),
+            daemon=True,
+        ).start()
+
+    def _add_profile_job(self, profile_id, ref_audio, ref_text, overwrite):
+        try:
+            mgr = self._server_manager()
+            mgr.save_profile(
+                profile_id=profile_id,
+                ref_audio_path=ref_audio,
+                ref_text=ref_text,
+                overwrite=bool(overwrite),
+            )
+            wx.CallAfter(self._profile_saved, profile_id, None)
+        except Exception as exc:  # noqa: BLE001
+            wx.CallAfter(self._profile_saved, profile_id, str(exc))
+
+    def _profile_saved(self, profile_id, error):
+        self.add_profile_btn.Enable(True)
+        if error:
+            self.profiles_status.SetLabel("Could not save the profile.")
+            wx.MessageBox(
+                f"Could not save profile '{profile_id}': {error}",
+                "OmniVoice profiles", style=wx.OK | wx.ICON_ERROR,
+            )
+            return
+        self.profile_id_ctrl.SetValue("")
+        self.profile_audio_ctrl.SetValue("")
+        self.profile_ref_text_ctrl.SetValue("")
+        self.profiles_status.SetLabel(f"Profile '{profile_id}' saved.")
+        self._on_refresh_profiles(None)
+
+    def _on_delete_profile(self, _):
+        """Delete the selected profile from the server."""
+        profile_id = self._selected_profile_id()
+        if not profile_id:
+            return
+        if wx.MessageBox(
+            f"Delete the voice profile '{profile_id}' from the server?",
+            "Delete voice profile",
+            style=wx.YES_NO | wx.ICON_QUESTION,
+        ) != wx.YES:
+            return
+        self.delete_profile_btn.Disable()
+        self.profiles_status.SetLabel(f"Deleting profile '{profile_id}'...")
+        threading.Thread(
+            target=self._delete_profile_job, args=(profile_id,), daemon=True
+        ).start()
+
+    def _delete_profile_job(self, profile_id):
+        try:
+            mgr = self._server_manager()
+            ok = mgr.delete_profile(profile_id)
+            wx.CallAfter(self._profile_deleted, profile_id, None if ok else "not found")
+        except Exception as exc:  # noqa: BLE001
+            wx.CallAfter(self._profile_deleted, profile_id, str(exc))
+
+    def _profile_deleted(self, profile_id, error):
+        if error:
+            self.profiles_status.SetLabel("Could not delete the profile.")
+            wx.MessageBox(
+                f"Could not delete profile '{profile_id}': {error}",
+                "OmniVoice profiles", style=wx.OK | wx.ICON_ERROR,
+            )
+            return
+        self.profiles_status.SetLabel(f"Profile '{profile_id}' deleted.")
+        self._on_refresh_profiles(None)
 
     def apply_to_settings(self):
         """Save server settings."""

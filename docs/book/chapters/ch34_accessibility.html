@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 34: Accessibility (a11y) - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part IV</div><ul class="chapters"><li><a href="ch27_wxpython_intro.html">Ch 27</a></li><li><a href="ch28_sizers_layout.html">Ch 28</a></li><li><a href="ch29_controls.html">Ch 29</a></li><li><a href="ch30_events.html">Ch 30</a></li><li><a href="ch31_dialogs.html">Ch 31</a></li><li><a href="ch32_custom_drawing.html">Ch 32</a></li><li><a href="ch33_threading_gui.html">Ch 33</a></li><li><a href="ch34_accessibility.html" class="active">Ch 34: Accessibility</a></li><li><a href="ch35_themes.html">Ch 35</a></li><li><a href="ch36_wx_adv.html">Ch 36</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 34</div>
+<h1>Accessibility (a11y)</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand why accessibility matters in desktop apps</li>
+  <li>Make wxPython apps accessible with SetName() and proper labels</li>
+  <li>See the AIVS a11y helper system</li>
+</ul>
+
+<hr>
+
+<h2>34.1 What Is Accessibility?</h2>
+
+<p>
+  Accessibility (a11y) ensures that people with disabilities can use your software.
+  For a <strong>text-to-speech application</strong> like AIVS, this is especially
+  important because many users rely on screen readers (NVDA, JAWS, Narrator).
+</p>
+
+<hr>
+
+<h2>34.2 wxPython Accessibility Basics</h2>
+
+<pre><code><span class="cm"># Every control needs a readable name for screen readers</span>
+button = wx.Button(parent, label=<span class="str">"Start recording"</span>)
+button.SetName(<span class="str">"Start recording"</span>)  <span class="cm"># MSAA/UIA accessible name</span>
+
+<span class="cm"># Text controls should be read-only and have clear names</span>
+text = wx.TextCtrl(
+    parent,
+    style=wx.TE_MULTILINE | wx.TE_READONLY,
+    size=(-<span class="num">1</span>, <span class="num">130</span>),
+)
+text.SetName(<span class="str">"Text to record"</span>)
+text.SetToolTip(<span class="str">"Read-only preview of the text that will be synthesized"</span>)
+
+<span class="cm"># ComboBoxes need accessible names</span>
+combo = wx.ComboBox(parent, style=wx.CB_READONLY)
+combo.SetName(<span class="str">"Select TTS engine"</span>)
+
+<span class="cm"># Announce state changes</span>
+self.status = wx.StaticText(self, label=<span class="str">"Ready."</span>)
+self.status.SetName(<span class="str">"Recording status"</span>)
+self.status.SetToolTip(<span class="str">"Current status of the recording process"</span>)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Every control needs a readable name for screen readers</code>
+        <br><span class="desc">A comment: <em>Every control needs a readable name for screen readers</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>button = wx.Button(parent, label=&quot;Start recording&quot;)</code>
+        <br><span class="desc">Creates a clickable push button. The most common way to trigger user actions.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>button.SetName(&quot;Start recording&quot;)  # MSAA/UIA accessible name</code>
+        <br><span class="desc"><code>button.SetName(&quot;Start recording&quot;)  # MSAA/UIA accessible name</code></span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># Text controls should be read-only and have clear names</code>
+        <br><span class="desc">A comment: <em>Text controls should be read-only and have clear names</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>text = wx.TextCtrl(</code>
+        <br><span class="desc">Creates a text input control. Can be single-line (for paths) or multi-line (for text display).</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>parent,</code>
+        <br><span class="desc"><code>parent,</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>style=wx.TE_MULTILINE | wx.TE_READONLY,</code>
+        <br><span class="desc">TextCtrl style: enables multi-line text input.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>size=(-1, 130),</code>
+        <br><span class="desc">Assigns <code>(-1, 130),</code> to <code>size</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>text.SetName(&quot;Text to record&quot;)</code>
+        <br><span class="desc"><code>text.SetName(&quot;Text to record&quot;)</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>text.SetToolTip(&quot;Read-only preview of the text that will be synthesized&quot;)</code>
+        <br><span class="desc"><code>text.SetToolTip(&quot;Read-only preview of the text that will be synthesized&quot;)</code></span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code># ComboBoxes need accessible names</code>
+        <br><span class="desc">A comment: <em>ComboBoxes need accessible names</em>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>combo = wx.ComboBox(parent, style=wx.CB_READONLY)</code>
+        <br><span class="desc">ComboBox style: prevents typing custom values.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>combo.SetName(&quot;Select TTS engine&quot;)</code>
+        <br><span class="desc"><code>combo.SetName(&quot;Select TTS engine&quot;)</code></span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code># Announce state changes</code>
+        <br><span class="desc">A comment: <em>Announce state changes</em>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>self.status = wx.StaticText(self, label=&quot;Ready.&quot;)</code>
+        <br><span class="desc">Creates a non-editable text label.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>self.status.SetName(&quot;Recording status&quot;)</code>
+        <br><span class="desc"><code>self.status.SetName(&quot;Recording status&quot;)</code></span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>self.status.SetToolTip(&quot;Current status of the recording process&quot;)</code>
+        <br><span class="desc"><code>self.status.SetToolTip(&quot;Current status of the recording process&quot;)</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>34.3 AIVS a11y Helper</h2>
+
+<pre><code><span class="cm"># From gui/a11y.py</span>
+<span class="kw">def</span> <span class="fn">add_labeled</span>(parent, sizer, label_text, control, **kwargs):
+    <span class="str">"""Add a label-control pair with screen reader support."""</span>
+    label = wx.StaticText(parent, label=label_text + <span class="str">":"</span>)
+    _tint(label)  <span class="cm"># Apply theme colors</span>
+    sizer.Add(label, <span class="num">0</span>, wx.ALIGN_CENTER_VERTICAL | wx.ALL, <span class="num">4</span>)
+    control.SetName(label_text)  <span class="cm"># Set accessible name</span>
+    sizer.Add(control, <span class="num">1</span>, wx.EXPAND | wx.ALL, <span class="num">4</span>)
+    <span class="kw">return</span> label
+
+<span class="kw">def</span> <span class="fn">add_check</span>(parent, sizer, label_text, checked=<span class="kw">False</span>):
+    <span class="str">"""CheckBox with accessible name."""</span>
+    box = wx.CheckBox(parent, label=label_text)
+    box.SetValue(checked)
+    box.SetName(label_text)
+    sizer.Add(box, <span class="num">0</span>, wx.ALL, <span class="num">4</span>)
+    <span class="kw">return</span> box
+
+<span class="kw">def</span> <span class="fn">set_accessible_name</span>(control, name):
+    control.SetName(name)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From gui/a11y.py</code>
+        <br><span class="desc">A comment: <em>From gui/a11y.py</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def add_labeled(parent, sizer, label_text, control, **kwargs):</code>
+        <br><span class="desc">Defines function <code>add_labeled</code> accepting (parent, sizer, label_text, control, ...).</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;&quot;&quot;Add a label-control pair with screen reader support.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Add a label-control pair with screen reader support.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>label = wx.StaticText(parent, label=label_text + &quot;:&quot;)</code>
+        <br><span class="desc">Creates a non-editable text label.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>_tint(label)  # Apply theme colors</code>
+        <br><span class="desc">Converts a value to an integer. Truncates floats toward zero. Raises ValueError for invalid strings.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>sizer.Add(label, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 4)</code>
+        <br><span class="desc">Flag: centers the widget vertically.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>control.SetName(label_text)  # Set accessible name</code>
+        <br><span class="desc"><code>control.SetName(label_text)  # Set accessible name</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>sizer.Add(control, 1, wx.EXPAND | wx.ALL, 4)</code>
+        <br><span class="desc">Adds a child window to the sizer. Parameters: window, proportion, flags, border. Flags control alignment and padding.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>return label</code>
+        <br><span class="desc">Returns <code>label</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>def add_check(parent, sizer, label_text, checked=False):</code>
+        <br><span class="desc">Defines function <code>add_check</code> accepting (parent, sizer, label_text, checked).</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>&quot;&quot;&quot;CheckBox with accessible name.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>CheckBox with accessible name.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>box = wx.CheckBox(parent, label=label_text)</code>
+        <br><span class="desc">Creates a check box toggle. Returns True when checked, False when unchecked.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>box.SetValue(checked)</code>
+        <br><span class="desc"><code>box.SetValue(checked)</code></span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>box.SetName(label_text)</code>
+        <br><span class="desc"><code>box.SetName(label_text)</code></span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>sizer.Add(box, 0, wx.ALL, 4)</code>
+        <br><span class="desc">Adds a child window to the sizer. Parameters: window, proportion, flags, border. Flags control alignment and padding.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>return box</code>
+        <br><span class="desc">Returns <code>box</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>def set_accessible_name(control, name):</code>
+        <br><span class="desc">Defines function <code>set_accessible_name</code> accepting (control, name).</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>control.SetName(name)</code>
+        <br><span class="desc"><code>control.SetName(name)</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>34.4 Tab Order and Focus</h2>
+
+<pre><code><span class="cm"># Tab order follows creation order in the sizer</span>
+<span class="cm"># AIVS puts the text preview first so screen readers</span>
+<span class="cm"># announce the content before the controls</span>
+
+<span class="cm"># Announce page changes in wizards</span>
+<span class="kw">def</span> <span class="fn">_on_page_changed</span>(self, evt):
+    page = evt.GetPage()
+    <span class="kw">if</span> evt.GetDirection():  <span class="cm"># Forward</span>
+        <span class="kw">if</span> page <span class="kw">is</span> self.page_details:
+            self.page_details.name_ctrl.SetFocus()
+    evt.Skip()
+
+<span class="cm"># Set initial focus when dialogs open</span>
+self.SetName(<span class="str">f"Recording: </span>{project_name}<span class="str">"</span>)
+wx.CallAfter(self.text_preview.SetFocus)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Tab order follows creation order in the sizer</code>
+        <br><span class="desc">A comment: <em>Tab order follows creation order in the sizer</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># AIVS puts the text preview first so screen readers</code>
+        <br><span class="desc">A comment: <em>AIVS puts the text preview first so screen readers</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># announce the content before the controls</code>
+        <br><span class="desc">A comment: <em>announce the content before the controls</em>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># Announce page changes in wizards</code>
+        <br><span class="desc">A comment: <em>Announce page changes in wizards</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>def _on_page_changed(self, evt):</code>
+        <br><span class="desc">Defines function <code>_on_page_changed</code> accepting (self, evt).</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>page = evt.GetPage()</code>
+        <br><span class="desc">Assigns <code>evt.GetPage()</code> to <code>page</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>if evt.GetDirection():  # Forward</code>
+        <br><span class="desc">Checks condition: <code>evt.GetDirection()</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>if page is self.page_details:</code>
+        <br><span class="desc">Checks condition: <code>page is self.page_details</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>self.page_details.name_ctrl.SetFocus()</code>
+        <br><span class="desc"><code>self.page_details.name_ctrl.SetFocus()</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>evt.Skip()</code>
+        <br><span class="desc"><code>evt.Skip()</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># Set initial focus when dialogs open</code>
+        <br><span class="desc">A comment: <em>Set initial focus when dialogs open</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>self.SetName(f&quot;Recording: {project_name}&quot;)</code>
+        <br><span class="desc">Calls <code>self.SetName()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>wx.CallAfter(self.text_preview.SetFocus)</code>
+        <br><span class="desc">Schedules a function to run on the main thread after the current event handler. Essential for thread-safe GUI updates.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>34.5 Key Takeaways</h2>
+<ul>
+  <li><strong>SetName()</strong> is the most important accessibility method — it provides the screen reader label</li>
+  <li>Every interactive control needs a <strong>descriptive name</strong></li>
+  <li><strong>Tab order</strong> should be logical (content first, then controls)</li>
+  <li>AIVS has a dedicated <strong>a11y.py</strong> module with helpers for accessible controls</li>
+  <li>The AIVS project was designed with accessibility as a <strong>core requirement</strong></li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch33_threading_gui.html">← Ch 33</a> &nbsp;|&nbsp; <a href="ch35_themes.html">Ch 35 — Theming →</a></p>
+</div></div></body>
+</html>

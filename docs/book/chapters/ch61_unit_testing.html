@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 61: Unit Testing Strategies - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part VII — Testing</div><ul class="chapters"><li><a href="ch61_unit_testing.html" class="active">Ch 61: Unit Testing</a></li><li><a href="ch62_mocking.html">Ch 62</a></li><li><a href="ch63_integration.html">Ch 63</a></li><li><a href="ch64_pyinstaller.html">Ch 64</a></li><li><a href="ch65_inno_setup.html">Ch 65</a></li><li><a href="ch66_ci_cd.html">Ch 66</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="part-divider">
+  <div class="part-number">Part VII</div>
+  <h2>Testing, Packaging &amp; Deployment</h2>
+</div>
+
+<div class="chapter-number">Chapter 61</div>
+<h1>Unit Testing Strategies</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand the AIVS testing philosophy</li>
+  <li>Learn what makes a good test</li>
+  <li>See the complete test suite structure</li>
+</ul>
+
+<hr>
+
+<h2>61.1 AIVS Test Suite Overview</h2>
+
+<table>
+  <thead><tr><th>Test File</th><th>Tests</th><th>Strategy</th></tr></thead>
+  <tbody>
+    <tr><td><code>test_catalog.py</code></td><td>14</td><td>Validate data structure integrity</td></tr>
+    <tr><td><code>test_compute.py</code></td><td>6</td><td>Mock GPU detection, verify logic</td></tr>
+    <tr><td><code>test_engine.py</code></td><td>8</td><td>Mock sherpa-onnx, test post-processing</td></tr>
+    <tr><td><code>test_parsers.py</code></td><td>12</td><td>Create temp files, parse and verify</td></tr>
+    <tr><td><code>test_project.py</code></td><td>10</td><td>Temp dirs, save/load cycle</td></tr>
+    <tr><td><code>test_splitter.py</code></td><td>15</td><td>Create Document objects, verify splits</td></tr>
+    <tr><td><code>test_settings.py</code></td><td>8</td><td>Temp file, dot-notation access</td></tr>
+    <tr><td><code>test_paths.py</code></td><td>7</td><td>Verify path resolution</td></tr>
+    <tr><td><code>test_gui_smoke.py</code></td><td>6</td><td>Create wx objects, verify no crash</td></tr>
+    <tr><td><code>test_runtime.py</code></td><td>5</td><td>Temp venv, run_in_env</td></tr>
+    <tr><td><code>test_clone.py</code></td><td>4</td><td>Mock subprocess, test protocol</td></tr>
+    <tr><td><code>test_daisy.py</code></td><td>4</td><td>Generate DAISY structure, verify files</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h2>61.2 Test Categories</h2>
+
+<h3>Data Validation Tests</h3>
+<pre><code><span class="cm"># Verify catalog structure integrity</span>
+<span class="kw">def</span> <span class="fn">test_every_voice_has_id_and_name</span>():
+    <span class="kw">for</span> tts <span class="kw">in</span> catalog.get_tts_list():
+        <span class="kw">for</span> lang <span class="kw">in</span> tts.get(<span class="str">"languages"</span>, []):
+            <span class="kw">for</span> variant <span class="kw">in</span> lang.get(<span class="str">"variants"</span>, []):
+                <span class="kw">for</span> voice <span class="kw">in</span> variant.get(<span class="str">"voices"</span>, []):
+                    <span class="kw">assert</span> voice[<span class="str">"id"</span>], <span class="str">"Voice must have an id"</span>
+                    <span class="kw">assert</span> voice.get(<span class="str">"name"</span>), <span class="str">"Voice must have a name"</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Verify catalog structure integrity</code>
+        <br><span class="desc">A comment: <em>Verify catalog structure integrity</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def test_every_voice_has_id_and_name():</code>
+        <br><span class="desc">Test function. pytest discovers functions prefixed with 'test_'.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>for tts in catalog.get_tts_list():</code>
+        <br><span class="desc">For loop iteration.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>for lang in tts.get(&quot;languages&quot;, []):</code>
+        <br><span class="desc">For loop iteration.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>for variant in lang.get(&quot;variants&quot;, []):</code>
+        <br><span class="desc">For loop iteration.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>for voice in variant.get(&quot;voices&quot;, []):</code>
+        <br><span class="desc">For loop iteration.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>assert voice[&quot;id&quot;], &quot;Voice must have an id&quot;</code>
+        <br><span class="desc">Assertion that verifies a condition is True.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>assert voice.get(&quot;name&quot;), &quot;Voice must have a name&quot;</code>
+        <br><span class="desc">Assertion that verifies a condition is True.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>Unit Tests with Mocking</h3>
+<pre><code><span class="cm"># Test compute detection without real GPU</span>
+<span class="kw">def</span> <span class="fn">test_cuda_offered_with_runtime_and_gpu</span>():
+    self._patch(runtime_installed=<span class="kw">True</span>, nvidia=<span class="kw">True</span>)
+    det = compute.detect(force=<span class="kw">True</span>)
+    <span class="kw">assert</span> det[<span class="str">"cuda"</span>] <span class="kw">is</span> <span class="kw">True</span>
+    <span class="kw">assert</span> <span class="str">"cuda"</span> <span class="kw">in</span> compute.available_compute()</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Test compute detection without real GPU</code>
+        <br><span class="desc">A comment: <em>Test compute detection without real GPU</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def test_cuda_offered_with_runtime_and_gpu():</code>
+        <br><span class="desc">Test function. pytest discovers functions prefixed with 'test_'.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>self._patch(runtime_installed=True, nvidia=True)</code>
+        <br><span class="desc">Context manager that replaces a name with a Mock. Use 'as' to get the mock reference.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>det = compute.detect(force=True)</code>
+        <br><span class="desc">Assigns <code>compute.detect(force=True)</code> to <code>det</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>assert det[&quot;cuda&quot;] is True</code>
+        <br><span class="desc">Assertion that verifies a condition is True.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>assert &quot;cuda&quot; in compute.available_compute()</code>
+        <br><span class="desc">Assertion that verifies a condition is True.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>File System Tests</h3>
+<pre><code><span class="cm"># Use tempfile for isolated file system tests</span>
+<span class="kw">class</span> <span class="cls">ResolveVoiceFilesTest</span>(unittest.TestCase):
+    <span class="kw">def</span> <span class="fn">setUp</span>(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        <span class="cm"># Mock paths to use temp directory</span>
+        self.patcher = mock.patch(
+            <span class="str">"ai_voice_studio.paths.user_data_dir"</span>,
+            return_value=self.tmp.name,
+        )
+        self.patcher.start()
+
+    <span class="kw">def</span> <span class="fn">test_matcha_finds_model</span>(self):
+        vdir = self._voice_dir(<span class="str">"matcha_en/default"</span>)
+        open(os.path.join(vdir, <span class="str">"model-steps-3.onnx"</span>), <span class="str">"w"</span>).close()
+        files = resolve_voice_files({<span class="str">"dir"</span>: vdir, <span class="str">"engine"</span>: <span class="str">"matcha"</span>})
+        <span class="kw">assert</span> files[<span class="str">"model"</span>].endswith(<span class="str">"model-steps-3.onnx"</span>)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Use tempfile for isolated file system tests</code>
+        <br><span class="desc">A comment: <em>Use tempfile for isolated file system tests</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>class ResolveVoiceFilesTest(unittest.TestCase):</code>
+        <br><span class="desc">Defines a new class.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>def setUp(self):</code>
+        <br><span class="desc">Runs before each test method. Used to create test fixtures.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>self.tmp = tempfile.TemporaryDirectory()</code>
+        <br><span class="desc">Returns the transposed array (swaps rows and columns for 2D arrays).</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># Mock paths to use temp directory</code>
+        <br><span class="desc">A comment: <em>Mock paths to use temp directory</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>self.patcher = mock.patch(</code>
+        <br><span class="desc">Decorator/context manager that replaces a function/attribute with a Mock during testing.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>&quot;ai_voice_studio.paths.user_data_dir&quot;,</code>
+        <br><span class="desc"><code>&quot;ai_voice_studio.paths.user_data_dir&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>return_value=self.tmp.name,</code>
+        <br><span class="desc">Assigns <code>self.tmp.name,</code> to <code>return_value</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>self.patcher.start()</code>
+        <br><span class="desc"><code>self.patcher.start()</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>def test_matcha_finds_model(self):</code>
+        <br><span class="desc">Test function. pytest discovers functions prefixed with 'test_'.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>vdir = self._voice_dir(&quot;matcha_en/default&quot;)</code>
+        <br><span class="desc">Assigns <code>self._voice_dir(&quot;matcha_en/default&quot;)</code> to <code>vdir</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>open(os.path.join(vdir, &quot;model-steps-3.onnx&quot;), &quot;w&quot;).close()</code>
+        <br><span class="desc">Opens a file and returns a file object.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>files = resolve_voice_files({&quot;dir&quot;: vdir, &quot;engine&quot;: &quot;matcha&quot;})</code>
+        <br><span class="desc">Assigns <code>resolve_voice_files({&quot;dir&quot;: vdir, &quot;engine&quot;: &quot;matcha&quot;})</code> to <code>files</code>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>assert files[&quot;model&quot;].endswith(&quot;model-steps-3.onnx&quot;)</code>
+        <br><span class="desc">Assertion that verifies a condition is True.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>61.3 Running Tests</h2>
+
+<pre><code><span class="cm"># Run all tests</span>
+python -m pytest tests/ -v
+
+<span class="cm"># Run with coverage</span>
+pip install pytest-cov
+python -m pytest tests/ --cov=ai_voice_studio --cov-report=term-missing
+
+<span class="cm"># Run specific test class</span>
+python -m pytest tests/test_catalog.py::CatalogStructureTest -v
+
+<span class="cm"># Run specific test</span>
+python -m pytest tests/test_catalog.py::CatalogStructureTest::test_tts_ids_unique -v
+
+<span class="cm"># Run tests matching pattern</span>
+python -m pytest tests/ -k "piper" -v</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 4)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Run all tests</code>
+        <br><span class="desc">A comment: <em>Run all tests</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>python -m pytest tests/ -v</code>
+        <br><span class="desc">The testing framework used by AIVS. Discovers test files named test_*.py.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># Run with coverage</code>
+        <br><span class="desc">A comment: <em>Run with coverage</em>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>pip install pytest-cov</code>
+        <br><span class="desc">The testing framework used by AIVS. Discovers test files named test_*.py.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>python -m pytest tests/ --cov=ai_voice_studio --cov-report=term-missing</code>
+        <br><span class="desc">The testing framework used by AIVS. Discovers test files named test_*.py.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># Run specific test class</code>
+        <br><span class="desc">A comment: <em>Run specific test class</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>python -m pytest tests/test_catalog.py::CatalogStructureTest -v</code>
+        <br><span class="desc">The testing framework used by AIVS. Discovers test files named test_*.py.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># Run specific test</code>
+        <br><span class="desc">A comment: <em>Run specific test</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>python -m pytest tests/test_catalog.py::CatalogStructureTest::test_tts_ids_unique -v</code>
+        <br><span class="desc">The testing framework used by AIVS. Discovers test files named test_*.py.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code># Run tests matching pattern</code>
+        <br><span class="desc">A comment: <em>Run tests matching pattern</em>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>python -m pytest tests/ -k &quot;piper&quot; -v</code>
+        <br><span class="desc">The testing framework used by AIVS. Discovers test files named test_*.py.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>61.4 Key Takeaways</h2>
+<ul>
+  <li>AIVS has <strong>99+ tests</strong> across 12 test files</li>
+  <li><strong>Data validation tests</strong> ensure catalog integrity</li>
+  <li><strong>Mocking</strong> isolates tests from external dependencies (GPU, network)</li>
+  <li><strong>tempfile</strong> provides isolated file system for tests</li>
+  <li>The GUI smoke tests verify <strong>wx objects can be created</strong> without crashes</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch60_addons.html">← Ch 60</a> &nbsp;|&nbsp; <a href="ch62_mocking.html">Ch 62 — Mocking →</a></p>
+</div></div></body>
+</html>

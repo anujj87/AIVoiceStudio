@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 14: Context Managers - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part II</div><ul class="chapters"><li><a href="ch11_oop_advanced.html">Ch 11</a></li><li><a href="ch12_iterators.html">Ch 12</a></li><li><a href="ch13_decorators.html">Ch 13</a></li><li><a href="ch14_context.html" class="active">Ch 14: Context Mgrs</a></li><li><a href="ch15_regex.html">Ch 15</a></li><li><a href="ch16_datetime.html">Ch 16</a></li><li><a href="ch17_testing.html">Ch 17</a></li><li><a href="ch18_json_xml.html">Ch 18</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 14</div>
+<h1>Context Managers</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand the <code>with</code> statement and context manager protocol</li>
+  <li>Create context managers using classes and <code>@contextmanager</code></li>
+  <li>Apply context managers for resource management in AIVS</li>
+</ul>
+
+<hr>
+
+<h2>14.1 The Context Manager Protocol</h2>
+
+<pre><code><span class="cm"># Context managers implement __enter__ and __exit__</span>
+<span class="kw">class</span> <span class="cls">ManagedEngine</span>:
+    <span class="str">"""TTS engine that cleans up when done."""</span>
+
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, engine_id: str):
+        self.engine_id = engine_id
+        self._model = <span class="kw">None</span>
+
+    <span class="kw">def</span> <span class="fn">__enter__</span>(self):
+        <span class="str">"""Called when entering the 'with' block."""</span>
+        <span class="kw">print</span>(<span class="str">f"Loading </span>{self.engine_id}<span class="str">..."</span>)
+        self._model = <span class="str">"loaded"</span>
+        <span class="kw">return</span> self  <span class="cm"># This is assigned to 'as' variable</span>
+
+    <span class="kw">def</span> <span class="fn">__exit__</span>(self, exc_type, exc_val, exc_tb):
+        <span class="str">"""Called when exiting the 'with' block (always)."""</span>
+        <span class="kw">print</span>(<span class="str">f"Unloading </span>{self.engine_id}<span class="str">..."</span>)
+        self._model = <span class="kw">None</span>
+        <span class="kw">return</span> <span class="kw">False</span>  <span class="cm"># Don't suppress exceptions</span>
+
+<span class="cm"># Usage</span>
+<span class="kw">with</span> ManagedEngine(<span class="str">"piper"</span>) <span class="kw">as</span> engine:
+    <span class="kw">print</span>(<span class="str">f"Using </span>{engine.engine_id}<span class="str">"</span>)
+    <span class="cm"># ... use the engine ...
+<span class="cm"># "Unloading piper..." is printed here, even if an exception occurs</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Context managers implement __enter__ and __exit__</code>
+        <br><span class="desc">A comment: <em>Context managers implement __enter__ and __exit__</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>class ManagedEngine:</code>
+        <br><span class="desc">Defines class <code>ManagedEngine</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;&quot;&quot;TTS engine that cleans up when done.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>TTS engine that cleans up when done.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>def __init__(self, engine_id: str):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>self.engine_id = engine_id</code>
+        <br><span class="desc">Stores <code>engine_id</code> in instance attribute <code>engine_id</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>self._model = None</code>
+        <br><span class="desc">Stores <code>None</code> in instance attribute <code>_model</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>def __enter__(self):</code>
+        <br><span class="desc">Called when entering a 'with' block. Returns the context manager's value.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>&quot;&quot;&quot;Called when entering the &#x27;with&#x27; block.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Called when entering the &#x27;with&#x27; block.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>print(f&quot;Loading {self.engine_id}...&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>self._model = &quot;loaded&quot;</code>
+        <br><span class="desc">Stores <code>&quot;loaded&quot;</code> in instance attribute <code>_model</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>return self  # This is assigned to &#x27;as&#x27; variable</code>
+        <br><span class="desc">Returns <code>self  # This is assigned to &#x27;as&#x27; variable</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>def __exit__(self, exc_type, exc_val, exc_tb):</code>
+        <br><span class="desc">Called when leaving a 'with' block. Handles cleanup and exception suppression.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>&quot;&quot;&quot;Called when exiting the &#x27;with&#x27; block (always).&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Called when exiting the &#x27;with&#x27; block (always).</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>print(f&quot;Unloading {self.engine_id}...&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>self._model = None</code>
+        <br><span class="desc">Stores <code>None</code> in instance attribute <code>_model</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>return False  # Don&#x27;t suppress exceptions</code>
+        <br><span class="desc">Returns <code>False  # Don&#x27;t suppress exceptions</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code># Usage</code>
+        <br><span class="desc">A comment: <em>Usage</em>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>with ManagedEngine(&quot;piper&quot;) as engine:</code>
+        <br><span class="desc">Context manager: <code>ManagedEngine(&quot;piper&quot;) as engine</code>. Automatically manages resource cleanup.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>print(f&quot;Using {engine.engine_id}&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code># ... use the engine ...</code>
+        <br><span class="desc">A comment: <em>... use the engine ...</em>.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code># &quot;Unloading piper...&quot; is printed here, even if an exception occurs</code>
+        <br><span class="desc">A comment: <em>&quot;Unloading piper...&quot; is printed here, even if an exception occurs</em>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>The __exit__ Parameters</h3>
+
+<table>
+  <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>exc_type</code></td><td>type | None</td><td>The exception class (or None if no exception)</td></tr>
+    <tr><td><code>exc_val</code></td><td>Exception | None</td><td>The exception instance</td></tr>
+    <tr><td><code>exc_tb</code></td><td>traceback | None</td><td>The traceback object</td></tr>
+  </tbody>
+</table>
+
+<pre><code><span class="kw">def</span> <span class="fn">__exit__</span>(self, exc_type, exc_val, exc_tb):
+    <span class="kw">if</span> exc_type <span class="kw">is not</span> <span class="kw">None</span>:
+        <span class="kw">print</span>(<span class="str">f"Exception occurred: </span>{exc_val}<span class="str">"</span>)
+    <span class="kw">return</span> <span class="kw">False</span>  <span class="cm"># False = don't suppress the exception</span>
+    <span class="cm"># return True  # True = suppress the exception</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>def __exit__(self, exc_type, exc_val, exc_tb):</code>
+        <br><span class="desc">Called when leaving a 'with' block. Handles cleanup and exception suppression.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>if exc_type is not None:</code>
+        <br><span class="desc">Checks condition: <code>exc_type is not None</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>print(f&quot;Exception occurred: {exc_val}&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>return False  # False = don&#x27;t suppress the exception</code>
+        <br><span class="desc">Returns <code>False  # False = don&#x27;t suppress the exception</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># return True  # True = suppress the exception</code>
+        <br><span class="desc">A comment: <em>return True  # True = suppress the exception</em>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>14.2 @contextmanager Decorator</h2>
+
+<pre><code><span class="kw">from</span> contextlib <span class="kw">import</span> contextmanager
+
+<span class="dec">@contextmanager</span>
+<span class="kw">def</span> <span class="fn">managed_engine</span>(engine_id: str):
+    <span class="str">"""Simpler context manager using @contextmanager."""</span>
+    <span class="kw">print</span>(<span class="str">f"Loading </span>{engine_id}<span class="str">..."</span>)
+    engine = <span class="str">"loaded"</span>
+    <span class="kw">try</span>:
+        <span class="kw">yield</span> engine  <span class="cm"># This is the 'as' value</span>
+    <span class="kw">finally</span>:
+        <span class="kw">print</span>(<span class="str">f"Unloading </span>{engine_id}<span class="str">..."</span>)
+
+<span class="cm"># Usage (identical to the class version)</span>
+<span class="kw">with</span> managed_engine(<span class="str">"piper"</span>) <span class="kw">as</span> engine:
+    <span class="kw">print</span>(<span class="str">f"Using </span>{engine}<span class="str">"</span>)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>from contextlib import contextmanager</code>
+        <br><span class="desc">Imports <code>contextmanager</code> from <code>contextlib</code>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>@contextmanager</code>
+        <br><span class="desc">Decorator: <code>@contextmanager</code>. Wraps the following function/class.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>def managed_engine(engine_id: str):</code>
+        <br><span class="desc">Defines function <code>managed_engine</code> accepting (engine_id).</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>&quot;&quot;&quot;Simpler context manager using @contextmanager.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Simpler context manager using @contextmanager.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>print(f&quot;Loading {engine_id}...&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>engine = &quot;loaded&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;loaded&quot;</code> to <code>engine</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>try:</code>
+        <br><span class="desc">Begins exception handling. Code in this block is monitored for errors.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>yield engine  # This is the &#x27;as&#x27; value</code>
+        <br><span class="desc">Pauses the function and sends a value to the caller. The function can be resumed later. Makes the function a generator.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>finally:</code>
+        <br><span class="desc">Always executes for cleanup code, whether or not an exception occurred.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>print(f&quot;Unloading {engine_id}...&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># Usage (identical to the class version)</code>
+        <br><span class="desc">A comment: <em>Usage (identical to the class version)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>with managed_engine(&quot;piper&quot;) as engine:</code>
+        <br><span class="desc">Context manager: <code>managed_engine(&quot;piper&quot;) as engine</code>. Automatically manages resource cleanup.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>print(f&quot;Using {engine}&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>14.3 Context Managers in AIVS</h2>
+
+<pre><code><span class="cm"># GUI busy cursor management</span>
+<span class="kw">from</span> contextlib <span class="kw">import</span> contextmanager
+
+<span class="dec">@contextmanager</span>
+<span class="kw">def</span> <span class="fn">busy_cursor</span>():
+    <span class="str">"""Show busy cursor during document parsing."""</span>
+    wx.BeginBusyCursor()
+    <span class="kw">try</span>:
+        <span class="kw">yield</span>
+    <span class="kw">finally</span>:
+        wx.EndBusyCursor()
+
+<span class="cm"># Usage in NewProjectWizard</span>
+<span class="kw">with</span> busy_cursor():
+    doc = parse_document(self.source_path)
+    segments = split_document(doc, mode)
+
+<span class="cm"># Thread-safe lock management</span>
+<span class="kw">class</span> <span class="cls">CloneClient</span>:
+    <span class="kw">def</span> <span class="fn">_request</span>(self, req: dict) -> dict:
+        <span class="kw">with</span> self._lock:  <span class="cm"># Thread-safe access</span>
+            <span class="cm"># ... send request and read response</span>
+
+<span class="cm"># Temporary directory for downloads</span>
+<span class="kw">import</span> tempfile
+<span class="kw">with</span> tempfile.TemporaryDirectory() <span class="kw">as</span> tmpdir:
+    <span class="cm"># Download to tmpdir, process, then it's auto-cleaned</span>
+    download_to(tmpdir)
+
+<span class="cm"># contextlib.suppress — ignore specific exceptions</span>
+<span class="kw">from</span> contextlib <span class="kw">import</span> contextlib
+<span class="kw">with</span> contextlib.suppress(FileNotFoundError):
+    os.unlink(temp_file)  <span class="cm"># Ignore if file doesn't exist</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 4)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># GUI busy cursor management</code>
+        <br><span class="desc">A comment: <em>GUI busy cursor management</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>from contextlib import contextmanager</code>
+        <br><span class="desc">Imports <code>contextmanager</code> from <code>contextlib</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>@contextmanager</code>
+        <br><span class="desc">Decorator: <code>@contextmanager</code>. Wraps the following function/class.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>def busy_cursor():</code>
+        <br><span class="desc">Defines function <code>busy_cursor</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>&quot;&quot;&quot;Show busy cursor during document parsing.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Show busy cursor during document parsing.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>wx.BeginBusyCursor()</code>
+        <br><span class="desc">Changes the cursor to a busy indicator (hourglass).</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>try:</code>
+        <br><span class="desc">Begins exception handling. Code in this block is monitored for errors.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>yield</code>
+        <br><span class="desc"><code>yield</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>finally:</code>
+        <br><span class="desc">Always executes for cleanup code, whether or not an exception occurred.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>wx.EndBusyCursor()</code>
+        <br><span class="desc">Restores the cursor to normal after BeginBusyCursor().</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># Usage in NewProjectWizard</code>
+        <br><span class="desc">A comment: <em>Usage in NewProjectWizard</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>with busy_cursor():</code>
+        <br><span class="desc">Context manager: <code>busy_cursor()</code>. Automatically manages resource cleanup.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>doc = parse_document(self.source_path)</code>
+        <br><span class="desc">Assigns <code>parse_document(self.source_path)</code> to <code>doc</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>segments = split_document(doc, mode)</code>
+        <br><span class="desc">Assigns <code>split_document(doc, mode)</code> to <code>segments</code>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code># Thread-safe lock management</code>
+        <br><span class="desc">A comment: <em>Thread-safe lock management</em>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>class CloneClient:</code>
+        <br><span class="desc">Defines class <code>CloneClient</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>def _request(self, req: dict) -&gt; dict:</code>
+        <br><span class="desc">Defines function <code>_request</code> accepting (self, req), returning <code>dict</code>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>with self._lock:  # Thread-safe access</code>
+        <br><span class="desc">Context manager: <code>self._lock</code>. Automatically manages resource cleanup.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code># ... send request and read response</code>
+        <br><span class="desc">A comment: <em>... send request and read response</em>.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code># Temporary directory for downloads</code>
+        <br><span class="desc">A comment: <em>Temporary directory for downloads</em>.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>import tempfile</code>
+        <br><span class="desc">Imports the <code>tempfile</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>with tempfile.TemporaryDirectory() as tmpdir:</code>
+        <br><span class="desc">Context manager: <code>tempfile.TemporaryDirectory() as tmpdir</code>. Automatically manages resource cleanup.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code># Download to tmpdir, process, then it&#x27;s auto-cleaned</code>
+        <br><span class="desc">A comment: <em>Download to tmpdir, process, then it&#x27;s auto-cleaned</em>.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>download_to(tmpdir)</code>
+        <br><span class="desc">Calls function <code>download_to()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code># contextlib.suppress — ignore specific exceptions</code>
+        <br><span class="desc">A comment: <em>contextlib.suppress — ignore specific exceptions</em>.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>from contextlib import contextlib</code>
+        <br><span class="desc">Imports <code>contextlib</code> from <code>contextlib</code>.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>with contextlib.suppress(FileNotFoundError):</code>
+        <br><span class="desc">Context manager that suppresses specified exceptions.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>os.unlink(temp_file)  # Ignore if file doesn&#x27;t exist</code>
+        <br><span class="desc"><code>os.unlink(temp_file)  # Ignore if file doesn&#x27;t exist</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>14.4 Key Takeaways</h2>
+<ul>
+  <li>Context managers ensure <strong>cleanup always happens</strong>, even on exceptions</li>
+  <li><strong><code>@contextmanager</code></strong> is simpler than implementing <code>__enter__</code>/<code>__exit__</code></li>
+  <li>Use context managers for <strong>files, locks, subprocesses, GUI state</strong></li>
+  <li>The AIVS project uses context managers for <strong>thread locks</strong>, <strong>temp directories</strong>, and <strong>GUI busy cursor</strong></li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch13_decorators.html">← Ch 13</a> &nbsp;|&nbsp; <a href="ch15_regex.html">Ch 15 — Regex →</a></p>
+</div></div></body>
+</html>

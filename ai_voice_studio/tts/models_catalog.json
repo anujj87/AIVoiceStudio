@@ -2957,7 +2957,7 @@
             {
               "id": "server",
               "name": "Server mode (OpenAI-compatible HTTP API)",
-              "note": "Runs as an HTTP server. Other apps on the network can use it too.",
+              "note": "Runs as an HTTP server. Other apps on the network can use it too. Voices are the server's official OpenAI-compatible presets; each maps to a built-in voice-design prompt.",
               "voices": [
                 {
                   "id": "alloy",
@@ -2965,29 +2965,64 @@
                   "sid": 0
                 },
                 {
-                  "id": "echo",
-                  "name": "Echo (male, young adult, moderate pitch, american accent)",
+                  "id": "ash",
+                  "name": "Ash (male, young adult, low pitch, american accent)",
                   "sid": 1
                 },
                 {
-                  "id": "fable",
-                  "name": "Fable (male, middle-aged, low pitch, british accent)",
+                  "id": "ballad",
+                  "name": "Ballad (male, middle-aged, low pitch, british accent)",
                   "sid": 2
                 },
                 {
-                  "id": "onyx",
-                  "name": "Onyx (male, middle-aged, low pitch, deep)",
+                  "id": "cedar",
+                  "name": "Cedar (male, middle-aged, low pitch, american accent)",
                   "sid": 3
+                },
+                {
+                  "id": "coral",
+                  "name": "Coral (female, young adult, high pitch, australian accent)",
+                  "sid": 4
+                },
+                {
+                  "id": "echo",
+                  "name": "Echo (male, middle-aged, moderate pitch, canadian accent)",
+                  "sid": 5
+                },
+                {
+                  "id": "fable",
+                  "name": "Fable (female, middle-aged, moderate pitch, british accent)",
+                  "sid": 6
+                },
+                {
+                  "id": "marin",
+                  "name": "Marin (female, middle-aged, moderate pitch, canadian accent)",
+                  "sid": 7
                 },
                 {
                   "id": "nova",
                   "name": "Nova (female, young adult, high pitch, american accent)",
-                  "sid": 4
+                  "sid": 8
+                },
+                {
+                  "id": "onyx",
+                  "name": "Onyx (male, middle-aged, very low pitch, british accent)",
+                  "sid": 9
+                },
+                {
+                  "id": "sage",
+                  "name": "Sage (female, elderly, low pitch, british accent)",
+                  "sid": 10
                 },
                 {
                   "id": "shimmer",
-                  "name": "Shimmer (female, young adult, moderate pitch, australian accent)",
-                  "sid": 5
+                  "name": "Shimmer (female, young adult, very high pitch, american accent)",
+                  "sid": 11
+                },
+                {
+                  "id": "verse",
+                  "name": "Verse (male, young adult, moderate pitch, british accent)",
+                  "sid": 12
                 }
               ]
             },

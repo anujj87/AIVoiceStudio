@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 68: Subprocess Architecture - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part VIII</div><ul class="chapters"><li><a href="ch67_python_runtime.html">Ch 67</a></li><li><a href="ch68_subprocess.html" class="active">Ch 68: Subprocess</a></li><li><a href="ch69_logging.html">Ch 69</a></li><li><a href="ch70_performance.html">Ch 70</a></li><li><a href="ch71_security.html">Ch 71</a></li><li><a href="ch72_roadmap.html">Ch 72</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 68</div>
+<h1>Subprocess Architecture</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand why AIVS uses subprocess isolation</li>
+  <li>See the JSON-lines IPC pattern</li>
+  <li>Understand the frozen app worker embedding</li>
+</ul>
+
+<hr>
+
+<h2>68.1 Why Subprocess Isolation?</h2>
+
+<table>
+  <thead><tr><th>Component</th><th>Runtime</th><th>Isolation Reason</th></tr></thead>
+  <tbody>
+    <tr><td>Main App</td><td>wxPython + sherpa-onnx (ONNX)</td><td>Core application</td></tr>
+    <tr><td>Clone Worker</td><td>PyTorch + coqui-tts</td><td>PyTorch conflicts with ONNX</td></tr>
+    <tr><td>OmniVoice Worker</td><td>PyTorch + CUDA</td><td>CUDA/PyTorch isolation</td></tr>
+    <tr><td>OmniVoice Server</td><td>HTTP server + PyTorch</td><td>Network service isolation</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h2>68.2 JSON-Lines IPC Pattern</h2>
+
+<pre><code><span class="cm"># All workers follow the same pattern:</span>
+<span class="cm"># 1. Worker reads JSON from stdin (one line per request)</span>
+<span class="cm"># 2. Worker writes JSON to stdout (one line per response)</span>
+<span class="cm"># 3. App manages the subprocess lifecycle</span>
+
+<span class="cm"># Worker loop</span>
+<span class="kw">for</span> line <span class="kw">in</span> sys.stdin:
+    req = json.loads(line.strip())
+    <span class="kw">if</span> req[<span class="str">"cmd"</span>] == <span class="str">"quit"</span>: <span class="kw">break</span>
+    <span class="kw">if</span> req[<span class="str">"cmd"</span>] == <span class="str">"ping"</span>:
+        respond({<span class="str">"ok"</span>: <span class="kw">True</span>, <span class="str">"engine"</span>: <span class="kw">True</span>})
+    <span class="kw">if</span> req[<span class="str">"cmd"</span>] == <span class="str">"synthesize"</span>:
+        audio = synthesize(req[<span class="str">"text"</span>])
+        respond({<span class="str">"ok"</span>: <span class="kw">True</span>, <span class="str">"wav"</span>: base64.b64encode(audio)})
+
+<span class="cm"># App-side request</span>
+<span class="kw">def</span> <span class="fn">_request</span>(self, req):
+    <span class="kw">with</span> self._lock:
+        req[<span class="str">"id"</span>] = self._next_id
+        self._proc.stdin.write(json.dumps(req) + <span class="str">"\n"</span>)
+        line = self._proc.stdout.readline()
+        <span class="kw">return</span> json.loads(line)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># All workers follow the same pattern:</code>
+        <br><span class="desc">A comment: <em>All workers follow the same pattern:</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># 1. Worker reads JSON from stdin (one line per request)</code>
+        <br><span class="desc">A comment: <em>1. Worker reads JSON from stdin (one line per request)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># 2. Worker writes JSON to stdout (one line per response)</code>
+        <br><span class="desc">A comment: <em>2. Worker writes JSON to stdout (one line per response)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># 3. App manages the subprocess lifecycle</code>
+        <br><span class="desc">A comment: <em>3. App manages the subprocess lifecycle</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># Worker loop</code>
+        <br><span class="desc">A comment: <em>Worker loop</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>for line in sys.stdin:</code>
+        <br><span class="desc">For loop iteration.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>req = json.loads(line.strip())</code>
+        <br><span class="desc">Deserializes JSON from a file into a Python object.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>if req[&quot;cmd&quot;] == &quot;quit&quot;: break</code>
+        <br><span class="desc">Exits the innermost loop.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>if req[&quot;cmd&quot;] == &quot;ping&quot;:</code>
+        <br><span class="desc">Conditional check.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>respond({&quot;ok&quot;: True, &quot;engine&quot;: True})</code>
+        <br><span class="desc">Calls function <code>respond()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>if req[&quot;cmd&quot;] == &quot;synthesize&quot;:</code>
+        <br><span class="desc">Conditional check.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>audio = synthesize(req[&quot;text&quot;])</code>
+        <br><span class="desc">Assigns <code>synthesize(req[&quot;text&quot;])</code> to <code>audio</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>respond({&quot;ok&quot;: True, &quot;wav&quot;: base64.b64encode(audio)})</code>
+        <br><span class="desc">Calls function <code>respond()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code># App-side request</code>
+        <br><span class="desc">A comment: <em>App-side request</em>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>def _request(self, req):</code>
+        <br><span class="desc">Defines a function.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>with self._lock:</code>
+        <br><span class="desc">Context manager: <code>self._lock</code>. Auto-manages cleanup.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>req[&quot;id&quot;] = self._next_id</code>
+        <br><span class="desc"><code>req[&quot;id&quot;] = self._next_id</code></span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>self._proc.stdin.write(json.dumps(req) + &quot;\n&quot;)</code>
+        <br><span class="desc">Serializes a Python object to JSON and writes to a file.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>line = self._proc.stdout.readline()</code>
+        <br><span class="desc">Assigns <code>self._proc.stdout.readline()</code> to <code>line</code>.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>return json.loads(line)</code>
+        <br><span class="desc">Deserializes JSON from a file into a Python object.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>68.3 Frozen App Worker Embedding</h2>
+
+<pre><code><span class="cm"># In frozen apps, PyInstaller bundles .py files into a PYZ archive</span>
+<span class="cm"># The managed venv's Python can't read .pyz files</span>
+<span class="cm"># Solution: embed worker source as a string constant</span>
+
+_WORKER_SOURCE = r'''
+import json, sys, numpy as np
+def main():
+    for line in sys.stdin:
+        req = json.loads(line.strip())
+        if req["cmd"] == "quit": break
+        if req["cmd"] == "synthesize":
+            # ... synthesize and respond ...
+'''
+
+<span class="kw">def</span> <span class="fn">_read_worker_source</span>() -> str:
+    <span class="kw">if</span> getattr(sys, <span class="str">"frozen"</span>, <span class="kw">False</span>):
+        <span class="kw">return</span> _WORKER_SOURCE  <span class="cm"># Use embedded source</span>
+    <span class="cm"># Dev mode: read from actual file</span>
+    <span class="kw">with</span> open(<span class="str">"worker.py"</span>) <span class="kw">as</span> f:
+        <span class="kw">return</span> f.read()</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># In frozen apps, PyInstaller bundles .py files into a PYZ archive</code>
+        <br><span class="desc">A comment: <em>In frozen apps, PyInstaller bundles .py files into a PYZ archive</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># The managed venv&#x27;s Python can&#x27;t read .pyz files</code>
+        <br><span class="desc">A comment: <em>The managed venv&#x27;s Python can&#x27;t read .pyz files</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># Solution: embed worker source as a string constant</code>
+        <br><span class="desc">A comment: <em>Solution: embed worker source as a string constant</em>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>_WORKER_SOURCE = r&#x27;&#x27;&#x27;</code>
+        <br><span class="desc">Assigns <code>r&#x27;&#x27;&#x27;</code> to <code>_WORKER_SOURCE</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>import json, sys, numpy as np</code>
+        <br><span class="desc">Imports a module.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>def main():</code>
+        <br><span class="desc">Defines a function.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>for line in sys.stdin:</code>
+        <br><span class="desc">For loop iteration.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>req = json.loads(line.strip())</code>
+        <br><span class="desc">Deserializes JSON from a file into a Python object.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>if req[&quot;cmd&quot;] == &quot;quit&quot;: break</code>
+        <br><span class="desc">Exits the innermost loop.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>if req[&quot;cmd&quot;] == &quot;synthesize&quot;:</code>
+        <br><span class="desc">Conditional check.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># ... synthesize and respond ...</code>
+        <br><span class="desc">A comment: <em>... synthesize and respond ...</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>&#x27;&#x27;&#x27;</code>
+        <br><span class="desc">Opens a docstring block.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>def _read_worker_source() -&gt; str:</code>
+        <br><span class="desc">Defines a function.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>if getattr(sys, &quot;frozen&quot;, False):</code>
+        <br><span class="desc">Gets an attribute value by name.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>return _WORKER_SOURCE  # Use embedded source</code>
+        <br><span class="desc">Returns a value from a function.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code># Dev mode: read from actual file</code>
+        <br><span class="desc">A comment: <em>Dev mode: read from actual file</em>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>with open(&quot;worker.py&quot;) as f:</code>
+        <br><span class="desc">Opens a file using a context manager. Auto-closes when the block exits.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>return f.read()</code>
+        <br><span class="desc">Returns a value from a function.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>68.4 Key Takeaways</h2>
+<ul>
+  <li><strong>Subprocess isolation</strong> prevents runtime conflicts (ONNX vs PyTorch)</li>
+  <li><strong>JSON-lines protocol</strong> is the universal IPC pattern</li>
+  <li><strong>Embedded worker source</strong> solves the frozen app problem</li>
+  <li>All workers follow the same <strong>lifecycle</strong>: start → ping → process → quit</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch67_python_runtime.html">← Ch 67</a> &nbsp;|&nbsp; <a href="ch69_logging.html">Ch 69 — Logging →</a></p>
+</div></div></body>
+</html>

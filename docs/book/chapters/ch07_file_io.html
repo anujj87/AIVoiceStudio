@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 7: File I/O - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2><div class="part-header">Part I</div><ul class="chapters"><li><a href="ch01_introduction.html">Ch 1</a></li><li><a href="ch02_variables.html">Ch 2</a></li><li><a href="ch03_control_flow.html">Ch 3</a></li><li><a href="ch04_functions.html">Ch 4</a></li><li><a href="ch05_strings.html">Ch 5</a></li><li><a href="ch06_collections.html">Ch 6</a></li><li><a href="ch07_file_io.html" class="active">Ch 7: File I/O</a></li><li><a href="ch08_error_handling.html">Ch 8</a></li><li><a href="ch09_modules.html">Ch 9</a></li><li><a href="ch10_oop_basics.html">Ch 10</a></li></ul></nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 7</div>
+<h1>File I/O</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Read and write text and binary files</li>
+  <li>Understand file modes, encoding, and context managers</li>
+  <li>Use the <code>pathlib</code> module for modern path handling</li>
+  <li>See how AIVS reads/writes JSON settings and project files</li>
+</ul>
+
+<hr>
+
+<h2>7.1 Opening and Closing Files</h2>
+
+<pre><code><span class="cm"># The "classic" way (don't do this in modern Python)</span>
+f = open(<span class="str">"data.txt"</span>, <span class="str">"r"</span>)
+content = f.read()
+f.close()  <span class="cm"># Must close manually!</span>
+
+<span class="cm"># The correct way — context manager (auto-closes)</span>
+<span class="kw">with</span> open(<span class="str">"data.txt"</span>, <span class="str">"r"</span>) <span class="kw">as</span> f:
+    content = f.read()
+<span class="cm"># f is automatically closed here, even if an exception occurs</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># The &quot;classic&quot; way (don&#x27;t do this in modern Python)</code>
+        <br><span class="desc">A comment: <em>The &quot;classic&quot; way (don&#x27;t do this in modern Python)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>f = open(&quot;data.txt&quot;, &quot;r&quot;)</code>
+        <br><span class="desc">Opens a file and returns a file object. Supports modes: 'r' (read), 'w' (write), 'a' (append), 'b' (binary).</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>content = f.read()</code>
+        <br><span class="desc">Reads the entire file contents as a string.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>f.close()  # Must close manually!</code>
+        <br><span class="desc">Closes the file and flushes the write buffer. Prefer using 'with' instead.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># The correct way — context manager (auto-closes)</code>
+        <br><span class="desc">A comment: <em>The correct way — context manager (auto-closes)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>with open(&quot;data.txt&quot;, &quot;r&quot;) as f:</code>
+        <br><span class="desc">Opens a file using a context manager. The file is automatically closed when the block exits, even if an error occurs.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>content = f.read()</code>
+        <br><span class="desc">Reads the entire file contents as a string.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># f is automatically closed here, even if an exception occurs</code>
+        <br><span class="desc">A comment: <em>f is automatically closed here, even if an exception occurs</em>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>File Modes</h3>
+
+<table>
+  <thead><tr><th>Mode</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>"r"</code></td><td>Read (default). File must exist.</td></tr>
+    <tr><td><code>"w"</code></td><td>Write. Creates or <strong>truncates</strong> file.</td></tr>
+    <tr><td><code>"a"</code></td><td>Append. Creates if doesn't exist.</td></tr>
+    <tr><td><code>"x"</code></td><td>Exclusive create. Fails if file exists.</td></tr>
+    <tr><td><code>"r+"</code></td><td>Read + write. File must exist.</td></tr>
+    <tr><td><code>"rb"</code></td><td>Read binary.</td></tr>
+    <tr><td><code>"wb"</code></td><td>Write binary.</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h2>7.2 Reading Files</h2>
+
+<pre><code><span class="cm"># Read entire file</span>
+<span class="kw">with</span> open(<span class="str">"config.json"</span>, <span class="str">"r"</span>, encoding=<span class="str">"utf-8"</span>) <span class="kw">as</span> f:
+    content = f.read()  <span class="cm"># Returns a single string</span>
+
+<span class="cm"># Read line by line (memory-efficient for large files)</span>
+<span class="kw">with</span> open(<span class="str">"segments.txt"</span>, <span class="str">"r"</span>, encoding=<span class="str">"utf-8"</span>) <span class="kw">as</span> f:
+    <span class="kw">for</span> line <span class="kw">in</span> f:
+        line = line.rstrip(<span class="str">"\n"</span>)  <span class="cm"># Strip trailing newline</span>
+        <span class="kw">print</span>(line)
+
+<span class="cm"># Read all lines into a list</span>
+<span class="kw">with</span> open(<span class="str">"segments.txt"</span>, <span class="str">"r"</span>, encoding=<span class="str">"utf-8"</span>) <span class="kw">as</span> f:
+    lines = f.readlines()  <span class="cm"># List of strings (with \n)</span>
+
+<span class="cm"># Read as bytes (for binary files like audio)</span>
+<span class="kw">with</span> open(<span class="str">"audio.wav"</span>, <span class="str">"rb"</span>) <span class="kw">as</span> f:
+    data = f.read()  <span class="cm"># Returns bytes object</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Read entire file</code>
+        <br><span class="desc">A comment: <em>Read entire file</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>with open(&quot;config.json&quot;, &quot;r&quot;, encoding=&quot;utf-8&quot;) as f:</code>
+        <br><span class="desc">Opens a file using a context manager. The file is automatically closed when the block exits, even if an error occurs.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>content = f.read()  # Returns a single string</code>
+        <br><span class="desc">Reads the entire file contents as a string.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># Read line by line (memory-efficient for large files)</code>
+        <br><span class="desc">A comment: <em>Read line by line (memory-efficient for large files)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>with open(&quot;segments.txt&quot;, &quot;r&quot;, encoding=&quot;utf-8&quot;) as f:</code>
+        <br><span class="desc">Opens a file using a context manager. The file is automatically closed when the block exits, even if an error occurs.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>for line in f:</code>
+        <br><span class="desc">Iterates over <code>f</code>, assigning each element to <code>line</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>line = line.rstrip(&quot;\n&quot;)  # Strip trailing newline</code>
+        <br><span class="desc">Removes trailing whitespace only.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>print(line)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code># Read all lines into a list</code>
+        <br><span class="desc">A comment: <em>Read all lines into a list</em>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>with open(&quot;segments.txt&quot;, &quot;r&quot;, encoding=&quot;utf-8&quot;) as f:</code>
+        <br><span class="desc">Opens a file using a context manager. The file is automatically closed when the block exits, even if an error occurs.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>lines = f.readlines()  # List of strings (with \n)</code>
+        <br><span class="desc">Reads all lines and returns them as a list of strings.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code># Read as bytes (for binary files like audio)</code>
+        <br><span class="desc">A comment: <em>Read as bytes (for binary files like audio)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>with open(&quot;audio.wav&quot;, &quot;rb&quot;) as f:</code>
+        <br><span class="desc">Opens a file using a context manager. The file is automatically closed when the block exits, even if an error occurs.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>data = f.read()  # Returns bytes object</code>
+        <br><span class="desc">Reads the entire file contents as a string.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>7.3 Writing Files</h2>
+
+<pre><code><span class="cm"># Write text</span>
+<span class="kw">with</span> open(<span class="str">"output.txt"</span>, <span class="str">"w"</span>, encoding=<span class="str">"utf-8"</span>) <span class="kw">as</span> f:
+    f.write(<span class="str">"Hello, world!\n"</span>)
+    f.write(<span class="str">"Second line\n"</span>)
+
+<span class="cm"># writelines (no automatic newlines)</span>
+<span class="kw">with</span> open(<span class="str">"output.txt"</span>, <span class="str">"w"</span>, encoding=<span class="str">"utf-8"</span>) <span class="kw">as</span> f:
+    lines = [<span class="str">"line 1\n"</span>, <span class="str">"line 2\n"</span>, <span class="str">"line 3\n"</span>]
+    f.writelines(lines)
+
+<span class="cm"># Append mode</span>
+<span class="kw">with</span> open(<span class="str">"log.txt"</span>, <span class="str">"a"</span>, encoding=<span class="str">"utf-8"</span>) <span class="kw">as</span> f:
+    f.write(<span class="str">"New log entry\n"</span>)
+
+<span class="cm"># Print to file</span>
+<span class="kw">with</span> open(<span class="str">"report.txt"</span>, <span class="str">"w"</span>) <span class="kw">as</span> f:
+    <span class="kw">print</span>(<span class="str">"Status: OK"</span>, file=f)
+    <span class="kw">print</span>(<span class="str">"Voices: 42"</span>, file=f)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Write text</code>
+        <br><span class="desc">A comment: <em>Write text</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>with open(&quot;output.txt&quot;, &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:</code>
+        <br><span class="desc">Opens a file using a context manager. The file is automatically closed when the block exits, even if an error occurs.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>f.write(&quot;Hello, world!\n&quot;)</code>
+        <br><span class="desc">Writes a string to the file. In text mode, does not add a newline automatically.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>f.write(&quot;Second line\n&quot;)</code>
+        <br><span class="desc">Writes a string to the file. In text mode, does not add a newline automatically.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># writelines (no automatic newlines)</code>
+        <br><span class="desc">A comment: <em>writelines (no automatic newlines)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>with open(&quot;output.txt&quot;, &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:</code>
+        <br><span class="desc">Opens a file using a context manager. The file is automatically closed when the block exits, even if an error occurs.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>lines = [&quot;line 1\n&quot;, &quot;line 2\n&quot;, &quot;line 3\n&quot;]</code>
+        <br><span class="desc">Assigns <code>[&quot;line 1\n&quot;, &quot;line 2\n&quot;, &quot;line 3\n&quot;]</code> to <code>lines</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>f.writelines(lines)</code>
+        <br><span class="desc">Writes a list of strings to the file without adding newlines.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code># Append mode</code>
+        <br><span class="desc">A comment: <em>Append mode</em>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>with open(&quot;log.txt&quot;, &quot;a&quot;, encoding=&quot;utf-8&quot;) as f:</code>
+        <br><span class="desc">Opens a file using a context manager. The file is automatically closed when the block exits, even if an error occurs.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>f.write(&quot;New log entry\n&quot;)</code>
+        <br><span class="desc">Writes a string to the file. In text mode, does not add a newline automatically.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code># Print to file</code>
+        <br><span class="desc">A comment: <em>Print to file</em>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>with open(&quot;report.txt&quot;, &quot;w&quot;) as f:</code>
+        <br><span class="desc">Opens a file using a context manager. The file is automatically closed when the block exits, even if an error occurs.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>print(&quot;Status: OK&quot;, file=f)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>print(&quot;Voices: 42&quot;, file=f)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>7.4 JSON File I/O</h2>
+
+<p>JSON is the backbone of AIVS — settings, project files, and catalog data all use it:</p>
+
+<pre><code><span class="kw">import</span> json
+
+<span class="cm"># Reading JSON</span>
+<span class="kw">with</span> open(<span class="str">"settings.json"</span>, <span class="str">"r"</span>, encoding=<span class="str">"utf-8"</span>) <span class="kw">as</span> f:
+    settings = json.load(f)  <span class="cm"># Returns a Python dict</span>
+
+<span class="cm"># Writing JSON (with nice formatting)</span>
+<span class="kw">with</span> open(<span class="str">"settings.json"</span>, <span class="str">"w"</span>, encoding=<span class="str">"utf-8"</span>) <span class="kw">as</span> f:
+    json.dump(settings, f, indent=<span class="num">2</span>, ensure_ascii=<span class="kw">False</span>)
+
+<span class="cm"># JSON string ↔ Python object</span>
+text = json.dumps({<span class="str">"rate"</span>: <span class="num">1.5</span>, <span class="str">"pitch"</span>: <span class="num">1.0</span>}, indent=<span class="num">2</span>)
+obj = json.loads(text)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 4)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>import json</code>
+        <br><span class="desc">Imports the <code>json</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Reading JSON</code>
+        <br><span class="desc">A comment: <em>Reading JSON</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>with open(&quot;settings.json&quot;, &quot;r&quot;, encoding=&quot;utf-8&quot;) as f:</code>
+        <br><span class="desc">Opens a file using a context manager. The file is automatically closed when the block exits, even if an error occurs.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>settings = json.load(f)  # Returns a Python dict</code>
+        <br><span class="desc">Deserializes JSON from a file into a Python object.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># Writing JSON (with nice formatting)</code>
+        <br><span class="desc">A comment: <em>Writing JSON (with nice formatting)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>with open(&quot;settings.json&quot;, &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:</code>
+        <br><span class="desc">Opens a file using a context manager. The file is automatically closed when the block exits, even if an error occurs.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>json.dump(settings, f, indent=2, ensure_ascii=False)</code>
+        <br><span class="desc">Serializes a Python object to JSON and writes to a file.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># JSON string ↔ Python object</code>
+        <br><span class="desc">A comment: <em>JSON string ↔ Python object</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>text = json.dumps({&quot;rate&quot;: 1.5, &quot;pitch&quot;: 1.0}, indent=2)</code>
+        <br><span class="desc">Serializes a Python object to a JSON string.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>obj = json.loads(text)</code>
+        <br><span class="desc">Deserializes a JSON string into a Python object.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>AIVS Settings Pattern</h3>
+
+<pre><code><span class="cm"># From ai_voice_studio/settings.py</span>
+<span class="kw">def</span> <span class="fn">load</span>(self) -> None:
+    <span class="str">"""Load settings from disk, merging with defaults."""</span>
+    <span class="kw">if</span> os.path.isfile(self._path):
+        <span class="kw">with</span> open(self._path, <span class="str">"r"</span>, encoding=<span class="str">"utf-8"</span>) <span class="kw">as</span> f:
+            stored = json.load(f)
+        <span class="cm"># Merge: defaults + stored values</span>
+        self._data = {**self._defaults, **stored}
+
+<span class="kw">def</span> <span class="fn">save</span>(self) -> None:
+    <span class="str">"""Save current settings to disk."""</span>
+    os.makedirs(os.path.dirname(self._path), exist_ok=<span class="kw">True</span>)
+    <span class="kw">with</span> open(self._path, <span class="str">"w"</span>, encoding=<span class="str">"utf-8"</span>) <span class="kw">as</span> f:
+        json.dump(self._data, f, indent=<span class="num">2</span>, ensure_ascii=<span class="kw">False</span>)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 5)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From ai_voice_studio/settings.py</code>
+        <br><span class="desc">A comment: <em>From ai_voice_studio/settings.py</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def load(self) -&gt; None:</code>
+        <br><span class="desc">Defines function <code>load</code> accepting (self), returning <code>None</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;&quot;&quot;Load settings from disk, merging with defaults.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Load settings from disk, merging with defaults.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>if os.path.isfile(self._path):</code>
+        <br><span class="desc">OS-agnostic path manipulation. Use join(), exists(), dirname(), basename(), splitext().</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>with open(self._path, &quot;r&quot;, encoding=&quot;utf-8&quot;) as f:</code>
+        <br><span class="desc">Opens a file using a context manager. The file is automatically closed when the block exits, even if an error occurs.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>stored = json.load(f)</code>
+        <br><span class="desc">Deserializes JSON from a file into a Python object.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># Merge: defaults + stored values</code>
+        <br><span class="desc">A comment: <em>Merge: defaults + stored values</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>self._data = {**self._defaults, **stored}</code>
+        <br><span class="desc">Stores <code>{**self._defaults, **stored}</code> in instance attribute <code>_data</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>def save(self) -&gt; None:</code>
+        <br><span class="desc">Defines function <code>save</code> accepting (self), returning <code>None</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>&quot;&quot;&quot;Save current settings to disk.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Save current settings to disk.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>os.makedirs(os.path.dirname(self._path), exist_ok=True)</code>
+        <br><span class="desc">Recursively creates directories. exist_ok=True prevents errors if directory exists.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>with open(self._path, &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:</code>
+        <br><span class="desc">Opens a file using a context manager. The file is automatically closed when the block exits, even if an error occurs.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>json.dump(self._data, f, indent=2, ensure_ascii=False)</code>
+        <br><span class="desc">Serializes a Python object to JSON and writes to a file.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>7.5 Binary File I/O</h2>
+
+<pre><code><span class="cm"># Writing binary data (audio samples)</span>
+<span class="kw">import</span> numpy <span class="kw">as</span> np
+
+samples = np.array([<span class="num">0</span>, <span class="num">1000</span>, <span class="num">-1000</span>, <span class="num">2000</span>], dtype=np.int16)
+<span class="kw">with</span> open(<span class="str">"output.raw"</span>, <span class="str">"wb"</span>) <span class="kw">as</span> f:
+    f.write(samples.tobytes())
+
+<span class="cm"># Reading binary data</span>
+<span class="kw">with</span> open(<span class="str">"output.raw"</span>, <span class="str">"rb"</span>) <span class="kw">as</span> f:
+    raw = f.read()
+samples = np.frombuffer(raw, dtype=np.int16)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 6)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Writing binary data (audio samples)</code>
+        <br><span class="desc">A comment: <em>Writing binary data (audio samples)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>import numpy as np</code>
+        <br><span class="desc">Imports the <code>numpy as np</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>samples = np.array([0, 1000, -1000, 2000], dtype=np.int16)</code>
+        <br><span class="desc">Assigns <code>np.array([0, 1000, -1000, 2000], dtype=np.int16)</code> to <code>samples</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>with open(&quot;output.raw&quot;, &quot;wb&quot;) as f:</code>
+        <br><span class="desc">Opens a file using a context manager. The file is automatically closed when the block exits, even if an error occurs.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>f.write(samples.tobytes())</code>
+        <br><span class="desc">Writes a string to the file. In text mode, does not add a newline automatically.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># Reading binary data</code>
+        <br><span class="desc">A comment: <em>Reading binary data</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>with open(&quot;output.raw&quot;, &quot;rb&quot;) as f:</code>
+        <br><span class="desc">Opens a file using a context manager. The file is automatically closed when the block exits, even if an error occurs.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>raw = f.read()</code>
+        <br><span class="desc">Reads the entire file contents as a string.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>samples = np.frombuffer(raw, dtype=np.int16)</code>
+        <br><span class="desc">Assigns <code>np.frombuffer(raw, dtype=np.int16)</code> to <code>samples</code>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>7.6 pathlib — Modern Path Handling</h2>
+
+<pre><code><span class="kw">from</span> pathlib <span class="kw">import</span> Path
+
+<span class="cm"># Create Path objects</span>
+p = Path(<span class="str">"ai_voice_studio"</span>)
+p = Path.home() / <span class="str">"AIVoiceStudio"</span>
+p = Path(<span class="str">"."</span>) / <span class="str">"models"</span> / <span class="str">"piper"</span>
+
+<span class="cm"># Path properties</span>
+<span class="kw">print</span>(p.name)        <span class="cm"># "piper" (filename)</span>
+<span class="kw">print</span>(p.stem)        <span class="cm"># "piper" (without extension)</span>
+<span class="kw">print</span>(p.suffix)      <span class="cm"># "" (extension)</span>
+<span class="kw">print</span>(p.parent)      <span class="cm"># PosixPath('models')</span>
+<span class="kw">print</span>(p.exists())    <span class="cm"># True/False</span>
+<span class="kw">print</span>(p.is_file())   <span class="cm"># True/False</span>
+<span class="kw">print</span>(p.is_dir())    <span class="cm"># True/False</span>
+
+<span class="cm"># Read/write text files</span>
+text = Path(<span class="str">"notes.txt"</span>).read_text(encoding=<span class="str">"utf-8"</span>)
+Path(<span class="str">"output.txt"</span>).write_text(<span class="str">"Hello!\n"</span>, encoding=<span class="str">"utf-8"</span>)
+
+<span class="cm"># Read/write bytes</span>
+data = Path(<span class="str">"image.png"</span>).read_bytes()
+Path(<span class="str">"copy.png"</span>).write_bytes(data)
+
+<span class="cm"># Create directories</span>
+Path(<span class="str">"output/audio"</span>).mkdir(parents=<span class="kw">True</span>, exist_ok=<span class="kw">True</span>)
+
+<span class="cm"># Glob pattern matching</span>
+py_files = list(Path(<span class="str">"."</span>).glob(<span class="str">"**/*.py"</span>))  <span class="cm"># Recursive</span>
+test_files = list(Path(<span class="str">"tests"</span>).glob(<span class="str">"test_*.py"</span>))
+
+<span class="cm"># Iterating directory</span>
+<span class="kw">for</span> p <span class="kw">in</span> Path(<span class="str">"models"</span>).iterdir():
+    <span class="kw">if</span> p.is_dir():
+        <span class="kw">print</span>(<span class="str">f"Directory: </span>{p.name}<span class="str">"</span>)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 7)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>from pathlib import Path</code>
+        <br><span class="desc">Imports <code>Path</code> from <code>pathlib</code>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Create Path objects</code>
+        <br><span class="desc">A comment: <em>Create Path objects</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>p = Path(&quot;ai_voice_studio&quot;)</code>
+        <br><span class="desc">Assigns <code>Path(&quot;ai_voice_studio&quot;)</code> to <code>p</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>p = Path.home() / &quot;AIVoiceStudio&quot;</code>
+        <br><span class="desc">Assigns <code>Path.home() / &quot;AIVoiceStudio&quot;</code> to <code>p</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>p = Path(&quot;.&quot;) / &quot;models&quot; / &quot;piper&quot;</code>
+        <br><span class="desc">Assigns <code>Path(&quot;.&quot;) / &quot;models&quot; / &quot;piper&quot;</code> to <code>p</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># Path properties</code>
+        <br><span class="desc">A comment: <em>Path properties</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>print(p.name)        # &quot;piper&quot; (filename)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>print(p.stem)        # &quot;piper&quot; (without extension)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>print(p.suffix)      # &quot;&quot; (extension)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>print(p.parent)      # PosixPath(&#x27;models&#x27;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>print(p.exists())    # True/False</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>print(p.is_file())   # True/False</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>print(p.is_dir())    # True/False</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code># Read/write text files</code>
+        <br><span class="desc">A comment: <em>Read/write text files</em>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>text = Path(&quot;notes.txt&quot;).read_text(encoding=&quot;utf-8&quot;)</code>
+        <br><span class="desc">Assigns <code>Path(&quot;notes.txt&quot;).read_text(encoding=&quot;utf-8&quot;)</code> to <code>text</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>Path(&quot;output.txt&quot;).write_text(&quot;Hello!\n&quot;, encoding=&quot;utf-8&quot;)</code>
+        <br><span class="desc">Calls function <code>Path()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code># Read/write bytes</code>
+        <br><span class="desc">A comment: <em>Read/write bytes</em>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>data = Path(&quot;image.png&quot;).read_bytes()</code>
+        <br><span class="desc">Assigns <code>Path(&quot;image.png&quot;).read_bytes()</code> to <code>data</code>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>Path(&quot;copy.png&quot;).write_bytes(data)</code>
+        <br><span class="desc">Calls function <code>Path()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code># Create directories</code>
+        <br><span class="desc">A comment: <em>Create directories</em>.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>Path(&quot;output/audio&quot;).mkdir(parents=True, exist_ok=True)</code>
+        <br><span class="desc">Returns a list of attributes and methods of an object. Useful for exploration and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code># Glob pattern matching</code>
+        <br><span class="desc">A comment: <em>Glob pattern matching</em>.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>py_files = list(Path(&quot;.&quot;).glob(&quot;**/*.py&quot;))  # Recursive</code>
+        <br><span class="desc">Assigns <code>list(Path(&quot;.&quot;).glob(&quot;**/*.py&quot;))  # Recursive</code> to <code>py_files</code>.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>test_files = list(Path(&quot;tests&quot;).glob(&quot;test_*.py&quot;))</code>
+        <br><span class="desc">Assigns <code>list(Path(&quot;tests&quot;).glob(&quot;test_*.py&quot;))</code> to <code>test_files</code>.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code># Iterating directory</code>
+        <br><span class="desc">A comment: <em>Iterating directory</em>.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>for p in Path(&quot;models&quot;).iterdir():</code>
+        <br><span class="desc">Returns a list of attributes and methods of an object. Useful for exploration and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>if p.is_dir():</code>
+        <br><span class="desc">Returns a list of attributes and methods of an object. Useful for exploration and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>print(f&quot;Directory: {p.name}&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>7.7 os.path vs pathlib</h2>
+
+<table>
+  <thead><tr><th>Operation</th><th>os.path</th><th>pathlib</th></tr></thead>
+  <tbody>
+    <tr><td>Join paths</td><td><code>os.path.join(a, b)</code></td><td><code>Path(a) / b</code></td></tr>
+    <tr><td>Exists?</td><td><code>os.path.exists(p)</code></td><td><code>Path(p).exists()</code></td></tr>
+    <tr><td>Get name</td><td><code>os.path.basename(p)</code></td><td><code>Path(p).name</code></td></tr>
+    <tr><td>Get dir</td><td><code>os.path.dirname(p)</code></td><td><code>Path(p).parent</code></td></tr>
+    <tr><td>Makedirs</td><td><code>os.makedirs(p, exist_ok=True)</code></td><td><code>Path(p).mkdir(parents=True, exist_ok=True)</code></td></tr>
+  </tbody>
+</table>
+
+<p>The AIVS project uses <code>os.path</code> for cross-platform compatibility with older code patterns, but <code>pathlib</code> is preferred for new code.</p>
+
+<hr>
+
+<h2>7.8 File I/O in AIVS</h2>
+
+<pre><code><span class="cm"># From project.py — atomic JSON write</span>
+<span class="kw">def</span> <span class="fn">save_project</span>(project_dir: str, data: dict) -> None:
+    <span class="str">"""Save project.json atomically (write to temp, then rename)."""</span>
+    <span class="kw">import</span> tempfile
+    path = os.path.join(project_dir, <span class="str">"project.json"</span>)
+    <span class="cm"># Write to a temp file first (atomic on same filesystem)</span>
+    fd, tmp = tempfile.mkstemp(dir=project_dir, suffix=<span class="str">".tmp"</span>)
+    <span class="kw">try</span>:
+        <span class="kw">with</span> os.fdopen(fd, <span class="str">"w"</span>, encoding=<span class="str">"utf-8"</span>) <span class="kw">as</span> f:
+            json.dump(data, f, indent=<span class="num">2</span>, ensure_ascii=<span class="kw">False</span>)
+        <span class="cm"># Atomic rename (on same filesystem)</span>
+        os.replace(tmp, path)
+    <span class="kw">except</span>:
+        os.unlink(tmp)
+        <span class="kw">raise</span>
+
+<span class="cm"># From tts/downloader.py — streaming download with progress</span>
+<span class="kw">def</span> <span class="fn">_download_file</span>(url: str, dest: str, progress=None) -> None:
+    <span class="str">"""Download a file with progress reporting."""</span>
+    <span class="kw">import</span> requests
+    <span class="kw">with</span> requests.get(url, stream=<span class="kw">True</span>) <span class="kw">as</span> resp:
+        total = int(resp.headers.get(<span class="str">"content-length"</span>, <span class="num">0</span>))
+        downloaded = <span class="num">0</span>
+        <span class="kw">with</span> open(dest, <span class="str">"wb"</span>) <span class="kw">as</span> f:
+            <span class="kw">for</span> chunk <span class="kw">in</span> resp.iter_content(chunk_size=<span class="num">8192</span>):
+                f.write(chunk)
+                downloaded += len(chunk)
+                <span class="kw">if</span> progress:
+                    progress(downloaded, total)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 8)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From project.py — atomic JSON write</code>
+        <br><span class="desc">A comment: <em>From project.py — atomic JSON write</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def save_project(project_dir: str, data: dict) -&gt; None:</code>
+        <br><span class="desc">Defines function <code>save_project</code> accepting (project_dir, data), returning <code>None</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;&quot;&quot;Save project.json atomically (write to temp, then rename).&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Save project.json atomically (write to temp, then rename).</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>import tempfile</code>
+        <br><span class="desc">Imports the <code>tempfile</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>path = os.path.join(project_dir, &quot;project.json&quot;)</code>
+        <br><span class="desc">OS-agnostic path manipulation. Use join(), exists(), dirname(), basename(), splitext().</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># Write to a temp file first (atomic on same filesystem)</code>
+        <br><span class="desc">A comment: <em>Write to a temp file first (atomic on same filesystem)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>fd, tmp = tempfile.mkstemp(dir=project_dir, suffix=&quot;.tmp&quot;)</code>
+        <br><span class="desc"><code>fd, tmp = tempfile.mkstemp(dir=project_dir, suffix=&quot;.tmp&quot;)</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>try:</code>
+        <br><span class="desc">Begins exception handling. Code in this block is monitored for errors.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>with os.fdopen(fd, &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:</code>
+        <br><span class="desc">Opens a file and returns a file object. Supports modes: 'r' (read), 'w' (write), 'a' (append), 'b' (binary).</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>json.dump(data, f, indent=2, ensure_ascii=False)</code>
+        <br><span class="desc">Serializes a Python object to JSON and writes to a file.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># Atomic rename (on same filesystem)</code>
+        <br><span class="desc">A comment: <em>Atomic rename (on same filesystem)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>os.replace(tmp, path)</code>
+        <br><span class="desc">Returns a copy with all occurrences of old replaced by new. Strings are immutable.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>except:</code>
+        <br><span class="desc">Catches exceptions. Use specific exception types when possible.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>os.unlink(tmp)</code>
+        <br><span class="desc"><code>os.unlink(tmp)</code></span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>raise</code>
+        <br><span class="desc"><code>raise</code></span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code># From tts/downloader.py — streaming download with progress</code>
+        <br><span class="desc">A comment: <em>From tts/downloader.py — streaming download with progress</em>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>def _download_file(url: str, dest: str, progress=None) -&gt; None:</code>
+        <br><span class="desc">Defines function <code>_download_file</code> accepting (url, dest, progress), returning <code>None</code>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>&quot;&quot;&quot;Download a file with progress reporting.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Download a file with progress reporting.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>import requests</code>
+        <br><span class="desc">Imports the <code>requests</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>with requests.get(url, stream=True) as resp:</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>total = int(resp.headers.get(&quot;content-length&quot;, 0))</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>downloaded = 0</code>
+        <br><span class="desc">Assigns <code>0</code> to <code>downloaded</code>.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>with open(dest, &quot;wb&quot;) as f:</code>
+        <br><span class="desc">Opens a file using a context manager. The file is automatically closed when the block exits, even if an error occurs.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>for chunk in resp.iter_content(chunk_size=8192):</code>
+        <br><span class="desc">Iterates over <code>resp.iter_content(chunk_size=8192)</code>, assigning each element to <code>chunk</code>.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>f.write(chunk)</code>
+        <br><span class="desc">Writes a string to the file. In text mode, does not add a newline automatically.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>downloaded += len(chunk)</code>
+        <br><span class="desc">Returns the number of items in a sequence (string, list, dict, tuple). Essential for loop bounds and validation.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>if progress:</code>
+        <br><span class="desc">Checks condition: <code>progress</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>progress(downloaded, total)</code>
+        <br><span class="desc">Calls function <code>progress()</code>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>7.9 Temporary Files</h2>
+
+<pre><code><span class="kw">import</span> tempfile
+
+<span class="cm"># Temporary file (auto-deleted when closed)</span>
+<span class="kw">with</span> tempfile.NamedTemporaryFile(suffix=<span class="str">".wav"</span>, delete=<span class="kw">True</span>) <span class="kw">as</span> tmp:
+    tmp.write(audio_data)
+    tmp.flush()
+    <span class="cm"># Process the file...</span>
+<span class="cm"># File is deleted automatically</span>
+
+<span class="cm"># Temporary directory</span>
+<span class="kw">with</span> tempfile.TemporaryDirectory() <span class="kw">as</span> tmpdir:
+    <span class="cm"># Work with tmpdir...</span>
+    <span class="kw">pass</span>
+<span class="cm"># Directory and all contents deleted automatically</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 9)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>import tempfile</code>
+        <br><span class="desc">Imports the <code>tempfile</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Temporary file (auto-deleted when closed)</code>
+        <br><span class="desc">A comment: <em>Temporary file (auto-deleted when closed)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>with tempfile.NamedTemporaryFile(suffix=&quot;.wav&quot;, delete=True) as tmp:</code>
+        <br><span class="desc">Creates a temporary file that is deleted when closed.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>tmp.write(audio_data)</code>
+        <br><span class="desc">Writes a string to the file. In text mode, does not add a newline automatically.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>tmp.flush()</code>
+        <br><span class="desc"><code>tmp.flush()</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># Process the file...</code>
+        <br><span class="desc">A comment: <em>Process the file...</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># File is deleted automatically</code>
+        <br><span class="desc">A comment: <em>File is deleted automatically</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># Temporary directory</code>
+        <br><span class="desc">A comment: <em>Temporary directory</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>with tempfile.TemporaryDirectory() as tmpdir:</code>
+        <br><span class="desc">Context manager: <code>tempfile.TemporaryDirectory() as tmpdir</code>. Automatically manages resource cleanup.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code># Work with tmpdir...</code>
+        <br><span class="desc">A comment: <em>Work with tmpdir...</em>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>pass</code>
+        <br><span class="desc">Placeholder: does nothing.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code># Directory and all contents deleted automatically</code>
+        <br><span class="desc">A comment: <em>Directory and all contents deleted automatically</em>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>7.10 Key Takeaways</h2>
+<ul>
+  <li><strong>Always use <code>with</code> statements</strong> for file I/O (context managers auto-close)</li>
+  <li><strong>Always specify <code>encoding="utf-8"</code></strong> for text files</li>
+  <li><strong>JSON</strong> is the standard format for settings and project data in AIVS</li>
+  <li><strong>Atomic writes</strong> (write to temp file, then rename) prevent corruption</li>
+  <li><strong>pathlib</strong> is the modern way to handle file paths</li>
+  <li>For streaming large files, read in <strong>chunks</strong> to avoid loading everything into memory</li>
+</ul>
+
+<div class="exercise"><strong>Exercise 7.1:</strong> Write a function that reads a text file and returns a <code>Counter</code> of word frequencies. Test it on the project's README.md.</div>
+<div class="exercise"><strong>Exercise 7.2:</strong> Implement a <code>safe_json_write(path, data)</code> function that writes JSON atomically with proper error handling.</div>
+
+<hr>
+<p style="text-align: center;"><a href="ch06_collections.html">← Ch 6</a> &nbsp;|&nbsp; <a href="ch08_error_handling.html">Ch 8 — Error Handling →</a></p>
+</div></div></body>
+</html>

@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 39: sherpa-onnx TTS Engine - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part V</div><ul class="chapters"><li><a href="ch37_numpy.html">Ch 37</a></li><li><a href="ch38_requests.html">Ch 38</a></li><li><a href="ch39_sherpa_onnx.html" class="active">Ch 39: sherpa-onnx</a></li><li><a href="ch40_pypdf_docx.html">Ch 40</a></li><li><a href="ch41_ffmpeg.html">Ch 41</a></li><li><a href="ch42_virtualenvs.html">Ch 42</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 39</div>
+<h1>sherpa-onnx TTS Engine</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand sherpa-onnx's role in AIVS</li>
+  <li>Configure and use the TTS engine</li>
+  <li>See how multiple TTS engines are supported</li>
+</ul>
+
+<hr>
+
+<h2>39.1 What Is sherpa-onnx?</h2>
+
+<p>
+  <strong>sherpa-onnx</strong> is a C++ speech processing library with Python bindings,
+  using the ONNX runtime for inference. It supports multiple TTS model formats:
+</p>
+
+<ul>
+  <li><strong>VITS</strong> — used by Piper voices</li>
+  <li><strong>Kokoro</strong> — multi-speaker multi-language</li>
+  <li><strong>Matcha</strong> — flow-matching TTS with vocoder</li>
+  <li><strong>Kitten</strong> — small efficient models</li>
+</ul>
+
+<hr>
+
+<h2>39.2 TTS Engine Wrapper in AIVS</h2>
+
+<pre><code><span class="cm"># From tts/engine.py — simplified</span>
+<span class="kw">import</span> sherpa_onnx
+<span class="kw">import</span> numpy <span class="kw">as</span> np
+
+<span class="kw">class</span> <span class="cls">TtsEngine</span>:
+    <span class="str">"""Wrapper around sherpa-onnx TTS."""</span>
+    sample_rate = <span class="num">24000</span>
+
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, voice_entry: dict):
+        files = resolve_voice_files(voice_entry)
+        config = sherpa_onnx.OfflineTtsConfig(
+            model=sherpa_onnx.OfflineTtsModelConfig(
+                vits=sherpa_onnx.OfflineTtsVitsModelConfig(
+                    model=files[<span class="str">"model"</span>],
+                    tokens=files[<span class="str">"tokens"</span>],
+                    data_dir=files.get(<span class="str">"data_dir"</span>, <span class="str">""</span>),
+                    lexicon=files.get(<span class="str">"lexicon"</span>, <span class="str">""</span>),
+                    dict_dir=files.get(<span class="str">"dict_dir"</span>, <span class="str">""</span>),
+                ),
+                num_threads=<span class="num">1</span>,
+            ),
+            max_num_sentences=<span class="num">1</span>,
+        )
+        self._tts = sherpa_onnx.OfflineTts(config)
+
+    <span class="kw">def</span> <span class="fn">synthesize</span>(self, text, sid=<span class="num">0</span>, speed=<span class="num">1.0</span>, pitch=<span class="num">1.0</span>, volume=<span class="num">1.0</span>):
+        <span class="kw">if not</span> text.strip():
+            <span class="kw">raise</span> ValueError(<span class="str">"Nothing to synthesize"</span>)
+
+        <span class="cm"># Core synthesis</span>
+        audio = self._tts.generate(text=text, sid=sid, speed=speed)
+        samples = np.array(audio.samples, dtype=np.int16)
+
+        <span class="cm"># Apply post-processing</span>
+        <span class="kw">if</span> pitch != <span class="num">1.0</span>:
+            samples = _shift_pitch(samples, pitch)
+        <span class="kw">if</span> volume != <span class="num">1.0</span>:
+            samples = _apply_volume(samples, volume)
+
+        <span class="kw">return</span> samples
+
+<span class="cm"># Engine caching (one engine per voice)</span>
+_engine_cache: dict[str, TtsEngine] = {}
+
+<span class="kw">def</span> <span class="fn">get_engine</span>(voice_entry: dict) -> TtsEngine:
+    <span class="str">"""Get or create a cached engine."""</span>
+    key = voice_entry.get(<span class="str">"voice"</span>, <span class="str">""</span>)
+    <span class="kw">if</span> key <span class="kw">not in</span> _engine_cache:
+        _engine_cache[key] = TtsEngine(voice_entry)
+    <span class="kw">return</span> _engine_cache[key]</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From tts/engine.py — simplified</code>
+        <br><span class="desc">A comment: <em>From tts/engine.py — simplified</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>import sherpa_onnx</code>
+        <br><span class="desc">Imports a module.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>import numpy as np</code>
+        <br><span class="desc">Imports a module.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>class TtsEngine:</code>
+        <br><span class="desc">Defines a new class.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>&quot;&quot;&quot;Wrapper around sherpa-onnx TTS.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Wrapper around sherpa-onnx TTS.</em>. Documents the following code.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>sample_rate = 24000</code>
+        <br><span class="desc">Assigns <code>24000</code> to <code>sample_rate</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>def __init__(self, voice_entry: dict):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>files = resolve_voice_files(voice_entry)</code>
+        <br><span class="desc">Assigns <code>resolve_voice_files(voice_entry)</code> to <code>files</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>config = sherpa_onnx.OfflineTtsConfig(</code>
+        <br><span class="desc">Configuration container for the offline TTS engine. Specifies model, rule_fsts, and max_num_sentences.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>model=sherpa_onnx.OfflineTtsModelConfig(</code>
+        <br><span class="desc">Configuration for the TTS model. Specifies which model type (VITS, Kokoro, Matcha) to use.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>vits=sherpa_onnx.OfflineTtsVitsModelConfig(</code>
+        <br><span class="desc">Configuration for VITS-style models. Requires model, tokens, and optionally lexicon, data_dir.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>model=files[&quot;model&quot;],</code>
+        <br><span class="desc">Path to the ONNX model file. The main neural network weights.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>tokens=files[&quot;tokens&quot;],</code>
+        <br><span class="desc">Path to the tokens file. Defines the vocabulary the model uses.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>data_dir=files.get(&quot;data_dir&quot;, &quot;&quot;),</code>
+        <br><span class="desc">Path to espeak-ng data directory (for Kokoro models).</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>lexicon=files.get(&quot;lexicon&quot;, &quot;&quot;),</code>
+        <br><span class="desc">Path to a pronunciation lexicon file. Maps words to phoneme sequences.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>dict_dir=files.get(&quot;dict_dir&quot;, &quot;&quot;),</code>
+        <br><span class="desc">Assigns <code>files.get(&quot;dict_dir&quot;, &quot;&quot;),</code> to <code>dict_dir</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>),</code>
+        <br><span class="desc"><code>),</code></span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>num_threads=1,</code>
+        <br><span class="desc">Number of CPU threads for inference. Higher values use more CPU but may be faster.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>),</code>
+        <br><span class="desc"><code>),</code></span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>max_num_sentences=1,</code>
+        <br><span class="desc">Maximum number of sentences to synthesize in one call. Higher values use more memory.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>self._tts = sherpa_onnx.OfflineTts(config)</code>
+        <br><span class="desc">Creates an offline TTS engine from a configuration. The main entry point for text-to-speech synthesis.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>def synthesize(self, text, sid=0, speed=1.0, pitch=1.0, volume=1.0):</code>
+        <br><span class="desc">Defines a function.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>if not text.strip():</code>
+        <br><span class="desc">Conditional check.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>raise ValueError(&quot;Nothing to synthesize&quot;)</code>
+        <br><span class="desc">Manually raises an exception.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code># Core synthesis</code>
+        <br><span class="desc">A comment: <em>Core synthesis</em>.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>audio = self._tts.generate(text=text, sid=sid, speed=speed)</code>
+        <br><span class="desc">Generates audio from text. Returns a GeneratedAudio object with .samples and .sample_rate.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>samples = np.array(audio.samples, dtype=np.int16)</code>
+        <br><span class="desc">Creates a NumPy array from a list or tuple. The dtype parameter specifies the data type (e.g., np.int16 for 16-bit audio samples).</span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code># Apply post-processing</code>
+        <br><span class="desc">A comment: <em>Apply post-processing</em>.</span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code>if pitch != 1.0:</code>
+        <br><span class="desc">Conditional check.</span>
+      </li>
+      <li>
+        <strong>Line 31:</strong> <code>samples = _shift_pitch(samples, pitch)</code>
+        <br><span class="desc">Assigns <code>_shift_pitch(samples, pitch)</code> to <code>samples</code>.</span>
+      </li>
+      <li>
+        <strong>Line 32:</strong> <code>if volume != 1.0:</code>
+        <br><span class="desc">Conditional check.</span>
+      </li>
+      <li>
+        <strong>Line 33:</strong> <code>samples = _apply_volume(samples, volume)</code>
+        <br><span class="desc">Assigns <code>_apply_volume(samples, volume)</code> to <code>samples</code>.</span>
+      </li>
+      <li>
+        <strong>Line 34:</strong> <code>return samples</code>
+        <br><span class="desc">Returns a value from a function.</span>
+      </li>
+      <li>
+        <strong>Line 35:</strong> <code># Engine caching (one engine per voice)</code>
+        <br><span class="desc">A comment: <em>Engine caching (one engine per voice)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 36:</strong> <code>_engine_cache: dict[str, TtsEngine] = {}</code>
+        <br><span class="desc"><code>_engine_cache: dict[str, TtsEngine] = {}</code></span>
+      </li>
+      <li>
+        <strong>Line 37:</strong> <code>def get_engine(voice_entry: dict) -&gt; TtsEngine:</code>
+        <br><span class="desc">Begins exception handling.</span>
+      </li>
+      <li>
+        <strong>Line 38:</strong> <code>&quot;&quot;&quot;Get or create a cached engine.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Get or create a cached engine.</em>. Documents the following code.</span>
+      </li>
+      <li>
+        <strong>Line 39:</strong> <code>key = voice_entry.get(&quot;voice&quot;, &quot;&quot;)</code>
+        <br><span class="desc">Assigns <code>voice_entry.get(&quot;voice&quot;, &quot;&quot;)</code> to <code>key</code>.</span>
+      </li>
+      <li>
+        <strong>Line 40:</strong> <code>if key not in _engine_cache:</code>
+        <br><span class="desc">Conditional check.</span>
+      </li>
+      <li>
+        <strong>Line 41:</strong> <code>_engine_cache[key] = TtsEngine(voice_entry)</code>
+        <br><span class="desc"><code>_engine_cache[key] = TtsEngine(voice_entry)</code></span>
+      </li>
+      <li>
+        <strong>Line 42:</strong> <code>return _engine_cache[key]</code>
+        <br><span class="desc">Returns a value from a function.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>39.3 Voice Catalog Structure</h2>
+
+<pre><code><span class="cm"># The catalog maps TTS engines to languages, variants, and voices</span>
+<span class="cm"># From tts/catalog.py (simplified)</span>
+_CATALOG = (
+    {
+        <span class="str">"id"</span>: <span class="str">"piper"</span>,
+        <span class="str">"name"</span>: <span class="str">"Piper TTS"</span>,
+        <span class="str">"engine"</span>: <span class="str">"vits"</span>,
+        <span class="str">"voice_cloning"</span>: <span class="kw">True</span>,
+        <span class="str">"languages"</span>: [
+            {
+                <span class="str">"code"</span>: <span class="str">"en_US"</span>,
+                <span class="str">"name"</span>: <span class="str">"English (US)"</span>,
+                <span class="str">"variants"</span>: [
+                    {
+                        <span class="str">"id"</span>: <span class="str">"medium"</span>,
+                        <span class="str">"name"</span>: <span class="str">"Medium quality"</span>,
+                        <span class="str">"voices"</span>: [
+                            {<span class="str">"id"</span>: <span class="str">"af"</span>, <span class="str">"name"</span>: <span class="str">"AF"</span>, <span class="str">"sid"</span>: <span class="num">0</span>},
+                            {<span class="str">"id"</span>: <span class="str">"af_bella"</span>, <span class="str">"name"</span>: <span class="str">"Bella"</span>, <span class="str">"sid"</span>: <span class="num">2</span>},
+                            <span class="cm"># ... more voices</span>
+                        ],
+                    },
+                ],
+            },
+        ],
+    },
+    <span class="cm"># ... Kokoro, Matcha, Kitten entries</span>
+)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># The catalog maps TTS engines to languages, variants, and voices</code>
+        <br><span class="desc">A comment: <em>The catalog maps TTS engines to languages, variants, and voices</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># From tts/catalog.py (simplified)</code>
+        <br><span class="desc">A comment: <em>From tts/catalog.py (simplified)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>_CATALOG = (</code>
+        <br><span class="desc">Assigns <code>(</code> to <code>_CATALOG</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>{</code>
+        <br><span class="desc"><code>{</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>&quot;id&quot;: &quot;piper&quot;,</code>
+        <br><span class="desc"><code>&quot;id&quot;: &quot;piper&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>&quot;name&quot;: &quot;Piper TTS&quot;,</code>
+        <br><span class="desc"><code>&quot;name&quot;: &quot;Piper TTS&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>&quot;engine&quot;: &quot;vits&quot;,</code>
+        <br><span class="desc"><code>&quot;engine&quot;: &quot;vits&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>&quot;voice_cloning&quot;: True,</code>
+        <br><span class="desc"><code>&quot;voice_cloning&quot;: True,</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>&quot;languages&quot;: [</code>
+        <br><span class="desc"><code>&quot;languages&quot;: [</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>{</code>
+        <br><span class="desc"><code>{</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>&quot;code&quot;: &quot;en_US&quot;,</code>
+        <br><span class="desc"><code>&quot;code&quot;: &quot;en_US&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>&quot;name&quot;: &quot;English (US)&quot;,</code>
+        <br><span class="desc"><code>&quot;name&quot;: &quot;English (US)&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>&quot;variants&quot;: [</code>
+        <br><span class="desc"><code>&quot;variants&quot;: [</code></span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>{</code>
+        <br><span class="desc"><code>{</code></span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>&quot;id&quot;: &quot;medium&quot;,</code>
+        <br><span class="desc"><code>&quot;id&quot;: &quot;medium&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>&quot;name&quot;: &quot;Medium quality&quot;,</code>
+        <br><span class="desc"><code>&quot;name&quot;: &quot;Medium quality&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>&quot;voices&quot;: [</code>
+        <br><span class="desc"><code>&quot;voices&quot;: [</code></span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>{&quot;id&quot;: &quot;af&quot;, &quot;name&quot;: &quot;AF&quot;, &quot;sid&quot;: 0},</code>
+        <br><span class="desc"><code>{&quot;id&quot;: &quot;af&quot;, &quot;name&quot;: &quot;AF&quot;, &quot;sid&quot;: 0},</code></span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>{&quot;id&quot;: &quot;af_bella&quot;, &quot;name&quot;: &quot;Bella&quot;, &quot;sid&quot;: 2},</code>
+        <br><span class="desc"><code>{&quot;id&quot;: &quot;af_bella&quot;, &quot;name&quot;: &quot;Bella&quot;, &quot;sid&quot;: 2},</code></span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code># ... more voices</code>
+        <br><span class="desc">A comment: <em>... more voices</em>.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>],</code>
+        <br><span class="desc"><code>],</code></span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>},</code>
+        <br><span class="desc"><code>},</code></span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>],</code>
+        <br><span class="desc"><code>],</code></span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>},</code>
+        <br><span class="desc"><code>},</code></span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>],</code>
+        <br><span class="desc"><code>],</code></span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>},</code>
+        <br><span class="desc"><code>},</code></span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code># ... Kokoro, Matcha, Kitten entries</code>
+        <br><span class="desc">A comment: <em>... Kokoro, Matcha, Kitten entries</em>.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>39.4 Key Takeaways</h2>
+<ul>
+  <li><strong>sherpa-onnx</strong> is the primary TTS engine — supports VITS, Kokoro, Matcha, Kitten</li>
+  <li><strong>Engine caching</strong> prevents reloading models for each synthesis call</li>
+  <li><strong>resolve_voice_files()</strong> maps voice entries to actual file paths</li>
+  <li>The <strong>catalog</strong> is a nested dict: TTS → language → variant → voice</li>
+  <li>Post-processing (pitch, volume) is applied <strong>after</strong> synthesis</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch38_requests.html">← Ch 38</a> &nbsp;|&nbsp; <a href="ch40_pypdf_docx.html">Ch 40 — PDF/DOCX →</a></p>
+</div></div></body>
+</html>

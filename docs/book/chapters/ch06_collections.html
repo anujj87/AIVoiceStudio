@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 6: Collections - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2><div class="part-header">Part I</div><ul class="chapters"><li><a href="ch01_introduction.html">Ch 1</a></li><li><a href="ch02_variables.html">Ch 2</a></li><li><a href="ch03_control_flow.html">Ch 3</a></li><li><a href="ch04_functions.html">Ch 4</a></li><li><a href="ch05_strings.html">Ch 5</a></li><li><a href="ch06_collections.html" class="active">Ch 6: Collections</a></li><li><a href="ch07_file_io.html">Ch 7</a></li><li><a href="ch08_error_handling.html">Ch 8</a></li><li><a href="ch09_modules.html">Ch 9</a></li><li><a href="ch10_oop_basics.html">Ch 10</a></li></ul></nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 6</div>
+<h1>Lists, Tuples, Sets &amp; Dictionaries</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Master Python's four core collection types</li>
+  <li>Understand when to use each type</li>
+  <li>Learn collection methods and operations</li>
+  <li>See how AIVS uses collections for voice catalogs and settings</li>
+</ul>
+
+<hr>
+
+<h2>6.1 Lists — Ordered, Mutable Sequences</h2>
+
+<pre><code><span class="cm"># Creating lists</span>
+engines = [<span class="str">"Piper"</span>, <span class="str">"Kokoro"</span>, <span class="str">"Matcha"</span>, <span class="str">"Kitten"</span>]
+numbers = [<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">4</span>, <span class="num">5</span>]
+mixed = [<span class="num">42</span>, <span class="str">"hello"</span>, <span class="kw">True</span>, <span class="kw">None</span>]  <span class="cm"># Any types</span>
+empty = []
+
+<span class="cm"># Accessing elements (0-based indexing)</span>
+<span class="kw">print</span>(engines[<span class="num">0</span>])      <span class="cm"># "Piper"</span>
+<span class="kw">print</span>(engines[-<span class="num">1</span>])     <span class="cm"># "Kitten" (last element)</span>
+
+<span class="cm"># Slicing (returns a new list)</span>
+<span class="kw">print</span>(engines[<span class="num">1</span>:<span class="num">3</span>])    <span class="cm"># ["Kokoro", "Matcha"]</span>
+<span class="kw">print</span>(engines[::<span class="num">2</span>])     <span class="cm"># ["Piper", "Matcha"] (every other)</span>
+<span class="kw">print</span>(engines[::-<span class="num">1</span>])    <span class="cm"># Reversed copy</span>
+
+<span class="cm"># Modifying</span>
+engines[<span class="num">0</span>] = <span class="str">"Piper v2"</span>
+engines.append(<span class="str">"XTTS"</span>)
+engines.insert(<span class="num">1</span>, <span class="str">"New Engine"</span>)
+engines.extend([<span class="str">"OmniVoice"</span>, <span class="str">"Server"</span>])
+engines.remove(<span class="str">"Matcha"</span>)
+popped = engines.pop()    <span class="cm"># Remove and return last</span>
+popped = engines.pop(<span class="num">0</span>)  <span class="cm"># Remove and return first</span>
+<span class="kw">del</span> engines[<span class="num">0</span>]          <span class="cm"># Delete by index</span>
+
+<span class="cm"># Useful operations</span>
+<span class="kw">print</span>(len(engines))         <span class="cm"># Count</span>
+<span class="kw">print</span>(<span class="str">"Piper"</span> <span class="kw">in</span> engines)   <span class="cm"># Membership test: True</span>
+engines.sort()                <span class="cm"># Sort in-place (alphabetical)</span>
+engines.sort(reverse=<span class="kw">True</span>)   <span class="cm"># Reverse sort</span>
+engines.reverse()             <span class="cm"># Reverse in-place</span>
+
+<span class="cm"># Count and index</span>
+engines = [<span class="str">"Piper"</span>, <span class="str">"Kokoro"</span>, <span class="str">"Piper"</span>]
+<span class="kw">print</span>(engines.count(<span class="str">"Piper"</span>))  <span class="cm"># 2</span>
+<span class="kw">print</span>(engines.index(<span class="str">"Kokoro"</span>)) <span class="cm"># 1</span>
+
+<span class="cm"># Copying (important!)</span>
+a = [<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>]
+b = a.copy()     <span class="cm"># Independent copy</span>
+b = a[:]          <span class="cm"># Also an independent copy</span>
+b = list(a)       <span class="cm"># Also an independent copy</span>
+<span class="cm"># b = a          # WRONG: just another reference to same list!</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Creating lists</code>
+        <br><span class="desc">A comment: <em>Creating lists</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>engines = [&quot;Piper&quot;, &quot;Kokoro&quot;, &quot;Matcha&quot;, &quot;Kitten&quot;]</code>
+        <br><span class="desc">Assigns <code>[&quot;Piper&quot;, &quot;Kokoro&quot;, &quot;Matcha&quot;, &quot;Kitten&quot;]</code> to <code>engines</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>numbers = [1, 2, 3, 4, 5]</code>
+        <br><span class="desc">Assigns <code>[1, 2, 3, 4, 5]</code> to <code>numbers</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>mixed = [42, &quot;hello&quot;, True, None]  # Any types</code>
+        <br><span class="desc">Type hint meaning any type is acceptable. Use sparingly.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>empty = []</code>
+        <br><span class="desc">Assigns <code>[]</code> to <code>empty</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># Accessing elements (0-based indexing)</code>
+        <br><span class="desc">A comment: <em>Accessing elements (0-based indexing)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>print(engines[0])      # &quot;Piper&quot;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>print(engines[-1])     # &quot;Kitten&quot; (last element)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code># Slicing (returns a new list)</code>
+        <br><span class="desc">A comment: <em>Slicing (returns a new list)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>print(engines[1:3])    # [&quot;Kokoro&quot;, &quot;Matcha&quot;]</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>print(engines[::2])     # [&quot;Piper&quot;, &quot;Matcha&quot;] (every other)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>print(engines[::-1])    # Reversed copy</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code># Modifying</code>
+        <br><span class="desc">A comment: <em>Modifying</em>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>engines[0] = &quot;Piper v2&quot;</code>
+        <br><span class="desc"><code>engines[0] = &quot;Piper v2&quot;</code></span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>engines.append(&quot;XTTS&quot;)</code>
+        <br><span class="desc">Adds a single item to the end of the list.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>engines.insert(1, &quot;New Engine&quot;)</code>
+        <br><span class="desc">Inserts an item at the given index. Shifts subsequent items right.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>engines.extend([&quot;OmniVoice&quot;, &quot;Server&quot;])</code>
+        <br><span class="desc">Extends the list by appending items from an iterable.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>engines.remove(&quot;Matcha&quot;)</code>
+        <br><span class="desc">Removes an element. Raises KeyError if not found.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>popped = engines.pop()    # Remove and return last</code>
+        <br><span class="desc">Removes and returns the value for a key, or a default if not found.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>popped = engines.pop(0)  # Remove and return first</code>
+        <br><span class="desc">Removes and returns the value for a key, or a default if not found.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>del engines[0]          # Delete by index</code>
+        <br><span class="desc"><code>del engines[0]          # Delete by index</code></span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code># Useful operations</code>
+        <br><span class="desc">A comment: <em>Useful operations</em>.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>print(len(engines))         # Count</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>print(&quot;Piper&quot; in engines)   # Membership test: True</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>engines.sort()                # Sort in-place (alphabetical)</code>
+        <br><span class="desc">Sorts the list in-place. Accepts key= and reverse= parameters.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>engines.sort(reverse=True)   # Reverse sort</code>
+        <br><span class="desc">Sorts the list in-place. Accepts key= and reverse= parameters.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>engines.reverse()             # Reverse in-place</code>
+        <br><span class="desc">Reverses the list in-place.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code># Count and index</code>
+        <br><span class="desc">A comment: <em>Count and index</em>.</span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>engines = [&quot;Piper&quot;, &quot;Kokoro&quot;, &quot;Piper&quot;]</code>
+        <br><span class="desc">Assigns <code>[&quot;Piper&quot;, &quot;Kokoro&quot;, &quot;Piper&quot;]</code> to <code>engines</code>.</span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code>print(engines.count(&quot;Piper&quot;))  # 2</code>
+        <br><span class="desc">Returns the number of occurrences of a value.</span>
+      </li>
+      <li>
+        <strong>Line 31:</strong> <code>print(engines.index(&quot;Kokoro&quot;)) # 1</code>
+        <br><span class="desc">Returns the index of the first occurrence of a value.</span>
+      </li>
+      <li>
+        <strong>Line 32:</strong> <code># Copying (important!)</code>
+        <br><span class="desc">A comment: <em>Copying (important!)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 33:</strong> <code>a = [1, 2, 3]</code>
+        <br><span class="desc">Assigns <code>[1, 2, 3]</code> to <code>a</code>.</span>
+      </li>
+      <li>
+        <strong>Line 34:</strong> <code>b = a.copy()     # Independent copy</code>
+        <br><span class="desc">Returns a shallow copy of the dictionary.</span>
+      </li>
+      <li>
+        <strong>Line 35:</strong> <code>b = a[:]          # Also an independent copy</code>
+        <br><span class="desc">Assigns <code>a[:]          # Also an independent copy</code> to <code>b</code>.</span>
+      </li>
+      <li>
+        <strong>Line 36:</strong> <code>b = list(a)       # Also an independent copy</code>
+        <br><span class="desc">Assigns <code>list(a)       # Also an independent copy</code> to <code>b</code>.</span>
+      </li>
+      <li>
+        <strong>Line 37:</strong> <code># b = a          # WRONG: just another reference to same list!</code>
+        <br><span class="desc">A comment: <em>b = a          # WRONG: just another reference to same list!</em>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>6.2 Tuples — Ordered, Immutable Sequences</h2>
+
+<pre><code><span class="cm"># Creating tuples</span>
+point = (<span class="num">3</span>, <span class="num">4</span>)
+single = (<span class="num">42</span>,)       <span class="cm"># Trailing comma required for single-element tuple</span>
+empty = ()
+<span class="cm"># Parentheses are optional for packing</span>
+point = <span class="num">3</span>, <span class="num">4</span>          <span class="cm"># Also a tuple</span>
+
+<span class="cm"># Accessing (same as lists)</span>
+<span class="kw">print</span>(point[<span class="num">0</span>])       <span class="cm"># 3</span>
+
+<span class="cm"># Cannot modify!</span>
+<span class="cm"># point[0] = 5  # TypeError: 'tuple' does not support item assignment</span>
+
+<span class="cm"># Named tuples — readable tuples with field names</span>
+<span class="kw">from</span> collections <span class="kw">import</span> namedtuple
+
+Segment = namedtuple(<span class="str">"Segment"</span>, [<span class="str">"index"</span>, <span class="str">"title"</span>, <span class="str">"text"</span>])
+seg = Segment(index=<span class="num">1</span>, title=<span class="str">"Chapter 1"</span>, text=<span class="str">"Once upon..."</span>)
+<span class="kw">print</span>(seg.index)     <span class="cm"># 1 (named access)</span>
+<span class="kw">print</span>(seg[<span class="num">0</span>])        <span class="cm"># 1 (also indexable)</span>
+
+<span class="cm"># Unpacking</span>
+index, title, text = seg</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Creating tuples</code>
+        <br><span class="desc">A comment: <em>Creating tuples</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>point = (3, 4)</code>
+        <br><span class="desc">Assigns <code>(3, 4)</code> to <code>point</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>single = (42,)       # Trailing comma required for single-element tuple</code>
+        <br><span class="desc">Assigns <code>(42,)       # Trailing comma required for single-element tuple</code> to <code>single</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>empty = ()</code>
+        <br><span class="desc">Assigns <code>()</code> to <code>empty</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># Parentheses are optional for packing</code>
+        <br><span class="desc">A comment: <em>Parentheses are optional for packing</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>point = 3, 4          # Also a tuple</code>
+        <br><span class="desc">Assigns <code>3, 4          # Also a tuple</code> to <code>point</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># Accessing (same as lists)</code>
+        <br><span class="desc">A comment: <em>Accessing (same as lists)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>print(point[0])       # 3</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code># Cannot modify!</code>
+        <br><span class="desc">A comment: <em>Cannot modify!</em>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code># point[0] = 5  # TypeError: &#x27;tuple&#x27; does not support item assignment</code>
+        <br><span class="desc">A comment: <em>point[0] = 5  # TypeError: &#x27;tuple&#x27; does not support item assignment</em>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># Named tuples — readable tuples with field names</code>
+        <br><span class="desc">A comment: <em>Named tuples — readable tuples with field names</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>from collections import namedtuple</code>
+        <br><span class="desc">Imports <code>namedtuple</code> from <code>collections</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>Segment = namedtuple(&quot;Segment&quot;, [&quot;index&quot;, &quot;title&quot;, &quot;text&quot;])</code>
+        <br><span class="desc">Assigns <code>namedtuple(&quot;Segment&quot;, [&quot;index&quot;, &quot;title&quot;, &quot;text&quot;])</code> to <code>Segment</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>seg = Segment(index=1, title=&quot;Chapter 1&quot;, text=&quot;Once upon...&quot;)</code>
+        <br><span class="desc">Assigns <code>Segment(index=1, title=&quot;Chapter 1&quot;, text=&quot;Once upon...&quot;)</code> to <code>seg</code>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>print(seg.index)     # 1 (named access)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>print(seg[0])        # 1 (also indexable)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code># Unpacking</code>
+        <br><span class="desc">A comment: <em>Unpacking</em>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>index, title, text = seg</code>
+        <br><span class="desc"><code>index, title, text = seg</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>Tuples vs Lists</h3>
+
+<table>
+  <thead><tr><th>Feature</th><th>List</th><th>Tuple</th></tr></thead>
+  <tbody>
+    <tr><td>Mutable?</td><td>Yes</td><td>No</td></tr>
+    <tr><td>Syntax</td><td><code>[1, 2, 3]</code></td><td><code>(1, 2, 3)</code></td></tr>
+    <tr><td>Performance</td><td>Slower</td><td>Faster (immutable, cached)</td></tr>
+    <tr><td>Dict key?</td><td>No</td><td>Yes</td></tr>
+    <tr><td>Use case</td><td>Dynamic collections</td><td>Fixed records, dict keys</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h2>6.3 Dictionaries — Key-Value Mapping</h2>
+
+<pre><code><span class="cm"># Creating dicts</span>
+voice = {
+    <span class="str">"id"</span>: <span class="str">"af_bella"</span>,
+    <span class="str">"name"</span>: <span class="str">"Bella"</span>,
+    <span class="str">"sid"</span>: <span class="num">2</span>,
+    <span class="str">"language"</span>: <span class="str">"en"</span>,
+}
+
+<span class="cm"># Accessing</span>
+<span class="kw">print</span>(voice[<span class="str">"id"</span>])           <span class="cm"># "af_bella"</span>
+<span class="kw">print</span>(voice.get(<span class="str">"speed"</span>, <span class="num">1.0</span>))  <span class="cm"># 1.0 (default if key missing)</span>
+<span class="kw">print</span>(voice.get(<span class="str">"speed"</span>))      <span class="cm"># None (no default)</span>
+
+<span class="cm"># Modifying</span>
+voice[<span class="str">"sample_rate"</span>] = <span class="num">24000</span>   <span class="cm"># Add/update</span>
+<span class="kw">del</span> voice[<span class="str">"sid"</span>]              <span class="cm"># Delete</span>
+removed = voice.pop(<span class="str">"language"</span>) <span class="cm"># Remove and return</span>
+
+<span class="cm"># Iteration</span>
+<span class="kw">for</span> key <span class="kw">in</span> voice:              <span class="cm"># Keys (default)</span>
+    <span class="kw">print</span>(key)
+
+<span class="kw">for</span> key, value <span class="kw">in</span> voice.items():  <span class="cm"># Key-value pairs</span>
+    <span class="kw">print</span>(<span class="str">f"</span>{key}<span class="str">: </span>{value}<span class="str">"</span>)
+
+<span class="kw">for</span> value <span class="kw">in</span> voice.values():   <span class="cm"># Values only</span>
+    <span class="kw">print</span>(value)
+
+<span class="cm"># Merging</span>
+defaults = {<span class="str">"rate"</span>: <span class="num">1.0</span>, <span class="str">"pitch"</span>: <span class="num">1.0</span>}
+overrides = {<span class="str">"rate"</span>: <span class="num">1.5</span>, <span class="str">"volume"</span>: <span class="num">0.8</span>}
+
+<span class="cm"># Python 3.9+ merge operator</span>
+merged = defaults | overrides   <span class="cm"># {"rate": 1.5, "pitch": 1.0, "volume": 0.8}</span>
+
+<span class="cm"># Classic merge</span>
+merged = {**defaults, **overrides}
+
+<span class="cm"># setdefault — get or set in one step</span>
+config = {}
+config.setdefault(<span class="str">"threads"</span>, <span class="num">4</span>)  <span class="cm"># Sets and returns 4</span>
+config.setdefault(<span class="str">"threads"</span>, <span class="num">8</span>)  <span class="cm"># Returns existing 4</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Creating dicts</code>
+        <br><span class="desc">A comment: <em>Creating dicts</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>voice = {</code>
+        <br><span class="desc">Assigns <code>{</code> to <code>voice</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;id&quot;: &quot;af_bella&quot;,</code>
+        <br><span class="desc"><code>&quot;id&quot;: &quot;af_bella&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>&quot;name&quot;: &quot;Bella&quot;,</code>
+        <br><span class="desc"><code>&quot;name&quot;: &quot;Bella&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>&quot;sid&quot;: 2,</code>
+        <br><span class="desc"><code>&quot;sid&quot;: 2,</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>&quot;language&quot;: &quot;en&quot;,</code>
+        <br><span class="desc"><code>&quot;language&quot;: &quot;en&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>}</code>
+        <br><span class="desc"><code>}</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># Accessing</code>
+        <br><span class="desc">A comment: <em>Accessing</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>print(voice[&quot;id&quot;])           # &quot;af_bella&quot;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>print(voice.get(&quot;speed&quot;, 1.0))  # 1.0 (default if key missing)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>print(voice.get(&quot;speed&quot;))      # None (no default)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code># Modifying</code>
+        <br><span class="desc">A comment: <em>Modifying</em>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>voice[&quot;sample_rate&quot;] = 24000   # Add/update</code>
+        <br><span class="desc"><code>voice[&quot;sample_rate&quot;] = 24000   # Add/update</code></span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>del voice[&quot;sid&quot;]              # Delete</code>
+        <br><span class="desc"><code>del voice[&quot;sid&quot;]              # Delete</code></span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>removed = voice.pop(&quot;language&quot;) # Remove and return</code>
+        <br><span class="desc">Removes and returns the value for a key, or a default if not found.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code># Iteration</code>
+        <br><span class="desc">A comment: <em>Iteration</em>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>for key in voice:              # Keys (default)</code>
+        <br><span class="desc">Iterates over <code>voice</code>, assigning each element to <code>key</code>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>print(key)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>for key, value in voice.items():  # Key-value pairs</code>
+        <br><span class="desc">Returns a view of the dictionary's (key, value) pairs.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>print(f&quot;{key}: {value}&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>for value in voice.values():   # Values only</code>
+        <br><span class="desc">Returns a view of the dictionary's values.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>print(value)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code># Merging</code>
+        <br><span class="desc">A comment: <em>Merging</em>.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>defaults = {&quot;rate&quot;: 1.0, &quot;pitch&quot;: 1.0}</code>
+        <br><span class="desc">Assigns <code>{&quot;rate&quot;: 1.0, &quot;pitch&quot;: 1.0}</code> to <code>defaults</code>.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>overrides = {&quot;rate&quot;: 1.5, &quot;volume&quot;: 0.8}</code>
+        <br><span class="desc">Assigns <code>{&quot;rate&quot;: 1.5, &quot;volume&quot;: 0.8}</code> to <code>overrides</code>.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code># Python 3.9+ merge operator</code>
+        <br><span class="desc">A comment: <em>Python 3.9+ merge operator</em>.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>merged = defaults | overrides   # {&quot;rate&quot;: 1.5, &quot;pitch&quot;: 1.0, &quot;volume&quot;: 0.8}</code>
+        <br><span class="desc">Assigns <code>defaults | overrides   # {&quot;rate&quot;: 1.5, &quot;pitch&quot;: 1.0, &quot;volume&quot;: 0.8}</code> to <code>merged</code>.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code># Classic merge</code>
+        <br><span class="desc">A comment: <em>Classic merge</em>.</span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>merged = {**defaults, **overrides}</code>
+        <br><span class="desc">Assigns <code>{**defaults, **overrides}</code> to <code>merged</code>.</span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code># setdefault — get or set in one step</code>
+        <br><span class="desc">A comment: <em>setdefault — get or set in one step</em>.</span>
+      </li>
+      <li>
+        <strong>Line 31:</strong> <code>config = {}</code>
+        <br><span class="desc">Assigns <code>{}</code> to <code>config</code>.</span>
+      </li>
+      <li>
+        <strong>Line 32:</strong> <code>config.setdefault(&quot;threads&quot;, 4)  # Sets and returns 4</code>
+        <br><span class="desc">Returns the value for a key, or inserts it with a default if not found.</span>
+      </li>
+      <li>
+        <strong>Line 33:</strong> <code>config.setdefault(&quot;threads&quot;, 8)  # Returns existing 4</code>
+        <br><span class="desc">Returns the value for a key, or inserts it with a default if not found.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>Dictionaries in AIVS Settings</h3>
+
+<pre><code><span class="cm"># From ai_voice_studio/settings.py</span>
+<span class="kw">class</span> <span class="cls">Settings</span>:
+    <span class="kw">def</span> <span class="fn">__init__</span>(self):
+        self._data: dict = {
+            <span class="str">"theme"</span>: <span class="str">"system"</span>,
+            <span class="str">"audio_mode"</span>: <span class="str">"page_with_h1"</span>,
+            <span class="str">"recording.rate"</span>: <span class="num">1.0</span>,
+            <span class="str">"recording.pitch"</span>: <span class="num">1.0</span>,
+            <span class="str">"recording.volume"</span>: <span class="num">1.0</span>,
+            <span class="str">"recording.output_format"</span>: <span class="str">"wav"</span>,
+            <span class="str">"developer_mode"</span>: <span class="kw">False</span>,
+        }
+
+    <span class="kw">def</span> <span class="fn">get</span>(self, key: str, default=<span class="kw">None</span>):
+        <span class="str">"""Dot-notation get: settings.get('recording.rate')"""</span>
+        keys = key.split(<span class="str">"."</span>)
+        obj = self._data
+        <span class="kw">for</span> k <span class="kw">in</span> keys:
+            <span class="kw">if</span> isinstance(obj, dict):
+                obj = obj.get(k)
+                <span class="kw">if</span> obj <span class="kw">is</span> <span class="kw">None</span>:
+                    <span class="kw">return</span> default
+            <span class="kw">else</span>:
+                <span class="kw">return</span> default
+        <span class="kw">return</span> obj
+
+    <span class="kw">def</span> <span class="fn">set</span>(self, key: str, value):
+        <span class="str">"""Dot-notation set: settings.set('recording.rate', 1.5)"""</span>
+        keys = key.split(<span class="str">"."</span>)
+        obj = self._data
+        <span class="kw">for</span> k <span class="kw">in</span> keys[:-<span class="num">1</span>]:
+            obj = obj.setdefault(k, {})
+        obj[keys[-<span class="num">1</span>]] = value</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 4)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From ai_voice_studio/settings.py</code>
+        <br><span class="desc">A comment: <em>From ai_voice_studio/settings.py</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>class Settings:</code>
+        <br><span class="desc">Defines class <code>Settings</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>def __init__(self):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>self._data: dict = {</code>
+        <br><span class="desc"><code>self._data: dict = {</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>&quot;theme&quot;: &quot;system&quot;,</code>
+        <br><span class="desc"><code>&quot;theme&quot;: &quot;system&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>&quot;audio_mode&quot;: &quot;page_with_h1&quot;,</code>
+        <br><span class="desc"><code>&quot;audio_mode&quot;: &quot;page_with_h1&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>&quot;recording.rate&quot;: 1.0,</code>
+        <br><span class="desc"><code>&quot;recording.rate&quot;: 1.0,</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>&quot;recording.pitch&quot;: 1.0,</code>
+        <br><span class="desc"><code>&quot;recording.pitch&quot;: 1.0,</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>&quot;recording.volume&quot;: 1.0,</code>
+        <br><span class="desc"><code>&quot;recording.volume&quot;: 1.0,</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>&quot;recording.output_format&quot;: &quot;wav&quot;,</code>
+        <br><span class="desc"><code>&quot;recording.output_format&quot;: &quot;wav&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>&quot;developer_mode&quot;: False,</code>
+        <br><span class="desc"><code>&quot;developer_mode&quot;: False,</code></span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>}</code>
+        <br><span class="desc"><code>}</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>def get(self, key: str, default=None):</code>
+        <br><span class="desc">Defines function <code>get</code> accepting (self, key, default).</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>&quot;&quot;&quot;Dot-notation get: settings.get(&#x27;recording.rate&#x27;)&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Dot-notation get: settings.get(&#x27;recording.rate&#x27;)</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>keys = key.split(&quot;.&quot;)</code>
+        <br><span class="desc">Splits a string into a list by the given delimiter. Without arguments, splits on whitespace.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>obj = self._data</code>
+        <br><span class="desc">Assigns <code>self._data</code> to <code>obj</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>for k in keys:</code>
+        <br><span class="desc">Iterates over <code>keys</code>, assigning each element to <code>k</code>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>if isinstance(obj, dict):</code>
+        <br><span class="desc">Checks if an object is an instance of a class. Preferred over type() for type checking.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>obj = obj.get(k)</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>if obj is None:</code>
+        <br><span class="desc">Checks condition: <code>obj is None</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>return default</code>
+        <br><span class="desc">Returns <code>default</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>else:</code>
+        <br><span class="desc">Fallback: executes when none of the above conditions matched.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>return default</code>
+        <br><span class="desc">Returns <code>default</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>return obj</code>
+        <br><span class="desc">Returns <code>obj</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>def set(self, key: str, value):</code>
+        <br><span class="desc">Defines function <code>set</code> accepting (self, key, value).</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>&quot;&quot;&quot;Dot-notation set: settings.set(&#x27;recording.rate&#x27;, 1.5)&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Dot-notation set: settings.set(&#x27;recording.rate&#x27;, 1.5)</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>keys = key.split(&quot;.&quot;)</code>
+        <br><span class="desc">Splits a string into a list by the given delimiter. Without arguments, splits on whitespace.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>obj = self._data</code>
+        <br><span class="desc">Assigns <code>self._data</code> to <code>obj</code>.</span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>for k in keys[:-1]:</code>
+        <br><span class="desc">Iterates over <code>keys[:-1]</code>, assigning each element to <code>k</code>.</span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code>obj = obj.setdefault(k, {})</code>
+        <br><span class="desc">Returns the value for a key, or inserts it with a default if not found.</span>
+      </li>
+      <li>
+        <strong>Line 31:</strong> <code>obj[keys[-1]] = value</code>
+        <br><span class="desc"><code>obj[keys[-1]] = value</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>6.4 Sets — Unordered, Unique Elements</h2>
+
+<pre><code><span class="cm"># Creating sets</span>
+languages = {<span class="str">"en"</span>, <span class="str">"zh"</span>, <span class="str">"ja"</span>, <span class="str">"ko"</span>}
+empty_set = set()  <span class="cm"># {} creates an empty dict, not set!</span>
+
+<span class="cm"># From a list (removes duplicates)</span>
+voices = [<span class="str">"af"</span>, <span class="str">"am"</span>, <span class="str">"af"</span>, <span class="str">"bf"</span>, <span class="str">"am"</span>]
+unique_voices = set(voices)  <span class="cm"># {"af", "am", "bf"}</span>
+
+<span class="cm"># Set operations</span>
+a = {<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">4</span>}
+b = {<span class="num">3</span>, <span class="num">4</span>, <span class="num">5</span>, <span class="num">6</span>}
+
+<span class="kw">print</span>(a | b)     <span class="cm"># Union: {1, 2, 3, 4, 5, 6}</span>
+<span class="kw">print</span>(a & b)     <span class="cm"># Intersection: {3, 4}</span>
+<span class="kw">print</span>(a - b)     <span class="cm"># Difference: {1, 2}</span>
+<span class="kw">print</span>(a ^ b)     <span class="cm"># Symmetric difference: {1, 2, 5, 6}</span>
+
+<span class="cm"># Membership (very fast — O(1) lookup)</span>
+<span class="kw">print</span>(<span class="num">3</span> <span class="kw">in</span> a)    <span class="cm"># True</span>
+
+<span class="cm"># Frozenset — immutable set (can be dict key)</span>
+frozen = frozenset([<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>])</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 5)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Creating sets</code>
+        <br><span class="desc">A comment: <em>Creating sets</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>languages = {&quot;en&quot;, &quot;zh&quot;, &quot;ja&quot;, &quot;ko&quot;}</code>
+        <br><span class="desc">Assigns <code>{&quot;en&quot;, &quot;zh&quot;, &quot;ja&quot;, &quot;ko&quot;}</code> to <code>languages</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>empty_set = set()  # {} creates an empty dict, not set!</code>
+        <br><span class="desc">Assigns <code>set()  # {} creates an empty dict, not set!</code> to <code>empty_set</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># From a list (removes duplicates)</code>
+        <br><span class="desc">A comment: <em>From a list (removes duplicates)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>voices = [&quot;af&quot;, &quot;am&quot;, &quot;af&quot;, &quot;bf&quot;, &quot;am&quot;]</code>
+        <br><span class="desc">Assigns <code>[&quot;af&quot;, &quot;am&quot;, &quot;af&quot;, &quot;bf&quot;, &quot;am&quot;]</code> to <code>voices</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>unique_voices = set(voices)  # {&quot;af&quot;, &quot;am&quot;, &quot;bf&quot;}</code>
+        <br><span class="desc">Assigns <code>set(voices)  # {&quot;af&quot;, &quot;am&quot;, &quot;bf&quot;}</code> to <code>unique_voices</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># Set operations</code>
+        <br><span class="desc">A comment: <em>Set operations</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>a = {1, 2, 3, 4}</code>
+        <br><span class="desc">Assigns <code>{1, 2, 3, 4}</code> to <code>a</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>b = {3, 4, 5, 6}</code>
+        <br><span class="desc">Assigns <code>{3, 4, 5, 6}</code> to <code>b</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>print(a | b)     # Union: {1, 2, 3, 4, 5, 6}</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>print(a &amp; b)     # Intersection: {3, 4}</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>print(a - b)     # Difference: {1, 2}</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>print(a ^ b)     # Symmetric difference: {1, 2, 5, 6}</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code># Membership (very fast — O(1) lookup)</code>
+        <br><span class="desc">A comment: <em>Membership (very fast — O(1) lookup)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>print(3 in a)    # True</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code># Frozenset — immutable set (can be dict key)</code>
+        <br><span class="desc">A comment: <em>Frozenset — immutable set (can be dict key)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>frozen = frozenset([1, 2, 3])</code>
+        <br><span class="desc">Assigns <code>frozenset([1, 2, 3])</code> to <code>frozen</code>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>Sets in AIVS</h3>
+
+<pre><code><span class="cm"># From gui/recording_dialog.py — collecting unique TTS engine IDs</span>
+tts_ids = sorted({v[<span class="str">"tts"</span>] <span class="kw">for</span> v <span class="kw">in</span> self._voices})
+<span class="cm"># Set comprehension removes duplicates, sorted() makes it a list</span>
+
+<span class="cm"># Checking which compute modes are available</span>
+available = set(compute.available_compute())
+<span class="kw">if</span> <span class="str">"cuda"</span> <span class="kw">in</span> available:
+    <span class="cm"># Show GPU option</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 6)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From gui/recording_dialog.py — collecting unique TTS engine IDs</code>
+        <br><span class="desc">A comment: <em>From gui/recording_dialog.py — collecting unique TTS engine IDs</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>tts_ids = sorted({v[&quot;tts&quot;] for v in self._voices})</code>
+        <br><span class="desc">Returns a new sorted list from any iterable. Does not modify the original. Accepts a key= parameter for custom sorting.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># Set comprehension removes duplicates, sorted() makes it a list</code>
+        <br><span class="desc">A comment: <em>Set comprehension removes duplicates, sorted() makes it a list</em>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># Checking which compute modes are available</code>
+        <br><span class="desc">A comment: <em>Checking which compute modes are available</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>available = set(compute.available_compute())</code>
+        <br><span class="desc">Assigns <code>set(compute.available_compute())</code> to <code>available</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>if &quot;cuda&quot; in available:</code>
+        <br><span class="desc">Checks condition: <code>&quot;cuda&quot; in available</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># Show GPU option</code>
+        <br><span class="desc">A comment: <em>Show GPU option</em>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>6.5 Choosing the Right Collection</h2>
+
+<table>
+  <thead><tr><th>Need</th><th>Use</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td>Ordered sequence, mutable</td><td><code>list</code></td><td>Index access, append, sort</td></tr>
+    <tr><td>Ordered sequence, immutable</td><td><code>tuple</code></td><td>Hashable, slightly faster</td></tr>
+    <tr><td>Key-value mapping</td><td><code>dict</code></td><td>O(1) lookup by key</td></tr>
+    <tr><td>Unique elements, fast membership</td><td><code>set</code></td><td>O(1) <code>in</code> test</td></tr>
+    <tr><td>Record with named fields</td><td><code>namedtuple</code></td><td>Readable, immutable</td></tr>
+    <tr><td>Fixed-structure record</td><td><code>@dataclass</code></td><td>Mutable, type-hinted (Ch 10)</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h2>6.6 Nested Collections</h2>
+
+<pre><code><span class="cm"># List of dicts — very common in real projects</span>
+voices = [
+    {<span class="str">"id"</span>: <span class="str">"af"</span>, <span class="str">"name"</span>: <span class="str">"AF"</span>, <span class="str">"sid"</span>: <span class="num">0</span>},
+    {<span class="str">"id"</span>: <span class="str">"am_adam"</span>, <span class="str">"name"</span>: <span class="str">"Adam"</span>, <span class="str">"sid"</span>: <span class="num">1</span>},
+    {<span class="str">"id"</span>: <span class="str">"bf_emma"</span>, <span class="str">"name"</span>: <span class="str">"Emma"</span>, <span class="str">"sid"</span>: <span class="num">2</span>},
+]
+
+<span class="cm"># Dict of lists</span>
+by_language = {
+    <span class="str">"en"</span>: [<span class="str">"af"</span>, <span class="str">"am_adam"</span>, <span class="str">"bf_emma"</span>],
+    <span class="str">"zh"</span>: [<span class="str">"zf_xiaobei"</span>, <span class="str">"zm_009"</span>],
+}
+
+<span class="cm"># Deeply nested (AIVS catalog structure)</span>
+catalog_entry = {
+    <span class="str">"id"</span>: <span class="str">"kokoro"</span>,
+    <span class="str">"name"</span>: <span class="str">"Kokoro TTS"</span>,
+    <span class="str">"languages"</span>: [
+        {
+            <span class="str">"code"</span>: <span class="str">"multi"</span>,
+            <span class="str">"name"</span>: <span class="str">"Multilingual"</span>,
+            <span class="str">"variants"</span>: [
+                {
+                    <span class="str">"id"</span>: <span class="str">"v1_1"</span>,
+                    <span class="str">"artifact"</span>: <span class="str">"kokoro-multi-lang-v1_1.tar.bz2"</span>,
+                    <span class="str">"voices"</span>: [
+                        {<span class="str">"id"</span>: <span class="str">"af_maple"</span>, <span class="str">"name"</span>: <span class="str">"Maple"</span>, <span class="str">"sid"</span>: <span class="num">0</span>},
+                        <span class="cm"># ... 103 voices total</span>
+                    ],
+                },
+            ],
+        },
+    ],
+}
+
+<span class="cm"># Accessing nested data</span>
+first_voice = catalog_entry[<span class="str">"languages"</span>][<span class="num">0</span>][<span class="str">"variants"</span>][<span class="num">0</span>][<span class="str">"voices"</span>][<span class="num">0</span>]
+<span class="kw">print</span>(first_voice[<span class="str">"id"</span>])  <span class="cm"># "af_maple"</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 7)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># List of dicts — very common in real projects</code>
+        <br><span class="desc">A comment: <em>List of dicts — very common in real projects</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>voices = [</code>
+        <br><span class="desc">Assigns <code>[</code> to <code>voices</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>{&quot;id&quot;: &quot;af&quot;, &quot;name&quot;: &quot;AF&quot;, &quot;sid&quot;: 0},</code>
+        <br><span class="desc"><code>{&quot;id&quot;: &quot;af&quot;, &quot;name&quot;: &quot;AF&quot;, &quot;sid&quot;: 0},</code></span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>{&quot;id&quot;: &quot;am_adam&quot;, &quot;name&quot;: &quot;Adam&quot;, &quot;sid&quot;: 1},</code>
+        <br><span class="desc"><code>{&quot;id&quot;: &quot;am_adam&quot;, &quot;name&quot;: &quot;Adam&quot;, &quot;sid&quot;: 1},</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>{&quot;id&quot;: &quot;bf_emma&quot;, &quot;name&quot;: &quot;Emma&quot;, &quot;sid&quot;: 2},</code>
+        <br><span class="desc"><code>{&quot;id&quot;: &quot;bf_emma&quot;, &quot;name&quot;: &quot;Emma&quot;, &quot;sid&quot;: 2},</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>]</code>
+        <br><span class="desc"><code>]</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># Dict of lists</code>
+        <br><span class="desc">A comment: <em>Dict of lists</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>by_language = {</code>
+        <br><span class="desc">Assigns <code>{</code> to <code>by_language</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>&quot;en&quot;: [&quot;af&quot;, &quot;am_adam&quot;, &quot;bf_emma&quot;],</code>
+        <br><span class="desc"><code>&quot;en&quot;: [&quot;af&quot;, &quot;am_adam&quot;, &quot;bf_emma&quot;],</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>&quot;zh&quot;: [&quot;zf_xiaobei&quot;, &quot;zm_009&quot;],</code>
+        <br><span class="desc"><code>&quot;zh&quot;: [&quot;zf_xiaobei&quot;, &quot;zm_009&quot;],</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>}</code>
+        <br><span class="desc"><code>}</code></span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code># Deeply nested (AIVS catalog structure)</code>
+        <br><span class="desc">A comment: <em>Deeply nested (AIVS catalog structure)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>catalog_entry = {</code>
+        <br><span class="desc">Assigns <code>{</code> to <code>catalog_entry</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>&quot;id&quot;: &quot;kokoro&quot;,</code>
+        <br><span class="desc"><code>&quot;id&quot;: &quot;kokoro&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>&quot;name&quot;: &quot;Kokoro TTS&quot;,</code>
+        <br><span class="desc"><code>&quot;name&quot;: &quot;Kokoro TTS&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>&quot;languages&quot;: [</code>
+        <br><span class="desc"><code>&quot;languages&quot;: [</code></span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>{</code>
+        <br><span class="desc"><code>{</code></span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>&quot;code&quot;: &quot;multi&quot;,</code>
+        <br><span class="desc"><code>&quot;code&quot;: &quot;multi&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>&quot;name&quot;: &quot;Multilingual&quot;,</code>
+        <br><span class="desc"><code>&quot;name&quot;: &quot;Multilingual&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>&quot;variants&quot;: [</code>
+        <br><span class="desc"><code>&quot;variants&quot;: [</code></span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>{</code>
+        <br><span class="desc"><code>{</code></span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>&quot;id&quot;: &quot;v1_1&quot;,</code>
+        <br><span class="desc"><code>&quot;id&quot;: &quot;v1_1&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>&quot;artifact&quot;: &quot;kokoro-multi-lang-v1_1.tar.bz2&quot;,</code>
+        <br><span class="desc"><code>&quot;artifact&quot;: &quot;kokoro-multi-lang-v1_1.tar.bz2&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>&quot;voices&quot;: [</code>
+        <br><span class="desc"><code>&quot;voices&quot;: [</code></span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>{&quot;id&quot;: &quot;af_maple&quot;, &quot;name&quot;: &quot;Maple&quot;, &quot;sid&quot;: 0},</code>
+        <br><span class="desc"><code>{&quot;id&quot;: &quot;af_maple&quot;, &quot;name&quot;: &quot;Maple&quot;, &quot;sid&quot;: 0},</code></span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code># ... 103 voices total</code>
+        <br><span class="desc">A comment: <em>... 103 voices total</em>.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>],</code>
+        <br><span class="desc"><code>],</code></span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>},</code>
+        <br><span class="desc"><code>},</code></span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>],</code>
+        <br><span class="desc"><code>],</code></span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code>},</code>
+        <br><span class="desc"><code>},</code></span>
+      </li>
+      <li>
+        <strong>Line 31:</strong> <code>],</code>
+        <br><span class="desc"><code>],</code></span>
+      </li>
+      <li>
+        <strong>Line 32:</strong> <code>}</code>
+        <br><span class="desc"><code>}</code></span>
+      </li>
+      <li>
+        <strong>Line 33:</strong> <code># Accessing nested data</code>
+        <br><span class="desc">A comment: <em>Accessing nested data</em>.</span>
+      </li>
+      <li>
+        <strong>Line 34:</strong> <code>first_voice = catalog_entry[&quot;languages&quot;][0][&quot;variants&quot;][0][&quot;voices&quot;][0]</code>
+        <br><span class="desc">Assigns <code>catalog_entry[&quot;languages&quot;][0][&quot;variants&quot;][0][&quot;voices&quot;][0]</code> to <code>first_voice</code>.</span>
+      </li>
+      <li>
+        <strong>Line 35:</strong> <code>print(first_voice[&quot;id&quot;])  # &quot;af_maple&quot;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>6.7 Useful Collection Functions</h2>
+
+<pre><code><span class="cm"># sorted() — returns a new sorted list</span>
+voices = [<span class="str">"bf"</span>, <span class="str">"af"</span>, <span class="str">"am"</span>]
+sorted_voices = sorted(voices)                    <span class="cm"># ["af", "am", "bf"]</span>
+sorted_voices = sorted(voices, reverse=<span class="kw">True</span>)       <span class="cm"># ["bf", "am", "af"]</span>
+sorted_voices = sorted(voices, key=len)            <span class="cm"># ["af", "am", "bf"]</span>
+
+<span class="cm"># sorted with dict key</span>
+voices_sorted = sorted(voice_list, key=<span class="kw">lambda</span> v: v.get(<span class="str">"name"</span>, <span class="str">""</span>))
+
+<span class="cm"># min, max, sum</span>
+sids = [v[<span class="str">"sid"</span>] <span class="kw">for</span> v <span class="kw">in</span> voices]
+<span class="kw">print</span>(min(sids), max(sids), sum(sids))
+
+<span class="cm"># any() and all()</span>
+has_gpu = any(detected.values())       <span class="cm"># True if any value is True</span>
+all_ok = all(status.values())          <span class="cm"># True if all values are True</span>
+
+<span class="cm"># zip() — iterate multiple sequences in parallel</span>
+names = [<span class="str">"Piper"</span>, <span class="str">"Kokoro"</span>]
+counts = [<span class="num">153</span>, <span class="num">103</span>]
+<span class="kw">for</span> name, count <span class="kw">in</span> zip(names, counts):
+    <span class="kw">print</span>(<span class="str">f"</span>{name}<span class="str">: </span>{count}<span class="str"> voices"</span>)
+
+<span class="cm"># reversed() — returns an iterator</span>
+<span class="kw">for</span> v <span class="kw">in</span> reversed([<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>]):
+    <span class="kw">print</span>(v)  <span class="cm"># 3, 2, 1</span>
+
+<span class="cm"># enumerate() with custom start</span>
+<span class="kw">for</span> i, voice <span class="kw">in</span> enumerate(voices, start=<span class="num">1</span>):
+    <span class="kw">print</span>(<span class="str">f"Voice #</span>{i}<span class="str">: </span>{voice}<span class="str">"</span>)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 8)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># sorted() — returns a new sorted list</code>
+        <br><span class="desc">A comment: <em>sorted() — returns a new sorted list</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>voices = [&quot;bf&quot;, &quot;af&quot;, &quot;am&quot;]</code>
+        <br><span class="desc">Assigns <code>[&quot;bf&quot;, &quot;af&quot;, &quot;am&quot;]</code> to <code>voices</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>sorted_voices = sorted(voices)                    # [&quot;af&quot;, &quot;am&quot;, &quot;bf&quot;]</code>
+        <br><span class="desc">Returns a new sorted list from any iterable. Does not modify the original. Accepts a key= parameter for custom sorting.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>sorted_voices = sorted(voices, reverse=True)       # [&quot;bf&quot;, &quot;am&quot;, &quot;af&quot;]</code>
+        <br><span class="desc">Returns a new sorted list from any iterable. Does not modify the original. Accepts a key= parameter for custom sorting.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>sorted_voices = sorted(voices, key=len)            # [&quot;af&quot;, &quot;am&quot;, &quot;bf&quot;]</code>
+        <br><span class="desc">Returns a new sorted list from any iterable. Does not modify the original. Accepts a key= parameter for custom sorting.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># sorted with dict key</code>
+        <br><span class="desc">A comment: <em>sorted with dict key</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>voices_sorted = sorted(voice_list, key=lambda v: v.get(&quot;name&quot;, &quot;&quot;))</code>
+        <br><span class="desc">Returns a new sorted list from any iterable. Does not modify the original. Accepts a key= parameter for custom sorting.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># min, max, sum</code>
+        <br><span class="desc">A comment: <em>min, max, sum</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>sids = [v[&quot;sid&quot;] for v in voices]</code>
+        <br><span class="desc">Assigns <code>[v[&quot;sid&quot;] for v in voices]</code> to <code>sids</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>print(min(sids), max(sids), sum(sids))</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># any() and all()</code>
+        <br><span class="desc">A comment: <em>any() and all()</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>has_gpu = any(detected.values())       # True if any value is True</code>
+        <br><span class="desc">Returns a view of the dictionary's values.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>all_ok = all(status.values())          # True if all values are True</code>
+        <br><span class="desc">Returns a view of the dictionary's values.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code># zip() — iterate multiple sequences in parallel</code>
+        <br><span class="desc">A comment: <em>zip() — iterate multiple sequences in parallel</em>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>names = [&quot;Piper&quot;, &quot;Kokoro&quot;]</code>
+        <br><span class="desc">Assigns <code>[&quot;Piper&quot;, &quot;Kokoro&quot;]</code> to <code>names</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>counts = [153, 103]</code>
+        <br><span class="desc">Assigns <code>[153, 103]</code> to <code>counts</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>for name, count in zip(names, counts):</code>
+        <br><span class="desc">Combines multiple iterables element-wise. Stops at the shortest input. Used for parallel iteration.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>print(f&quot;{name}: {count} voices&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code># reversed() — returns an iterator</code>
+        <br><span class="desc">A comment: <em>reversed() — returns an iterator</em>.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>for v in reversed([1, 2, 3]):</code>
+        <br><span class="desc">Returns a reverse iterator over a sequence. Does not modify the original.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>print(v)  # 3, 2, 1</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code># enumerate() with custom start</code>
+        <br><span class="desc">A comment: <em>enumerate() with custom start</em>.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>for i, voice in enumerate(voices, start=1):</code>
+        <br><span class="desc">Adds a counter to an iterable, returning (index, value) pairs. Preferred over manual index tracking.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>print(f&quot;Voice #{i}: {voice}&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>6.8 collections Module</h2>
+
+<pre><code><span class="kw">from</span> collections <span class="kw">import</span> Counter, defaultdict, deque, OrderedDict
+
+<span class="cm"># Counter — count occurrences</span>
+text = <span class="str">"hello world hello python hello"</span>
+word_counts = Counter(text.split())
+<span class="kw">print</span>(word_counts)          <span class="cm"># Counter({'hello': 3, 'world': 1, ...})</span>
+<span class="kw">print</span>(word_counts.most_common(<span class="num">2</span>))  <span class="cm"># [('hello', 3), ('world', 1)]</span>
+
+<span class="cm"># defaultdict — dict with default values</span>
+voices_by_tts = defaultdict(list)
+<span class="kw">for</span> v <span class="kw">in</span> all_voices:
+    voices_by_tts[v[<span class="str">"tts"</span>]].append(v)  <span class="cm"># No KeyError if key missing</span>
+
+<span class="cm"># deque — double-ended queue (fast insert/delete at both ends)</span>
+history = deque(maxlen=<span class="num">10</span>)  <span class="cm"># Auto-removes oldest</span>
+history.append(<span class="str">"action1"</span>)
+history.appendleft(<span class="str">"action0"</span>)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 9)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>from collections import Counter, defaultdict, deque, OrderedDict</code>
+        <br><span class="desc">Imports <code>Counter, defaultdict, deque, OrderedDict</code> from <code>collections</code>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Counter — count occurrences</code>
+        <br><span class="desc">A comment: <em>Counter — count occurrences</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>text = &quot;hello world hello python hello&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;hello world hello python hello&quot;</code> to <code>text</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>word_counts = Counter(text.split())</code>
+        <br><span class="desc">Splits a string into a list by the given delimiter. Without arguments, splits on whitespace.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>print(word_counts)          # Counter({&#x27;hello&#x27;: 3, &#x27;world&#x27;: 1, ...})</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>print(word_counts.most_common(2))  # [(&#x27;hello&#x27;, 3), (&#x27;world&#x27;, 1)]</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># defaultdict — dict with default values</code>
+        <br><span class="desc">A comment: <em>defaultdict — dict with default values</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>voices_by_tts = defaultdict(list)</code>
+        <br><span class="desc">Assigns <code>defaultdict(list)</code> to <code>voices_by_tts</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>for v in all_voices:</code>
+        <br><span class="desc">Iterates over <code>all_voices</code>, assigning each element to <code>v</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>voices_by_tts[v[&quot;tts&quot;]].append(v)  # No KeyError if key missing</code>
+        <br><span class="desc">Adds a single item to the end of the list.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># deque — double-ended queue (fast insert/delete at both ends)</code>
+        <br><span class="desc">A comment: <em>deque — double-ended queue (fast insert/delete at both ends)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>history = deque(maxlen=10)  # Auto-removes oldest</code>
+        <br><span class="desc">Assigns <code>deque(maxlen=10)  # Auto-removes oldest</code> to <code>history</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>history.append(&quot;action1&quot;)</code>
+        <br><span class="desc">Adds a single item to the end of the list.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>history.appendleft(&quot;action0&quot;)</code>
+        <br><span class="desc"><code>history.appendleft(&quot;action0&quot;)</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>6.9 Key Takeaways</h2>
+<ul>
+  <li><strong>Lists</strong> for ordered, mutable sequences (most common)</li>
+  <li><strong>Tuples</strong> for fixed records and dict keys</li>
+  <li><strong>Dicts</strong> for key-value data (the backbone of AIVS settings and catalog)</li>
+  <li><strong>Sets</strong> for unique elements and fast membership testing</li>
+  <li><strong>Copy correctly</strong> — <code>b = a</code> creates a reference, not a copy</li>
+  <li><strong>Dict.get()</strong> with a default avoids KeyError</li>
+  <li>The AIVS catalog is a deeply nested dict structure: TTS → language → variant → voice</li>
+</ul>
+
+<div class="exercise"><strong>Exercise 6.1:</strong> Given a list of voice dictionaries, write a dict comprehension that groups them by language code. Result: <code>{"en": [...], "zh": [...], ...}</code></div>
+<div class="exercise"><strong>Exercise 6.2:</strong> Implement a simple <code>LRUCache</code> class using <code>OrderedDict</code> with a <code>maxlen</code> parameter.</div>
+
+<hr>
+<p style="text-align: center;"><a href="ch05_strings.html">← Ch 5</a> &nbsp;|&nbsp; <a href="ch07_file_io.html">Ch 7 — File I/O →</a></p>
+</div></div></body>
+</html>

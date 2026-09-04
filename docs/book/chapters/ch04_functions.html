@@ -1,0 +1,1345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 4: Functions - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2><div class="part-header">Part I</div><ul class="chapters"><li><a href="ch01_introduction.html">Ch 1</a></li><li><a href="ch02_variables.html">Ch 2</a></li><li><a href="ch03_control_flow.html">Ch 3</a></li><li><a href="ch04_functions.html" class="active">Ch 4: Functions</a></li><li><a href="ch05_strings.html">Ch 5</a></li><li><a href="ch06_collections.html">Ch 6</a></li><li><a href="ch07_file_io.html">Ch 7</a></li><li><a href="ch08_error_handling.html">Ch 8</a></li><li><a href="ch09_modules.html">Ch 9</a></li><li><a href="ch10_oop_basics.html">Ch 10</a></li></ul></nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 4</div>
+<h1>Functions</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Define and call functions with parameters and return values</li>
+  <li>Master default arguments, *args, and **kwargs</li>
+  <li>Understand scope (LEGB rule) and closures</li>
+  <li>Use lambda functions for short throwaway operations</li>
+  <li>See function patterns used throughout AI Voice Studio</li>
+</ul>
+
+<hr>
+
+<h2>4.1 Defining Functions</h2>
+
+<pre><code><span class="cm"># Basic function definition</span>
+<span class="kw">def</span> <span class="fn">greet</span>(name: str) -> str:
+    <span class="str">"""Return a greeting for the given name."""</span>  <span class="cm"># Docstring</span>
+    <span class="kw">return</span> <span class="str">f"Hello, </span>{name}<span class="str">!"</span>
+
+<span class="cm"># Call the function</span>
+message = greet(<span class="str">"Developer"</span>)
+<span class="kw">print</span>(message)  <span class="cm"># Hello, Developer!</span>
+
+<span class="cm"># Functions without a return statement return None implicitly</span>
+<span class="kw">def</span> <span class="fn">log_event</span>(event: str):
+    <span class="kw">print</span>(<span class="str">f"[LOG] </span>{event}<span class="str">"</span>)
+    <span class="cm"># No return → returns None</span>
+
+result = log_event(<span class="str">"app started"</span>)
+<span class="kw">print</span>(result)  <span class="cm"># None</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Basic function definition</code>
+        <br><span class="desc">A comment: <em>Basic function definition</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def greet(name: str) -&gt; str:</code>
+        <br><span class="desc">Defines function <code>greet</code> accepting (name), returning <code>str</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;&quot;&quot;Return a greeting for the given name.&quot;&quot;&quot;  # Docstring</code>
+        <br><span class="desc">Docstring: <em>Return a greeting for the given name.&quot;&quot;&quot;  # Docstring</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>return f&quot;Hello, {name}!&quot;</code>
+        <br><span class="desc">Returns <code>f&quot;Hello, {name}!&quot;</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># Call the function</code>
+        <br><span class="desc">A comment: <em>Call the function</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>message = greet(&quot;Developer&quot;)</code>
+        <br><span class="desc">Assigns <code>greet(&quot;Developer&quot;)</code> to <code>message</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>print(message)  # Hello, Developer!</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># Functions without a return statement return None implicitly</code>
+        <br><span class="desc">A comment: <em>Functions without a return statement return None implicitly</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>def log_event(event: str):</code>
+        <br><span class="desc">Defines function <code>log_event</code> accepting (event).</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>print(f&quot;[LOG] {event}&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># No return → returns None</code>
+        <br><span class="desc">A comment: <em>No return → returns None</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>result = log_event(&quot;app started&quot;)</code>
+        <br><span class="desc">Assigns <code>log_event(&quot;app started&quot;)</code> to <code>result</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>print(result)  # None</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>Function Anatomy</h3>
+
+<table>
+  <thead><tr><th>Component</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td><code>def</code></td><td>Keyword that starts the definition</td></tr>
+    <tr><td>Function name</td><td>snake_case identifier</td></tr>
+    <tr><td>Parameters</td><td>Inputs in parentheses</td></tr>
+    <tr><td>Return type hint</td><td><code>-> str</code> documents the return type</td></tr>
+    <tr><td>Docstring</td><td>Triple-quoted string explaining what it does</td></tr>
+    <tr><td>Body</td><td>Indented block of code</td></tr>
+    <tr><td><code>return</code></td><td>Sends a value back to the caller</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h2>4.2 Parameters and Arguments</h2>
+
+<h3>Positional Parameters</h3>
+
+<pre><code><span class="kw">def</span> <span class="fn">create_audio_file</span>(text: str, output_path: str, sample_rate: int):
+    <span class="str">"""Create an audio file from text."""</span>
+    <span class="cm"># ... synthesize and save ...</span>
+    <span class="kw">print</span>(<span class="str">f"Saved </span>{len(text)}<span class="str"> chars to </span>{output_path}<span class="str">"</span>)
+
+<span class="cm"># Arguments must match parameter order</span>
+create_audio_file(<span class="str">"Hello world"</span>, <span class="str">"/tmp/out.wav"</span>, <span class="num">24000</span>)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>def create_audio_file(text: str, output_path: str, sample_rate: int):</code>
+        <br><span class="desc">Defines function <code>create_audio_file</code> accepting (text, output_path, sample_rate).</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>&quot;&quot;&quot;Create an audio file from text.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Create an audio file from text.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># ... synthesize and save ...</code>
+        <br><span class="desc">A comment: <em>... synthesize and save ...</em>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>print(f&quot;Saved {len(text)} chars to {output_path}&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># Arguments must match parameter order</code>
+        <br><span class="desc">A comment: <em>Arguments must match parameter order</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>create_audio_file(&quot;Hello world&quot;, &quot;/tmp/out.wav&quot;, 24000)</code>
+        <br><span class="desc">Calls function <code>create_audio_file()</code>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>Keyword Arguments</h3>
+
+<pre><code><span class="cm"># Keyword arguments can be in any order</span>
+create_audio_file(
+    text=<span class="str">"Hello world"</span>,
+    sample_rate=<span class="num">24000</span>,
+    output_path=<span class="str">"/tmp/out.wav"</span>,
+)
+
+<span class="cm"># Mixing positional and keyword (positional must come first)</span>
+create_audio_file(<span class="str">"Hello world"</span>, output_path=<span class="str">"/tmp/out.wav"</span>, sample_rate=<span class="num">24000</span>)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Keyword arguments can be in any order</code>
+        <br><span class="desc">A comment: <em>Keyword arguments can be in any order</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>create_audio_file(</code>
+        <br><span class="desc">Calls function <code>create_audio_file()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>text=&quot;Hello world&quot;,</code>
+        <br><span class="desc">Assigns <code>&quot;Hello world&quot;,</code> to <code>text</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>sample_rate=24000,</code>
+        <br><span class="desc">Assigns <code>24000,</code> to <code>sample_rate</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>output_path=&quot;/tmp/out.wav&quot;,</code>
+        <br><span class="desc">Assigns <code>&quot;/tmp/out.wav&quot;,</code> to <code>output_path</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># Mixing positional and keyword (positional must come first)</code>
+        <br><span class="desc">A comment: <em>Mixing positional and keyword (positional must come first)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>create_audio_file(&quot;Hello world&quot;, output_path=&quot;/tmp/out.wav&quot;, sample_rate=24000)</code>
+        <br><span class="desc">Calls function <code>create_audio_file()</code>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>Default Parameter Values</h3>
+
+<pre><code><span class="kw">def</span> <span class="fn">synthesize</span>(
+    text: str,
+    voice: str = <span class="str">"default"</span>,
+    rate: float = <span class="num">1.0</span>,
+    pitch: float = <span class="num">1.0</span>,
+    volume: float = <span class="num">1.0</span>,
+) -> <span class="str">"np.ndarray"</span>:
+    <span class="str">"""Synthesize text with configurable voice parameters."""</span>
+    <span class="cm"># ...</span>
+    <span class="kw">pass</span>
+
+<span class="cm"># Call with defaults</span>
+audio = synthesize(<span class="str">"Hello"</span>)
+
+<span class="cm"># Override some defaults</span>
+audio = synthesize(<span class="str">"Hello"</span>, rate=<span class="num">1.5</span>, pitch=<span class="num">0.8</span>)
+
+<span class="cm"># Override all</span>
+audio = synthesize(<span class="str">"Hello"</span>, voice=<span class="str">"af_bella"</span>, rate=<span class="num">1.2</span>, pitch=<span class="num">1.0</span>, volume=<span class="num">0.8</span>)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 4)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>def synthesize(</code>
+        <br><span class="desc"><code>def synthesize(</code></span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>text: str,</code>
+        <br><span class="desc"><code>text: str,</code></span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>voice: str = &quot;default&quot;,</code>
+        <br><span class="desc"><code>voice: str = &quot;default&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>rate: float = 1.0,</code>
+        <br><span class="desc"><code>rate: float = 1.0,</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>pitch: float = 1.0,</code>
+        <br><span class="desc"><code>pitch: float = 1.0,</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>volume: float = 1.0,</code>
+        <br><span class="desc"><code>volume: float = 1.0,</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>) -&gt; &quot;np.ndarray&quot;:</code>
+        <br><span class="desc"><code>) -&gt; &quot;np.ndarray&quot;:</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>&quot;&quot;&quot;Synthesize text with configurable voice parameters.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Synthesize text with configurable voice parameters.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code># ...</code>
+        <br><span class="desc">A comment: <em>...</em>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>pass</code>
+        <br><span class="desc">Placeholder: does nothing.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># Call with defaults</code>
+        <br><span class="desc">A comment: <em>Call with defaults</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>audio = synthesize(&quot;Hello&quot;)</code>
+        <br><span class="desc">Assigns <code>synthesize(&quot;Hello&quot;)</code> to <code>audio</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code># Override some defaults</code>
+        <br><span class="desc">A comment: <em>Override some defaults</em>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>audio = synthesize(&quot;Hello&quot;, rate=1.5, pitch=0.8)</code>
+        <br><span class="desc">Assigns <code>synthesize(&quot;Hello&quot;, rate=1.5, pitch=0.8)</code> to <code>audio</code>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code># Override all</code>
+        <br><span class="desc">A comment: <em>Override all</em>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>audio = synthesize(&quot;Hello&quot;, voice=&quot;af_bella&quot;, rate=1.2, pitch=1.0, volume=0.8)</code>
+        <br><span class="desc">Assigns <code>synthesize(&quot;Hello&quot;, voice=&quot;af_bella&quot;, rate=1.2, pitch=1.0, volume=0.8)</code> to <code>audio</code>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<div class="warning">
+  Never use mutable objects (lists, dicts) as default parameters! They are created
+  once at function definition time and shared across all calls:
+  <pre><code><span class="cm"># WRONG — shared mutable default!</span>
+<span class="kw">def</span> <span class="fn">add_voice</span>(voice, voices=[]):
+    voices.append(voice)
+    <span class="kw">return</span> voices
+
+<span class="cm"># RIGHT — create a new list each call</span>
+<span class="kw">def</span> <span class="fn">add_voice</span>(voice, voices=<span class="kw">None</span>):
+    <span class="kw">if</span> voices <span class="kw">is</span> <span class="kw">None</span>:
+        voices = []
+    voices.append(voice)
+    <span class="kw">return</span> voices</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 5)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># WRONG — shared mutable default!</code>
+        <br><span class="desc">A comment: <em>WRONG — shared mutable default!</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def add_voice(voice, voices=[]):</code>
+        <br><span class="desc">Defines function <code>add_voice</code> accepting (voice, voices).</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>voices.append(voice)</code>
+        <br><span class="desc">Adds a single item to the end of the list.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>return voices</code>
+        <br><span class="desc">Returns <code>voices</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># RIGHT — create a new list each call</code>
+        <br><span class="desc">A comment: <em>RIGHT — create a new list each call</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>def add_voice(voice, voices=None):</code>
+        <br><span class="desc">Defines function <code>add_voice</code> accepting (voice, voices).</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>if voices is None:</code>
+        <br><span class="desc">Checks condition: <code>voices is None</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>voices = []</code>
+        <br><span class="desc">Assigns <code>[]</code> to <code>voices</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>voices.append(voice)</code>
+        <br><span class="desc">Adds a single item to the end of the list.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>return voices</code>
+        <br><span class="desc">Returns <code>voices</code> to the caller.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+</div>
+
+<h3>Arbitrary Arguments (*args and **kwargs)</h3>
+
+<pre><code><span class="cm"># *args collects extra positional arguments into a tuple</span>
+<span class="kw">def</span> <span class="fn">log_all</span>(*messages: str):
+    <span class="kw">for</span> msg <span class="kw">in</span> messages:
+        <span class="kw">print</span>(<span class="str">f"[LOG] </span>{msg}<span class="str">"</span>)
+
+log_all(<span class="str">"Starting"</span>, <span class="str">"Loading models"</span>, <span class="str">"Ready"</span>)
+
+<span class="cm"># **kwargs collects extra keyword arguments into a dict</span>
+<span class="kw">def</span> <span class="fn">create_engine</span>(engine_id: str, **options):
+    <span class="kw">print</span>(<span class="str">f"Engine: </span>{engine_id}<span class="str">"</span>)
+    <span class="kw">for</span> key, value <span class="kw">in</span> options.items():
+        <span class="kw">print</span>(<span class="str">f"  </span>{key}<span class="str"> = </span>{value}<span class="str">"</span>)
+
+create_engine(<span class="str">"piper"</span>, device=<span class="str">"cpu"</span>, threads=<span class="num">4</span>, verbose=<span class="kw">True</span>)
+<span class="cm"># Engine: piper</span>
+<span class="cm">#   device = cpu</span>
+<span class="cm">#   threads = 4</span>
+<span class="cm">#   verbose = True</span>
+
+<span class="cm"># Combining positional, keyword, *args, **kwargs</span>
+<span class="kw">def</span> <span class="fn">configure</span>(name: str, *engines, debug=<span class="kw">False</span>, **settings):
+    <span class="kw">pass</span>
+
+configure(<span class="str">"AIVS"</span>, <span class="str">"piper"</span>, <span class="str">"kokoro"</span>, debug=<span class="kw">True</span>, rate=<span class="num">1.5</span>)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 6)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># *args collects extra positional arguments into a tuple</code>
+        <br><span class="desc">A comment: <em>*args collects extra positional arguments into a tuple</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def log_all(*messages: str):</code>
+        <br><span class="desc">Returns True if all elements in the iterable are truthy. Short-circuits on first False.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>for msg in messages:</code>
+        <br><span class="desc">Iterates over <code>messages</code>, assigning each element to <code>msg</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>print(f&quot;[LOG] {msg}&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>log_all(&quot;Starting&quot;, &quot;Loading models&quot;, &quot;Ready&quot;)</code>
+        <br><span class="desc">Returns True if all elements in the iterable are truthy. Short-circuits on first False.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># **kwargs collects extra keyword arguments into a dict</code>
+        <br><span class="desc">A comment: <em>**kwargs collects extra keyword arguments into a dict</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>def create_engine(engine_id: str, **options):</code>
+        <br><span class="desc">Defines function <code>create_engine</code> accepting (engine_id, **options).</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>print(f&quot;Engine: {engine_id}&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>for key, value in options.items():</code>
+        <br><span class="desc">Returns a view of the dictionary's (key, value) pairs.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>print(f&quot;  {key} = {value}&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>create_engine(&quot;piper&quot;, device=&quot;cpu&quot;, threads=4, verbose=True)</code>
+        <br><span class="desc">Calls function <code>create_engine()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code># Engine: piper</code>
+        <br><span class="desc">A comment: <em>Engine: piper</em>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>#   device = cpu</code>
+        <br><span class="desc">A comment: <em>device = cpu</em>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>#   threads = 4</code>
+        <br><span class="desc">A comment: <em>threads = 4</em>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>#   verbose = True</code>
+        <br><span class="desc">A comment: <em>verbose = True</em>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code># Combining positional, keyword, *args, **kwargs</code>
+        <br><span class="desc">A comment: <em>Combining positional, keyword, *args, **kwargs</em>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>def configure(name: str, *engines, debug=False, **settings):</code>
+        <br><span class="desc">Defines function <code>configure</code> accepting (name, *engines, debug, **settings).</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>pass</code>
+        <br><span class="desc">Placeholder: does nothing.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>configure(&quot;AIVS&quot;, &quot;piper&quot;, &quot;kokoro&quot;, debug=True, rate=1.5)</code>
+        <br><span class="desc">Calls function <code>configure()</code>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>4.3 Return Values</h2>
+
+<pre><code><span class="cm"># Single return value</span>
+<span class="kw">def</span> <span class="fn">get_sample_rate</span>(voice: dict) -> int:
+    <span class="kw">return</span> voice.get(<span class="str">"sample_rate"</span>, <span class="num">24000</span>)
+
+<span class="cm"># Multiple return values (returns a tuple)</span>
+<span class="kw">def</span> <span class="fn">parse_voice_id</span>(voice_id: str) -> tuple[str, str]:
+    <span class="str">"""Split 'en_US/medium' into (language, variant)."""</span>
+    parts = voice_id.split(<span class="str">"/"</span>)
+    <span class="kw">return</span> parts[<span class="num">0</span>], parts[<span class="num">1</span>]  <span class="cm"># Implicit tuple packing</span>
+
+lang, variant = parse_voice_id(<span class="str">"en_US/medium"</span>)  <span class="cm"># Tuple unpacking</span>
+
+<span class="cm"># Returning None for "not found"</span>
+<span class="kw">def</span> <span class="fn">find_voice</span>(voices: list, voice_id: str) -> dict | <span class="kw">None</span>:
+    <span class="kw">for</span> v <span class="kw">in</span> voices:
+        <span class="kw">if</span> v[<span class="str">"id"</span>] == voice_id:
+            <span class="kw">return</span> v
+    <span class="kw">return</span> <span class="kw">None</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 7)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Single return value</code>
+        <br><span class="desc">A comment: <em>Single return value</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def get_sample_rate(voice: dict) -&gt; int:</code>
+        <br><span class="desc">Defines function <code>get_sample_rate</code> accepting (voice), returning <code>int</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>return voice.get(&quot;sample_rate&quot;, 24000)</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># Multiple return values (returns a tuple)</code>
+        <br><span class="desc">A comment: <em>Multiple return values (returns a tuple)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>def parse_voice_id(voice_id: str) -&gt; tuple[str, str]:</code>
+        <br><span class="desc">Returns the unique identity of an object (memory address in CPython). Used with 'is' for identity checks.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>&quot;&quot;&quot;Split &#x27;en_US/medium&#x27; into (language, variant).&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Split &#x27;en_US/medium&#x27; into (language, variant).</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>parts = voice_id.split(&quot;/&quot;)</code>
+        <br><span class="desc">Splits a string into a list by the given delimiter. Without arguments, splits on whitespace.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>return parts[0], parts[1]  # Implicit tuple packing</code>
+        <br><span class="desc">Returns <code>parts[0], parts[1]  # Implicit tuple packing</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>lang, variant = parse_voice_id(&quot;en_US/medium&quot;)  # Tuple unpacking</code>
+        <br><span class="desc">Returns the unique identity of an object (memory address in CPython). Used with 'is' for identity checks.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code># Returning None for &quot;not found&quot;</code>
+        <br><span class="desc">A comment: <em>Returning None for &quot;not found&quot;</em>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>def find_voice(voices: list, voice_id: str) -&gt; dict | None:</code>
+        <br><span class="desc">Defines function <code>find_voice</code> accepting (voices, voice_id), returning <code>dict | None</code>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>for v in voices:</code>
+        <br><span class="desc">Iterates over <code>voices</code>, assigning each element to <code>v</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>if v[&quot;id&quot;] == voice_id:</code>
+        <br><span class="desc">Checks condition: <code>v[&quot;id&quot;] == voice_id</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>return v</code>
+        <br><span class="desc">Returns <code>v</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>return None</code>
+        <br><span class="desc">Returns <code>None</code> (no value).</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>4.4 Scope — The LEGB Rule</h2>
+
+<p>Python looks up variable names in this order: <strong>L</strong>ocal → <strong>E</strong>nclosing → <strong>G</strong>lobal → <strong>B</strong>uilt-in.</p>
+
+<pre><code><span class="cm"># Global scope</span>
+APP_NAME = <span class="str">"AI Voice Studio"</span>
+
+<span class="kw">def</span> <span class="fn">outer</span>():
+    <span class="cm"># Enclosing scope</span>
+    version = <span class="str">"2.0"</span>
+
+    <span class="kw">def</span> <span class="fn">inner</span>():
+        <span class="cm"># Local scope</span>
+        <span class="kw">print</span>(APP_NAME)    <span class="cm"># Global — found</span>
+        <span class="kw">print</span>(version)     <span class="cm"># Enclosing — found</span>
+        <span class="kw">print</span>(len(<span class="str">"hi"</span>))   <span class="cm"># Built-in — found</span>
+        name = <span class="str">"inner"</span>    <span class="cm"># Local variable</span>
+
+    inner()
+
+outer()</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 8)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Global scope</code>
+        <br><span class="desc">A comment: <em>Global scope</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>APP_NAME = &quot;AI Voice Studio&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;AI Voice Studio&quot;</code> to <code>APP_NAME</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>def outer():</code>
+        <br><span class="desc">Defines function <code>outer</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># Enclosing scope</code>
+        <br><span class="desc">A comment: <em>Enclosing scope</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>version = &quot;2.0&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;2.0&quot;</code> to <code>version</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>def inner():</code>
+        <br><span class="desc">Defines function <code>inner</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># Local scope</code>
+        <br><span class="desc">A comment: <em>Local scope</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>print(APP_NAME)    # Global — found</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>print(version)     # Enclosing — found</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>print(len(&quot;hi&quot;))   # Built-in — found</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>name = &quot;inner&quot;    # Local variable</code>
+        <br><span class="desc">Assigns <code>&quot;inner&quot;    # Local variable</code> to <code>name</code>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>inner()</code>
+        <br><span class="desc">Calls function <code>inner()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>outer()</code>
+        <br><span class="desc">Calls function <code>outer()</code>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>global and nonlocal</h3>
+
+<pre><code><span class="cm"># global — modify a global variable from inside a function</span>
+counter = <span class="num">0</span>
+
+<span class="kw">def</span> <span class="fn">increment</span>():
+    <span class="kw">global</span> counter
+    counter += <span class="num">1</span>
+
+increment()
+<span class="kw">print</span>(counter)  <span class="cm"># 1</span>
+
+<span class="cm"># nonlocal — modify an enclosing scope variable</span>
+<span class="kw">def</span> <span class="fn">make_counter</span>():
+    count = <span class="num">0</span>
+    <span class="kw">def</span> <span class="fn">increment</span>():
+        <span class="kw">nonlocal</span> count
+        count += <span class="num">1</span>
+        <span class="kw">return</span> count
+    <span class="kw">return</span> increment
+
+counter = make_counter()
+<span class="kw">print</span>(counter())  <span class="cm"># 1</span>
+<span class="kw">print</span>(counter())  <span class="cm"># 2</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 9)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># global — modify a global variable from inside a function</code>
+        <br><span class="desc">A comment: <em>global — modify a global variable from inside a function</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>counter = 0</code>
+        <br><span class="desc">Assigns <code>0</code> to <code>counter</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>def increment():</code>
+        <br><span class="desc">Defines function <code>increment</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>global counter</code>
+        <br><span class="desc"><code>global counter</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>counter += 1</code>
+        <br><span class="desc">Updates <code>counter</code> by += <code>1</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>increment()</code>
+        <br><span class="desc">Calls function <code>increment()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>print(counter)  # 1</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># nonlocal — modify an enclosing scope variable</code>
+        <br><span class="desc">A comment: <em>nonlocal — modify an enclosing scope variable</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>def make_counter():</code>
+        <br><span class="desc">Defines function <code>make_counter</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>count = 0</code>
+        <br><span class="desc">Assigns <code>0</code> to <code>count</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>def increment():</code>
+        <br><span class="desc">Defines function <code>increment</code>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>nonlocal count</code>
+        <br><span class="desc"><code>nonlocal count</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>count += 1</code>
+        <br><span class="desc">Updates <code>count</code> by += <code>1</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>return count</code>
+        <br><span class="desc">Returns <code>count</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>return increment</code>
+        <br><span class="desc">Returns <code>increment</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>counter = make_counter()</code>
+        <br><span class="desc">Assigns <code>make_counter()</code> to <code>counter</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>print(counter())  # 1</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>print(counter())  # 2</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>4.5 Lambda Functions</h2>
+
+<p>Lambdas are anonymous, single-expression functions:</p>
+
+<pre><code><span class="cm"># Regular function</span>
+<span class="kw">def</span> <span class="fn">double</span>(x):
+    <span class="kw">return</span> x * <span class="num">2</span>
+
+<span class="cm"># Equivalent lambda</span>
+double = <span class="kw">lambda</span> x: x * <span class="num">2</span>
+
+<span class="cm"># Common use cases</span>
+
+<span class="cm"># Sorting with a key function</span>
+voices = [
+    {<span class="str">"name"</span>: <span class="str">"Zoe"</span>, <span class="str">"sid"</span>: <span class="num">5</span>},
+    {<span class="str">"name"</span>: <span class="str">"Adam"</span>, <span class="str">"sid"</span>: <span class="num">1</span>},
+    {<span class="str">"name"</span>: <span class="str">"Bella"</span>, <span class="str">"sid"</span>: <span class="num">3</span>},
+]
+sorted_voices = sorted(voices, key=<span class="kw">lambda</span> v: v[<span class="str">"sid"</span>])
+
+<span class="cm"># Filtering</span>
+big_voices = list(filter(<span class="kw">lambda</span> v: v[<span class="str">"sid"</span>] > <span class="num">3</span>, voices))
+
+<span class="cm"># Mapping</span>
+names = list(map(<span class="kw">lambda</span> v: v[<span class="str">"name"</span>], voices))
+
+<span class="cm"># In AIVS — callback in thread setup</span>
+threading.Thread(
+    target=<span class="kw">lambda</span>: self._download_variant(tts_id, lang_code, variant_id),
+    daemon=<span class="kw">True</span>,
+).start()</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 10)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Regular function</code>
+        <br><span class="desc">A comment: <em>Regular function</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def double(x):</code>
+        <br><span class="desc">Defines function <code>double</code> accepting (x).</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>return x * 2</code>
+        <br><span class="desc">Returns <code>x * 2</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># Equivalent lambda</code>
+        <br><span class="desc">A comment: <em>Equivalent lambda</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>double = lambda x: x * 2</code>
+        <br><span class="desc">Creates an anonymous function and assigns it to <code>double</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># Common use cases</code>
+        <br><span class="desc">A comment: <em>Common use cases</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># Sorting with a key function</code>
+        <br><span class="desc">A comment: <em>Sorting with a key function</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>voices = [</code>
+        <br><span class="desc">Assigns <code>[</code> to <code>voices</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>{&quot;name&quot;: &quot;Zoe&quot;, &quot;sid&quot;: 5},</code>
+        <br><span class="desc"><code>{&quot;name&quot;: &quot;Zoe&quot;, &quot;sid&quot;: 5},</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>{&quot;name&quot;: &quot;Adam&quot;, &quot;sid&quot;: 1},</code>
+        <br><span class="desc"><code>{&quot;name&quot;: &quot;Adam&quot;, &quot;sid&quot;: 1},</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>{&quot;name&quot;: &quot;Bella&quot;, &quot;sid&quot;: 3},</code>
+        <br><span class="desc"><code>{&quot;name&quot;: &quot;Bella&quot;, &quot;sid&quot;: 3},</code></span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>]</code>
+        <br><span class="desc"><code>]</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>sorted_voices = sorted(voices, key=lambda v: v[&quot;sid&quot;])</code>
+        <br><span class="desc">Returns a new sorted list from any iterable. Does not modify the original. Accepts a key= parameter for custom sorting.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code># Filtering</code>
+        <br><span class="desc">A comment: <em>Filtering</em>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>big_voices = list(filter(lambda v: v[&quot;sid&quot;] &gt; 3, voices))</code>
+        <br><span class="desc">Returns items from an iterable where the function returns True. Returns an iterator.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code># Mapping</code>
+        <br><span class="desc">A comment: <em>Mapping</em>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>names = list(map(lambda v: v[&quot;name&quot;], voices))</code>
+        <br><span class="desc">Applies a function to every item in an iterable. Returns an iterator. Often replaced by list comprehensions.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code># In AIVS — callback in thread setup</code>
+        <br><span class="desc">A comment: <em>In AIVS — callback in thread setup</em>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>threading.Thread(</code>
+        <br><span class="desc">Creates a background thread. Use daemon=True for threads that should not block app exit.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>target=lambda: self._download_variant(tts_id, lang_code, variant_id),</code>
+        <br><span class="desc">Assigns <code>lambda: self._download_variant(tts_id, lang_code, variant_id),</code> to <code>target</code>.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>daemon=True,</code>
+        <br><span class="desc">Assigns <code>True,</code> to <code>daemon</code>.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>).start()</code>
+        <br><span class="desc"><code>).start()</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>4.6 Higher-Order Functions</h2>
+
+<p>Functions that take or return other functions:</p>
+
+<pre><code><span class="cm"># Function as argument</span>
+<span class="kw">def</span> <span class="fn">apply_to_segments</span>(segments: list, func):
+    <span class="str">"""Apply a function to each segment."""</span>
+    results = []
+    <span class="kw">for</span> seg <span class="kw">in</span> segments:
+        results.append(func(seg))
+    <span class="kw">return</span> results
+
+<span class="cm"># Usage</span>
+titles = apply_to_segments(segments, <span class="kw">lambda</span> s: s[<span class="str">"title"</span>])
+lengths = apply_to_segments(segments, <span class="kw">lambda</span> s: len(s[<span class="str">"text"</span>]))
+
+<span class="cm"># Built-in higher-order functions</span>
+<span class="kw">def</span> <span class="fn">is_installed</span>(voice):
+    <span class="kw">return</span> voice.get(<span class="str">"installed"</span>, <span class="kw">False</span>)
+
+<span class="cm"># filter: keep items where function returns True</span>
+installed = list(filter(is_installed, all_voices))
+
+<span class="cm"># map: transform each item</span>
+ids = list(map(<span class="kw">lambda</span> v: v[<span class="str">"id"</span>], all_voices))
+
+<span class="cm"># sorted with key</span>
+by_name = sorted(all_voices, key=<span class="kw">lambda</span> v: v.get(<span class="str">"name"</span>, <span class="str">""</span>).lower())</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 11)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Function as argument</code>
+        <br><span class="desc">A comment: <em>Function as argument</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def apply_to_segments(segments: list, func):</code>
+        <br><span class="desc">Defines function <code>apply_to_segments</code> accepting (segments, func).</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;&quot;&quot;Apply a function to each segment.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Apply a function to each segment.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>results = []</code>
+        <br><span class="desc">Assigns <code>[]</code> to <code>results</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>for seg in segments:</code>
+        <br><span class="desc">Iterates over <code>segments</code>, assigning each element to <code>seg</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>results.append(func(seg))</code>
+        <br><span class="desc">Adds a single item to the end of the list.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>return results</code>
+        <br><span class="desc">Returns <code>results</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># Usage</code>
+        <br><span class="desc">A comment: <em>Usage</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>titles = apply_to_segments(segments, lambda s: s[&quot;title&quot;])</code>
+        <br><span class="desc">Assigns <code>apply_to_segments(segments, lambda s: s[&quot;title&quot;])</code> to <code>titles</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>lengths = apply_to_segments(segments, lambda s: len(s[&quot;text&quot;]))</code>
+        <br><span class="desc">Returns the number of items in a sequence (string, list, dict, tuple). Essential for loop bounds and validation.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># Built-in higher-order functions</code>
+        <br><span class="desc">A comment: <em>Built-in higher-order functions</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>def is_installed(voice):</code>
+        <br><span class="desc">Defines function <code>is_installed</code> accepting (voice).</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>return voice.get(&quot;installed&quot;, False)</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code># filter: keep items where function returns True</code>
+        <br><span class="desc">A comment: <em>filter: keep items where function returns True</em>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>installed = list(filter(is_installed, all_voices))</code>
+        <br><span class="desc">Returns items from an iterable where the function returns True. Returns an iterator.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code># map: transform each item</code>
+        <br><span class="desc">A comment: <em>map: transform each item</em>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>ids = list(map(lambda v: v[&quot;id&quot;], all_voices))</code>
+        <br><span class="desc">Applies a function to every item in an iterable. Returns an iterator. Often replaced by list comprehensions.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code># sorted with key</code>
+        <br><span class="desc">A comment: <em>sorted with key</em>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>by_name = sorted(all_voices, key=lambda v: v.get(&quot;name&quot;, &quot;&quot;).lower())</code>
+        <br><span class="desc">Returns a new sorted list from any iterable. Does not modify the original. Accepts a key= parameter for custom sorting.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>4.7 Functions in AI Voice Studio</h2>
+
+<p>Here are real function signatures from the project:</p>
+
+<pre><code><span class="cm"># From ai_voice_studio/util.py</span>
+<span class="kw">def</span> <span class="fn">sanitize_filename</span>(name: str, max_length: int = <span class="num">80</span>) -> str:
+    <span class="str">"""Remove or replace characters that are unsafe in filenames."""</span>
+
+<span class="kw">def</span> <span class="fn">find_python</span>() -> str:
+    <span class="str">"""Find a usable Python interpreter on the system."""</span>
+
+<span class="cm"># From ai_voice_studio/paths.py</span>
+<span class="kw">def</span> <span class="fn">user_data_dir</span>() -> str:
+    <span class="str">"""Return the user data directory (%APPDATA%/AIVoiceStudio)."""</span>
+
+<span class="kw">def</span> <span class="fn">models_dir</span>() -> str:
+    <span class="str">"""Return the directory where TTS models are stored."""</span>
+
+<span class="kw">def</span> <span class="fn">project_dir</span>(name: str) -> str:
+    <span class="str">"""Return the directory for a project with the given name."""</span>
+
+<span class="cm"># From ai_voice_studio/tts/engine.py</span>
+<span class="kw">def</span> <span class="fn">get_engine</span>(voice_entry: dict) -> <span class="str">"TtsEngine"</span>:
+    <span class="str">"""Get or create a cached TTS engine for the given voice."""</span>
+
+<span class="kw">def</span> <span class="fn">_shift_pitch</span>(samples: <span class="str">"np.ndarray"</span>, pitch: float) -> <span class="str">"np.ndarray"</span>:
+    <span class="str">"""Shift the pitch of audio samples without changing speed."""</span>
+
+<span class="kw">def</span> <span class="fn">_apply_volume</span>(samples: <span class="str">"np.ndarray"</span>, volume: float) -> <span class="str">"np.ndarray"</span>:
+    <span class="str">"""Apply volume scaling to audio samples."""</span>
+
+<span class="cm"># From ai_voice_studio/compute.py</span>
+<span class="kw">def</span> <span class="fn">resolve_compute</span>(mode: str) -> str:
+    <span class="str">"""Resolve 'auto' to the best available compute back-end."""</span>
+
+<span class="kw">def</span> <span class="fn">available_compute</span>() -> list[str]:
+    <span class="str">"""Return list of available compute back-end keys."""</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 12)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From ai_voice_studio/util.py</code>
+        <br><span class="desc">A comment: <em>From ai_voice_studio/util.py</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def sanitize_filename(name: str, max_length: int = 80) -&gt; str:</code>
+        <br><span class="desc">Defines function <code>sanitize_filename</code> accepting (name, max_length), returning <code>str</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;&quot;&quot;Remove or replace characters that are unsafe in filenames.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Remove or replace characters that are unsafe in filenames.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>def find_python() -&gt; str:</code>
+        <br><span class="desc">Defines function <code>find_python</code>, returning <code>str</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>&quot;&quot;&quot;Find a usable Python interpreter on the system.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Find a usable Python interpreter on the system.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># From ai_voice_studio/paths.py</code>
+        <br><span class="desc">A comment: <em>From ai_voice_studio/paths.py</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>def user_data_dir() -&gt; str:</code>
+        <br><span class="desc">Returns a list of attributes and methods of an object. Useful for exploration and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>&quot;&quot;&quot;Return the user data directory (%APPDATA%/AIVoiceStudio).&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Return the user data directory (%APPDATA%/AIVoiceStudio).</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>def models_dir() -&gt; str:</code>
+        <br><span class="desc">Returns a list of attributes and methods of an object. Useful for exploration and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>&quot;&quot;&quot;Return the directory where TTS models are stored.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Return the directory where TTS models are stored.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>def project_dir(name: str) -&gt; str:</code>
+        <br><span class="desc">Returns a list of attributes and methods of an object. Useful for exploration and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>&quot;&quot;&quot;Return the directory for a project with the given name.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Return the directory for a project with the given name.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code># From ai_voice_studio/tts/engine.py</code>
+        <br><span class="desc">A comment: <em>From ai_voice_studio/tts/engine.py</em>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>def get_engine(voice_entry: dict) -&gt; &quot;TtsEngine&quot;:</code>
+        <br><span class="desc">Begins exception handling. Code in this block is monitored for errors.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>&quot;&quot;&quot;Get or create a cached TTS engine for the given voice.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Get or create a cached TTS engine for the given voice.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>def _shift_pitch(samples: &quot;np.ndarray&quot;, pitch: float) -&gt; &quot;np.ndarray&quot;:</code>
+        <br><span class="desc">Defines function <code>_shift_pitch</code> accepting (samples, pitch), returning <code>&quot;np.ndarray&quot;</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>&quot;&quot;&quot;Shift the pitch of audio samples without changing speed.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Shift the pitch of audio samples without changing speed.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>def _apply_volume(samples: &quot;np.ndarray&quot;, volume: float) -&gt; &quot;np.ndarray&quot;:</code>
+        <br><span class="desc">Defines function <code>_apply_volume</code> accepting (samples, volume), returning <code>&quot;np.ndarray&quot;</code>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>&quot;&quot;&quot;Apply volume scaling to audio samples.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Apply volume scaling to audio samples.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code># From ai_voice_studio/compute.py</code>
+        <br><span class="desc">A comment: <em>From ai_voice_studio/compute.py</em>.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>def resolve_compute(mode: str) -&gt; str:</code>
+        <br><span class="desc">Defines function <code>resolve_compute</code> accepting (mode), returning <code>str</code>.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>&quot;&quot;&quot;Resolve &#x27;auto&#x27; to the best available compute back-end.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Resolve &#x27;auto&#x27; to the best available compute back-end.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>def available_compute() -&gt; list[str]:</code>
+        <br><span class="desc">Defines function <code>available_compute</code>, returning <code>list[str]</code>.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>&quot;&quot;&quot;Return list of available compute back-end keys.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Return list of available compute back-end keys.</em>. Documents the purpose of the following code.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>4.8 Recursive Functions</h2>
+
+<pre><code><span class="cm"># Factorial (classic example)</span>
+<span class="kw">def</span> <span class="fn">factorial</span>(n: int) -> int:
+    <span class="kw">if</span> n <= <span class="num">1</span>:
+        <span class="kw">return</span> <span class="num">1</span>
+    <span class="kw">return</span> n * factorial(n - <span class="num">1</span>)
+
+<span class="cm"># Recursive directory traversal (used in AIVS)</span>
+<span class="kw">import</span> os
+
+<span class="kw">def</span> <span class="fn">find_all_files</span>(directory: str) -> list[str]:
+    <span class="str">"""Recursively find all files in a directory."""</span>
+    result = []
+    <span class="kw">for</span> entry <span class="kw">in</span> os.listdir(directory):
+        full_path = os.path.join(directory, entry)
+        <span class="kw">if</span> os.path.isfile(full_path):
+            result.append(full_path)
+        <span class="kw">elif</span> os.path.isdir(full_path):
+            result.extend(find_all_files(full_path))
+    <span class="kw">return</span> result</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 13)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Factorial (classic example)</code>
+        <br><span class="desc">A comment: <em>Factorial (classic example)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def factorial(n: int) -&gt; int:</code>
+        <br><span class="desc">Defines function <code>factorial</code> accepting (n), returning <code>int</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>if n &lt;= 1:</code>
+        <br><span class="desc">Checks condition: <code>n &lt;= 1</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>return 1</code>
+        <br><span class="desc">Returns <code>1</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>return n * factorial(n - 1)</code>
+        <br><span class="desc">Returns <code>n * factorial(n - 1)</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># Recursive directory traversal (used in AIVS)</code>
+        <br><span class="desc">A comment: <em>Recursive directory traversal (used in AIVS)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>import os</code>
+        <br><span class="desc">Imports the <code>os</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>def find_all_files(directory: str) -&gt; list[str]:</code>
+        <br><span class="desc">Defines function <code>find_all_files</code> accepting (directory), returning <code>list[str]</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>&quot;&quot;&quot;Recursively find all files in a directory.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Recursively find all files in a directory.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>result = []</code>
+        <br><span class="desc">Assigns <code>[]</code> to <code>result</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>for entry in os.listdir(directory):</code>
+        <br><span class="desc">Returns a list of attributes and methods of an object. Useful for exploration and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>full_path = os.path.join(directory, entry)</code>
+        <br><span class="desc">OS-agnostic path manipulation. Use join(), exists(), dirname(), basename(), splitext().</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>if os.path.isfile(full_path):</code>
+        <br><span class="desc">OS-agnostic path manipulation. Use join(), exists(), dirname(), basename(), splitext().</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>result.append(full_path)</code>
+        <br><span class="desc">Adds a single item to the end of the list.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>elif os.path.isdir(full_path):</code>
+        <br><span class="desc">OS-agnostic path manipulation. Use join(), exists(), dirname(), basename(), splitext().</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>result.extend(find_all_files(full_path))</code>
+        <br><span class="desc">Extends the list by appending items from an iterable.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>return result</code>
+        <br><span class="desc">Returns <code>result</code> to the caller.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>4.9 Key Takeaways</h2>
+
+<ul>
+  <li>Use <strong>type hints</strong> on parameters and return values for clarity</li>
+  <li><strong>Docstrings</strong> should explain what, not how</li>
+  <li><strong>Default parameters</strong> must be immutable (<code>None</code> for mutable defaults)</li>
+  <li><code>*args</code> and <code>**kwargs</code> enable flexible function signatures</li>
+  <li><strong>Lambdas</strong> are for short, throwaway functions — use <code>def</code> for anything complex</li>
+  <li>Avoid <code>global</code> and <code>nonlocal</code> when possible — they make code harder to reason about</li>
+  <li>Functions should do <strong>one thing</strong> and do it well (Single Responsibility Principle)</li>
+</ul>
+
+<div class="exercise"><strong>Exercise 4.1:</strong> Write a function <code>format_duration(seconds: float) -> str</code> that converts a number of seconds into "HH:MM:SS" format. Test it with 0, 65, 3661, and 86400.</div>
+<div class="exercise"><strong>Exercise 4.2:</strong> Write a higher-order function <code>apply_filter(items, predicate)</code> that returns only items where the predicate returns True. Rewrite the AIVS voice filtering to use it.</div>
+
+<hr>
+<p style="text-align: center;"><a href="ch03_control_flow.html">← Chapter 3</a> &nbsp;|&nbsp; <a href="ch05_strings.html">Chapter 5 — Strings →</a></p>
+
+</div></div></body>
+</html>

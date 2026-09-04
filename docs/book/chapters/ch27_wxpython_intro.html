@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 27: wxPython Introduction - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part IV — wxPython</div><ul class="chapters"><li><a href="ch27_wxpython_intro.html" class="active">Ch 27: wxPython Intro</a></li><li><a href="ch28_sizers_layout.html">Ch 28</a></li><li><a href="ch29_controls.html">Ch 29</a></li><li><a href="ch30_events.html">Ch 30</a></li><li><a href="ch31_dialogs.html">Ch 31</a></li><li><a href="ch32_custom_drawing.html">Ch 32</a></li><li><a href="ch33_threading_gui.html">Ch 33</a></li><li><a href="ch34_accessibility.html">Ch 34</a></li><li><a href="ch35_themes.html">Ch 35</a></li><li><a href="ch36_wx_adv.html">Ch 36</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="part-divider">
+  <div class="part-number">Part IV</div>
+  <h2>wxPython GUI Development</h2>
+</div>
+
+<div class="chapter-number">Chapter 27</div>
+<h1>wxPython Introduction</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand wxPython's architecture and widget model</li>
+  <li>Create your first wxPython application</li>
+  <li>Explore the AIVS MainFrame</li>
+</ul>
+
+<hr>
+
+<h2>27.1 What Is wxPython?</h2>
+
+<p>
+  <strong>wxPython</strong> is a Python wrapper around the wxWidgets C++ GUI toolkit.
+  It provides <strong>native-looking widgets</strong> on each platform — Windows controls
+  look like Windows controls, macOS controls look like macOS controls, etc.
+</p>
+
+<table>
+  <thead><tr><th>Feature</th><th>wxPython</th><th>Tkinter</th><th>PyQt</th></tr></thead>
+  <tbody>
+    <tr><td>Native look?</td><td>Yes (wraps native widgets)</td><td>No (custom rendering)</td><td>Mostly</td></tr>
+    <tr><td>License</td><td>wxWindows (permissive)</td><td>PSF (Python)</td><td>GPL/Commercial</td></tr>
+    <tr><td>Accessibility</td><td>Good (MSAA/UIA on Windows)</td><td>Basic</td><td>Good</td></tr>
+    <tr><td>Learning curve</td><td>Moderate</td><td>Easy</td><td>Steep</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h2>27.2 Hello wxPython</h2>
+
+<pre><code><span class="kw">import</span> wx
+
+<span class="kw">class</span> <span class="cls">MyFrame</span>(wx.Frame):
+    <span class="kw">def</span> <span class="fn">__init__</span>(self):
+        <span class="kw">super</span>().__init__(
+            <span class="kw">None</span>,
+            title=<span class="str">"Hello wxPython"</span>,
+            size=(<span class="num">400</span>, <span class="num">300</span>),
+        )
+        panel = wx.Panel(self)
+        label = wx.StaticText(panel, label=<span class="str">"Hello, World!"</span>)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(label, <span class="num">0</span>, wx.ALL, <span class="num">20</span>)
+        panel.SetSizer(sizer)
+
+<span class="cm"># Application entry point</span>
+app = wx.App(<span class="kw">False</span>)
+frame = MyFrame()
+frame.Show()
+app.MainLoop()</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>import wx</code>
+        <br><span class="desc">Imports the <code>wx</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>class MyFrame(wx.Frame):</code>
+        <br><span class="desc">The top-level window class. MainFrame inherits from this. Provides the window frame, title bar, and system menu.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>def __init__(self):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>super().__init__(</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>None,</code>
+        <br><span class="desc"><code>None,</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>title=&quot;Hello wxPython&quot;,</code>
+        <br><span class="desc">Assigns <code>&quot;Hello wxPython&quot;,</code> to <code>title</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>size=(400, 300),</code>
+        <br><span class="desc">Assigns <code>(400, 300),</code> to <code>size</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>panel = wx.Panel(self)</code>
+        <br><span class="desc">Creates a container window inside a Frame. Groups child controls and manages tab traversal order.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>label = wx.StaticText(panel, label=&quot;Hello, World!&quot;)</code>
+        <br><span class="desc">Creates a non-editable text label.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>sizer = wx.BoxSizer(wx.VERTICAL)</code>
+        <br><span class="desc">Creates a layout manager that arranges children horizontally (HORIZONTAL) or vertically (VERTICAL).</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>sizer.Add(label, 0, wx.ALL, 20)</code>
+        <br><span class="desc">Adds a child window to the sizer. Parameters: window, proportion, flags, border. Flags control alignment and padding.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>panel.SetSizer(sizer)</code>
+        <br><span class="desc">Assigns a sizer to the panel. The sizer takes control of laying out the panel's children.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code># Application entry point</code>
+        <br><span class="desc">A comment: <em>Application entry point</em>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>app = wx.App(False)</code>
+        <br><span class="desc">Creates the wxPython application object. Must be created before any GUI elements. False means don't redirect stdout.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>frame = MyFrame()</code>
+        <br><span class="desc">Assigns <code>MyFrame()</code> to <code>frame</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>frame.Show()</code>
+        <br><span class="desc">Makes the frame visible on screen. The frame is hidden by default.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>app.MainLoop()</code>
+        <br><span class="desc">Starts the wxPython event loop. This blocks until the last window is closed. All GUI events are processed here.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>27.3 wx.App and wx.Frame</h2>
+
+<pre><code><span class="cm"># Every wxPython app needs exactly ONE wx.App</span>
+app = wx.App(<span class="kw">False</span>)  <span class="cm"># False = don't redirect stdout</span>
+
+<span class="cm"># wx.Frame is the main window</span>
+frame = wx.Frame(
+    <span class="kw">None</span>,               <span class="cm"># Parent (None = top-level)</span>
+    title=<span class="str">"My App"</span>,
+    size=(<span class="num">800</span>, <span class="num">600</span>),
+    style=wx.DEFAULT_FRAME_STYLE,
+)
+
+<span class="cm"># Frame properties</span>
+frame.SetTitle(<span class="str">"New Title"</span>)
+frame.SetSize((<span class="num">1024</span>, <span class="num">768</span>))
+frame.Centre()  <span class="cm"># Center on screen</span>
+
+<span class="cm"># Menu bar</span>
+menubar = wx.MenuBar()
+file_menu = wx.Menu()
+file_menu.Append(wx.ID_NEW, <span class="str">"&amp;New\tCtrl+N"</span>)
+file_menu.Append(wx.ID_OPEN, <span class="str">"&amp;Open\tCtrl+O"</span>)
+file_menu.Append(wx.ID_EXIT, <span class="str">"E&amp;xit"</span>)
+menubar.Append(file_menu, <span class="str">"&amp;File"</span>)
+frame.SetMenuBar(menubar)
+
+<span class="cm"># Status bar</span>
+frame.CreateStatusBar()
+frame.SetStatusText(<span class="str">"Ready"</span>)
+
+frame.Show()
+app.MainLoop()</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Every wxPython app needs exactly ONE wx.App</code>
+        <br><span class="desc">A comment: <em>Every wxPython app needs exactly ONE wx.App</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>app = wx.App(False)  # False = don&#x27;t redirect stdout</code>
+        <br><span class="desc">Creates the wxPython application object. Must be created before any GUI elements. False means don't redirect stdout.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># wx.Frame is the main window</code>
+        <br><span class="desc">A comment: <em>wx.Frame is the main window</em>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>frame = wx.Frame(</code>
+        <br><span class="desc">Creates a top-level window with title bar, menus, and status bar. The main container for desktop apps.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>None,               # Parent (None = top-level)</code>
+        <br><span class="desc"><code>None,               # Parent (None = top-level)</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>title=&quot;My App&quot;,</code>
+        <br><span class="desc">Assigns <code>&quot;My App&quot;,</code> to <code>title</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>size=(800, 600),</code>
+        <br><span class="desc">Assigns <code>(800, 600),</code> to <code>size</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>style=wx.DEFAULT_FRAME_STYLE,</code>
+        <br><span class="desc">Assigns <code>wx.DEFAULT_FRAME_STYLE,</code> to <code>style</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code># Frame properties</code>
+        <br><span class="desc">A comment: <em>Frame properties</em>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>frame.SetTitle(&quot;New Title&quot;)</code>
+        <br><span class="desc">Changes the frame's title bar text.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>frame.SetSize((1024, 768))</code>
+        <br><span class="desc">Sets the frame's size in pixels (width, height).</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>frame.Centre()  # Center on screen</code>
+        <br><span class="desc">Centers the frame on the screen.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code># Menu bar</code>
+        <br><span class="desc">A comment: <em>Menu bar</em>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>menubar = wx.MenuBar()</code>
+        <br><span class="desc">Creates a horizontal menu bar at the top of a Frame.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>file_menu = wx.Menu()</code>
+        <br><span class="desc">Creates a dropdown menu. Contains menu items, separators, and sub-menus.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>file_menu.Append(wx.ID_NEW, &quot;&amp;New\tCtrl+N&quot;)</code>
+        <br><span class="desc">Adds a menu item with an ID, label, and optional help text. Use \t for accelerators.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>file_menu.Append(wx.ID_OPEN, &quot;&amp;Open\tCtrl+O&quot;)</code>
+        <br><span class="desc">Adds a menu item with an ID, label, and optional help text. Use \t for accelerators.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>file_menu.Append(wx.ID_EXIT, &quot;E&amp;xit&quot;)</code>
+        <br><span class="desc">Adds a menu item with an ID, label, and optional help text. Use \t for accelerators.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>menubar.Append(file_menu, &quot;&amp;File&quot;)</code>
+        <br><span class="desc">Adds a menu to the menu bar with a label.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>frame.SetMenuBar(menubar)</code>
+        <br><span class="desc">Attaches a menu bar to the frame.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code># Status bar</code>
+        <br><span class="desc">A comment: <em>Status bar</em>.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>frame.CreateStatusBar()</code>
+        <br><span class="desc">Creates and attaches a status bar to the frame.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>frame.SetStatusText(&quot;Ready&quot;)</code>
+        <br><span class="desc">Sets the text displayed in the status bar.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>frame.Show()</code>
+        <br><span class="desc">Makes the frame visible on screen. The frame is hidden by default.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>app.MainLoop()</code>
+        <br><span class="desc">Starts the wxPython event loop. This blocks until the last window is closed. All GUI events are processed here.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>27.4 The AIVS MainFrame</h2>
+
+<pre><code><span class="cm"># From gui/main_frame.py</span>
+<span class="kw">class</span> <span class="cls">MainFrame</span>(wx.Frame):
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, parent, settings: Settings, store: ModelStore):
+        <span class="kw">super</span>().__init__(
+            parent,
+            title=<span class="str">f"</span>{APP_NAME}<span class="str"> v</span>{APP_VERSION}<span class="str">"</span>,
+            size=(<span class="num">800</span>, <span class="num">600</span>),
+        )
+        self.settings = settings
+        self.store = store
+
+        self._build_menu()
+        self._build_ui()
+        self._bind_events()
+
+        self.Centre()
+        self.SetStatusText(<span class="str">"Ready"</span>)
+
+    <span class="kw">def</span> <span class="fn">_build_menu</span>(self):
+        <span class="str">"""Build the menu bar with File, Edit, Tools, Settings, Help."""</span>
+        menubar = wx.MenuBar()
+
+        <span class="cm"># File menu</span>
+        file_menu = wx.Menu()
+        file_menu.Append(ID_NEW_PROJECT, <span class="str">"&amp;New Project\tCtrl+Shift+N"</span>)
+        file_menu.Append(ID_OPEN_PROJECT, <span class="str">"&amp;Open Project\tCtrl+O"</span>)
+        file_menu.AppendSeparator()
+        file_menu.Append(wx.ID_EXIT, <span class="str">"E&amp;xit\tAlt+F4"</span>)
+        menubar.Append(file_menu, <span class="str">"&amp;File"</span>)
+
+        <span class="cm"># Tools menu</span>
+        tools_menu = wx.Menu()
+        tools_menu.Append(ID_RECORD, <span class="str">"&amp;Record\tCtrl+Shift+R"</span>)
+        menubar.Append(tools_menu, <span class="str">"&amp;Tools"</span>)
+
+        <span class="cm"># Settings menu</span>
+        settings_menu = wx.Menu()
+        settings_menu.Append(ID_SETTINGS, <span class="str">"&amp;Settings\tCtrl+,"</span>)
+        menubar.Append(settings_menu, <span class="str">"&amp;Settings"</span>)
+
+        self.SetMenuBar(menubar)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From gui/main_frame.py</code>
+        <br><span class="desc">A comment: <em>From gui/main_frame.py</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>class MainFrame(wx.Frame):</code>
+        <br><span class="desc">The top-level window class. MainFrame inherits from this. Provides the window frame, title bar, and system menu.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>def __init__(self, parent, settings: Settings, store: ModelStore):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>super().__init__(</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>parent,</code>
+        <br><span class="desc"><code>parent,</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>title=f&quot;{APP_NAME} v{APP_VERSION}&quot;,</code>
+        <br><span class="desc">Assigns <code>f&quot;{APP_NAME} v{APP_VERSION}&quot;,</code> to <code>title</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>size=(800, 600),</code>
+        <br><span class="desc">Assigns <code>(800, 600),</code> to <code>size</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>self.settings = settings</code>
+        <br><span class="desc">Stores <code>settings</code> in instance attribute <code>settings</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>self.store = store</code>
+        <br><span class="desc">Stores <code>store</code> in instance attribute <code>store</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>self._build_menu()</code>
+        <br><span class="desc">Calls <code>self._build_menu()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>self._build_ui()</code>
+        <br><span class="desc">Calls <code>self._build_ui()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>self._bind_events()</code>
+        <br><span class="desc">Calls <code>self._bind_events()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>self.Centre()</code>
+        <br><span class="desc">Calls <code>self.Centre()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>self.SetStatusText(&quot;Ready&quot;)</code>
+        <br><span class="desc">Sets the text in the specified status bar pane.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>def _build_menu(self):</code>
+        <br><span class="desc">Defines function <code>_build_menu</code> accepting (self).</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>&quot;&quot;&quot;Build the menu bar with File, Edit, Tools, Settings, Help.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Build the menu bar with File, Edit, Tools, Settings, Help.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>menubar = wx.MenuBar()</code>
+        <br><span class="desc">Creates a horizontal menu bar at the top of a Frame.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code># File menu</code>
+        <br><span class="desc">A comment: <em>File menu</em>.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>file_menu = wx.Menu()</code>
+        <br><span class="desc">Creates a dropdown menu. Contains menu items, separators, and sub-menus.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>file_menu.Append(ID_NEW_PROJECT, &quot;&amp;New Project\tCtrl+Shift+N&quot;)</code>
+        <br><span class="desc">Adds a menu item with an ID, label, and optional help text. Use \t for accelerators.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>file_menu.Append(ID_OPEN_PROJECT, &quot;&amp;Open Project\tCtrl+O&quot;)</code>
+        <br><span class="desc">Adds a menu item with an ID, label, and optional help text. Use \t for accelerators.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>file_menu.AppendSeparator()</code>
+        <br><span class="desc">Adds a visual separator line between menu items.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>file_menu.Append(wx.ID_EXIT, &quot;E&amp;xit\tAlt+F4&quot;)</code>
+        <br><span class="desc">Adds a menu item with an ID, label, and optional help text. Use \t for accelerators.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>menubar.Append(file_menu, &quot;&amp;File&quot;)</code>
+        <br><span class="desc">Adds a menu to the menu bar with a label.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code># Tools menu</code>
+        <br><span class="desc">A comment: <em>Tools menu</em>.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>tools_menu = wx.Menu()</code>
+        <br><span class="desc">Creates a dropdown menu. Contains menu items, separators, and sub-menus.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>tools_menu.Append(ID_RECORD, &quot;&amp;Record\tCtrl+Shift+R&quot;)</code>
+        <br><span class="desc">Adds a menu item with an ID, label, and optional help text. Use \t for accelerators.</span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>menubar.Append(tools_menu, &quot;&amp;Tools&quot;)</code>
+        <br><span class="desc">Adds a menu to the menu bar with a label.</span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code># Settings menu</code>
+        <br><span class="desc">A comment: <em>Settings menu</em>.</span>
+      </li>
+      <li>
+        <strong>Line 31:</strong> <code>settings_menu = wx.Menu()</code>
+        <br><span class="desc">Creates a dropdown menu. Contains menu items, separators, and sub-menus.</span>
+      </li>
+      <li>
+        <strong>Line 32:</strong> <code>settings_menu.Append(ID_SETTINGS, &quot;&amp;Settings\tCtrl+,&quot;)</code>
+        <br><span class="desc">Adds a menu item with an ID, label, and optional help text. Use \t for accelerators.</span>
+      </li>
+      <li>
+        <strong>Line 33:</strong> <code>menubar.Append(settings_menu, &quot;&amp;Settings&quot;)</code>
+        <br><span class="desc">Adds a menu to the menu bar with a label.</span>
+      </li>
+      <li>
+        <strong>Line 34:</strong> <code>self.SetMenuBar(menubar)</code>
+        <br><span class="desc">Calls <code>self.SetMenuBar()</code>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>27.5 The Widget Hierarchy</h2>
+
+<pre><code>wx.App                          <span class="cm"># Application object</span>
+└── wx.Frame                    <span class="cm"># Window</span>
+    ├── wx.MenuBar              <span class="cm"># Menu bar</span>
+    │   ├── wx.Menu             <span class="cm"># Drop-down menu</span>
+    │   │   └── wx.MenuItem     <span class="cm"># Menu item</span>
+    ├── wx.Panel                <span class="cm"># Container panel</span>
+    │   ├── wx.StaticText       <span class="cm"># Label</span>
+    │   ├── wx.TextCtrl         <span class="cm"># Text input</span>
+    │   ├── wx.Button           <span class="cm"># Button</span>
+    │   ├── wx.ComboBox         <span class="cm"># Drop-down combo</span>
+    │   ├── wx.CheckBox         <span class="cm"># Checkbox</span>
+    │   ├── wx.RadioButton      <span class="cm"># Radio button</span>
+    │   ├── wx.Slider           <span class="cm"># Slider</span>
+    │   ├── wx.Gauge            <span class="cm"># Progress bar</span>
+    │   └── wx.ListBox          <span class="cm"># List box</span>
+    └── wx.StatusBar            <span class="cm"># Status bar</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 4)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>wx.App                          # Application object</code>
+        <br><span class="desc"><code>wx.App                          # Application object</code></span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>└── wx.Frame                    # Window</code>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>├── wx.MenuBar              # Menu bar</code>
+        <br><span class="desc">The horizontal menu bar at the top of a Frame. Contains File, Edit, Tools, Help menus.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>│   ├── wx.Menu             # Drop-down menu</code>
+        <br><span class="desc">A dropdown menu that appears when clicking a menu bar item or right-clicking.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>│   │   └── wx.MenuItem     # Menu item</code>
+        <br><span class="desc">A dropdown menu that appears when clicking a menu bar item or right-clicking.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>├── wx.Panel                # Container panel</code>
+        <br><span class="desc">A container that sits inside a Frame. Groups controls and provides a background for drawing.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>│   ├── wx.StaticText       # Label</code>
+        <br><span class="desc">A non-editable text label widget. The primary way to display text information in wxPython.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>│   ├── wx.TextCtrl         # Text input</code>
+        <br><span class="desc">A text input control. Can be single-line, multi-line, read-only, or password-masked.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>│   ├── wx.Button           # Button</code>
+        <br><span class="desc">A clickable push button. Clicking it generates an EVT_BUTTON event.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>│   ├── wx.ComboBox         # Drop-down combo</code>
+        <br><span class="desc"><code>│   ├── wx.ComboBox         # Drop-down combo</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>│   ├── wx.CheckBox         # Checkbox</code>
+        <br><span class="desc">A toggle control with a label. Returns True when checked, False when unchecked.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>│   ├── wx.RadioButton      # Radio button</code>
+        <br><span class="desc"><code>│   ├── wx.RadioButton      # Radio button</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>│   ├── wx.Slider           # Slider</code>
+        <br><span class="desc">A slider control for numeric values. The range is set in the constructor; GetValue() returns the current position.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>│   ├── wx.Gauge            # Progress bar</code>
+        <br><span class="desc">A progress bar. SetRange() sets the max value; SetValue() updates the current progress.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>│   └── wx.ListBox          # List box</code>
+        <br><span class="desc">A list control for displaying and selecting items. Used for voice selection and recent projects.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>└── wx.StatusBar            # Status bar</code>
+        <br><span class="desc">A bar at the bottom of the frame showing status messages, progress, and context info.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>27.6 Key Takeaways</h2>
+<ul>
+  <li><strong>wx.App</strong> manages the event loop; create exactly one</li>
+  <li><strong>wx.Frame</strong> is the main window with menus, status bar</li>
+  <li>Widgets are organized in a <strong>parent-child hierarchy</strong></li>
+  <li>AIVS MainFrame has <strong>5 menus</strong> (File, Edit, Tools, Settings, Help)</li>
+  <li>wxPython provides <strong>native widgets</strong> with platform-specific appearance</li>
+</ul>
+
+<div class="exercise"><strong>Exercise 27.1:</strong> Create a wxPython application with a Frame, a menu with "File → Exit", and a status bar showing "Ready".</div>
+
+<hr>
+<p style="text-align: center;"><a href="ch26_c_extensions.html">← Ch 26</a> &nbsp;|&nbsp; <a href="ch28_sizers_layout.html">Ch 28 — Sizers →</a></p>
+</div></div></body>
+</html>

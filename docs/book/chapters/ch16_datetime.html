@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 16: Date &amp; Time - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part II</div><ul class="chapters"><li><a href="ch11_oop_advanced.html">Ch 11</a></li><li><a href="ch12_iterators.html">Ch 12</a></li><li><a href="ch13_decorators.html">Ch 13</a></li><li><a href="ch14_context.html">Ch 14</a></li><li><a href="ch15_regex.html">Ch 15</a></li><li><a href="ch16_datetime.html" class="active">Ch 16: Date/Time</a></li><li><a href="ch17_testing.html">Ch 17</a></li><li><a href="ch18_json_xml.html">Ch 18</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 16</div>
+<h1>Date &amp; Time</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Use the <code>datetime</code> module for dates, times, and timezones</li>
+  <li>Format and parse dates with <code>strftime</code> and <code>strptime</code></li>
+  <li>Use <code>time.monotonic()</code> for performance timing</li>
+  <li>See time handling in AIVS (DAISY timestamps, logging)</li>
+</ul>
+
+<hr>
+
+<h2>16.1 datetime Module</h2>
+
+<pre><code><span class="kw">from</span> datetime <span class="kw">import</span> datetime, date, time, timedelta, timezone
+
+<span class="cm"># Current date and time</span>
+now = datetime.now()
+<span class="kw">print</span>(now)           <span class="cm"># 2026-08-29 14:30:00.123456</span>
+<span class="kw">print</span>(now.date())     <span class="cm"># 2026-08-29</span>
+<span class="kw">print</span>(now.time())     <span class="cm"># 14:30:00.123456</span>
+
+<span class="cm"># Create specific dates</span>
+birthday = date(<span class="num">2026</span>, <span class="num">8</span>, <span class="num">29</span>)
+release = datetime(<span class="num">2026</span>, <span class="num">12</span>, <span class="num">1</span>, <span class="num">10</span>, <span class="num">30</span>, <span class="num">0</span>)
+
+<span class="cm"># UTC time</span>
+utc_now = datetime.now(timezone.utc)
+
+<span class="cm"># Time deltas</span>
+tomorrow = now + timedelta(days=<span class="num">1</span>)
+next_week = now + timedelta(weeks=<span class="num">1</span>)
+one_hour_later = now + timedelta(hours=<span class="num">1</span>)
+diff = release - now  <span class="cm"># timedelta object</span>
+<span class="kw">print</span>(diff.days)      <span class="cm"># Days until release</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>from datetime import datetime, date, time, timedelta, timezone</code>
+        <br><span class="desc">Imports <code>datetime, date, time, timedelta, timezone</code> from <code>datetime</code>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Current date and time</code>
+        <br><span class="desc">A comment: <em>Current date and time</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>now = datetime.now()</code>
+        <br><span class="desc">Assigns <code>datetime.now()</code> to <code>now</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>print(now)           # 2026-08-29 14:30:00.123456</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>print(now.date())     # 2026-08-29</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>print(now.time())     # 14:30:00.123456</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># Create specific dates</code>
+        <br><span class="desc">A comment: <em>Create specific dates</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>birthday = date(2026, 8, 29)</code>
+        <br><span class="desc">Assigns <code>date(2026, 8, 29)</code> to <code>birthday</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>release = datetime(2026, 12, 1, 10, 30, 0)</code>
+        <br><span class="desc">Assigns <code>datetime(2026, 12, 1, 10, 30, 0)</code> to <code>release</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code># UTC time</code>
+        <br><span class="desc">A comment: <em>UTC time</em>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>utc_now = datetime.now(timezone.utc)</code>
+        <br><span class="desc">Assigns <code>datetime.now(timezone.utc)</code> to <code>utc_now</code>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code># Time deltas</code>
+        <br><span class="desc">A comment: <em>Time deltas</em>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>tomorrow = now + timedelta(days=1)</code>
+        <br><span class="desc">Assigns <code>now + timedelta(days=1)</code> to <code>tomorrow</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>next_week = now + timedelta(weeks=1)</code>
+        <br><span class="desc">Assigns <code>now + timedelta(weeks=1)</code> to <code>next_week</code>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>one_hour_later = now + timedelta(hours=1)</code>
+        <br><span class="desc">Assigns <code>now + timedelta(hours=1)</code> to <code>one_hour_later</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>diff = release - now  # timedelta object</code>
+        <br><span class="desc">Assigns <code>release - now  # timedelta object</code> to <code>diff</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>print(diff.days)      # Days until release</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>16.2 Formatting and Parsing</h2>
+
+<pre><code><span class="cm"># strftime — format datetime as string</span>
+now = datetime(<span class="num">2026</span>, <span class="num">8</span>, <span class="num">29</span>, <span class="num">14</span>, <span class="num">30</span>)
+<span class="kw">print</span>(now.strftime(<span class="str">"%Y-%m-%d %H:%M:%S"</span>))  <span class="cm"># "2026-08-29 14:30:00"</span>
+<span class="kw">print</span>(now.strftime(<span class="str">"%B %d, %Y"</span>))          <span class="cm"># "August 29, 2026"</span>
+<span class="kw">print</span>(now.strftime(<span class="str">"%c"</span>))                  <span class="cm"># Locale-specific</span>
+
+<span class="cm"># strptime — parse string into datetime</span>
+dt = datetime.strptime(<span class="str">"2026-08-29"</span>, <span class="str">"%Y-%m-%d"</span>)
+
+<span class="cm"># ISO 8601 format (used in AIVS DAISY builder)</span>
+iso = datetime.now(timezone.utc).strftime(<span class="str">"%Y-%m-%dT%H:%M:%SZ"</span>)
+<span class="kw">print</span>(iso)  <span class="cm"># "2026-08-29T19:30:00Z"</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># strftime — format datetime as string</code>
+        <br><span class="desc">A comment: <em>strftime — format datetime as string</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>now = datetime(2026, 8, 29, 14, 30)</code>
+        <br><span class="desc">Assigns <code>datetime(2026, 8, 29, 14, 30)</code> to <code>now</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>print(now.strftime(&quot;%Y-%m-%d %H:%M:%S&quot;))  # &quot;2026-08-29 14:30:00&quot;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>print(now.strftime(&quot;%B %d, %Y&quot;))          # &quot;August 29, 2026&quot;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>print(now.strftime(&quot;%c&quot;))                  # Locale-specific</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># strptime — parse string into datetime</code>
+        <br><span class="desc">A comment: <em>strptime — parse string into datetime</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>dt = datetime.strptime(&quot;2026-08-29&quot;, &quot;%Y-%m-%d&quot;)</code>
+        <br><span class="desc">Assigns <code>datetime.strptime(&quot;2026-08-29&quot;, &quot;%Y-%m-%d&quot;)</code> to <code>dt</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># ISO 8601 format (used in AIVS DAISY builder)</code>
+        <br><span class="desc">A comment: <em>ISO 8601 format (used in AIVS DAISY builder)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>iso = datetime.now(timezone.utc).strftime(&quot;%Y-%m-%dT%H:%M:%SZ&quot;)</code>
+        <br><span class="desc">Assigns <code>datetime.now(timezone.utc).strftime(&quot;%Y-%m-%dT%H:%M:%SZ&quot;)</code> to <code>iso</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>print(iso)  # &quot;2026-08-29T19:30:00Z&quot;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>Format Codes Reference</h3>
+
+<table>
+  <thead><tr><th>Code</th><th>Meaning</th><th>Example</th></tr></thead>
+  <tbody>
+    <tr><td><code>%Y</code></td><td>4-digit year</td><td>2026</td></tr>
+    <tr><td><code>%m</code></td><td>Month (01-12)</td><td>08</td></tr>
+    <tr><td><code>%d</code></td><td>Day (01-31)</td><td>29</td></tr>
+    <tr><td><code>%H</code></td><td>Hour 24h (00-23)</td><td>14</td></tr>
+    <tr><td><code>%M</code></td><td>Minute (00-59)</td><td>30</td></tr>
+    <tr><td><code>%S</code></td><td>Second (00-59)</td><td>00</td></tr>
+    <tr><td><code>%B</code></td><td>Full month name</td><td>August</td></tr>
+    <tr><td><code>%A</code></td><td>Full weekday name</td><td>Saturday</td></tr>
+    <tr><td><code>%Z</code></td><td>Timezone name</td><td>UTC</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h2>16.3 Time Performance Measurement</h2>
+
+<pre><code><span class="kw">import</span> time
+
+<span class="cm"># time.monotonic() — best for measuring elapsed time</span>
+start = time.monotonic()
+<span class="cm"># ... do work ...</span>
+elapsed = time.monotonic() - start
+<span class="kw">print</span>(<span class="str">f"Elapsed: </span>{elapsed:<span class="num">.3f</span>}<span class="str">s"</span>)
+
+<span class="cm"># Used in AIVS server health check polling</span>
+<span class="kw">def</span> <span class="fn">_wait_ready</span>(self, timeout: float):
+    <span class="str">"""Poll health endpoint until server responds."""</span>
+    deadline = time.monotonic() + timeout
+    <span class="kw">while</span> time.monotonic() < deadline:
+        <span class="kw">if</span> self.health_check():
+            <span class="kw">return</span>
+        time.sleep(<span class="num">1.0</span>)
+    <span class="kw">raise</span> TimeoutError(<span class="str">f"Server not ready in </span>{timeout}<span class="str">s"</span>)
+
+<span class="cm"># time.perf_counter() — highest resolution timer</span>
+start = time.perf_counter()
+result = expensive_computation()
+duration = time.perf_counter() - start</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>import time</code>
+        <br><span class="desc">Imports the <code>time</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># time.monotonic() — best for measuring elapsed time</code>
+        <br><span class="desc">A comment: <em>time.monotonic() — best for measuring elapsed time</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>start = time.monotonic()</code>
+        <br><span class="desc">Assigns <code>time.monotonic()</code> to <code>start</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># ... do work ...</code>
+        <br><span class="desc">A comment: <em>... do work ...</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>elapsed = time.monotonic() - start</code>
+        <br><span class="desc">Assigns <code>time.monotonic() - start</code> to <code>elapsed</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>print(f&quot;Elapsed: {elapsed:.3f}s&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># Used in AIVS server health check polling</code>
+        <br><span class="desc">A comment: <em>Used in AIVS server health check polling</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>def _wait_ready(self, timeout: float):</code>
+        <br><span class="desc">Defines function <code>_wait_ready</code> accepting (self, timeout).</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>&quot;&quot;&quot;Poll health endpoint until server responds.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Poll health endpoint until server responds.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>deadline = time.monotonic() + timeout</code>
+        <br><span class="desc">Assigns <code>time.monotonic() + timeout</code> to <code>deadline</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>while time.monotonic() &lt; deadline:</code>
+        <br><span class="desc">While loop: repeats as long as <code>time.monotonic() &lt; deadline</code>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>if self.health_check():</code>
+        <br><span class="desc">Checks condition: <code>self.health_check()</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>return</code>
+        <br><span class="desc">Returns <code>None</code> implicitly (exits the function).</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>time.sleep(1.0)</code>
+        <br><span class="desc"><code>time.sleep(1.0)</code></span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>raise TimeoutError(f&quot;Server not ready in {timeout}s&quot;)</code>
+        <br><span class="desc">Manually raises an exception. Use to signal error conditions to callers.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code># time.perf_counter() — highest resolution timer</code>
+        <br><span class="desc">A comment: <em>time.perf_counter() — highest resolution timer</em>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>start = time.perf_counter()</code>
+        <br><span class="desc">Assigns <code>time.perf_counter()</code> to <code>start</code>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>result = expensive_computation()</code>
+        <br><span class="desc">Assigns <code>expensive_computation()</code> to <code>result</code>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>duration = time.perf_counter() - start</code>
+        <br><span class="desc">Assigns <code>time.perf_counter() - start</code> to <code>duration</code>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>16.4 Dates in AIVS</h2>
+
+<pre><code><span class="cm"># From documents/daisy_builder.py — DAISY book metadata</span>
+<span class="kw">from</span> datetime <span class="kw">import</span> datetime, timezone
+
+now_iso = datetime.now(timezone.utc).strftime(<span class="str">"%Y-%m-%dT%H:%M:%SZ"</span>)
+date_only = datetime.now(timezone.utc).strftime(<span class="str">"%Y-%m-%d"</span>)
+
+<span class="cm"># Used in NCC.html and package.opf metadata:</span>
+<span class="cm"># &lt;meta name="dc:date" content="2026-08-29" /&gt;</span>
+<span class="cm"># &lt;dc:date&gt;2026-08-29T19:30:00Z&lt;/dc:date&gt;</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 4)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From documents/daisy_builder.py — DAISY book metadata</code>
+        <br><span class="desc">A comment: <em>From documents/daisy_builder.py — DAISY book metadata</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>from datetime import datetime, timezone</code>
+        <br><span class="desc">Imports <code>datetime, timezone</code> from <code>datetime</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>now_iso = datetime.now(timezone.utc).strftime(&quot;%Y-%m-%dT%H:%M:%SZ&quot;)</code>
+        <br><span class="desc">Assigns <code>datetime.now(timezone.utc).strftime(&quot;%Y-%m-%dT%H:%M:%SZ&quot;)</code> to <code>now_iso</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>date_only = datetime.now(timezone.utc).strftime(&quot;%Y-%m-%d&quot;)</code>
+        <br><span class="desc">Assigns <code>datetime.now(timezone.utc).strftime(&quot;%Y-%m-%d&quot;)</code> to <code>date_only</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># Used in NCC.html and package.opf metadata:</code>
+        <br><span class="desc">A comment: <em>Used in NCC.html and package.opf metadata:</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># &lt;meta name=&quot;dc:date&quot; content=&quot;2026-08-29&quot; /&gt;</code>
+        <br><span class="desc">A comment: <em>&lt;meta name=&quot;dc:date&quot; content=&quot;2026-08-29&quot; /&gt;</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># &lt;dc:date&gt;2026-08-29T19:30:00Z&lt;/dc:date&gt;</code>
+        <br><span class="desc">A comment: <em>&lt;dc:date&gt;2026-08-29T19:30:00Z&lt;/dc:date&gt;</em>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>16.5 Key Takeaways</h2>
+<ul>
+  <li><strong><code>datetime.now()</code></strong> for current time; <strong><code>timezone.utc</code></strong> for UTC</li>
+  <li><strong><code>strftime()</code></strong> formats; <strong><code>strptime()</code></strong> parses</li>
+  <li><strong><code>time.monotonic()</code></strong> for measuring elapsed time (not affected by clock changes)</li>
+  <li>AIVS uses ISO 8601 timestamps for DAISY book metadata</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch15_regex.html">← Ch 15</a> &nbsp;|&nbsp; <a href="ch17_testing.html">Ch 17 — Testing →</a></p>
+</div></div></body>
+</html>

@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 18: JSON, XML &amp; Data - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part II</div><ul class="chapters"><li><a href="ch11_oop_advanced.html">Ch 11</a></li><li><a href="ch12_iterators.html">Ch 12</a></li><li><a href="ch13_decorators.html">Ch 13</a></li><li><a href="ch14_context.html">Ch 14</a></li><li><a href="ch15_regex.html">Ch 15</a></li><li><a href="ch16_datetime.html">Ch 16</a></li><li><a href="ch17_testing.html">Ch 17</a></li><li><a href="ch18_json_xml.html" class="active">Ch 18: JSON/XML</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 18</div>
+<h1>JSON, XML &amp; Structured Data</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Master JSON serialization and deserialization</li>
+  <li>Understand XML basics for DAISY book generation</li>
+  <li>See structured data patterns throughout AIVS</li>
+</ul>
+
+<hr>
+
+<h2>18.1 JSON in Depth</h2>
+
+<pre><code><span class="kw">import</span> json
+
+<span class="cm"># Python ↔ JSON type mapping</span>
+<span class="cm"># dict    →  object</span>
+<span class="cm"># list    →  array</span>
+<span class="cm"># str     →  string</span>
+<span class="cm"># int/float → number</span>
+<span class="cm"># True    →  true</span>
+<span class="cm"># False   →  false</span>
+<span class="cm"># None    →  null</span>
+
+<span class="cm"># Complex serialization</span>
+data = {
+    <span class="str">"name"</span>: <span class="str">"My Project"</span>,
+    <span class="str">"segments"</span>: [
+        {<span class="str">"index"</span>: <span class="num">1</span>, <span class="str">"title"</span>: <span class="str">"Chapter 1"</span>, <span class="str">"text"</span>: <span class="str">"..."</span>},
+        {<span class="str">"index"</span>: <span class="num">2</span>, <span class="str">"title"</span>: <span class="str">"Chapter 2"</span>, <span class="str">"text"</span>: <span class="str">"..."</span>},
+    ],
+    <span class="str">"tts"</span>: {
+        <span class="str">"voice"</span>: <span class="str">"af_bella"</span>,
+        <span class="str">"rate"</span>: <span class="num">1.0</span>,
+        <span class="str">"pitch"</span>: <span class="num">1.0</span>,
+    },
+}
+
+<span class="cm"># Serialize with nice formatting</span>
+json_str = json.dumps(data, indent=<span class="num">2</span>, ensure_ascii=<span class="kw">False</span>)
+<span class="kw">print</span>(json_str)
+
+<span class="cm"># Deserialize</span>
+loaded = json.loads(json_str)
+
+<span class="cm"># Write to file</span>
+<span class="kw">with</span> open(<span class="str">"project.json"</span>, <span class="str">"w"</span>, encoding=<span class="str">"utf-8"</span>) <span class="kw">as</span> f:
+    json.dump(data, f, indent=<span class="num">2</span>, ensure_ascii=<span class="kw">False</span>)
+
+<span class="cm"># Read from file</span>
+<span class="kw">with</span> open(<span class="str">"project.json"</span>, <span class="str">"r"</span>, encoding=<span class="str">"utf-8"</span>) <span class="kw">as</span> f:
+    loaded = json.load(f)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>import json</code>
+        <br><span class="desc">Imports the <code>json</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Python ↔ JSON type mapping</code>
+        <br><span class="desc">A comment: <em>Python ↔ JSON type mapping</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># dict    →  object</code>
+        <br><span class="desc">A comment: <em>dict    →  object</em>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># list    →  array</code>
+        <br><span class="desc">A comment: <em>list    →  array</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># str     →  string</code>
+        <br><span class="desc">A comment: <em>str     →  string</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># int/float → number</code>
+        <br><span class="desc">A comment: <em>int/float → number</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># True    →  true</code>
+        <br><span class="desc">A comment: <em>True    →  true</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># False   →  false</code>
+        <br><span class="desc">A comment: <em>False   →  false</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code># None    →  null</code>
+        <br><span class="desc">A comment: <em>None    →  null</em>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code># Complex serialization</code>
+        <br><span class="desc">A comment: <em>Complex serialization</em>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>data = {</code>
+        <br><span class="desc">Assigns <code>{</code> to <code>data</code>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>&quot;name&quot;: &quot;My Project&quot;,</code>
+        <br><span class="desc"><code>&quot;name&quot;: &quot;My Project&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>&quot;segments&quot;: [</code>
+        <br><span class="desc"><code>&quot;segments&quot;: [</code></span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>{&quot;index&quot;: 1, &quot;title&quot;: &quot;Chapter 1&quot;, &quot;text&quot;: &quot;...&quot;},</code>
+        <br><span class="desc"><code>{&quot;index&quot;: 1, &quot;title&quot;: &quot;Chapter 1&quot;, &quot;text&quot;: &quot;...&quot;},</code></span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>{&quot;index&quot;: 2, &quot;title&quot;: &quot;Chapter 2&quot;, &quot;text&quot;: &quot;...&quot;},</code>
+        <br><span class="desc"><code>{&quot;index&quot;: 2, &quot;title&quot;: &quot;Chapter 2&quot;, &quot;text&quot;: &quot;...&quot;},</code></span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>],</code>
+        <br><span class="desc"><code>],</code></span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>&quot;tts&quot;: {</code>
+        <br><span class="desc"><code>&quot;tts&quot;: {</code></span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>&quot;voice&quot;: &quot;af_bella&quot;,</code>
+        <br><span class="desc"><code>&quot;voice&quot;: &quot;af_bella&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>&quot;rate&quot;: 1.0,</code>
+        <br><span class="desc"><code>&quot;rate&quot;: 1.0,</code></span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>&quot;pitch&quot;: 1.0,</code>
+        <br><span class="desc"><code>&quot;pitch&quot;: 1.0,</code></span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>},</code>
+        <br><span class="desc"><code>},</code></span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>}</code>
+        <br><span class="desc"><code>}</code></span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code># Serialize with nice formatting</code>
+        <br><span class="desc">A comment: <em>Serialize with nice formatting</em>.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>json_str = json.dumps(data, indent=2, ensure_ascii=False)</code>
+        <br><span class="desc">Serializes a Python object to a JSON string.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>print(json_str)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code># Deserialize</code>
+        <br><span class="desc">A comment: <em>Deserialize</em>.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>loaded = json.loads(json_str)</code>
+        <br><span class="desc">Deserializes a JSON string into a Python object.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code># Write to file</code>
+        <br><span class="desc">A comment: <em>Write to file</em>.</span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>with open(&quot;project.json&quot;, &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:</code>
+        <br><span class="desc">Opens a file using a context manager. The file is automatically closed when the block exits, even if an error occurs.</span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code>json.dump(data, f, indent=2, ensure_ascii=False)</code>
+        <br><span class="desc">Serializes a Python object to JSON and writes to a file.</span>
+      </li>
+      <li>
+        <strong>Line 31:</strong> <code># Read from file</code>
+        <br><span class="desc">A comment: <em>Read from file</em>.</span>
+      </li>
+      <li>
+        <strong>Line 32:</strong> <code>with open(&quot;project.json&quot;, &quot;r&quot;, encoding=&quot;utf-8&quot;) as f:</code>
+        <br><span class="desc">Opens a file using a context manager. The file is automatically closed when the block exits, even if an error occurs.</span>
+      </li>
+      <li>
+        <strong>Line 33:</strong> <code>loaded = json.load(f)</code>
+        <br><span class="desc">Deserializes JSON from a file into a Python object.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>18.2 JSON in AIVS</h2>
+
+<p>JSON is the backbone of AIVS. Three critical files use it:</p>
+
+<h3>1. Settings File</h3>
+
+<pre><code><span class="cm"># settings.json — user preferences</span>
+{
+  <span class="str">"theme"</span>: <span class="str">"dark"</span>,
+  <span class="str">"audio_mode"</span>: <span class="str">"page_with_h1"</span>,
+  <span class="str">"recording.rate"</span>: <span class="num">1.0</span>,
+  <span class="str">"recording.pitch"</span>: <span class="num">1.0</span>,
+  <span class="str">"recording.volume"</span>: <span class="num">1.0</span>,
+  <span class="str">"recording.output_format"</span>: <span class="str">"wav"</span>,
+  <span class="str">"recording.punctuation"</span>: <span class="str">"default"</span>,
+  <span class="str">"compute"</span>: <span class="str">"auto"</span>,
+  <span class="str">"developer_mode"</span>: <span class="kw">false</span>,
+  <span class="str">"last_model"</span>: {
+    <span class="str">"tts"</span>: <span class="str">"piper"</span>,
+    <span class="str">"language"</span>: <span class="str">"en_US"</span>,
+    <span class="str">"voice"</span>: <span class="str">"af_bella"</span>
+  },
+  <span class="str">"recent_projects"</span>: [
+    [<span class="str">"My Book"</span>, <span class="str">"C:\\Users\\...\\My Book"</span>]
+  ]
+}</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># settings.json — user preferences</code>
+        <br><span class="desc">A comment: <em>settings.json — user preferences</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>{</code>
+        <br><span class="desc"><code>{</code></span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;theme&quot;: &quot;dark&quot;,</code>
+        <br><span class="desc"><code>&quot;theme&quot;: &quot;dark&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>&quot;audio_mode&quot;: &quot;page_with_h1&quot;,</code>
+        <br><span class="desc"><code>&quot;audio_mode&quot;: &quot;page_with_h1&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>&quot;recording.rate&quot;: 1.0,</code>
+        <br><span class="desc"><code>&quot;recording.rate&quot;: 1.0,</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>&quot;recording.pitch&quot;: 1.0,</code>
+        <br><span class="desc"><code>&quot;recording.pitch&quot;: 1.0,</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>&quot;recording.volume&quot;: 1.0,</code>
+        <br><span class="desc"><code>&quot;recording.volume&quot;: 1.0,</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>&quot;recording.output_format&quot;: &quot;wav&quot;,</code>
+        <br><span class="desc"><code>&quot;recording.output_format&quot;: &quot;wav&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>&quot;recording.punctuation&quot;: &quot;default&quot;,</code>
+        <br><span class="desc"><code>&quot;recording.punctuation&quot;: &quot;default&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>&quot;compute&quot;: &quot;auto&quot;,</code>
+        <br><span class="desc"><code>&quot;compute&quot;: &quot;auto&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>&quot;developer_mode&quot;: false,</code>
+        <br><span class="desc"><code>&quot;developer_mode&quot;: false,</code></span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>&quot;last_model&quot;: {</code>
+        <br><span class="desc"><code>&quot;last_model&quot;: {</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>&quot;tts&quot;: &quot;piper&quot;,</code>
+        <br><span class="desc"><code>&quot;tts&quot;: &quot;piper&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>&quot;language&quot;: &quot;en_US&quot;,</code>
+        <br><span class="desc"><code>&quot;language&quot;: &quot;en_US&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>&quot;voice&quot;: &quot;af_bella&quot;</code>
+        <br><span class="desc"><code>&quot;voice&quot;: &quot;af_bella&quot;</code></span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>},</code>
+        <br><span class="desc"><code>},</code></span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>&quot;recent_projects&quot;: [</code>
+        <br><span class="desc"><code>&quot;recent_projects&quot;: [</code></span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>[&quot;My Book&quot;, &quot;C:\\Users\\...\\My Book&quot;]</code>
+        <br><span class="desc"><code>[&quot;My Book&quot;, &quot;C:\\Users\\...\\My Book&quot;]</code></span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>]</code>
+        <br><span class="desc"><code>]</code></span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>}</code>
+        <br><span class="desc"><code>}</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>2. Project File</h3>
+
+<pre><code><span class="cm"># project.json — per-project state</span>
+{
+  <span class="str">"name"</span>: <span class="str">"My Audiobook"</span>,
+  <span class="str">"source"</span>: <span class="str">"C:\\Documents\\book.pdf"</span>,
+  <span class="str">"mode"</span>: <span class="str">"page_with_h1"</span>,
+  <span class="str">"project_type"</span>: <span class="str">"audio_playlist"</span>,
+  <span class="str">"segments"</span>: [
+    {
+      <span class="str">"index"</span>: <span class="num">1</span>,
+      <span class="str">"title"</span>: <span class="str">"Chapter 1: Introduction"</span>,
+      <span class="str">"text"</span>: <span class="str">"Once upon a time..."</span>,
+      <span class="str">"status"</span>: <span class="str">"done"</span>,
+      <span class="str">"saved"</span>: <span class="str">"Chapter_1_Introduction.wav"</span>,
+      <span class="str">"duration"</span>: <span class="num">120.5</span>
+    },
+    {
+      <span class="str">"index"</span>: <span class="num">2</span>,
+      <span class="str">"title"</span>: <span class="str">"Chapter 2: The Beginning"</span>,
+      <span class="str">"text"</span>: <span class="str">"It was a dark..."</span>,
+      <span class="str">"status"</span>: <span class="str">"pending"</span>
+    }
+  ],
+  <span class="str">"tts"</span>: {
+    <span class="str">"tts"</span>: <span class="str">"piper"</span>,
+    <span class="str">"language"</span>: <span class="str">"en_US"</span>,
+    <span class="str">"variant"</span>: <span class="str">"medium"</span>,
+    <span class="str">"voice"</span>: <span class="str">"af_bella"</span>,
+    <span class="str">"rate"</span>: <span class="num">1.0</span>,
+    <span class="str">"pitch"</span>: <span class="num">1.0</span>,
+    <span class="str">"volume"</span>: <span class="num">1.0</span>,
+    <span class="str">"punctuation"</span>: <span class="str">"default"</span>,
+    <span class="str">"output_format"</span>: <span class="str">"wav"</span>,
+    <span class="str">"compute"</span>: <span class="str">"cpu"</span>
+  }
+}</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># project.json — per-project state</code>
+        <br><span class="desc">A comment: <em>project.json — per-project state</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>{</code>
+        <br><span class="desc"><code>{</code></span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;name&quot;: &quot;My Audiobook&quot;,</code>
+        <br><span class="desc"><code>&quot;name&quot;: &quot;My Audiobook&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>&quot;source&quot;: &quot;C:\\Documents\\book.pdf&quot;,</code>
+        <br><span class="desc"><code>&quot;source&quot;: &quot;C:\\Documents\\book.pdf&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>&quot;mode&quot;: &quot;page_with_h1&quot;,</code>
+        <br><span class="desc"><code>&quot;mode&quot;: &quot;page_with_h1&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>&quot;project_type&quot;: &quot;audio_playlist&quot;,</code>
+        <br><span class="desc"><code>&quot;project_type&quot;: &quot;audio_playlist&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>&quot;segments&quot;: [</code>
+        <br><span class="desc"><code>&quot;segments&quot;: [</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>{</code>
+        <br><span class="desc"><code>{</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>&quot;index&quot;: 1,</code>
+        <br><span class="desc"><code>&quot;index&quot;: 1,</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>&quot;title&quot;: &quot;Chapter 1: Introduction&quot;,</code>
+        <br><span class="desc"><code>&quot;title&quot;: &quot;Chapter 1: Introduction&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>&quot;text&quot;: &quot;Once upon a time...&quot;,</code>
+        <br><span class="desc"><code>&quot;text&quot;: &quot;Once upon a time...&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>&quot;status&quot;: &quot;done&quot;,</code>
+        <br><span class="desc"><code>&quot;status&quot;: &quot;done&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>&quot;saved&quot;: &quot;Chapter_1_Introduction.wav&quot;,</code>
+        <br><span class="desc"><code>&quot;saved&quot;: &quot;Chapter_1_Introduction.wav&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>&quot;duration&quot;: 120.5</code>
+        <br><span class="desc"><code>&quot;duration&quot;: 120.5</code></span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>},</code>
+        <br><span class="desc"><code>},</code></span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>{</code>
+        <br><span class="desc"><code>{</code></span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>&quot;index&quot;: 2,</code>
+        <br><span class="desc"><code>&quot;index&quot;: 2,</code></span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>&quot;title&quot;: &quot;Chapter 2: The Beginning&quot;,</code>
+        <br><span class="desc"><code>&quot;title&quot;: &quot;Chapter 2: The Beginning&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>&quot;text&quot;: &quot;It was a dark...&quot;,</code>
+        <br><span class="desc"><code>&quot;text&quot;: &quot;It was a dark...&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>&quot;status&quot;: &quot;pending&quot;</code>
+        <br><span class="desc"><code>&quot;status&quot;: &quot;pending&quot;</code></span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>}</code>
+        <br><span class="desc"><code>}</code></span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>],</code>
+        <br><span class="desc"><code>],</code></span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>&quot;tts&quot;: {</code>
+        <br><span class="desc"><code>&quot;tts&quot;: {</code></span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>&quot;tts&quot;: &quot;piper&quot;,</code>
+        <br><span class="desc"><code>&quot;tts&quot;: &quot;piper&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>&quot;language&quot;: &quot;en_US&quot;,</code>
+        <br><span class="desc"><code>&quot;language&quot;: &quot;en_US&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>&quot;variant&quot;: &quot;medium&quot;,</code>
+        <br><span class="desc"><code>&quot;variant&quot;: &quot;medium&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>&quot;voice&quot;: &quot;af_bella&quot;,</code>
+        <br><span class="desc"><code>&quot;voice&quot;: &quot;af_bella&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>&quot;rate&quot;: 1.0,</code>
+        <br><span class="desc"><code>&quot;rate&quot;: 1.0,</code></span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>&quot;pitch&quot;: 1.0,</code>
+        <br><span class="desc"><code>&quot;pitch&quot;: 1.0,</code></span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code>&quot;volume&quot;: 1.0,</code>
+        <br><span class="desc"><code>&quot;volume&quot;: 1.0,</code></span>
+      </li>
+      <li>
+        <strong>Line 31:</strong> <code>&quot;punctuation&quot;: &quot;default&quot;,</code>
+        <br><span class="desc"><code>&quot;punctuation&quot;: &quot;default&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 32:</strong> <code>&quot;output_format&quot;: &quot;wav&quot;,</code>
+        <br><span class="desc"><code>&quot;output_format&quot;: &quot;wav&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 33:</strong> <code>&quot;compute&quot;: &quot;cpu&quot;</code>
+        <br><span class="desc"><code>&quot;compute&quot;: &quot;cpu&quot;</code></span>
+      </li>
+      <li>
+        <strong>Line 34:</strong> <code>}</code>
+        <br><span class="desc"><code>}</code></span>
+      </li>
+      <li>
+        <strong>Line 35:</strong> <code>}</code>
+        <br><span class="desc"><code>}</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>3. TTS Worker Protocol</h3>
+
+<pre><code><span class="cm"># JSON lines protocol between app and worker subprocesses</span>
+<span class="cm"># Request (app → worker):</span>
+{<span class="str">"cmd"</span>: <span class="str">"synthesize"</span>, <span class="str">"text"</span>: <span class="str">"Hello world"</span>, <span class="str">"speed"</span>: <span class="num">1.0</span>}
+<span class="cm"># Response (worker → app):</span>
+{<span class="str">"ok"</span>: <span class="kw">true</span>, <span class="str">"wav"</span>: <span class="str">"base64-encoded-audio..."</span>}
+
+<span class="cm"># Error response:</span>
+{<span class="str">"ok"</span>: <span class="kw">false</span>, <span class="str">"error"</span>: <span class="str">"Engine not installed"</span>}</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 4)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># JSON lines protocol between app and worker subprocesses</code>
+        <br><span class="desc">A comment: <em>JSON lines protocol between app and worker subprocesses</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Request (app → worker):</code>
+        <br><span class="desc">A comment: <em>Request (app → worker):</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>{&quot;cmd&quot;: &quot;synthesize&quot;, &quot;text&quot;: &quot;Hello world&quot;, &quot;speed&quot;: 1.0}</code>
+        <br><span class="desc"><code>{&quot;cmd&quot;: &quot;synthesize&quot;, &quot;text&quot;: &quot;Hello world&quot;, &quot;speed&quot;: 1.0}</code></span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># Response (worker → app):</code>
+        <br><span class="desc">A comment: <em>Response (worker → app):</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>{&quot;ok&quot;: true, &quot;wav&quot;: &quot;base64-encoded-audio...&quot;}</code>
+        <br><span class="desc"><code>{&quot;ok&quot;: true, &quot;wav&quot;: &quot;base64-encoded-audio...&quot;}</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># Error response:</code>
+        <br><span class="desc">A comment: <em>Error response:</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>{&quot;ok&quot;: false, &quot;error&quot;: &quot;Engine not installed&quot;}</code>
+        <br><span class="desc"><code>{&quot;ok&quot;: false, &quot;error&quot;: &quot;Engine not installed&quot;}</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>18.3 XML Basics (for DAISY)</h2>
+
+<pre><code><span class="cm"># AIVS generates XML for DAISY 2.02 books</span>
+<span class="cm"># NCC.html (Navigation Center Combined)</span>
+ncc = <span class="str">f"""&lt;!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"&gt;
+&lt;html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en"&gt;
+&lt;head&gt;
+  &lt;title&gt;</span>{title}<span class="str">&lt;/title&gt;
+  &lt;meta name="dc:title" content="</span>{title}<span class="str">" /&gt;
+  &lt;meta name="dc:identifier" content="</span>{book_uid}<span class="str">" /&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;h1&gt;</span>{title}<span class="str">&lt;/h1&gt;
+  &lt;h2&gt;&lt;a href="Chapter_1.smil"&gt;Chapter 1&lt;/a&gt;&lt;/h2&gt;
+&lt;/body&gt;
+&lt;/html&gt;"""</span>
+
+<span class="cm"># package.opf (Open Packaging Format)</span>
+opf = <span class="str">"""&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;package xmlns="http://www.idpf.org/2007/opf" version="2.0"&gt;
+  &lt;metadata xmlns:dc="http://purl.org/dc/elements/1.1/"&gt;
+    &lt;dc:title&gt;</span>{title}<span class="str">&lt;/dc:title&gt;
+    &lt;dc:identifier&gt;</span>{uid}<span class="str">&lt;/dc:identifier&gt;
+    &lt;dc:language&gt;</span>{lang}<span class="str">&lt;/dc:language&gt;
+  &lt;/metadata&gt;
+&lt;/package&gt;"""</span>
+
+<span class="cm"># SMIL files (audio-text synchronization)</span>
+smil = <span class="str">"""&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;smil xmlns="http://www.w3.org/2001/SMIL20/Language"&gt;
+  &lt;body&gt;
+    &lt;seq&gt;
+      &lt;par&gt;
+        &lt;audio src="audio/Chapter_1.wav" /&gt;
+      &lt;/par&gt;
+    &lt;/seq&gt;
+  &lt;/body&gt;
+&lt;/smil&gt;"""</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 5)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># AIVS generates XML for DAISY 2.02 books</code>
+        <br><span class="desc">A comment: <em>AIVS generates XML for DAISY 2.02 books</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># NCC.html (Navigation Center Combined)</code>
+        <br><span class="desc">A comment: <em>NCC.html (Navigation Center Combined)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>ncc = f&quot;&quot;&quot;&lt;!DOCTYPE html PUBLIC &quot;-//W3C//DTD XHTML 1.0 Transitional//EN&quot;</code>
+        <br><span class="desc">Assigns <code>f&quot;&quot;&quot;&lt;!DOCTYPE html PUBLIC &quot;-//W3C//DTD XHTML 1.0 Transitional//EN&quot;</code> to <code>ncc</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>&quot;http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd&quot;&gt;</code>
+        <br><span class="desc"><code>&quot;http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd&quot;&gt;</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>&lt;html xmlns=&quot;http://www.w3.org/1999/xhtml&quot; xml:lang=&quot;en&quot; lang=&quot;en&quot;&gt;</code>
+        <br><span class="desc"><code>&lt;html xmlns=&quot;http://www.w3.org/1999/xhtml&quot; xml:lang=&quot;en&quot; lang=&quot;en&quot;&gt;</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>&lt;head&gt;</code>
+        <br><span class="desc"><code>&lt;head&gt;</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>&lt;title&gt;{title}&lt;/title&gt;</code>
+        <br><span class="desc"><code>&lt;title&gt;{title}&lt;/title&gt;</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>&lt;meta name=&quot;dc:title&quot; content=&quot;{title}&quot; /&gt;</code>
+        <br><span class="desc"><code>&lt;meta name=&quot;dc:title&quot; content=&quot;{title}&quot; /&gt;</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>&lt;meta name=&quot;dc:identifier&quot; content=&quot;{book_uid}&quot; /&gt;</code>
+        <br><span class="desc"><code>&lt;meta name=&quot;dc:identifier&quot; content=&quot;{book_uid}&quot; /&gt;</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>&lt;/head&gt;</code>
+        <br><span class="desc"><code>&lt;/head&gt;</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>&lt;body&gt;</code>
+        <br><span class="desc"><code>&lt;body&gt;</code></span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>&lt;h1&gt;{title}&lt;/h1&gt;</code>
+        <br><span class="desc"><code>&lt;h1&gt;{title}&lt;/h1&gt;</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>&lt;h2&gt;&lt;a href=&quot;Chapter_1.smil&quot;&gt;Chapter 1&lt;/a&gt;&lt;/h2&gt;</code>
+        <br><span class="desc"><code>&lt;h2&gt;&lt;a href=&quot;Chapter_1.smil&quot;&gt;Chapter 1&lt;/a&gt;&lt;/h2&gt;</code></span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>&lt;/body&gt;</code>
+        <br><span class="desc"><code>&lt;/body&gt;</code></span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>&lt;/html&gt;&quot;&quot;&quot;</code>
+        <br><span class="desc"><code>&lt;/html&gt;&quot;&quot;&quot;</code></span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code># package.opf (Open Packaging Format)</code>
+        <br><span class="desc">A comment: <em>package.opf (Open Packaging Format)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>opf = &quot;&quot;&quot;&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;</code>
+        <br><span class="desc">Assigns <code>&quot;&quot;&quot;&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;</code> to <code>opf</code>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>&lt;package xmlns=&quot;http://www.idpf.org/2007/opf&quot; version=&quot;2.0&quot;&gt;</code>
+        <br><span class="desc"><code>&lt;package xmlns=&quot;http://www.idpf.org/2007/opf&quot; version=&quot;2.0&quot;&gt;</code></span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>&lt;metadata xmlns:dc=&quot;http://purl.org/dc/elements/1.1/&quot;&gt;</code>
+        <br><span class="desc"><code>&lt;metadata xmlns:dc=&quot;http://purl.org/dc/elements/1.1/&quot;&gt;</code></span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>&lt;dc:title&gt;{title}&lt;/dc:title&gt;</code>
+        <br><span class="desc"><code>&lt;dc:title&gt;{title}&lt;/dc:title&gt;</code></span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>&lt;dc:identifier&gt;{uid}&lt;/dc:identifier&gt;</code>
+        <br><span class="desc"><code>&lt;dc:identifier&gt;{uid}&lt;/dc:identifier&gt;</code></span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>&lt;dc:language&gt;{lang}&lt;/dc:language&gt;</code>
+        <br><span class="desc"><code>&lt;dc:language&gt;{lang}&lt;/dc:language&gt;</code></span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>&lt;/metadata&gt;</code>
+        <br><span class="desc"><code>&lt;/metadata&gt;</code></span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>&lt;/package&gt;&quot;&quot;&quot;</code>
+        <br><span class="desc"><code>&lt;/package&gt;&quot;&quot;&quot;</code></span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code># SMIL files (audio-text synchronization)</code>
+        <br><span class="desc">A comment: <em>SMIL files (audio-text synchronization)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>smil = &quot;&quot;&quot;&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;</code>
+        <br><span class="desc">Assigns <code>&quot;&quot;&quot;&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;</code> to <code>smil</code>.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>&lt;smil xmlns=&quot;http://www.w3.org/2001/SMIL20/Language&quot;&gt;</code>
+        <br><span class="desc"><code>&lt;smil xmlns=&quot;http://www.w3.org/2001/SMIL20/Language&quot;&gt;</code></span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>&lt;body&gt;</code>
+        <br><span class="desc"><code>&lt;body&gt;</code></span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>&lt;seq&gt;</code>
+        <br><span class="desc"><code>&lt;seq&gt;</code></span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code>&lt;par&gt;</code>
+        <br><span class="desc"><code>&lt;par&gt;</code></span>
+      </li>
+      <li>
+        <strong>Line 31:</strong> <code>&lt;audio src=&quot;audio/Chapter_1.wav&quot; /&gt;</code>
+        <br><span class="desc"><code>&lt;audio src=&quot;audio/Chapter_1.wav&quot; /&gt;</code></span>
+      </li>
+      <li>
+        <strong>Line 32:</strong> <code>&lt;/par&gt;</code>
+        <br><span class="desc"><code>&lt;/par&gt;</code></span>
+      </li>
+      <li>
+        <strong>Line 33:</strong> <code>&lt;/seq&gt;</code>
+        <br><span class="desc"><code>&lt;/seq&gt;</code></span>
+      </li>
+      <li>
+        <strong>Line 34:</strong> <code>&lt;/body&gt;</code>
+        <br><span class="desc"><code>&lt;/body&gt;</code></span>
+      </li>
+      <li>
+        <strong>Line 35:</strong> <code>&lt;/smil&gt;&quot;&quot;&quot;</code>
+        <br><span class="desc"><code>&lt;/smil&gt;&quot;&quot;&quot;</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>18.4 Structured Data Patterns</h2>
+
+<pre><code><span class="cm"># Pattern: Default dict with deep merge</span>
+<span class="kw">def</span> <span class="fn">deep_merge</span>(base: dict, override: dict) -> dict:
+    <span class="str">"""Merge two dicts, with override taking precedence."""</span>
+    result = dict(base)
+    <span class="kw">for</span> key, value <span class="kw">in</span> override.items():
+        <span class="kw">if</span> key <span class="kw">in</span> result <span class="kw">and</span> isinstance(result[key], dict) <span class="kw">and</span> isinstance(value, dict):
+            result[key] = deep_merge(result[key], value)
+        <span class="kw">else</span>:
+            result[key] = value
+    <span class="kw">return</span> result
+
+<span class="cm"># Pattern: Typed dict for structured data</span>
+<span class="kw">from</span> typing <span class="kw">import</span> TypedDict
+
+<span class="kw">class</span> <span class="cls">SegmentDict</span>(TypedDict, total=<span class="kw">False</span>):
+    index: int
+    title: str
+    text: str
+    status: str
+    saved: str
+    duration: float</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 6)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Pattern: Default dict with deep merge</code>
+        <br><span class="desc">A comment: <em>Pattern: Default dict with deep merge</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def deep_merge(base: dict, override: dict) -&gt; dict:</code>
+        <br><span class="desc">Defines function <code>deep_merge</code> accepting (base, override), returning <code>dict</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;&quot;&quot;Merge two dicts, with override taking precedence.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Merge two dicts, with override taking precedence.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>result = dict(base)</code>
+        <br><span class="desc">Assigns <code>dict(base)</code> to <code>result</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>for key, value in override.items():</code>
+        <br><span class="desc">Returns a view of the dictionary's (key, value) pairs.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>if key in result and isinstance(result[key], dict) and isinstance(value, dict):</code>
+        <br><span class="desc">Checks if an object is an instance of a class. Preferred over type() for type checking.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>result[key] = deep_merge(result[key], value)</code>
+        <br><span class="desc"><code>result[key] = deep_merge(result[key], value)</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>else:</code>
+        <br><span class="desc">Fallback: executes when none of the above conditions matched.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>result[key] = value</code>
+        <br><span class="desc"><code>result[key] = value</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>return result</code>
+        <br><span class="desc">Returns <code>result</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># Pattern: Typed dict for structured data</code>
+        <br><span class="desc">A comment: <em>Pattern: Typed dict for structured data</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>from typing import TypedDict</code>
+        <br><span class="desc">Imports <code>TypedDict</code> from <code>typing</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>class SegmentDict(TypedDict, total=False):</code>
+        <br><span class="desc">Defines class <code>SegmentDict</code> inheriting from <code>TypedDict, total=False</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>index: int</code>
+        <br><span class="desc"><code>index: int</code></span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>title: str</code>
+        <br><span class="desc"><code>title: str</code></span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>text: str</code>
+        <br><span class="desc"><code>text: str</code></span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>status: str</code>
+        <br><span class="desc"><code>status: str</code></span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>saved: str</code>
+        <br><span class="desc"><code>saved: str</code></span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>duration: float</code>
+        <br><span class="desc"><code>duration: float</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>18.5 Key Takeaways</h2>
+<ul>
+  <li><strong>JSON</strong> is the primary data format in AIVS — settings, projects, and worker protocols all use it</li>
+  <li><strong><code>json.dumps/loads</code></strong> for strings; <strong><code>json.dump/load</code></strong> for files</li>
+  <li>Always use <strong><code>ensure_ascii=False</code></strong> for Unicode text</li>
+  <li>XML is used for <strong>DAISY 2.02</strong> book structure (NCC, OPF, SMIL files)</li>
+  <li>The worker protocol uses <strong>JSON lines</strong> (one JSON object per line)</li>
+</ul>
+
+<hr>
+
+<p style="text-align: center;">
+  <a href="ch17_testing.html">← Ch 17</a> &nbsp;|&nbsp;
+  <strong>End of Part II</strong> &nbsp;|&nbsp;
+  <a href="ch19_concurrency.html">Part III — Ch 19: Concurrency →</a>
+</p>
+
+</div></div></body>
+</html>

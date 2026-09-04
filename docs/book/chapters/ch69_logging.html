@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 69: Logging &amp; Diagnostics - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part VIII</div><ul class="chapters"><li><a href="ch67_python_runtime.html">Ch 67</a></li><li><a href="ch68_subprocess.html">Ch 68</a></li><li><a href="ch69_logging.html" class="active">Ch 69: Logging</a></li><li><a href="ch70_performance.html">Ch 70</a></li><li><a href="ch71_security.html">Ch 71</a></li><li><a href="ch72_roadmap.html">Ch 72</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 69</div>
+<h1>Logging &amp; Diagnostics</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand the AIVS logging system (basic and heavy modes)</li>
+  <li>See how developer mode enables detailed diagnostics</li>
+  <li>Understand the crash log system</li>
+</ul>
+
+<hr>
+
+<h2>69.1 Two Logging Modes</h2>
+
+<pre><code><span class="cm"># From main.py</span>
+<span class="kw">def</span> <span class="fn">_setup_logging</span>(developer_mode=<span class="kw">False</span>):
+    <span class="kw">if</span> developer_mode:
+        <span class="kw">from</span> ai_voice_studio.heavy_logging <span class="kw">import</span> setup_heavy_logging
+        setup_heavy_logging(enabled=<span class="kw">True</span>)
+    <span class="kw">else</span>:
+        logging.basicConfig(
+            filename=paths.log_file(),
+            level=logging.INFO,
+            format=<span class="str">"%(asctime)s %(levelname)s %(name)s: %(message)s"</span>,
+        )</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From main.py</code>
+        <br><span class="desc">A comment: <em>From main.py</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def _setup_logging(developer_mode=False):</code>
+        <br><span class="desc">Defines a function.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>if developer_mode:</code>
+        <br><span class="desc">Conditional check.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>from ai_voice_studio.heavy_logging import setup_heavy_logging</code>
+        <br><span class="desc">Imports a module.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>setup_heavy_logging(enabled=True)</code>
+        <br><span class="desc">Calls function <code>setup_heavy_logging()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>else:</code>
+        <br><span class="desc">Fallback branch.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>logging.basicConfig(</code>
+        <br><span class="desc">Configures the root logger. Sets format, level, and output destination (file or stream).</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>filename=paths.log_file(),</code>
+        <br><span class="desc">Assigns <code>paths.log_file(),</code> to <code>filename</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>level=logging.INFO,</code>
+        <br><span class="desc">Level 20. Default level. Shows normal operation messages.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>format=&quot;%(asctime)s %(levelname)s %(name)s: %(message)s&quot;,</code>
+        <br><span class="desc">Assigns <code>&quot;%(asctime)s %(levelname)s %(name)s: %(message)s&quot;,</code> to <code>format</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>Basic Mode (Default)</h3>
+<ul>
+  <li>INFO level logging to <code>app.log</code></li>
+  <li>Single log file</li>
+</ul>
+
+<h3>Developer Mode (Heavy Logging)</h3>
+<ul>
+  <li>DEBUG level logging</li>
+  <li>Multiple subsystem log files</li>
+  <li>Full tracebacks for all caught exceptions</li>
+  <li>Thread crash logging</li>
+  <li>Crash log for unhandled exceptions</li>
+  <li>System info logging (OS, Python, GPU)</li>
+</ul>
+
+<hr>
+
+<h2>69.2 Logging Best Practices in AIVS</h2>
+
+<pre><code><span class="kw">import</span> logging
+log = logging.getLogger(__name__)
+
+<span class="cm"># Info: normal operations</span>
+log.info(<span class="str">"AI Voice Studio starting (Python </span>{sys.version.split()[0]}<span class="str">)"</span>)
+
+<span class="cm"># Warning: recoverable issues</span>
+log.warning(<span class="str">"Model not found at </span>{path}<span class="str">"</span>)
+
+<span class="cm"># Error: failures with context</span>
+log.error(<span class="str">"Failed to load model: </span>{exc}<span class="str">"</span>, exc_info=<span class="kw">True</span>)
+
+<span class="cm"># Debug: detailed diagnostic info</span>
+log.debug(<span class="str">"Resolved compute mode: </span>{mode}<span class="str">"</span>)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>import logging</code>
+        <br><span class="desc">Imports a module.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>log = logging.getLogger(__name__)</code>
+        <br><span class="desc">Creates or retrieves a logger by name. Hierarchical naming (a.b.c) enables per-module control.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># Info: normal operations</code>
+        <br><span class="desc">A comment: <em>Info: normal operations</em>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>log.info(&quot;AI Voice Studio starting (Python {sys.version.split()[0]})&quot;)</code>
+        <br><span class="desc">Logs an informational message. The default level. For normal operation events.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># Warning: recoverable issues</code>
+        <br><span class="desc">A comment: <em>Warning: recoverable issues</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>log.warning(&quot;Model not found at {path}&quot;)</code>
+        <br><span class="desc">Logs a warning. Something unexpected happened but the program continues.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># Error: failures with context</code>
+        <br><span class="desc">A comment: <em>Error: failures with context</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>log.error(&quot;Failed to load model: {exc}&quot;, exc_info=True)</code>
+        <br><span class="desc">Logs an error. Something failed but the program can still run.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code># Debug: detailed diagnostic info</code>
+        <br><span class="desc">A comment: <em>Debug: detailed diagnostic info</em>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>log.debug(&quot;Resolved compute mode: {mode}&quot;)</code>
+        <br><span class="desc">Logs a debug message. Only visible when the level is set to DEBUG. For detailed diagnostic info.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>69.3 Key Takeaways</h2>
+<ul>
+  <li><strong>Two modes</strong>: basic (INFO to app.log) and heavy (DEBUG to multiple files)</li>
+  <li><strong>Developer mode</strong> is toggled from Settings → General</li>
+  <li><strong>exc_info=True</strong> captures full tracebacks in error logs</li>
+  <li><strong>Each module</strong> gets its own logger: <code>logging.getLogger(__name__)</code></li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch68_subprocess.html">← Ch 68</a> &nbsp;|&nbsp; <a href="ch70_performance.html">Ch 70 — Performance →</a></p>
+</div></div></body>
+</html>

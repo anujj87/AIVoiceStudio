@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Appendix C: Glossary of Terms</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar">
+  <h2>📖 Table of Contents</h2>
+
+  <div class="part-header">Part I — Python Fundamentals</div>
+  <ul class="chapters">
+    <li><a href="ch01_introduction.html">Ch 1: Introduction &amp; Setup</a></li>
+    <li><a href="ch02_variables.html">Ch 2: Variables &amp; Data Types</a></li>
+    <li><a href="ch03_control_flow.html">Ch 3: Control Flow</a></li>
+    <li><a href="ch04_functions.html">Ch 4: Functions</a></li>
+    <li><a href="ch05_strings.html">Ch 5: Strings &amp; Formatting</a></li>
+    <li><a href="ch06_collections.html">Ch 6: Lists, Tuples, Sets &amp; Dicts</a></li>
+    <li><a href="ch07_file_io.html">Ch 7: File I/O</a></li>
+    <li><a href="ch08_error_handling.html">Ch 8: Error Handling</a></li>
+    <li><a href="ch09_modules.html">Ch 9: Modules &amp; Packages</a></li>
+    <li><a href="ch10_oop_basics.html">Ch 10: OOP Basics</a></li>
+  </ul>
+
+  <div class="part-header">Part II — Intermediate Python</div>
+  <ul class="chapters">
+    <li><a href="ch11_oop_advanced.html">Ch 11: OOP Advanced</a></li>
+    <li><a href="ch12_iterators.html">Ch 12: Iterators &amp; Generators</a></li>
+    <li><a href="ch13_decorators.html">Ch 13: Decorators</a></li>
+    <li><a href="ch14_context.html">Ch 14: Context Managers</a></li>
+    <li><a href="ch15_regex.html">Ch 15: Regular Expressions</a></li>
+    <li><a href="ch16_datetime.html">Ch 16: Date &amp; Time</a></li>
+    <li><a href="ch17_testing.html">Ch 17: Testing with unittest &amp; pytest</a></li>
+    <li><a href="ch18_json_xml.html">Ch 18: JSON, XML &amp; Structured Data</a></li>
+  </ul>
+
+  <div class="part-header">Part III — Advanced Python</div>
+  <ul class="chapters">
+    <li><a href="ch19_concurrency.html">Ch 19: Concurrency &amp; Threading</a></li>
+    <li><a href="ch20_multiprocessing.html">Ch 20: Multiprocessing</a></li>
+    <li><a href="ch21_async.html">Ch 21: Async I/O</a></li>
+    <li><a href="ch22_type_hints.html">Ch 22: Type Hints &amp; Static Typing</a></li>
+    <li><a href="ch23_metaclasses.html">Ch 23: Metaclasses &amp; Descriptors</a></li>
+    <li><a href="ch24_design_patterns.html">Ch 24: Design Patterns in Python</a></li>
+    <li><a href="ch25_introspection.html">Ch 25: Introspection &amp; Reflection</a></li>
+    <li><a href="ch26_c_extensions.html">Ch 26: C Extensions &amp; ctypes</a></li>
+  </ul>
+
+  <div class="part-header">Part IV — wxPython GUI Development</div>
+  <ul class="chapters">
+    <li><a href="ch27_wxpython_intro.html">Ch 27: wxPython Introduction</a></li>
+    <li><a href="ch28_sizers_layout.html">Ch 28: Sizers &amp; Layout</a></li>
+    <li><a href="ch29_controls.html">Ch 29: Controls &amp; Widgets</a></li>
+    <li><a href="ch30_events.html">Ch 30: Event Handling</a></li>
+    <li><a href="ch31_dialogs.html">Ch 31: Dialogs &amp; Wizards</a></li>
+    <li><a href="ch32_custom_drawing.html">Ch 32: Custom Drawing &amp; DC</a></li>
+    <li><a href="ch33_threading_gui.html">Ch 33: Threading in GUI Apps</a></li>
+    <li><a href="ch34_accessibility.html">Ch 34: Accessibility (a11y)</a></li>
+    <li><a href="ch35_themes.html">Ch 35: Theming &amp; Styling</a></li>
+    <li><a href="ch36_wx_adv.html">Ch 36: wx.adv &amp; Advanced Widgets</a></li>
+  </ul>
+
+  <div class="part-header">Part V — Dependencies Deep Dive</div>
+  <ul class="chapters">
+    <li><a href="ch37_numpy.html">Ch 37: NumPy for Audio Processing</a></li>
+    <li><a href="ch38_requests.html">Ch 38: Requests &amp; HTTP</a></li>
+    <li><a href="ch39_sherpa_onnx.html">Ch 39: sherpa-onnx TTS Engine</a></li>
+    <li><a href="ch40_pypdf_docx.html">Ch 40: PDF &amp; DOCX Parsing</a></li>
+    <li><a href="ch41_ffmpeg.html">Ch 41: FFmpeg &amp; Audio Formats</a></li>
+    <li><a href="ch42_virtualenvs.html">Ch 42: Virtual Environments &amp; Packaging</a></li>
+  </ul>
+
+  <div class="part-header">Part VI — Building AI Voice Studio</div>
+  <ul class="chapters">
+    <li><a href="ch43_architecture.html">Ch 43: Project Architecture</a></li>
+    <li><a href="ch44_paths_settings.html">Ch 44: Paths, Settings &amp; Constants</a></li>
+    <li><a href="ch45_project_model.html">Ch 45: Project Model &amp; Persistence</a></li>
+    <li><a href="ch46_document_parsing.html">Ch 46: Document Parsing &amp; Splitting</a></li>
+    <li><a href="ch47_tts_catalog.html">Ch 47: TTS Catalog &amp; Model Store</a></li>
+    <li><a href="ch48_tts_engine.html">Ch 48: TTS Engine Integration</a></li>
+    <li><a href="ch49_downloader.html">Ch 49: Model Downloader &amp; Artifacts</a></li>
+    <li><a href="ch50_compute_detection.html">Ch 50: Compute Back-end Detection</a></li>
+    <li><a href="ch51_main_frame.html">Ch 51: Main Frame &amp; Menu System</a></li>
+    <li><a href="ch52_settings_dialog.html">Ch 52: Settings Dialog</a></li>
+    <li><a href="ch53_model_panels.html">Ch 53: Model Management Panels</a></li>
+    <li><a href="ch54_new_project_wizard.html">Ch 54: New Project Wizard</a></li>
+    <li><a href="ch55_recording.html">Ch 55: Recording Dialog</a></li>
+    <li><a href="ch56_synthesis_worker.html">Ch 56: Background Synthesis Worker</a></li>
+    <li><a href="ch57_clone_engine.html">Ch 57: Voice Cloning (XTTS v2)</a></li>
+    <li><a href="ch58_omnivoice.html">Ch 58: OmniVoice TTS Engine</a></li>
+    <li><a href="ch59_daisy_builder.html">Ch 59: DAISY Book Builder</a></li>
+    <li><a href="ch60_addons.html">Ch 60: Addon System</a></li>
+  </ul>
+
+  <div class="part-header">Part VII — Testing &amp; Deployment</div>
+  <ul class="chapters">
+    <li><a href="ch61_unit_testing.html">Ch 61: Unit Testing Strategies</a></li>
+    <li><a href="ch62_mocking.html">Ch 62: Mocking &amp; Test Doubles</a></li>
+    <li><a href="ch63_integration.html">Ch 63: Integration Testing</a></li>
+    <li><a href="ch64_pyinstaller.html">Ch 64: PyInstaller Packaging</a></li>
+    <li><a href="ch65_inno_setup.html">Ch 65: Inno Setup Installers</a></li>
+    <li><a href="ch66_ci_cd.html">Ch 66: CI/CD &amp; Release</a></li>
+  </ul>
+
+  <div class="part-header">Part VIII — Advanced Topics</div>
+  <ul class="chapters">
+    <li><a href="ch67_python_runtime.html">Ch 67: Managed Python Runtime</a></li>
+    <li><a href="ch68_subprocess.html">Ch 68: Subprocess Architecture</a></li>
+    <li><a href="ch69_logging.html">Ch 69: Logging &amp; Diagnostics</a></li>
+    <li><a href="ch70_performance.html">Ch 70: Performance Optimization</a></li>
+    <li><a href="ch71_security.html">Ch 71: Security Considerations</a></li>
+    <li><a href="ch72_roadmap.html">Ch 72: Future Directions &amp; Roadmap</a></li>
+  </ul>
+
+  <div class="part-header">Appendices</div>
+  <ul class="chapters">
+    <li><a href="appendix_a_reference.html">A: Python Quick Reference</a></li>
+    <li><a href="appendix_b_api.html">B: AIVS API Reference</a></li>
+    <li><a href="appendix_c_glossary.html">C: Glossary</a></li>
+  </ul>
+</nav>
+
+<div class="main-content">
+<div class="book">
+
+<!-- ════════════════════════════════════════════════════════════════════
+     APPENDIX C — GLOSSARY OF TERMS
+     ════════════════════════════════════════════════════════════════════ -->
+
+<h1>Appendix C: Glossary of Terms</h1>
+
+<p>A comprehensive glossary of technical terms used throughout this book, covering Python, wxPython, AI/TTS, audio processing, and packaging concepts.</p>
+
+<h2>A</h2>
+
+<dl class="glossary">
+<dt>Accessibility (a11y)</dt>
+<dd>The design practice of making software usable by people with disabilities. In wxPython, this includes screen reader support via accessible names, roles, and descriptions. The <code>a11y</code> abbreviation comes from counting the letters between 'a' and 'y' in "accessibility."</dd>
+
+<dt>ACB (Audio Callback)</dt>
+<dd>In sherpa-onnx, an audio callback receives synthesized audio samples from the TTS engine. The callback is invoked from a background thread whenever a chunk of audio is ready for output.</dd>
+
+<dt>Aggregator</dt>
+<dd>In the AIVoiceStudio catalog system, an aggregator fetches and caches model catalogs from multiple upstream sources (Piper, Coqui, etc.) and provides a unified interface for querying available models.</dd>
+
+<dt>Async/Await</dt>
+<dd>Python's built-in asynchronous programming syntax. <code>async def</code> defines a coroutine function, and <code>await</code> suspends execution until an awaitable (coroutine, Future, Task) completes. Used with <code>asyncio</code> for non-blocking I/O operations.</dd>
+
+<dt>Attribute</dt>
+<dd>A variable associated with an object or class. In Python, attributes are accessed with dot notation (e.g., <code>obj.attr</code>). Class attributes are shared; instance attributes are per-object.</dd>
+
+<dt>Augmented Assignment</dt>
+<dd>Compound assignment operators that combine an operation with assignment: <code>+=</code>, <code>-=</code>, <code>*=</code>, <code>/=</code>, <code>%=</code>, <code>**=</code>, <code>//=</code>, etc.</dd>
+</dl>
+
+<h2>B</h2>
+
+<dl class="glossary">
+<dt>Backend</dt>
+<dd>In AIVoiceStudio, the compute backend refers to the hardware accelerator used for TTS inference: CPU, CUDA (NVIDIA GPU), DirectML (Windows ML), or CoreML (Apple). Also refers to sherpa-onnx's execution provider configuration.</dd>
+
+<dt>Background Thread</dt>
+<dd>A thread that runs concurrently with the main (GUI) thread, used for long-running operations like TTS synthesis, file downloads, or model loading. In wxPython, background threads must use <code>wx.CallAfter</code> to update the GUI safely.</dd>
+
+<dt>Base64</dt>
+<dd>A binary-to-text encoding scheme that represents binary data using 64 ASCII characters. Used in web APIs and configuration to embed binary data (like audio samples) in text format.</dd>
+
+<dt>Benchmark</dt>
+<dd>A standardized test that measures the performance of hardware or software. In AIVoiceStudio, compute benchmarks measure how fast TTS inference runs on different backends (CPU vs. GPU).</dd>
+
+<dt>Binder</dt>
+<dd>In wxPython, a binder associates an event type with a handler function. <code>self.Bind(wx.EVT_BUTTON, self.on_click, self.my_button)</code> tells wxPython to call <code>on_click</code> when the button is clicked.</dd>
+
+<dt>BOM (Byte Order Mark)</dt>
+<dd>A special Unicode character (U+FEFF) placed at the beginning of a text file to indicate its encoding and byte order. UTF-8 BOM is common in Windows-generated text files.</dd>
+
+<dt>Bytecode</dt>
+<dd>Intermediate compiled representation of Python source code. Python compiles <code>.py</code> files to <code>.pyc</code> bytecode files in <code>__pycache__/</code>, which the interpreter executes faster than raw source.</dd>
+</dl>
+
+<h2>C</h2>
+
+<dl class="glossary">
+<dt>Callback</dt>
+<dd>A function passed as an argument to another function, to be called when an event occurs or an operation completes. In sherpa-onnx TTS, audio callbacks receive synthesized audio chunks.</dd>
+
+<dt>Casting</dt>
+<dd>Converting a value from one type to another: <code>int("42")</code>, <code>float(5)</code>, <code>str(3.14)</code>. Also called type conversion.</dd>
+
+<dt>Catalog</dt>
+<dd>In AIVoiceStudio, the TTS catalog is a registry of all available voice models, organized by provider (Piper, Coqui), language, and quality. Stored as a JSON file with metadata for each model.</dd>
+
+<dt>CLI (Command-Line Interface)</dt>
+<dd>A text-based interface for interacting with software. Python's <code>argparse</code> module provides CLI argument parsing. AIVoiceStudio uses CLI for its build scripts.</dd>
+
+<dt>Comprehension</dt>
+<dd>A concise syntax for creating lists, dicts, or sets from iterables: <code>[x**2 for x in range(10)]</code> (list), <code>{k: v for k, v in items}</code> (dict), <code>{x for x in items}</code> (set). Also generator expressions with parentheses.</dd>
+
+<dt>Context Manager</dt>
+<dd>An object that implements <code>__enter__</code> and <code>__exit__</code> methods for use with the <code>with</code> statement. Ensures proper resource acquisition and cleanup. Examples: <code>open()</code>, <code>threading.Lock()</code>, wxPython's <code>BusyCursor</code>.</dd>
+
+<dt>Compute</dt>
+<dd>In AIVoiceStudio, refers to the hardware and software stack used for AI inference. Detected via <code>compute.py</code> which probes for CUDA, DirectML, CoreML, and CPU capabilities using py-cpuinfo and onnxruntime.</dd>
+
+<dt>CUDA</dt>
+<dd>NVIDIA's parallel computing platform for GPU-accelerated computation. When CUDA is available, sherpa-onnx can use it for much faster TTS synthesis. Detected by checking for CUDA runtime libraries.</dd>
+
+<dt>Coroutine</dt>
+<dd>A function defined with <code>async def</code> that can be paused and resumed. Coroutines are scheduled on the event loop and cooperatively yield control at <code>await</code> points.</dd>
+
+<dt>CPython</dt>
+<dd>The reference implementation of Python, written in C. Most Python installations use CPython. Identified by <code>sys.implementation.name == "cpython"</code>.</dd>
+
+<dt>Custom Event</dt>
+<dd>In wxPython, a user-defined event type created with <code>wx.NewEventType()</code> and <code>wx.PyEventBinder()</code>. Used for thread-safe communication between background workers and the GUI.</dd>
+</dl>
+
+<h2>D</h2>
+
+<dl class="glossary">
+<dt>DAISY</dt>
+<dd>Digital Accessible Information System — a technical standard for accessible digital publications. AIVoiceStudio's DAISY builder creates multi-level audio publications with navigation from document chapters.</dd>
+
+<dt>Dataclass</dt>
+<dd>A Python decorator (<code>@dataclass</code>) that automatically generates <code>__init__</code>, <code>__repr__</code>, <code>__eq__</code>, and other methods from class attribute annotations. Used extensively in AIVoiceStudio for configuration and data models.</dd>
+
+<dt>Decorator</dt>
+<dd>A function that takes a callable and returns a modified callable. Used with <code>@decorator</code> syntax above function or class definitions. Examples: <code>@property</code>, <code>@staticmethod</code>, <code>@dataclass</code>, <code>@functools.lru_cache</code>.</dd>
+
+<dt>Desktop Application</dt>
+<dd>A graphical application that runs locally on a user's computer, as opposed to a web application. AIVoiceStudio is a desktop app built with wxPython and packaged with PyInstaller.</dd>
+
+<dt>DirectML</dt>
+<dd>Microsoft's Direct Machine Learning API for hardware-accelerated AI inference on Windows. Works with any DirectX 12-compatible GPU, not just NVIDIA. Available via <code>onnxruntime-directml</code>.</dd>
+
+<dt>Docstring</dt>
+<dd>A string literal placed as the first statement in a module, class, or function to document its purpose. Triple-quoted: <code>"""Docstring."""</code>. Accessible via <code>__doc__</code> and the <code>help()</code> function.</dd>
+
+<dt>DPI (Dots Per Inch)</dt>
+<dd>A measure of display resolution. High-DPI displays (Retina, 4K) require special handling in desktop apps. wxPython supports DPI awareness through system settings and scaling.</dd>
+
+<dt>Dunder Method</dt>
+<dd>Special methods with double underscores: <code>__init__</code>, <code>__str__</code>, <code>__repr__</code>, <code>__len__</code>, <code>__getitem__</code>, etc. Also called magic methods. They define how objects behave with built-in operations.</dd>
+</dl>
+
+<h2>E</h2>
+
+<dl class="glossary">
+<dt>Enumerate</dt>
+<dd>A built-in function that returns pairs of (index, value) from an iterable: <code>for i, val in enumerate(items)</code>. Avoids manual counter management.</dd>
+
+<dt>Event</dt>
+<dd>In GUI programming, an event represents a user action (click, keypress) or system occurrence (timer, resize). wxPython events carry data and are dispatched to bound handler functions.</dd>
+
+<dt>Event Loop</dt>
+<dd>The core mechanism of a GUI framework that continuously polls for events and dispatches them to handlers. wxPython's <code>MainLoop()</code> runs the event loop. The application blocks at this call until the window is closed.</dd>
+
+<dt>Event Binder</dt>
+<dd>In wxPython, <code>wx.PyEventBinder</code> creates bindable event types. Used to associate custom events with handler methods: <code>self.Bind(MY_EVENT, self.handler)</code>.</dd>
+
+<dt>Exception</dt>
+<dd>An error that occurs during program execution. Python uses exceptions for error handling with <code>try</code>/<code>except</code>/<code>finally</code>. Exceptions are objects of classes inheriting from <code>BaseException</code>.</dd>
+
+<dt>Execution Provider</dt>
+<dd>In ONNX Runtime, the execution provider specifies the hardware backend: <code>CPUExecutionProvider</code>, <code>CUDAExecutionProvider</code>, <code>DmlExecutionProvider</code>, <code>CoreMLExecutionProvider</code>.</dd>
+
+<dt>Expression</dt>
+<dd>A piece of code that evaluates to a value. Examples: <code>2 + 3</code>, <code>"hello".upper()</code>, <code>[x for x in range(5)]</code>. Distinguished from statements, which don't return values.</dd>
+
+<dt>Extension</dt>
+<dd>A file suffix indicating file type: <code>.py</code> for Python, <code>.wav</code> for audio, <code>.json</code> for data. Python maps extensions to interpreters; in wxPython, extensions are used for file dialog filters.</dd>
+</dl>
+
+<h2>F</h2>
+
+<dl class="glossary">
+<dt>F-String</dt>
+<dd>Formatted string literals (Python 3.6+): <code>f"Hello, {name}!"</code>. Support expressions inside curly braces: <code>f"{price:.2f}"</code>. Faster and more readable than <code>.format()</code> or <code>%</code> formatting.</dd>
+
+<dt>Factory Function</dt>
+<dd>A function that creates and returns objects, serving as an alternative to constructors. In wxPython, many widget creation functions act as factories.</dd>
+
+<dt>Fallback</dt>
+<dd>A default value or behavior used when the preferred option is unavailable. In AIVoiceStudio, compute detection falls back through CUDA → DirectML → CPU if higher-performance backends aren't available.</dd>
+
+<dt>FFmpeg</dt>
+<dd>A powerful open-source multimedia framework for audio/video processing. AIVoiceStudio uses FFmpeg for audio format conversion (MP3, OGG, FLAC, WAV) and audio normalization.</dd>
+
+<dt>Frame</dt>
+<dd>In wxPython, a Frame is a top-level window with a title bar, menu bar, and close button. <code>wx.Frame</code> is the base class. AIVoiceStudio's main window is a Frame subclass.</dd>
+
+<dt>Function</dt>
+<dd>A reusable block of code defined with <code>def</code>. Functions can accept parameters, return values, and be passed as arguments. Python functions are first-class objects.</dd>
+
+<dt>Functor</dt>
+<dd>An object that can be "called" like a function by implementing <code>__call__</code>. Used in AIVoiceStudio for callback objects that need to maintain state between invocations.</dd>
+</dl>
+
+<h2>G</h2>
+
+<dl class="glossary">
+<dt>Garbage Collection</dt>
+<dd>Python's automatic memory management that reclaims memory from objects no longer in use. Uses reference counting plus a cyclic garbage collector for objects with circular references.</dd>
+
+<dt>Generator</dt>
+<dd>A function using <code>yield</code> that produces values lazily, one at a time. Generators are memory-efficient for large datasets and support the iterator protocol.</dd>
+
+<dt>GPU (Graphics Processing Unit)</dt>
+<dd>A specialized processor for parallel computation. NVIDIA GPUs support CUDA for AI inference, providing 10-50x speedup over CPU for TTS synthesis.</dd>
+
+<dt>GridBagSizer</dt>
+<dd>A wxPython layout manager that positions widgets in a grid with flexible row/column spanning. Used in AIVoiceStudio's settings dialog for complex form layouts.</dd>
+
+<dt>Guard Clause</dt>
+<dd>An early return statement that handles error conditions at the top of a function, reducing nesting. A common Python pattern: <code>if not valid: return</code> instead of wrapping the rest in <code>if valid:</code>.</dd>
+</dl>
+
+<h2>H</h2>
+
+<dl class="glossary">
+<dt>Hash</dt>
+<dd>A fixed-size value computed from data using a hash function. Python's built-in <code>hash()</code> is used for dictionary keys and set membership. <code>__hash__</code> defines custom hashing.</dd>
+
+<dt>Heap</dt>
+<dd>Memory area where Python allocates objects. Also refers to the <code>heapq</code> module for priority queues. In AIVoiceStudio, heavy logging uses heap memory tracking.</dd>
+
+<dt>HFS+ / APFS</dt>
+<dd>Apple's file system formats (Hierarchical File System Plus / Apple File System). Relevant for macOS path handling and case-sensitivity differences.</dd>
+
+<dt>Hungarian Notation</dt>
+<dd>A naming convention that prefixes variable names with their type: <code>nCount</code> (integer), <code>strName</code> (string), <code>btnOK</code> (button). Common in wxPython codebases.</dd>
+</dl>
+
+<h2>I</h2>
+
+<dl class="glossary">
+<dt>Idle Event</dt>
+<dd>In wxPython, <code>wx.EVT_IDLE</code> fires when the event loop has no pending events. Used for deferred operations and periodic updates without explicit timers.</dd>
+
+<dt>Import</dt>
+<dd>The <code>import</code> statement loads modules and their contents into the current namespace. Forms: <code>import os</code>, <code>from os import path</code>, <code>from os import path as p</code>.</dd>
+
+<dt>INI File</dt>
+<dd>A simple text file format for configuration with sections and key-value pairs. Python's <code>configparser</code> module reads and writes INI files. AIVoiceStudio uses them for user settings.</dd>
+
+<dt>Instance</dt>
+<dd>A specific object created from a class definition. Each instance has its own attributes but shares the class methods. Created by calling the class: <code>obj = MyClass()</code>.</dd>
+
+<dt>Inheritance</dt>
+<dd>A mechanism where a class (child/subclass) inherits attributes and methods from another class (parent/superclass). Supports code reuse and polymorphism. Python supports multiple inheritance.</dd>
+
+<dt>Installer</dt>
+<dd>A program that installs software on a user's computer. AIVoiceStudio uses Inno Setup to create a Windows installer that copies files, creates shortcuts, and registers the application.</dd>
+
+<dt>Iterable</dt>
+<dd>Any object that can be iterated over, implementing <code>__iter__</code> or <code>__getitem__</code>. Includes lists, tuples, strings, dicts, sets, generators, and files.</dd>
+
+<dt>Iterator</dt>
+<dd>An object implementing <code>__iter__</code> (returning itself) and <code>__next__</code> (returning the next value). Used by <code>for</code> loops internally. Created by <code>iter()</code> function.</dd>
+
+<dt>ISCC</dt>
+<dd>Inno Setup Compiler Command-line. Used to compile <code>.iss</code> scripts into setup executables: <code>"C:\Program Files\Inno Setup 7\ISCC.exe" script.iss</code>.</dd>
+</dl>
+
+<h2>J</h2>
+
+<dl class="glossary">
+<dt>JSON (JavaScript Object Notation)</dt>
+<dd>A lightweight data interchange format. Python's <code>json</code> module provides <code>dumps()</code>/<code>loads()</code> for serialization/deserialization. AIVoiceStudio uses JSON for settings, catalogs, and project files.</dd>
+
+<dt>Job Queue</dt>
+<dd>A data structure for managing tasks to be processed sequentially or in parallel. In AIVoiceStudio, synthesis jobs are queued and processed by background workers with progress callbacks.</dd>
+
+<dt>Join</dt>
+<dd>String method that concatenates iterable elements: <code>", ".join(words)</code>. Also refers to <code>thread.join()</code> which blocks until a thread completes, and SQL joins for database queries.</dd>
+</dl>
+
+<h2>K</h2>
+
+<dl class="glossary">
+<dt>Keyword Argument</dt>
+<dd>A function argument passed with a name: <code>func(name="Alice", age=30)</code>. Allows explicit argument naming, default values, and arbitrary order. Syntax: <code>**kwargs</code> captures keyword arguments as a dict.</dd>
+
+<dt>Keystroke</dt>
+<dd>A key press event in wxPython. <code>wx.KeyEvent</code> carries the key code, modifiers (Ctrl, Shift, Alt), and Unicode character. AIVoiceStudio binds keyboard shortcuts for common operations.</dd>
+</dl>
+
+<h2>L</h2>
+
+<dl class="glossary">
+<dt>Lambda</dt>
+<dd>An anonymous function: <code>lambda x: x * 2</code>. Limited to a single expression. Commonly used for short callbacks, <code>sorted()</code> keys, and <code>map()</code>/<code>filter()</code> operations.</dd>
+
+<dt>Lifecycle</dt>
+<dd>The stages an object goes through from creation to destruction. In wxPython widgets: construction → adding to sizer → show → hide → destroy. In AIVoiceStudio projects: new → open → edit → save → close.</dd>
+
+<dt>LSP (Language Server Protocol)</dt>
+<dd>A protocol for communication between code editors and language analysis tools. Provides features like autocompletion, error checking, and go-to-definition.</dd>
+
+<dt>LUT (Lookup Table)</dt>
+<dd>A data structure that maps keys to values for fast retrieval. Python dicts are hash-based LUTs with O(1) average lookup. In audio processing, LUTs map sample values for effects processing.</dd>
+</dl>
+
+<h2>M</h2>
+
+<dl class="glossary">
+<dt>MainLoop</dt>
+<dd>wxPython's event loop that runs until the application exits. Called as <code>app.MainLoop()</code>. Blocks the calling thread while dispatching events to handlers.</dd>
+
+<dt>Memoryview</dt>
+<dd>A built-in type that provides a typed, buffer-protocol view of binary data without copying. Useful for zero-copy slicing of large byte buffers in audio processing.</dd>
+
+<dt>Metaclass</dt>
+<dd>A class whose instances are classes. <code>type</code> is the default metaclass. Custom metaclasses can modify class creation. Used in wxPython for event system internals and in ORMs for model definitions.</dd>
+
+<dt>Method Resolution Order (MRO)</dt>
+<dd>The order in which Python looks up methods in a class hierarchy with multiple inheritance. Determined by the C3 linearization algorithm. Accessible via <code>ClassName.__mro__</code>.</dd>
+
+<dt>MIME</dt>
+<dd>Multipurpose Internet Mail Extensions. A standard for classifying file types. wxPython uses MIME types for drag-and-drop operations and clipboard data.</dd>
+
+<dt>Module</dt>
+<dd>A <code>.py</code> file containing Python definitions and statements. Modules provide namespaces for organizing code. The <code>__name__</code> attribute identifies the module; <code>"__main__"</code> indicates direct execution.</dd>
+
+<dt>Multiprocessing</dt>
+<dd>Running code in separate processes, each with its own Python interpreter and memory space. Bypasses the GIL for CPU-bound parallelism. Python's <code>multiprocessing</code> module provides the API.</dd>
+
+<dt>Mutability</dt>
+<dd>Whether an object can be modified after creation. Lists, dicts, and sets are mutable; strings, tuples, and ints are immutable. Mutable default arguments in functions are a common pitfall.</dd>
+</dl>
+
+<h2>N</h2>
+
+<dl class="glossary">
+<dt>Namespace</dt>
+<dd>A mapping from names to objects. Each module, class, and function has its own namespace. The LEGB rule (Local, Enclosing, Global, Built-in) determines name resolution.</dd>
+
+<dt>NIL / None</dt>
+<dd>In Python, <code>None</code> represents the absence of a value. It's a singleton — only one instance exists. Commonly used as a default parameter and sentinel value.</dd>
+
+<dt>Numpy</dt>
+<dd>A numerical computing library providing N-dimensional arrays, mathematical functions, and linear algebra operations. AIVoiceStudio uses numpy for audio sample array manipulation.</dd>
+
+<dt>Nuitka</dt>
+<dd>A Python-to-C compiler that translates Python code to optimized C/C++ for distribution. An alternative to PyInstaller for creating standalone executables.</dd>
+</dl>
+
+<h2>O</h2>
+
+<dl class="glossary">
+<dt>O(n) / Big-O Notation</dt>
+<dd>Mathematical notation describing algorithm complexity. O(1) = constant, O(n) = linear, O(n²) = quadratic, O(log n) = logarithmic. Dict lookup is O(1); list search is O(n).</dd>
+
+<dt>Object</dt>
+<dd>The fundamental unit of Python — everything is an object, including functions, classes, and modules. Objects have identity (<code>id()</code>), type (<code>type()</code>), and attributes.</dd>
+
+<dt>OmniVoice</dt>
+<dd>An advanced TTS engine in AIVoiceStudio supporting voice cloning. Uses a server-client architecture where the OmniVoice server runs inference and the worker communicates via HTTP.</dd>
+
+<dt>ONNX (Open Neural Network Exchange)</dt>
+<dd>An open format for representing machine learning models. sherpa-onnx uses ONNX models for TTS inference, enabling cross-platform deployment with multiple execution providers.</dd>
+
+<dt>OpenCV</dt>
+<dd>An open-source computer vision library. Not directly used in AIVoiceStudio, but similar to how sherpa-onnx uses pre-compiled native libraries for performance-critical operations.</dd>
+
+<dt>Operator Overloading</dt>
+<dd>Defining how custom objects respond to built-in operators via dunder methods: <code>__add__</code> for <code>+</code>, <code>__eq__</code> for <code>==</code>, <code>__lt__</code> for <code>&lt;</code>. Enables intuitive syntax for custom types.</dd>
+
+<dt>Output Buffer</dt>
+<dd>A memory region where audio samples are accumulated before being written to a file or played. In AIVoiceStudio's TTS engine, audio samples from the callback are appended to a buffer list, then concatenated into a numpy array.</dd>
+</dl>
+
+<h2>P</h2>
+
+<dl class="glossary">
+<dt>Package</dt>
+<dd>A Python directory containing an <code>__init__.py</code> file, making it importable as a module. Packages can be nested (sub-packages). AIVoiceStudio is a package with sub-packages: <code>tts</code>, <code>gui</code>, <code>audio</code>, etc.</dd>
+
+<dt>Parameter vs. Argument</dt>
+<dd>A <em>parameter</em> is a variable in a function definition; an <em>argument</em> is the value passed when calling the function. "The function accepts a <code>path</code> parameter" vs. "pass <code>'/tmp'</code> as an argument."</dd>
+
+<dt>Parsing</dt>
+<dd>Converting data from one format to a structured representation. AIVoiceStudio parses PDF (pypdf), DOCX (python-docx), TXT, EPUB, and DAISY documents into plain text for TTS processing.</dd>
+
+<dt>Pathlib</dt>
+<dd>Python's modern path handling module (3.4+). <code>Path</code> objects provide intuitive operators: <code>parent</code>, <code>/</code> for joining, <code>.stem</code>, <code>.suffix</code>, <code>.exists()</code>. Preferred over <code>os.path</code> for readability.</dd>
+
+<dt>Piper</dt>
+<dd>A fast, local neural TTS engine. AIVoiceStudio integrates Piper via sherpa-onnx for high-quality text-to-speech synthesis with multiple voices and languages.</dd>
+
+<dt>Priority Queue</dt>
+<dd>A data structure where elements are dequeued by priority rather than insertion order. Python's <code>heapq</code> module implements a min-heap. Used for task scheduling and job processing.</dd>
+
+<dt>Property</dt>
+<dd>A Python descriptor that manages attribute access with getter/setter/deleter methods. Defined with <code>@property</code> decorator. Provides computed attributes and encapsulation.</dd>
+
+<dt>PyInstaller</dt>
+<dd>A tool that bundles Python applications into standalone executables. Packages the Python interpreter, all dependencies, and native libraries into a distributable folder or single file.</dd>
+
+<dt>PyPDF (pypdf)</dt>
+<dd>A Python library for reading, splitting, and manipulating PDF files. AIVoiceStudio uses it to extract text from PDF documents for TTS processing.</dd>
+
+<dt>Python-docx</dt>
+<dd>A Python library for creating and reading Microsoft Word (.docx) files. AIVoiceStudio uses it to extract text from Word documents for TTS processing.</dd>
+
+<dt>PythonExec</dt>
+<dd>In AIVoiceStudio, the Python runtime subsystem for executing user-provided Python scripts within the application's environment, with sandboxed access to project files and settings.</dd>
+</dl>
+
+<h2>Q</h2>
+
+<dl class="glossary">
+<dt>Queue</dt>
+<dd>A FIFO (First In, First Out) data structure. <code>queue.Queue</code> is thread-safe for inter-thread communication. <code>asyncio.Queue</code> is for coroutines. Used for job processing in AIVoiceStudio.</dd>
+
+<dt>QuickStart</dt>
+<dd>A feature in AIVoiceStudio that provides one-click setup for downloading a default TTS model and creating a test project, allowing users to try the application immediately.</dd>
+</dl>
+
+<h2>R</h2>
+
+<dl class="glossary">
+<dt>RAII (Resource Acquisition Is Initialization)</dt>
+<dd>A C++ concept adopted in Python via context managers. Resources are acquired in <code>__enter__</code> and released in <code>__exit__</code>, guaranteeing cleanup even if exceptions occur.</dd>
+
+<dt>Raw String</dt>
+<dd>A string prefixed with <code>r</code> that doesn't process escape sequences: <code>r"C:\Users\test"</code>. Essential for regex patterns and Windows paths.</dd>
+
+<dt>Refactoring</dt>
+<dd>Restructuring code to improve readability, performance, or maintainability without changing external behavior. Common refactorings: extract method, rename, move, inline.</dd>
+
+<dt>Reference Counting</dt>
+<dd>Python's primary memory management mechanism. Each object tracks how many references point to it. When the count reaches zero, the object is immediately deallocated. Supplemental cyclic GC handles circular references.</dd>
+
+<dt>Requests</dt>
+<dd>A popular Python HTTP library. AIVoiceStudio uses it for downloading TTS models, checking API endpoints, and communicating with the OmniVoice server.</dd>
+
+<dt>ReStructuredText (RST)</dt>
+<dd>A markup language for documentation, used by Sphinx. Python's docstring conventions follow RST format. Not used in AIVoiceStudio's runtime, but common in Python ecosystem.</dd>
+
+<dt>Runtime</dt>
+<dd>The period during which a program is executing. In AIVoiceStudio, the runtime subsystem manages audio output devices, playback state, and session-scoped settings.</dd>
+</dl>
+
+<h2>S</h2>
+
+<dl class="glossary">
+<dt>Sash Window</dt>
+<dd>A wxPython window that can be resized by dragging a divider (sash). Used in AIVoiceStudio's main frame to create a resizable split between the project tree and content area.</dd>
+
+<dt>Semaphore</dt>
+<dd>A synchronization primitive that limits concurrent access to a resource. <code>threading.Semaphore(n)</code> allows up to <code>n</code> threads to proceed simultaneously. <code>asyncio.Semaphore</code> for async code.</dd>
+
+<dt>sherpa-onnx</dt>
+<dd>A C++/Python toolkit for running speech processing models (TTS, ASR, speaker identification) using ONNX Runtime. AIVoiceStudio's primary TTS engine for local, offline synthesis.</dd>
+
+<dt>Sizer</dt>
+<dd>wxPython's layout management system. Sizers automatically arrange child widgets within a container. Types: <code>BoxSizer</code> (linear), <code>GridSizer</code> (grid), <code>FlexGridSizer</code>, <code>GridBagSizer</code>.</dd>
+
+<dt>Splitter Window</dt>
+<dd>A wxPython widget that divides its area into two resizable panes separated by a movable sash. <code>wx.SplitterWindow</code> is used for master-detail layouts.</dd>
+
+<dt>Static Method</dt>
+<dd>A method defined with <code>@staticmethod</code> that doesn't receive <code>self</code> or <code>cls</code>. It's a regular function that lives inside a class's namespace for organizational purposes.</dd>
+
+<dt>Streaming</dt>
+<dd>Processing data incrementally as it arrives, rather than loading everything first. In TTS, streaming synthesis outputs audio chunks as they're generated, reducing latency. AIVoiceStudio's audio callback pattern implements streaming.</dd>
+
+<dt>String Interpolation</dt>
+<dd>Embedding expressions inside string literals. Python supports f-strings (<code>f"{x}"</code>), <code>.format()</code>, and <code>%</code> formatting. F-strings are preferred for readability and performance.</dd>
+
+<dt>Subclass</dt>
+<dd>A class that inherits from another class. Also called a child class or derived class. Can override parent methods and add new functionality.</dd>
+
+<dt>Subprocess</dt>
+<dd>Running external programs from Python via <code>subprocess.run()</code>, <code>subprocess.Popen()</code>. AIVoiceStudio uses subprocess to run FFmpeg for audio conversion.</dd>
+
+<dt>Superclass</dt>
+<dd>A class that is inherited from. Also called a parent class or base class. <code>super()</code> provides access to superclass methods for cooperative multiple inheritance.</dd>
+
+<dt>Synthesis</dt>
+<dd>Generating audio from text (TTS synthesis). In AIVoiceStudio, text is split into chunks, each chunk is sent to the TTS engine, and the resulting audio samples are concatenated into a complete audio file.</dd>
+
+<dt>SysTray</dt>
+<dd>System tray — the area near the clock in the taskbar. wxPython's <code>TaskBarIcon</code> allows applications to display an icon in the system tray with a context menu.</dd>
+</dl>
+
+<h2>T</h2>
+
+<dl class="glossary">
+<dt>Tab Completion</dt>
+<dd>IDE/REPL feature that suggests completions as you type. Powered by introspection (<code>dir()</code>, <code>__doc__</code>) and static analysis. IPython and modern IDEs provide rich tab completion.</dd>
+
+<dt>Template Method Pattern</dt>
+<dd>A design pattern where a base class defines the algorithm skeleton and subclasses override specific steps. In wxPython, <code>EvtHandler.ProcessEvent</code> is a template method.</dd>
+
+<dt>Text Chunking</dt>
+<dd>Breaking long text into smaller pieces for TTS processing. AIVoiceStudio's <code>TextSplitter</code> splits by sentence boundaries, respecting maximum character limits per chunk for the TTS engine.</dd>
+
+<dt>Thread</dt>
+<dd>A lightweight execution unit within a process. Python threads share memory but are limited by the GIL for CPU-bound work. Useful for I/O-bound tasks like downloads and TTS synthesis. <code>threading.Thread</code> is the API.</dd>
+
+<dt>Thread Safety</dt>
+<dd>Code that functions correctly when accessed by multiple threads simultaneously. In wxPython, GUI updates must use <code>wx.CallAfter()</code> from background threads. Locks and queues provide thread safety.</dd>
+
+<dt>Throttle</dt>
+<dd>Limiting the rate of operations. In AIVoiceStudio, UI updates during synthesis are throttled to avoid overwhelming the GUI event loop with too many status messages.</dd>
+
+<dt>Timer</dt>
+<dd>A wxPython widget that generates events at regular intervals: <code>wx.Timer</code>. Used for periodic checks, animations, and updating UI elements. Started with <code>timer.Start(milliseconds)</code>.</dd>
+
+<dt>Tkinter</dt>
+<dd>Python's standard GUI toolkit, included with Python. Simpler than wxPython but less feature-rich. wxPython is preferred for professional cross-platform applications.</dd>
+
+<dt>TTS (Text-to-Speech)</dt>
+<dd>Technology that converts written text into spoken audio. AIVoiceStudio uses local TTS engines (Piper via sherpa-onnx) for offline, private speech synthesis.</dd>
+
+<dt>Type Hint</dt>
+<dd>Optional annotations in Python function signatures and variables: <code>def greet(name: str) -> None:</code>. Used by type checkers (mypy, pyright) and IDEs for static analysis, not enforced at runtime.</dd>
+
+<dt>Type Checking</dt>
+<dd>Verifying that code uses types correctly. <em>Static</em> type checking (mypy, pyright) analyzes code without running it. <em>Dynamic</em> type checking validates types at runtime.</dd>
+</dl>
+
+<h2>U</h2>
+
+<dl class="glossary">
+<dt>Unpacking</dt>
+<dd>Extracting values from iterables: <code>a, b = [1, 2]</code> (tuple unpacking), <code>*rest = [1, 2, 3, 4]</code> (star unpacking), <code>func(**dict)</code> (keyword unpacking).</dd>
+
+<dt>UTC</dt>
+<dd>Coordinated Universal Time — the primary time standard. Python's <code>datetime.timezone.utc</code> and <code>datetime.utcnow()</code> work with UTC. Essential for logging and timestamp accuracy.</dd>
+
+<dt>UTF-8</dt>
+<dd>A variable-width character encoding for Unicode. The dominant encoding for web and text files. Python 3 source files default to UTF-8. Handles all world scripts including CJK, Arabic, and emoji.</dd>
+
+<dt>UUID (Universally Unique Identifier)</dt>
+<dd>A 128-bit identifier designed to be unique across all computers and time. Python's <code>uuid</code> module generates v4 (random) UUIDs: <code>uuid.uuid4()</code>. Used for session IDs and unique project identifiers.</dd>
+</dl>
+
+<h2>V</h2>
+
+<dl class="glossary">
+<dt>Virtual Environment</dt>
+<dd>An isolated Python installation with its own packages, independent of the system Python. Created with <code>python -m venv .venv</code>. Prevents dependency conflicts between projects.</dd>
+
+<dt>Void Return</dt>
+<dd>Functions that don't explicitly return a value implicitly return <code>None</code>. Type-hinted as <code>-> None</code>. Common for side-effect functions (printing, modifying state, event handlers).</dd>
+
+<dt>Viewport</dt>
+<dd>The visible area of a scrollable window. In wxPython, <code>GetClientSize()</code> returns the viewport dimensions. AIVoiceStudio accounts for viewport size in layout calculations.</dd>
+
+<dt>Voice Clone</dt>
+<dd>AI technology that creates a synthetic voice matching a specific person's speech patterns from audio samples. AIVoiceStudio's clone feature uses user-recorded audio to generate a voice profile for TTS.</dd>
+
+<dt>Voice Model</dt>
+<dd>A trained neural network file that produces speech for a specific voice. Each model has parameters: language, speaker ID, quality level, and file size. Stored in ONNX format for cross-platform use.</dd>
+</dl>
+
+<h2>W</h2>
+
+<dl class="glossary">
+<dt>WAV (Waveform Audio File Format)</dt>
+<dd>An uncompressed audio format. The standard intermediate format for TTS output in AIVoiceStudio. Converted to compressed formats (MP3, OGG, FLAC) via FFmpeg for distribution.</dd>
+
+<dt>Widget</dt>
+<dd>A GUI element in wxPython: buttons, text fields, labels, panels, etc. All widgets inherit from <code>wx.Window</code>. Widgets are added to sizers for layout management.</dd>
+
+<dt>Wildcard</dt>
+<dd>In file dialogs, a pattern for filtering files by extension: <code>"PDF files (*.pdf)|*.pdf|All files (*.*)|*.*"</code>. In Python, <code>*</code> in function parameters captures positional args as a tuple.</dd>
+
+<dt>wxPython</dt>
+<dd>A Python wrapper around the wxWidgets C++ GUI library. Provides native-look widgets on Windows, macOS, and Linux. AIVoiceStudio's GUI framework, chosen for its cross-platform capabilities and professional appearance.</dd>
+
+<dt>wx.CallAfter()</dt>
+<dd>A thread-safe method to schedule a function call on the main GUI thread. Essential for updating the UI from background threads in wxPython. Events are queued and processed in the next event loop iteration.</dd>
+
+<dt>wx.Panel</dt>
+<dd>A generic container widget that can hold other widgets. Panels provide a background for drawing and serve as parents for child controls. Used extensively in AIVoiceStudio's dialog layouts.</dd>
+</dl>
+
+<h2>X</h2>
+
+<dl class="glossary">
+<dt>XML (Extensible Markup Language)</dt>
+<dd>A markup language for structured data. Used in DAISY documents, DOCX files (OOXML), and many configuration formats. Python's <code>xml.etree.ElementTree</code> provides parsing.</dd>
+
+<dt>XOR (Exclusive OR)</dt>
+<dd>A bitwise operation returning true when inputs differ. In Python: <code>^</code> operator. Used for simple encryption, flag toggling, and hash computations.</dd>
+</dl>
+
+<h2>Y</h2>
+
+<dl class="glossary">
+<dt>Yield</dt>
+<dd>The keyword that makes a function a generator. <code>yield value</code> pauses the function and produces a value. The function resumes from where it left off when the next value is requested.</dd>
+
+<dt>YAML (YAML Ain't Markup Language)</dt>
+<dd>A human-readable data serialization format. Alternative to JSON with support for comments and complex types. Not used in AIVoiceStudio (which prefers JSON), but common in Python projects.</dd>
+</dl>
+
+<h2>Z</h2>
+
+<dl class="glossary">
+<dt>Zip File</dt>
+<dd>A compressed archive format. Python's <code>zipfile</code> module provides read/write access. AIVoiceStudio can import/export project data as zip archives.</dd>
+
+<dt>Zero-Copy</dt>
+<dd>Operations that don't create new data copies, improving performance. Python's <code>memoryview</code> and buffer protocol enable zero-copy slicing. NumPy array views are zero-copy.</dd>
+
+<dt>Zone</dt>
+<dd>In audio processing, a zone defines a region of audio for playback, editing, or effects. In AIVoiceStudio, synthesis zones map text segments to audio output regions.</dd>
+</dl>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     END OF APPENDIX C
+     ════════════════════════════════════════════════════════════════════ -->
+
+</div>
+</div><!-- /.main-content -->
+</div><!-- /.book-container -->
+</body>
+</html>

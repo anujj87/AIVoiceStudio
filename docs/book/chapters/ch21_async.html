@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 21: Async I/O - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part III</div><ul class="chapters"><li><a href="ch19_concurrency.html">Ch 19</a></li><li><a href="ch20_multiprocessing.html">Ch 20</a></li><li><a href="ch21_async.html" class="active">Ch 21: Async I/O</a></li><li><a href="ch22_type_hints.html">Ch 22</a></li><li><a href="ch23_metaclasses.html">Ch 23</a></li><li><a href="ch24_design_patterns.html">Ch 24</a></li><li><a href="ch25_introspection.html">Ch 25</a></li><li><a href="ch26_c_extensions.html">Ch 26</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 21</div>
+<h1>Async I/O</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand asyncio's event loop model</li>
+  <li>Write async functions with <code>async/await</code></li>
+  <li>Understand when async is appropriate vs. threads</li>
+  <li>See where AIVS could benefit from async patterns</li>
+</ul>
+
+<hr>
+
+<h2>21.1 What Is Async I/O?</h2>
+
+<p>
+  <code>asyncio</code> is Python's built-in framework for writing concurrent code using
+  <strong>coroutines</strong>. Unlike threads, async code runs in a <strong>single thread</strong>
+  and cooperatively yields control at <code>await</code> points.
+</p>
+
+<table>
+  <thead><tr><th>Feature</th><th>Threads</th><th>Async</th></tr></thead>
+  <tbody>
+    <tr><td>Parallelism</td><td>Preemptive (GIL)</td><td>Cooperative (single thread)</td></tr>
+    <tr><td>Overhead</td><td>Per-thread stack (~8MB)</td><td>Per-coroutine (~KB)</td></tr>
+    <tr><td>Best for</td><td>Mixed I/O + some CPU</td><td>High-concurrency I/O</td></tr>
+    <tr><td>GUI compatible?</td><td>Yes (PostEvent)</td><td>Needs event loop integration</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h2>21.2 Async Basics</h2>
+
+<pre><code><span class="kw">import</span> asyncio
+
+<span class="cm"># Define a coroutine</span>
+<span class="kw">async def</span> <span class="fn">fetch_model</span>(url: str) -> bytes:
+    <span class="kw">import</span> aiohttp
+    <span class="kw">async with</span> aiohttp.ClientSession() <span class="kw">as</span> session:
+        <span class="kw">async with</span> session.get(url) <span class="kw">as</span> response:
+            <span class="kw">return await</span> response.read()
+
+<span class="cm"># Run a coroutine</span>
+data = asyncio.run(fetch_model(<span class="str">"https://example.com/model.onnx"</span>))
+
+<span class="cm"># Multiple concurrent coroutines</span>
+<span class="kw">async def</span> <span class="fn">download_all</span>(urls: list[str]):
+    tasks = [fetch_model(url) <span class="kw">for</span> url <span class="kw">in</span> urls]
+    results = <span class="kw">await</span> asyncio.gather(*tasks)
+    <span class="kw">return</span> results</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>import asyncio</code>
+        <br><span class="desc">Imports the <code>asyncio</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Define a coroutine</code>
+        <br><span class="desc">A comment: <em>Define a coroutine</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>async def fetch_model(url: str) -&gt; bytes:</code>
+        <br><span class="desc">Defines an asynchronous function (coroutine). Can use 'await' inside.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>import aiohttp</code>
+        <br><span class="desc">Imports the <code>aiohttp</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>async with aiohttp.ClientSession() as session:</code>
+        <br><span class="desc"><code>async with aiohttp.ClientSession() as session:</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>async with session.get(url) as response:</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>return await response.read()</code>
+        <br><span class="desc">Reads the entire file contents as a string.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># Run a coroutine</code>
+        <br><span class="desc">A comment: <em>Run a coroutine</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>data = asyncio.run(fetch_model(&quot;https://example.com/model.onnx&quot;))</code>
+        <br><span class="desc">Runs an async function in the event loop. Entry point for async programs.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code># Multiple concurrent coroutines</code>
+        <br><span class="desc">A comment: <em>Multiple concurrent coroutines</em>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>async def download_all(urls: list[str]):</code>
+        <br><span class="desc">Defines an asynchronous function (coroutine). Can use 'await' inside.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>tasks = [fetch_model(url) for url in urls]</code>
+        <br><span class="desc">Assigns <code>[fetch_model(url) for url in urls]</code> to <code>tasks</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>results = await asyncio.gather(*tasks)</code>
+        <br><span class="desc">Runs multiple coroutines concurrently and returns their results.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>return results</code>
+        <br><span class="desc">Returns <code>results</code> to the caller.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>21.3 When Async Isn't the Right Choice</h2>
+
+<p>AI Voice Studio uses <strong>threads</strong>, not async, because:</p>
+
+<ul>
+  <li><strong>wxPython is not async-compatible</strong> — its event loop conflicts with asyncio</li>
+  <li><strong>Blocking libraries</strong> — sherpa-onnx and NumPy are synchronous</li>
+  <li><strong>Subprocess isolation</strong> — heavy work runs in separate processes anyway</li>
+  <li><strong>Thread simplicity</strong> — for 5-10 concurrent tasks, threads are simpler</li>
+</ul>
+
+<div class="info">
+  <strong>When to use async:</strong> Web servers handling thousands of connections,
+  web scrapers, WebSocket clients. For a desktop app with a handful of background
+  tasks, threads are the better choice.
+</div>
+
+<hr>
+
+<h2>21.4 Key Takeaways</h2>
+<ul>
+  <li><strong><code>async/await</code></strong> is for I/O-bound concurrency in a single thread</li>
+  <li><strong>asyncio.gather()</strong> runs multiple coroutines concurrently</li>
+  <li>AIVS uses <strong>threads + subprocesses</strong> instead, because wxPython and ML libraries are synchronous</li>
+  <li>Async shines for <strong>high-concurrency network I/O</strong> (hundreds of connections)</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch20_multiprocessing.html">← Ch 20</a> &nbsp;|&nbsp; <a href="ch22_type_hints.html">Ch 22 — Type Hints →</a></p>
+</div></div></body>
+</html>

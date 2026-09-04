@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 24: Design Patterns - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part III</div><ul class="chapters"><li><a href="ch19_concurrency.html">Ch 19</a></li><li><a href="ch20_multiprocessing.html">Ch 20</a></li><li><a href="ch21_async.html">Ch 21</a></li><li><a href="ch22_type_hints.html">Ch 22</a></li><li><a href="ch23_metaclasses.html">Ch 23</a></li><li><a href="ch24_design_patterns.html" class="active">Ch 24: Patterns</a></li><li><a href="ch25_introspection.html">Ch 25</a></li><li><a href="ch26_c_extensions.html">Ch 26</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 24</div>
+<h1>Design Patterns in Python</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Implement common design patterns in Pythonic ways</li>
+  <li>See Singleton, Observer, Strategy, and Factory patterns in AIVS</li>
+  <li>Understand when patterns are useful vs. over-engineering</li>
+</ul>
+
+<hr>
+
+<h2>24.1 Singleton Pattern</h2>
+
+<pre><code><span class="cm"># Ensures only one instance exists</span>
+<span class="kw">class</span> <span class="cls">Settings</span>:
+    _instance = <span class="kw">None</span>
+    _lock = threading.Lock()
+
+    <span class="kw">def</span> <span class="fn">__new__</span>(cls, *args, **kwargs):
+        <span class="kw">if</span> cls._instance <span class="kw">is</span> <span class="kw">None</span>:
+            <span class="kw">with</span> cls._lock:
+                <span class="kw">if</span> cls._instance <span class="kw">is</span> <span class="kw">None</span>:
+                    cls._instance = <span class="kw">super</span>().__new__(cls)
+        <span class="kw">return</span> cls._instance
+
+<span class="cm"># From AIVS — the addon manager is a singleton</span>
+_default_manager: AddonManager | <span class="kw">None</span> = <span class="kw">None</span>
+_manager_lock = threading.Lock()
+
+<span class="kw">def</span> <span class="fn">get_addon_manager</span>() -> AddonManager:
+    <span class="kw">global</span> _default_manager
+    <span class="kw">if</span> _default_manager <span class="kw">is</span> <span class="kw">None</span>:
+        <span class="kw">with</span> _manager_lock:
+            <span class="kw">if</span> _default_manager <span class="kw">is</span> <span class="kw">None</span>:
+                _default_manager = AddonManager()
+    <span class="kw">return</span> _default_manager</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Ensures only one instance exists</code>
+        <br><span class="desc">A comment: <em>Ensures only one instance exists</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>class Settings:</code>
+        <br><span class="desc">Defines class <code>Settings</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>_instance = None</code>
+        <br><span class="desc">Assigns <code>None</code> to <code>_instance</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>_lock = threading.Lock()</code>
+        <br><span class="desc">A mutual exclusion lock. Only one thread can hold it at a time. Prevents race conditions.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>def __new__(cls, *args, **kwargs):</code>
+        <br><span class="desc">Defines function <code>__new__</code> accepting (cls, *args, **kwargs).</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>if cls._instance is None:</code>
+        <br><span class="desc">Checks condition: <code>cls._instance is None</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>with cls._lock:</code>
+        <br><span class="desc">Context manager: <code>cls._lock</code>. Automatically manages resource cleanup.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>if cls._instance is None:</code>
+        <br><span class="desc">Checks condition: <code>cls._instance is None</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>cls._instance = super().__new__(cls)</code>
+        <br><span class="desc">Returns a proxy object that delegates method calls to a parent class. Used in __init__ to call the parent constructor.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>return cls._instance</code>
+        <br><span class="desc">Returns <code>cls._instance</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># From AIVS — the addon manager is a singleton</code>
+        <br><span class="desc">A comment: <em>From AIVS — the addon manager is a singleton</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>_default_manager: AddonManager | None = None</code>
+        <br><span class="desc"><code>_default_manager: AddonManager | None = None</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>_manager_lock = threading.Lock()</code>
+        <br><span class="desc">A mutual exclusion lock. Only one thread can hold it at a time. Prevents race conditions.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>def get_addon_manager() -&gt; AddonManager:</code>
+        <br><span class="desc">Defines function <code>get_addon_manager</code>, returning <code>AddonManager</code>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>global _default_manager</code>
+        <br><span class="desc"><code>global _default_manager</code></span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>if _default_manager is None:</code>
+        <br><span class="desc">Checks condition: <code>_default_manager is None</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>with _manager_lock:</code>
+        <br><span class="desc">Context manager: <code>_manager_lock</code>. Automatically manages resource cleanup.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>if _default_manager is None:</code>
+        <br><span class="desc">Checks condition: <code>_default_manager is None</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>_default_manager = AddonManager()</code>
+        <br><span class="desc">Assigns <code>AddonManager()</code> to <code>_default_manager</code>.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>return _default_manager</code>
+        <br><span class="desc">Returns <code>_default_manager</code> to the caller.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>24.2 Observer Pattern</h2>
+
+<pre><code><span class="cm"># wxPython events ARE the observer pattern</span>
+<span class="cm"># Custom events notify the GUI of background changes</span>
+
+<span class="cm"># From gui/events.py</span>
+_DOWNLOAD_PROGRESS = wx.NewEventType()
+EVT_DOWNLOAD_PROGRESS = wx.PyEventBinder(_DOWNLOAD_PROGRESS, <span class="num">1</span>)
+
+<span class="kw">class</span> <span class="cls">DownloadProgressEvent</span>(wx.PyCommandEvent):
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, name: str, done: int, total: int):
+        <span class="kw">super</span>().__init__(_DOWNLOAD_PROGRESS)
+        self.name = name
+        self.done = done
+        self.total = total
+
+<span class="cm"># Observer (worker thread) posts events:</span>
+wx.PostEvent(self, DownloadProgressEvent(name, <span class="num">50</span>, <span class="num">100</span>))
+
+<span class="cm"># Subscriber (GUI) handles events:</span>
+self.Bind(EVT_DOWNLOAD_PROGRESS, self._on_progress)
+
+<span class="kw">def</span> <span class="fn">_on_progress</span>(self, evt):
+    self.gauge.SetValue(evt.done * <span class="num">100</span> // evt.total)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># wxPython events ARE the observer pattern</code>
+        <br><span class="desc">A comment: <em>wxPython events ARE the observer pattern</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Custom events notify the GUI of background changes</code>
+        <br><span class="desc">A comment: <em>Custom events notify the GUI of background changes</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># From gui/events.py</code>
+        <br><span class="desc">A comment: <em>From gui/events.py</em>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>_DOWNLOAD_PROGRESS = wx.NewEventType()</code>
+        <br><span class="desc">Assigns <code>wx.NewEventType()</code> to <code>_DOWNLOAD_PROGRESS</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>EVT_DOWNLOAD_PROGRESS = wx.PyEventBinder(_DOWNLOAD_PROGRESS, 1)</code>
+        <br><span class="desc">Assigns <code>wx.PyEventBinder(_DOWNLOAD_PROGRESS, 1)</code> to <code>EVT_DOWNLOAD_PROGRESS</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>class DownloadProgressEvent(wx.PyCommandEvent):</code>
+        <br><span class="desc">Defines class <code>DownloadProgressEvent</code> inheriting from <code>wx.PyCommandEvent</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>def __init__(self, name: str, done: int, total: int):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>super().__init__(_DOWNLOAD_PROGRESS)</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>self.name = name</code>
+        <br><span class="desc">Stores <code>name</code> in instance attribute <code>name</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>self.done = done</code>
+        <br><span class="desc">Stores <code>done</code> in instance attribute <code>done</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>self.total = total</code>
+        <br><span class="desc">Stores <code>total</code> in instance attribute <code>total</code>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code># Observer (worker thread) posts events:</code>
+        <br><span class="desc">A comment: <em>Observer (worker thread) posts events:</em>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>wx.PostEvent(self, DownloadProgressEvent(name, 50, 100))</code>
+        <br><span class="desc">Creates a wxPython <code>wx.PostEvent</code> widget.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code># Subscriber (GUI) handles events:</code>
+        <br><span class="desc">A comment: <em>Subscriber (GUI) handles events:</em>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>self.Bind(EVT_DOWNLOAD_PROGRESS, self._on_progress)</code>
+        <br><span class="desc">Registers an event handler on the frame/window itself. Used for frame-level events.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>def _on_progress(self, evt):</code>
+        <br><span class="desc">Defines function <code>_on_progress</code> accepting (self, evt).</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>self.gauge.SetValue(evt.done * 100 // evt.total)</code>
+        <br><span class="desc"><code>self.gauge.SetValue(evt.done * 100 // evt.total)</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>24.3 Strategy Pattern</h2>
+
+<pre><code><span class="cm"># Different document parsers for different file types</span>
+<span class="kw">class</span> <span class="cls">Parser</span>(Protocol):
+    <span class="kw">def</span> <span class="fn">parse</span>(self, path: str) -> Document: ...
+
+<span class="kw">class</span> <span class="cls">PdfParser</span>:
+    <span class="kw">def</span> <span class="fn">parse</span>(self, path): ...
+
+<span class="kw">class</span> <span class="cls">DocxParser</span>:
+    <span class="kw">def</span> <span class="fn">parse</span>(self, path): ...
+
+<span class="cm"># Strategy selection at runtime</span>
+parsers = {
+    <span class="str">".pdf"</span>: PdfParser(),
+    <span class="str">".docx"</span>: DocxParser(),
+}
+
+<span class="kw">def</span> <span class="fn">parse_document</span>(path: str) -> Document:
+    ext = os.path.splitext(path)[<span class="num">1</span>].lower()
+    parser = parsers.get(ext)
+    <span class="kw">if</span> parser <span class="kw">is</span> <span class="kw">None</span>:
+        <span class="kw">raise</span> ParseError(<span class="str">f"Unsupported: </span>{ext}<span class="str">"</span>)
+    <span class="kw">return</span> parser.parse(path)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Different document parsers for different file types</code>
+        <br><span class="desc">A comment: <em>Different document parsers for different file types</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>class Parser(Protocol):</code>
+        <br><span class="desc">Defines class <code>Parser</code> inheriting from <code>Protocol</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>def parse(self, path: str) -&gt; Document: ...</code>
+        <br><span class="desc">Defines function <code>parse</code> accepting (self, path), returning <code>Document</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>class PdfParser:</code>
+        <br><span class="desc">Defines class <code>PdfParser</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>def parse(self, path): ...</code>
+        <br><span class="desc">Defines function <code>parse</code> accepting (self, path).</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>class DocxParser:</code>
+        <br><span class="desc">Defines class <code>DocxParser</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>def parse(self, path): ...</code>
+        <br><span class="desc">Defines function <code>parse</code> accepting (self, path).</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># Strategy selection at runtime</code>
+        <br><span class="desc">A comment: <em>Strategy selection at runtime</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>parsers = {</code>
+        <br><span class="desc">Assigns <code>{</code> to <code>parsers</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>&quot;.pdf&quot;: PdfParser(),</code>
+        <br><span class="desc"><code>&quot;.pdf&quot;: PdfParser(),</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>&quot;.docx&quot;: DocxParser(),</code>
+        <br><span class="desc"><code>&quot;.docx&quot;: DocxParser(),</code></span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>}</code>
+        <br><span class="desc"><code>}</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>def parse_document(path: str) -&gt; Document:</code>
+        <br><span class="desc">Defines function <code>parse_document</code> accepting (path), returning <code>Document</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>ext = os.path.splitext(path)[1].lower()</code>
+        <br><span class="desc">Converts all characters to lowercase. Returns a new string.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>parser = parsers.get(ext)</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>if parser is None:</code>
+        <br><span class="desc">Checks condition: <code>parser is None</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>raise ParseError(f&quot;Unsupported: {ext}&quot;)</code>
+        <br><span class="desc">Manually raises an exception. Use to signal error conditions to callers.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>return parser.parse(path)</code>
+        <br><span class="desc">Returns <code>parser.parse(path)</code> to the caller.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>24.4 Factory Pattern</h2>
+
+<pre><code><span class="cm"># From tts/engine.py — factory that creates the right engine</span>
+<span class="kw">def</span> <span class="fn">get_engine</span>(voice_entry: dict) -> TtsEngine:
+    <span class="str">"""Factory: create the appropriate engine for a voice."""</span>
+    engine_type = voice_entry.get(<span class="str">"engine"</span>, <span class="str">"vits"</span>)
+
+    <span class="kw">if</span> engine_type == <span class="str">"xtts"</span>:
+        client = CloneClient()
+        <span class="kw">return</span> XtTsCloneEngine(voice_entry, client)
+    <span class="kw">elif</span> engine_type == <span class="str">"omnivoice"</span>:
+        <span class="kw">return</span> OmniVoiceEngine(voice_entry)
+    <span class="kw">elif</span> engine_type == <span class="str">"omnivoice_server"</span>:
+        <span class="kw">return</span> OmniVoiceServerEngine(voice_entry)
+    <span class="kw">else</span>:
+        <span class="kw">return</span> SherpaEngine(voice_entry)  <span class="cm"># Default: sherpa-onnx</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 4)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From tts/engine.py — factory that creates the right engine</code>
+        <br><span class="desc">A comment: <em>From tts/engine.py — factory that creates the right engine</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def get_engine(voice_entry: dict) -&gt; TtsEngine:</code>
+        <br><span class="desc">Begins exception handling. Code in this block is monitored for errors.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;&quot;&quot;Factory: create the appropriate engine for a voice.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Factory: create the appropriate engine for a voice.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>engine_type = voice_entry.get(&quot;engine&quot;, &quot;vits&quot;)</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>if engine_type == &quot;xtts&quot;:</code>
+        <br><span class="desc">Checks condition: <code>engine_type == &quot;xtts&quot;</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>client = CloneClient()</code>
+        <br><span class="desc">Assigns <code>CloneClient()</code> to <code>client</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>return XtTsCloneEngine(voice_entry, client)</code>
+        <br><span class="desc">Returns <code>XtTsCloneEngine(voice_entry, client)</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>elif engine_type == &quot;omnivoice&quot;:</code>
+        <br><span class="desc">Alternative condition: <code>engine_type == &quot;omnivoice&quot;</code>. Checked only if all previous conditions were <code>False</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>return OmniVoiceEngine(voice_entry)</code>
+        <br><span class="desc">Returns <code>OmniVoiceEngine(voice_entry)</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>elif engine_type == &quot;omnivoice_server&quot;:</code>
+        <br><span class="desc">Alternative condition: <code>engine_type == &quot;omnivoice_server&quot;</code>. Checked only if all previous conditions were <code>False</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>return OmniVoiceServerEngine(voice_entry)</code>
+        <br><span class="desc">Returns <code>OmniVoiceServerEngine(voice_entry)</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>else:</code>
+        <br><span class="desc">Fallback: executes when none of the above conditions matched.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>return SherpaEngine(voice_entry)  # Default: sherpa-onnx</code>
+        <br><span class="desc">Returns <code>SherpaEngine(voice_entry)  # Default: sherpa-onnx</code> to the caller.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>24.5 Key Takeaways</h2>
+<ul>
+  <li><strong>Singleton</strong> for shared state (Settings, AddonManager)</li>
+  <li><strong>Observer</strong> for thread-GUI communication (wx events)</li>
+  <li><strong>Strategy</strong> for swappable algorithms (document parsers)</li>
+  <li><strong>Factory</strong> for object creation based on type (TTS engines)</li>
+  <li>Python makes patterns simpler — often a dict or function replaces a full class hierarchy</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch23_metaclasses.html">← Ch 23</a> &nbsp;|&nbsp; <a href="ch25_introspection.html">Ch 25 — Introspection →</a></p>
+</div></div></body>
+</html>

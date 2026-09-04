@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 45: Project Model &amp; Persistence - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part VI</div><ul class="chapters"><li><a href="ch43_architecture.html">Ch 43</a></li><li><a href="ch44_paths_settings.html">Ch 44</a></li><li><a href="ch45_project_model.html" class="active">Ch 45: Project Model</a></li><li><a href="ch46_document_parsing.html">Ch 46</a></li><li><a href="ch47_tts_catalog.html">Ch 47</a></li><li><a href="ch48_tts_engine.html">Ch 48</a></li><li><a href="ch49_downloader.html">Ch 49</a></li><li><a href="ch50_compute_detection.html">Ch 50</a></li><li><a href="ch51_main_frame.html">Ch 51</a></li><li><a href="ch52_settings_dialog.html">Ch 52</a></li><li><a href="ch53_model_panels.html">Ch 53</a></li><li><a href="ch54_new_project_wizard.html">Ch 54</a></li><li><a href="ch55_recording.html">Ch 55</a></li><li><a href="ch56_synthesis_worker.html">Ch 56</a></li><li><a href="ch57_clone_engine.html">Ch 57</a></li><li><a href="ch58_omnivoice.html">Ch 58</a></li><li><a href="ch59_daisy_builder.html">Ch 59</a></li><li><a href="ch60_addons.html">Ch 60</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 45</div>
+<h1>Project Model &amp; Persistence</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand the AIVS project data model</li>
+  <li>Implement atomic JSON writes for crash safety</li>
+  <li>See the segment lifecycle (pending → done)</li>
+</ul>
+
+<hr>
+
+<h2>45.1 The Project Data Model</h2>
+
+<pre><code><span class="cm"># A project is a JSON file with this structure:</span>
+{
+  <span class="str">"name"</span>: <span class="str">"My Audiobook"</span>,
+  <span class="str">"source"</span>: <span class="str">"C:\\Documents\\book.pdf"</span>,
+  <span class="str">"mode"</span>: <span class="str">"page_with_h1"</span>,
+  <span class="str">"project_type"</span>: <span class="str">"audio_playlist"</span>,
+  <span class="str">"segments"</span>: [
+    {
+      <span class="str">"index"</span>: <span class="num">1</span>,
+      <span class="str">"title"</span>: <span class="str">"Chapter 1"</span>,
+      <span class="str">"text"</span>: <span class="str">"Once upon a time..."</span>,
+      <span class="str">"status"</span>: <span class="str">"done"</span>,
+      <span class="str">"saved"</span>: <span class="str">"Chapter_1.wav"</span>,
+      <span class="str">"duration"</span>: <span class="num">120.5</span>
+    },
+    {
+      <span class="str">"index"</span>: <span class="num">2</span>,
+      <span class="str">"title"</span>: <span class="str">"Chapter 2"</span>,
+      <span class="str">"text"</span>: <span class="str">"It was a dark..."</span>
+    }
+  ],
+  <span class="str">"tts"</span>: { <span class="cm">/* voice settings */</span> }
+}</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># A project is a JSON file with this structure:</code>
+        <br><span class="desc">A comment: <em>A project is a JSON file with this structure:</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>{</code>
+        <br><span class="desc"><code>{</code></span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;name&quot;: &quot;My Audiobook&quot;,</code>
+        <br><span class="desc"><code>&quot;name&quot;: &quot;My Audiobook&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>&quot;source&quot;: &quot;C:\\Documents\\book.pdf&quot;,</code>
+        <br><span class="desc"><code>&quot;source&quot;: &quot;C:\\Documents\\book.pdf&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>&quot;mode&quot;: &quot;page_with_h1&quot;,</code>
+        <br><span class="desc"><code>&quot;mode&quot;: &quot;page_with_h1&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>&quot;project_type&quot;: &quot;audio_playlist&quot;,</code>
+        <br><span class="desc"><code>&quot;project_type&quot;: &quot;audio_playlist&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>&quot;segments&quot;: [</code>
+        <br><span class="desc"><code>&quot;segments&quot;: [</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>{</code>
+        <br><span class="desc"><code>{</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>&quot;index&quot;: 1,</code>
+        <br><span class="desc"><code>&quot;index&quot;: 1,</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>&quot;title&quot;: &quot;Chapter 1&quot;,</code>
+        <br><span class="desc"><code>&quot;title&quot;: &quot;Chapter 1&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>&quot;text&quot;: &quot;Once upon a time...&quot;,</code>
+        <br><span class="desc"><code>&quot;text&quot;: &quot;Once upon a time...&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>&quot;status&quot;: &quot;done&quot;,</code>
+        <br><span class="desc"><code>&quot;status&quot;: &quot;done&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>&quot;saved&quot;: &quot;Chapter_1.wav&quot;,</code>
+        <br><span class="desc"><code>&quot;saved&quot;: &quot;Chapter_1.wav&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>&quot;duration&quot;: 120.5</code>
+        <br><span class="desc"><code>&quot;duration&quot;: 120.5</code></span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>},</code>
+        <br><span class="desc"><code>},</code></span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>{</code>
+        <br><span class="desc"><code>{</code></span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>&quot;index&quot;: 2,</code>
+        <br><span class="desc"><code>&quot;index&quot;: 2,</code></span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>&quot;title&quot;: &quot;Chapter 2&quot;,</code>
+        <br><span class="desc"><code>&quot;title&quot;: &quot;Chapter 2&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>&quot;text&quot;: &quot;It was a dark...&quot;</code>
+        <br><span class="desc"><code>&quot;text&quot;: &quot;It was a dark...&quot;</code></span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>}</code>
+        <br><span class="desc"><code>}</code></span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>],</code>
+        <br><span class="desc"><code>],</code></span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>&quot;tts&quot;: { /* voice settings */ }</code>
+        <br><span class="desc"><code>&quot;tts&quot;: { /* voice settings */ }</code></span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>}</code>
+        <br><span class="desc"><code>}</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>45.2 Atomic Writes</h2>
+
+<pre><code><span class="cm"># From project.py — crash-safe save</span>
+<span class="kw">def</span> <span class="fn">save_project</span>(project_dir: str, data: dict) -> None:
+    <span class="str">"""Save project.json atomically (write to temp, then rename)."""</span>
+    <span class="kw">import</span> tempfile
+    path = os.path.join(project_dir, <span class="str">"project.json"</span>)
+    fd, tmp = tempfile.mkstemp(dir=project_dir, suffix=<span class="str">".tmp"</span>)
+    <span class="kw">try</span>:
+        <span class="kw">with</span> os.fdopen(fd, <span class="str">"w"</span>, encoding=<span class="str">"utf-8"</span>) <span class="kw">as</span> f:
+            json.dump(data, f, indent=<span class="num">2</span>, ensure_ascii=<span class="kw">False</span>)
+        os.replace(tmp, path)  <span class="cm"># Atomic on same filesystem</span>
+    <span class="kw">except</span>:
+        os.unlink(tmp)
+        <span class="kw">raise</span>
+
+<span class="kw">def</span> <span class="fn">mark_segment_done</span>(project_dir, segment_index, audio_path):
+    <span class="str">"""Mark a segment as done and save immediately."""</span>
+    data = load_project(project_dir)
+    <span class="kw">for</span> seg <span class="kw">in</span> data[<span class="str">"segments"</span>]:
+        <span class="kw">if</span> seg[<span class="str">"index"</span>] == segment_index:
+            seg[<span class="str">"status"</span>] = <span class="str">"done"</span>
+            seg[<span class="str">"saved"</span>] = os.path.basename(audio_path)
+            <span class="kw">break</span>
+    save_project(project_dir, data)
+
+<span class="kw">def</span> <span class="fn">first_pending_index</span>(project_dir) -> int:
+    <span class="str">"""Find the first segment that hasn't been recorded yet."""</span>
+    data = load_project(project_dir)
+    <span class="kw">for</span> seg <span class="kw">in</span> data.get(<span class="str">"segments"</span>, []):
+        <span class="kw">if</span> seg.get(<span class="str">"status"</span>) != <span class="str">"done"</span>:
+            <span class="kw">return</span> seg[<span class="str">"index"</span>] - <span class="num">1</span>
+    <span class="kw">return</span> len(data.get(<span class="str">"segments"</span>, []))</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From project.py — crash-safe save</code>
+        <br><span class="desc">A comment indicating the source file: <em>From project.py — crash-safe save</em>. This helps the reader locate the code in the AIVoiceStudio codebase.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def save_project(project_dir: str, data: dict) -&gt; None:</code>
+        <br><span class="desc">Defines function <code>save_project</code> accepting parameters (project_dir, data), returning <code>None</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;&quot;&quot;Save project.json atomically (write to temp, then rename).&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Save project.json atomically (write to temp, then rename).</em>. Documents the purpose of the following code block.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>import tempfile</code>
+        <br><span class="desc">Imports the <code>tempfile</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>path = os.path.join(project_dir, &quot;project.json&quot;)</code>
+        <br><span class="desc">Assigns <code>os.path.join(project_dir, &quot;project.json&quot;)</code> to <code>path</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>fd, tmp = tempfile.mkstemp(dir=project_dir, suffix=&quot;.tmp&quot;)</code>
+        <br><span class="desc"><code>fd, tmp = tempfile.mkstemp(dir=project_dir, suffix=&quot;.tmp&quot;)</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>try:</code>
+        <br><span class="desc">Begins exception handling. Errors in this block will be caught below.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>with os.fdopen(fd, &quot;w&quot;, encoding=&quot;utf-8&quot;) as f:</code>
+        <br><span class="desc">Context manager: <code>os.fdopen(fd, &quot;w&quot;, encoding=&quot;utf-8&quot;) as f</code>. Automatically manages resource cleanup.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>json.dump(data, f, indent=2, ensure_ascii=False)</code>
+        <br><span class="desc"><code>json.dump(data, f, indent=2, ensure_ascii=False)</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>os.replace(tmp, path)  # Atomic on same filesystem</code>
+        <br><span class="desc"><code>os.replace(tmp, path)  # Atomic on same filesystem</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>except:</code>
+        <br><span class="desc"><code>except:</code></span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>os.unlink(tmp)</code>
+        <br><span class="desc"><code>os.unlink(tmp)</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>raise</code>
+        <br><span class="desc"><code>raise</code></span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>def mark_segment_done(project_dir, segment_index, audio_path):</code>
+        <br><span class="desc">Defines function <code>mark_segment_done</code> accepting parameters (project_dir, segment_index, audio_path).</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>&quot;&quot;&quot;Mark a segment as done and save immediately.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Mark a segment as done and save immediately.</em>. Documents the purpose of the following code block.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>data = load_project(project_dir)</code>
+        <br><span class="desc">Assigns <code>load_project(project_dir)</code> to <code>data</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>for seg in data[&quot;segments&quot;]:</code>
+        <br><span class="desc">Iterates over <code>data[&quot;segments&quot;]</code>, assigning each element to <code>seg</code>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>if seg[&quot;index&quot;] == segment_index:</code>
+        <br><span class="desc">Checks condition: <code>seg[&quot;index&quot;] == segment_index</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>seg[&quot;status&quot;] = &quot;done&quot;</code>
+        <br><span class="desc"><code>seg[&quot;status&quot;] = &quot;done&quot;</code></span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>seg[&quot;saved&quot;] = os.path.basename(audio_path)</code>
+        <br><span class="desc"><code>seg[&quot;saved&quot;] = os.path.basename(audio_path)</code></span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>break</code>
+        <br><span class="desc">Exits the innermost loop immediately.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>save_project(project_dir, data)</code>
+        <br><span class="desc">Calls function <code>save_project()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>def first_pending_index(project_dir) -&gt; int:</code>
+        <br><span class="desc">Defines function <code>first_pending_index</code> accepting parameters (project_dir), returning <code>int</code>.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>&quot;&quot;&quot;Find the first segment that hasn&#x27;t been recorded yet.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Find the first segment that hasn&#x27;t been recorded yet.</em>. Documents the purpose of the following code block.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>data = load_project(project_dir)</code>
+        <br><span class="desc">Assigns <code>load_project(project_dir)</code> to <code>data</code>.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>for seg in data.get(&quot;segments&quot;, []):</code>
+        <br><span class="desc">Iterates over <code>data.get(&quot;segments&quot;, [])</code>, assigning each element to <code>seg</code>.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>if seg.get(&quot;status&quot;) != &quot;done&quot;:</code>
+        <br><span class="desc">Checks condition: <code>seg.get(&quot;status&quot;) != &quot;done&quot;</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>return seg[&quot;index&quot;] - 1</code>
+        <br><span class="desc">Returns <code>seg[&quot;index&quot;] - 1</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>return len(data.get(&quot;segments&quot;, []))</code>
+        <br><span class="desc">Returns <code>len(data.get(&quot;segments&quot;, []))</code> to the caller.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>45.3 Key Takeaways</h2>
+<ul>
+  <li>A project is a <strong>JSON file</strong> with name, source, segments, and TTS settings</li>
+  <li><strong>Atomic writes</strong> (temp file + rename) prevent corruption on crash</li>
+  <li>Segments are saved <strong>immediately</strong> after recording — reopening the project resumes where you left off</li>
+  <li><strong>first_pending_index()</strong> enables seamless resume after app restart</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch44_paths_settings.html">← Ch 44</a> &nbsp;|&nbsp; <a href="ch46_document_parsing.html">Ch 46 — Documents →</a></p>
+</div></div></body>
+</html>

@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 71: Security Considerations - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part VIII</div><ul class="chapters"><li><a href="ch67_python_runtime.html">Ch 67</a></li><li><a href="ch68_subprocess.html">Ch 68</a></li><li><a href="ch69_logging.html">Ch 69</a></li><li><a href="ch70_performance.html">Ch 70</a></li><li><a href="ch71_security.html" class="active">Ch 71: Security</a></li><li><a href="ch72_roadmap.html">Ch 72</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 71</div>
+<h1>Security Considerations</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand security practices in AIVS</li>
+  <li>See how addons are sandboxed</li>
+  <li>Understand the HTTP server security model</li>
+</ul>
+
+<hr>
+
+<h2>71.1 Input Validation</h2>
+
+<pre><code><span class="cm"># Filename sanitization prevents path traversal</span>
+<span class="kw">def</span> <span class="fn">sanitize_filename</span>(name: str, max_length: int = <span class="num">80</span>) -> str:
+    name = re.sub(r'[&lt;&gt;:"/\\|?*]', <span class="str">'_'</span>, name)  <span class="cm"># Remove dangerous chars</span>
+    name = re.sub(r'\s+', <span class="str">' '</span>, name).strip()
+    <span class="kw">if</span> len(name) > max_length:
+        name = name[:max_length].rstrip()
+    <span class="kw">return</span> name
+
+<span class="cm"># JSON protocol validation</span>
+<span class="kw">try</span>:
+    req = json.loads(line)
+<span class="kw">except</span> json.JSONDecodeError:
+    respond({<span class="str">"ok"</span>: <span class="kw">False</span>, <span class="str">"error"</span>: <span class="str">"Invalid request"</span>})</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Filename sanitization prevents path traversal</code>
+        <br><span class="desc">A comment: <em>Filename sanitization prevents path traversal</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def sanitize_filename(name: str, max_length: int = 80) -&gt; str:</code>
+        <br><span class="desc">Defines a function.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>name = re.sub(r&#x27;[&lt;&gt;:&quot;/\\|?*]&#x27;, &#x27;_&#x27;, name)  # Remove dangerous chars</code>
+        <br><span class="desc">Assigns <code>re.sub(r&#x27;[&lt;&gt;:&quot;/\\|?*]&#x27;, &#x27;_&#x27;, name)  # Remove dangerous chars</code> to <code>name</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>name = re.sub(r&#x27;\s+&#x27;, &#x27; &#x27;, name).strip()</code>
+        <br><span class="desc">Assigns <code>re.sub(r&#x27;\s+&#x27;, &#x27; &#x27;, name).strip()</code> to <code>name</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>if len(name) &gt; max_length:</code>
+        <br><span class="desc">Returns the number of items in a sequence (string, list, dict, tuple).</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>name = name[:max_length].rstrip()</code>
+        <br><span class="desc">Assigns <code>name[:max_length].rstrip()</code> to <code>name</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>return name</code>
+        <br><span class="desc">Returns a value from a function.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># JSON protocol validation</code>
+        <br><span class="desc">A comment: <em>JSON protocol validation</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>try:</code>
+        <br><span class="desc">Begins exception handling.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>req = json.loads(line)</code>
+        <br><span class="desc">Deserializes JSON from a file into a Python object.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>except json.JSONDecodeError:</code>
+        <br><span class="desc">Catches <code>json</code> exceptions.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>respond({&quot;ok&quot;: False, &quot;error&quot;: &quot;Invalid request&quot;})</code>
+        <br><span class="desc">Calls function <code>respond()</code>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>71.2 Addon Sandboxing</h2>
+
+<pre><code><span class="cm"># Addons are isolated:</span>
+<span class="cm"># 1. They live in their own directory</span>
+<span class="cm"># 2. They install deps into the managed venv (not main venv)</span>
+<span class="cm"># 3. Version compatibility is checked</span>
+<span class="kw">if not</span> manifest.is_compatible:
+    log.warning(<span class="str">"Addon requires app version </span>{manifest.min_app_version}<span class="str">"</span>)
+    <span class="kw">continue</span>  <span class="cm"># Skip incompatible addons</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Addons are isolated:</code>
+        <br><span class="desc">A comment: <em>Addons are isolated:</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># 1. They live in their own directory</code>
+        <br><span class="desc">A comment: <em>1. They live in their own directory</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># 2. They install deps into the managed venv (not main venv)</code>
+        <br><span class="desc">A comment: <em>2. They install deps into the managed venv (not main venv)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># 3. Version compatibility is checked</code>
+        <br><span class="desc">A comment: <em>3. Version compatibility is checked</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>if not manifest.is_compatible:</code>
+        <br><span class="desc">Conditional check.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>log.warning(&quot;Addon requires app version {manifest.min_app_version}&quot;)</code>
+        <br><span class="desc">Logs a warning. Something unexpected happened but the program continues.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>continue  # Skip incompatible addons</code>
+        <br><span class="desc">Skips to the next iteration.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>71.3 HTTP Server Security</h2>
+
+<pre><code><span class="cm"># OmniVoice Server supports:</span>
+<span class="cm"># - Bearer token authentication</span>
+<span class="cm"># - CORS origin restrictions</span>
+<span class="cm"># - Localhost-only binding (default)</span>
+
+<span class="cm"># Default: localhost only</span>
+DEFAULT_HOST = <span class="str">"127.0.0.1"</span>
+
+<span class="cm"># API key authentication</span>
+<span class="kw">if</span> self._api_key:
+    req.add_header(<span class="str">"Authorization"</span>, <span class="str">f"Bearer </span>{self._api_key}<span class="str">"</span>)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># OmniVoice Server supports:</code>
+        <br><span class="desc">A comment: <em>OmniVoice Server supports:</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># - Bearer token authentication</code>
+        <br><span class="desc">A comment: <em>- Bearer token authentication</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># - CORS origin restrictions</code>
+        <br><span class="desc">A comment: <em>- CORS origin restrictions</em>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># - Localhost-only binding (default)</code>
+        <br><span class="desc">A comment: <em>- Localhost-only binding (default)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># Default: localhost only</code>
+        <br><span class="desc">A comment: <em>Default: localhost only</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>DEFAULT_HOST = &quot;127.0.0.1&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;127.0.0.1&quot;</code> to <code>DEFAULT_HOST</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># API key authentication</code>
+        <br><span class="desc">A comment: <em>API key authentication</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>if self._api_key:</code>
+        <br><span class="desc">Conditional check.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>req.add_header(&quot;Authorization&quot;, f&quot;Bearer {self._api_key}&quot;)</code>
+        <br><span class="desc"><code>req.add_header(&quot;Authorization&quot;, f&quot;Bearer {self._api_key}&quot;)</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>71.4 Key Takeaways</h2>
+<ul>
+  <li><strong>Filename sanitization</strong> prevents path traversal attacks</li>
+  <li><strong>Addons</strong> are sandboxed in their own directories with version checks</li>
+  <li>The HTTP server defaults to <strong>localhost-only</strong> binding</li>
+  <li><strong>Bearer token auth</strong> protects the server when exposed on the network</li>
+  <li><strong>JSON validation</strong> prevents injection through the IPC protocol</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch70_performance.html">← Ch 70</a> &nbsp;|&nbsp; <a href="ch72_roadmap.html">Ch 72 — Roadmap →</a></p>
+</div></div></body>
+</html>

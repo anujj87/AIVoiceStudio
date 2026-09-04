@@ -369,6 +369,61 @@ class AvailablePanel(_ManagerPanel):
         self.preview_btn.Bind(wx.EVT_BUTTON, self._on_preview)
         self.refresh()
 
+    def on_activated(self):
+        """Refresh the voice lists when the category is opened so voices
+        created in other categories (e.g. the OmniVoice voice library in
+        Settings -> OmniVoice engines) appear without closing the dialog."""
+        prev = self._snapshot_selection()
+        super().on_activated()
+        self.refresh()
+        self._restore_selection(prev)
+
+    def _snapshot_selection(self):
+        sel = self.voice_combo.GetSelection()
+        voice = self.voice_combo.GetClientData(sel) if sel >= 0 else None
+        if not voice:
+            return None
+        return (voice.get("tts"), voice.get("language"),
+                voice.get("variant"), voice.get("voice"))
+
+    def _restore_selection(self, prev):
+        if not prev:
+            return
+        tts_id, lang, variant, voice_id = prev
+
+        def _cd(combo, index):
+            return combo.GetClientData(index) if index >= 0 else None
+
+        for i in range(self.tts_combo.GetCount()):
+            if _cd(self.tts_combo, i) == tts_id:
+                self.tts_combo.SetSelection(i)
+                self._on_tts(None)
+                break
+        else:
+            return
+        for i in range(self.lang_combo.GetCount()):
+            key = _cd(self.lang_combo, i)
+            if key and key[0] == tts_id and key[1] == lang:
+                self.lang_combo.SetSelection(i)
+                self._on_lang(None)
+                break
+        else:
+            return
+        for i in range(self.variant_combo.GetCount()):
+            key = _cd(self.variant_combo, i)
+            if key and key[0] == tts_id and key[1] == lang and key[2] == variant:
+                self.variant_combo.SetSelection(i)
+                self._on_variant(None)
+                break
+        else:
+            return
+        for i in range(self.voice_combo.GetCount()):
+            voice = _cd(self.voice_combo, i)
+            if voice and voice.get("voice") == voice_id:
+                self.voice_combo.SetSelection(i)
+                break
+        self._update_detail()
+
     def refresh(self):
         self._voices = self.store.installed_voices()
         # Inject pip-installed TTS voices (e.g. OmniVoice) that don't go
@@ -398,6 +453,17 @@ class AvailablePanel(_ManagerPanel):
                     "model_dir": voice.get("model_dir", ""),
                 }
             )
+        # Universal OmniVoice voice library: created voices are engine
+        # agnostic, so register them under every installed OmniVoice engine.
+        try:
+            from ..omnivoice import voice_store  # noqa: PLC0415
+            if voice_store.omni_custom_voices(self.store):
+                installed = voice_store.engine_ids_installed()
+                self._voices.extend(
+                    voice_store.consumer_entries(self.store, installed)
+                )
+        except Exception:  # noqa: BLE001
+            pass
         groups: dict = {}
         for v in self._voices:
             key = (v["tts"], v["language"], v["variant"])

@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Appendix A: Python Quick Reference - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Appendices</div><ul class="chapters"><li><a href="appendix_a_reference.html" class="active">A: Reference</a></li><li><a href="appendix_b_api.html">B: API</a></li><li><a href="appendix_c_glossary.html">C: Glossary</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Appendix A</div>
+<h1>Python Quick Reference</h1>
+
+<h2>A.1 Data Types</h2>
+
+<table>
+  <thead><tr><th>Type</th><th>Example</th><th>Mutable?</th></tr></thead>
+  <tbody>
+    <tr><td><code>int</code></td><td><code>42</code></td><td>No</td></tr>
+    <tr><td><code>float</code></td><td><code>3.14</code></td><td>No</td></tr>
+    <tr><td><code>str</code></td><td><code>"hello"</code></td><td>No</td></tr>
+    <tr><td><code>bool</code></td><td><code>True</code>, <code>False</code></td><td>No</td></tr>
+    <tr><td><code>list</code></td><td><code>[1, 2, 3]</code></td><td>Yes</td></tr>
+    <tr><td><code>tuple</code></td><td><code>(1, 2, 3)</code></td><td>No</td></tr>
+    <tr><td><code>dict</code></td><td><code>{"a": 1}</code></td><td>Yes</td></tr>
+    <tr><td><code>set</code></td><td><code>{1, 2, 3}</code></td><td>Yes</td></tr>
+    <tr><td><code>None</code></td><td><code>None</code></td><td>No</td></tr>
+  </tbody>
+</table>
+
+<h2>A.2 String Methods</h2>
+
+<table>
+  <thead><tr><th>Method</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>s.upper()</code></td><td>Convert to uppercase</td></tr>
+    <tr><td><code>s.lower()</code></td><td>Convert to lowercase</td></tr>
+    <tr><td><code>s.strip()</code></td><td>Remove leading/trailing whitespace</td></tr>
+    <tr><td><code>s.split(sep)</code></td><td>Split into list</td></tr>
+    <tr><td><code>s.join(list)</code></td><td>Join list with separator</td></tr>
+    <tr><td><code>s.replace(old, new)</code></td><td>Replace substring</td></tr>
+    <tr><td><code>s.find(sub)</code></td><td>Find index (or -1)</td></tr>
+    <tr><td><code>s.startswith(prefix)</code></td><td>Check prefix</td></tr>
+    <tr><td><code>s.endswith(suffix)</code></td><td>Check suffix</td></tr>
+    <tr><td><code>s.format(**kwargs)</code></td><td>Format string</td></tr>
+  </tbody>
+</table>
+
+<h2>A.3 List Methods</h2>
+
+<table>
+  <thead><tr><th>Method</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>lst.append(x)</code></td><td>Add to end</td></tr>
+    <tr><td><code>lst.extend(iterable)</code></td><td>Extend with iterable</td></tr>
+    <tr><td><code>lst.insert(i, x)</code></td><td>Insert at index</td></tr>
+    <tr><td><code>lst.remove(x)</code></td><td>Remove first occurrence</td></tr>
+    <tr><td><code>lst.pop(i)</code></td><td>Remove and return at index</td></tr>
+    <tr><td><code>lst.sort()</code></td><td>Sort in place</td></tr>
+    <tr><td><code>lst.reverse()</code></td><td>Reverse in place</td></tr>
+    <tr><td><code>lst.copy()</code></td><td>Shallow copy</td></tr>
+  </tbody>
+</table>
+
+<h2>A.4 Dict Methods</h2>
+
+<table>
+  <thead><tr><th>Method</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>d.get(key, default)</code></td><td>Get with default</td></tr>
+    <tr><td><code>d.keys()</code></td><td>All keys</td></tr>
+    <tr><td><code>d.values()</code></td><td>All values</td></tr>
+    <tr><td><code>d.items()</code></td><td>All key-value pairs</td></tr>
+    <tr><td><code>d.update(other)</code></td><td>Merge dicts</td></tr>
+    <tr><td><code>d.pop(key)</code></td><td>Remove and return</td></tr>
+    <tr><td><code>d.setdefault(key, val)</code></td><td>Get or set default</td></tr>
+  </tbody>
+</table>
+
+<h2>A.5 Built-in Functions</h2>
+
+<table>
+  <thead><tr><th>Function</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>len(x)</code></td><td>Length</td></tr>
+    <tr><td><code>type(x)</code></td><td>Type</td></tr>
+    <tr><td><code>isinstance(x, T)</code></td><td>Type check</td></tr>
+    <tr><td><code>range(n)</code></td><td>Number sequence</td></tr>
+    <tr><td><code>enumerate(lst)</code></td><td>Index + value pairs</td></tr>
+    <tr><td><code>zip(a, b)</code></td><td>Parallel iteration</td></tr>
+    <tr><td><code>map(fn, iterable)</code></td><td>Apply function</td></tr>
+    <tr><td><code>filter(fn, iterable)</code></td><td>Filter elements</td></tr>
+    <tr><td><code>sorted(iterable)</code></td><td>Return sorted list</td></tr>
+    <tr><td><code>any(iterable)</code></td><td>True if any element is truthy</td></tr>
+    <tr><td><code>all(iterable)</code></td><td>True if all elements are truthy</td></tr>
+    <tr><td><code>sum(iterable)</code></td><td>Sum of elements</td></tr>
+    <tr><td><code>min/max(iterable)</code></td><td>Minimum/maximum</td></tr>
+    <tr><td><code>abs(x)</code></td><td>Absolute value</td></tr>
+    <tr><td><code>round(x, n)</code></td><td>Round to n decimals</td></tr>
+  </tbody>
+</table>
+
+<h2>A.6 f-string Format Specifiers</h2>
+
+<table>
+  <thead><tr><th>Spec</th><th>Description</th><th>Example</th></tr></thead>
+  <tbody>
+    <tr><td><code>:.2f</code></td><td>2 decimal places</td><td><code>f"{3.14:.2f}"</code> → <code>3.14</code></td></tr>
+    <tr><td><code>:d</code></td><td>Decimal integer</td><td><code>f"{42:d}"</code> → <code>42</code></td></tr>
+    <tr><td><code>:05d</code></td><td>Zero-padded</td><td><code>f"{42:05d}"</code> → <code>00042</code></td></tr>
+    <tr><td><code>:,</code></td><td>Thousands separator</td><td><code>f"{1000000:,}"</code> → <code>1,000,000</code></td></tr>
+    <tr><td><code>:.1%</code></td><td>Percentage</td><td><code>f"{0.857:.1%}"</code> → <code>85.7%</code></td></tr>
+    <tr><td><code>:>10</code></td><td>Right-align</td><td><code>f"{'hi':>10}"</code> → <code>        hi</code></td></tr>
+    <tr><td><code>:^10</code></td><td>Center</td><td><code>f"{'hi':^10}"</code> → <code>    hi    </code></td></tr>
+    <tr><td><code>:=</code></td><td>Debug expression</td><td><code>f"{x = }"</code> → <code>x = 42</code></td></tr>
+  </tbody>
+</table>
+
+<h2>A.7 Common Patterns</h2>
+
+<pre><code><span class="cm"># Conditional assignment</span>
+x = value <span class="kw">if</span> condition <span class="kw">else</span> default
+
+<span class="cm"># Dictionary comprehension</span>
+{key: value <span class="kw">for</span> item <span class="kw">in</span> iterable}
+
+<span class="cm"># List comprehension with filter</span>
+[x <span class="kw">for</span> x <span class="kw">in</span> iterable <span class="kw">if</span> predicate(x)]
+
+<span class="cm"># Generator expression</span>
+sum(x <span class="kw">for</span> x <span class="kw">in</span> iterable)
+
+<span class="cm"># Ternary with collections</span>
+first = next((x <span class="kw">for</span> x <span class="kw">in</span> lst <span class="kw">if</span> pred(x)), <span class="kw">None</span>)
+
+<span class="cm"># Swap variables</span>
+a, b = b, a
+
+<span class="cm"># Unpack with ignore</span>
+first, *_, last = [1, 2, 3, 4, 5]</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Conditional assignment</code>
+        <br><span class="desc">A comment explaining: <em>Conditional assignment</em>. Comments are ignored by the Python interpreter and are used for documentation.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>x = value if condition else default</code>
+        <br><span class="desc">Assigns the expression <code>value if condition else default</code> to the variable <code>x</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># Dictionary comprehension</code>
+        <br><span class="desc">A comment explaining: <em>Dictionary comprehension</em>. Comments are ignored by the Python interpreter and are used for documentation.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>{key: value for item in iterable}</code>
+        <br><span class="desc"><code>{key: value for item in iterable}</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># List comprehension with filter</code>
+        <br><span class="desc">A comment explaining: <em>List comprehension with filter</em>. Comments are ignored by the Python interpreter and are used for documentation.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>[x for x in iterable if predicate(x)]</code>
+        <br><span class="desc"><code>[x for x in iterable if predicate(x)]</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># Generator expression</code>
+        <br><span class="desc">A comment explaining: <em>Generator expression</em>. Comments are ignored by the Python interpreter and are used for documentation.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>sum(x for x in iterable)</code>
+        <br><span class="desc"><code>sum(x for x in iterable)</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code># Ternary with collections</code>
+        <br><span class="desc">A comment explaining: <em>Ternary with collections</em>. Comments are ignored by the Python interpreter and are used for documentation.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>first = next((x for x in lst if pred(x)), None)</code>
+        <br><span class="desc">Assigns <code>None</code> to <code>first</code>, indicating no value or an uninitialized state.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># Swap variables</code>
+        <br><span class="desc">A comment explaining: <em>Swap variables</em>. Comments are ignored by the Python interpreter and are used for documentation.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>a, b = b, a</code>
+        <br><span class="desc"><code>a, b = b, a</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code># Unpack with ignore</code>
+        <br><span class="desc">A comment explaining: <em>Unpack with ignore</em>. Comments are ignored by the Python interpreter and are used for documentation.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>first, *_, last = [1, 2, 3, 4, 5]</code>
+        <br><span class="desc"><code>first, *_, last = [1, 2, 3, 4, 5]</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+<hr>
+
+<p style="text-align: center;">
+  <a href="ch72_roadmap.html">← Ch 72</a> &nbsp;|&nbsp;
+  <a href="appendix_b_api.html">Appendix B →</a>
+</p>
+
+</div></div></body>
+</html>

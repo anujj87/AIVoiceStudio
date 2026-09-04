@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 28: Sizers &amp; Layout - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part IV — wxPython</div><ul class="chapters"><li><a href="ch27_wxpython_intro.html">Ch 27</a></li><li><a href="ch28_sizers_layout.html" class="active">Ch 28: Sizers</a></li><li><a href="ch29_controls.html">Ch 29</a></li><li><a href="ch30_events.html">Ch 30</a></li><li><a href="ch31_dialogs.html">Ch 31</a></li><li><a href="ch32_custom_drawing.html">Ch 32</a></li><li><a href="ch33_threading_gui.html">Ch 33</a></li><li><a href="ch34_accessibility.html">Ch 34</a></li><li><a href="ch35_themes.html">Ch 35</a></li><li><a href="ch36_wx_adv.html">Ch 36</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 28</div>
+<h1>Sizers &amp; Layout</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand wxPython's layout system (sizers)</li>
+  <li>Use BoxSizer, FlexGridSizer, and GridSizer</li>
+  <li>See layout patterns in AIVS dialogs</li>
+</ul>
+
+<hr>
+
+<h2>28.1 Why Sizers?</h2>
+
+<p>wxPython does not use absolute positioning. Instead, <strong>sizers</strong> automatically arrange widgets, handling resizing, padding, and alignment.</p>
+
+<hr>
+
+<h2>28.2 BoxSizer — The Most Common</h2>
+
+<pre><code><span class="cm"># Vertical layout (widgets stack top to bottom)</span>
+sizer = wx.BoxSizer(wx.VERTICAL)
+sizer.Add(label, <span class="num">0</span>, wx.ALL, <span class="num">10</span>)       <span class="cm"># 0 = don't expand</span>
+sizer.Add(text_ctrl, <span class="num">1</span>, wx.EXPAND | wx.ALL, <span class="num">5</span>)  <span class="cm"># 1 = expand proportionally</span>
+sizer.Add(button, <span class="num">0</span>, wx.ALIGN_RIGHT | wx.ALL, <span class="num">5</span>)
+
+<span class="cm"># Horizontal layout (widgets go left to right)</span>
+hbox = wx.BoxSizer(wx.HORIZONTAL)
+hbox.Add(start_btn, <span class="num">0</span>, wx.ALL, <span class="num">4</span>)
+hbox.Add(pause_btn, <span class="num">0</span>, wx.ALL, <span class="num">4</span>)
+hbox.Add(stop_btn, <span class="num">0</span>, wx.ALL, <span class="num">4</span>)
+
+<span class="cm"># Add with proportion, flags, and border</span>
+sizer.Add(
+    widget,
+    proportion=<span class="num">1</span>,        <span class="cm"># Relative size (0=fixed, 1=shares space)</span>
+    flag=wx.EXPAND | wx.ALL,  <span class="cm"># Behavior</span>
+    border=<span class="num">10</span>,            <span class="cm"># Border width in pixels</span>
+)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Vertical layout (widgets stack top to bottom)</code>
+        <br><span class="desc">A comment: <em>Vertical layout (widgets stack top to bottom)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>sizer = wx.BoxSizer(wx.VERTICAL)</code>
+        <br><span class="desc">Creates a layout manager that arranges children horizontally (HORIZONTAL) or vertically (VERTICAL).</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>sizer.Add(label, 0, wx.ALL, 10)       # 0 = don&#x27;t expand</code>
+        <br><span class="desc">Adds a child window to the sizer. Parameters: window, proportion, flags, border. Flags control alignment and padding.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>sizer.Add(text_ctrl, 1, wx.EXPAND | wx.ALL, 5)  # 1 = expand proportionally</code>
+        <br><span class="desc">Adds a child window to the sizer. Parameters: window, proportion, flags, border. Flags control alignment and padding.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>sizer.Add(button, 0, wx.ALIGN_RIGHT | wx.ALL, 5)</code>
+        <br><span class="desc">Flag: aligns the widget to the right of the sizer cell.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># Horizontal layout (widgets go left to right)</code>
+        <br><span class="desc">A comment: <em>Horizontal layout (widgets go left to right)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>hbox = wx.BoxSizer(wx.HORIZONTAL)</code>
+        <br><span class="desc">Creates a layout manager that arranges children horizontally (HORIZONTAL) or vertically (VERTICAL).</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>hbox.Add(start_btn, 0, wx.ALL, 4)</code>
+        <br><span class="desc">Border flag: adds a border on all four sides of the widget.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>hbox.Add(pause_btn, 0, wx.ALL, 4)</code>
+        <br><span class="desc">Border flag: adds a border on all four sides of the widget.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>hbox.Add(stop_btn, 0, wx.ALL, 4)</code>
+        <br><span class="desc">Border flag: adds a border on all four sides of the widget.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># Add with proportion, flags, and border</code>
+        <br><span class="desc">A comment: <em>Add with proportion, flags, and border</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>sizer.Add(</code>
+        <br><span class="desc">Adds a child window to the sizer. Parameters: window, proportion, flags, border. Flags control alignment and padding.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>widget,</code>
+        <br><span class="desc"><code>widget,</code></span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>proportion=1,        # Relative size (0=fixed, 1=shares space)</code>
+        <br><span class="desc">Assigns <code>1,        # Relative size (0=fixed, 1=shares space)</code> to <code>proportion</code>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>flag=wx.EXPAND | wx.ALL,  # Behavior</code>
+        <br><span class="desc">Flag: the widget stretches to fill the sizer's available space.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>border=10,            # Border width in pixels</code>
+        <br><span class="desc">Assigns <code>10,            # Border width in pixels</code> to <code>border</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>Sizer Flags</h3>
+
+<table>
+  <thead><tr><th>Flag</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>wx.EXPAND</code></td><td>Widget fills available space</td></tr>
+    <tr><td><code>wx.ALL</code></td><td>Border on all sides</td></tr>
+    <tr><td><code>wx.LEFT/wx.RIGHT/wx.TOP/wx.BOTTOM</code></td><td>Border on specific sides</td></tr>
+    <tr><td><code>wx.ALIGN_CENTER</code></td><td>Center in available space</td></tr>
+    <tr><td><code>wx.ALIGN_RIGHT</code></td><td>Align to right</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h2>28.3 FlexGridSizer — For Form Layouts</h2>
+
+<pre><code><span class="cm"># From AIVS settings — label-control grid layout</span>
+grid = wx.FlexGridSizer(cols=<span class="num">2</span>, vgap=<span class="num">6</span>, hgap=<span class="num">8</span>)
+grid.AddGrowableCol(<span class="num">1</span>)  <span class="cm"># Column 1 (control) stretches</span>
+
+<span class="cm"># Label + control pairs</span>
+grid.Add(
+    wx.StaticText(self, label=<span class="str">"TTS engine:"</span>),
+    <span class="num">0</span>, wx.ALIGN_CENTER_VERTICAL | wx.LEFT | wx.RIGHT, <span class="num">2</span>,
+)
+grid.Add(
+    wx.ComboBox(self, style=wx.CB_READONLY),
+    <span class="num">1</span>, wx.EXPAND | wx.LEFT | wx.RIGHT, <span class="num">2</span>,
+)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From AIVS settings — label-control grid layout</code>
+        <br><span class="desc">A comment: <em>From AIVS settings — label-control grid layout</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>grid = wx.FlexGridSizer(cols=2, vgap=6, hgap=8)</code>
+        <br><span class="desc">Like GridSizer but rows/columns can have different sizes.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>grid.AddGrowableCol(1)  # Column 1 (control) stretches</code>
+        <br><span class="desc"><code>grid.AddGrowableCol(1)  # Column 1 (control) stretches</code></span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># Label + control pairs</code>
+        <br><span class="desc">A comment: <em>Label + control pairs</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>grid.Add(</code>
+        <br><span class="desc"><code>grid.Add(</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>wx.StaticText(self, label=&quot;TTS engine:&quot;),</code>
+        <br><span class="desc">Creates a non-editable text label.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>0, wx.ALIGN_CENTER_VERTICAL | wx.LEFT | wx.RIGHT, 2,</code>
+        <br><span class="desc">Flag: centers the widget vertically.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>grid.Add(</code>
+        <br><span class="desc"><code>grid.Add(</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>wx.ComboBox(self, style=wx.CB_READONLY),</code>
+        <br><span class="desc">ComboBox style: prevents typing custom values.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>1, wx.EXPAND | wx.LEFT | wx.RIGHT, 2,</code>
+        <br><span class="desc">Flag: the widget stretches to fill the sizer's available space.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>28.4 Layout in AIVS Recording Dialog</h2>
+
+<pre><code><span class="cm"># From recording_dialog.py — nested sizer layout</span>
+<span class="kw">def</span> <span class="fn">_build_ui</span>(self):
+    sizer = wx.BoxSizer(wx.VERTICAL)
+
+    <span class="cm"># Title</span>
+    title = wx.StaticText(self, label=<span class="str">f"Project: </span>{title_text}<span class="str">"</span>)
+    sizer.Add(title, <span class="num">0</span>, wx.ALL, <span class="num">6</span>)
+
+    <span class="cm"># Text preview</span>
+    self.text_preview = wx.TextCtrl(
+        self, style=wx.TE_MULTILINE | wx.TE_READONLY, size=(-<span class="num">1</span>, <span class="num">130</span>),
+    )
+    sizer.Add(self.text_preview, <span class="num">0</span>, wx.EXPAND | wx.LEFT | wx.RIGHT, <span class="num">6</span>)
+
+    <span class="cm"># Model selectors (grid layout)</span>
+    grid = wx.FlexGridSizer(cols=<span class="num">2</span>, vgap=<span class="num">6</span>, hgap=<span class="num">8</span>)
+    grid.AddGrowableCol(<span class="num">1</span>)
+    add_labeled(self, grid, <span class="str">"TTS engine"</span>, self.tts_combo)
+    add_labeled(self, grid, <span class="str">"Language"</span>, self.lang_combo)
+    add_labeled(self, grid, <span class="str">"Voice"</span>, self.voice_combo)
+    sizer.Add(grid, <span class="num">0</span>, wx.EXPAND | wx.ALL, <span class="num">6</span>)
+
+    <span class="cm"># Buttons (horizontal)</span>
+    btns = wx.BoxSizer(wx.HORIZONTAL)
+    btns.Add(self.start_btn, <span class="num">0</span>, wx.ALL, <span class="num">4</span>)
+    btns.Add(self.pause_btn, <span class="num">0</span>, wx.ALL, <span class="num">4</span>)
+    btns.Add(self.stop_btn, <span class="num">0</span>, wx.ALL, <span class="num">4</span>)
+    sizer.Add(btns, <span class="num">0</span>, wx.LEFT, <span class="num">2</span>)
+
+    <span class="cm"># Progress bar (expands horizontally)</span>
+    self.gauge = wx.Gauge(self, range=<span class="num">100</span>, size=(-<span class="num">1</span>, <span class="num">22</span>))
+    sizer.Add(self.gauge, <span class="num">0</span>, wx.EXPAND | wx.ALL, <span class="num">6</span>)
+
+    self.SetSizer(sizer)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From recording_dialog.py — nested sizer layout</code>
+        <br><span class="desc">A comment: <em>From recording_dialog.py — nested sizer layout</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def _build_ui(self):</code>
+        <br><span class="desc">Defines function <code>_build_ui</code> accepting (self).</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>sizer = wx.BoxSizer(wx.VERTICAL)</code>
+        <br><span class="desc">Creates a layout manager that arranges children horizontally (HORIZONTAL) or vertically (VERTICAL).</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># Title</code>
+        <br><span class="desc">A comment: <em>Title</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>title = wx.StaticText(self, label=f&quot;Project: {title_text}&quot;)</code>
+        <br><span class="desc">Creates a non-editable text label.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>sizer.Add(title, 0, wx.ALL, 6)</code>
+        <br><span class="desc">Adds a child window to the sizer. Parameters: window, proportion, flags, border. Flags control alignment and padding.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># Text preview</code>
+        <br><span class="desc">A comment: <em>Text preview</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>self.text_preview = wx.TextCtrl(</code>
+        <br><span class="desc">Creates a text input control. Can be single-line (for paths) or multi-line (for text display).</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>self, style=wx.TE_MULTILINE | wx.TE_READONLY, size=(-1, 130),</code>
+        <br><span class="desc">TextCtrl style: enables multi-line text input.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>sizer.Add(self.text_preview, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 6)</code>
+        <br><span class="desc">Adds a child window to the sizer. Parameters: window, proportion, flags, border. Flags control alignment and padding.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code># Model selectors (grid layout)</code>
+        <br><span class="desc">A comment: <em>Model selectors (grid layout)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>grid = wx.FlexGridSizer(cols=2, vgap=6, hgap=8)</code>
+        <br><span class="desc">Like GridSizer but rows/columns can have different sizes.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>grid.AddGrowableCol(1)</code>
+        <br><span class="desc"><code>grid.AddGrowableCol(1)</code></span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>add_labeled(self, grid, &quot;TTS engine&quot;, self.tts_combo)</code>
+        <br><span class="desc">Calls function <code>add_labeled()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>add_labeled(self, grid, &quot;Language&quot;, self.lang_combo)</code>
+        <br><span class="desc">Calls function <code>add_labeled()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>add_labeled(self, grid, &quot;Voice&quot;, self.voice_combo)</code>
+        <br><span class="desc">Calls function <code>add_labeled()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>sizer.Add(grid, 0, wx.EXPAND | wx.ALL, 6)</code>
+        <br><span class="desc">Adds a child window to the sizer. Parameters: window, proportion, flags, border. Flags control alignment and padding.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code># Buttons (horizontal)</code>
+        <br><span class="desc">A comment: <em>Buttons (horizontal)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>btns = wx.BoxSizer(wx.HORIZONTAL)</code>
+        <br><span class="desc">Creates a layout manager that arranges children horizontally (HORIZONTAL) or vertically (VERTICAL).</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>btns.Add(self.start_btn, 0, wx.ALL, 4)</code>
+        <br><span class="desc">Border flag: adds a border on all four sides of the widget.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>btns.Add(self.pause_btn, 0, wx.ALL, 4)</code>
+        <br><span class="desc">Border flag: adds a border on all four sides of the widget.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>btns.Add(self.stop_btn, 0, wx.ALL, 4)</code>
+        <br><span class="desc">Border flag: adds a border on all four sides of the widget.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>sizer.Add(btns, 0, wx.LEFT, 2)</code>
+        <br><span class="desc">Adds a child window to the sizer. Parameters: window, proportion, flags, border. Flags control alignment and padding.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code># Progress bar (expands horizontally)</code>
+        <br><span class="desc">A comment: <em>Progress bar (expands horizontally)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>self.gauge = wx.Gauge(self, range=100, size=(-1, 22))</code>
+        <br><span class="desc">Creates a progress bar control. Shows download and synthesis progress.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>sizer.Add(self.gauge, 0, wx.EXPAND | wx.ALL, 6)</code>
+        <br><span class="desc">Adds a child window to the sizer. Parameters: window, proportion, flags, border. Flags control alignment and padding.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>self.SetSizer(sizer)</code>
+        <br><span class="desc">Calls <code>self.SetSizer()</code>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>28.5 Key Takeaways</h2>
+<ul>
+  <li><strong>BoxSizer</strong> for linear layouts (vertical/horizontal)</li>
+  <li><strong>FlexGridSizer</strong> for form-style layouts (label + control pairs)</li>
+  <li><strong>Proportion</strong> controls how space is shared (0 = fixed, 1+ = proportional)</li>
+  <li><strong>Flags</strong> control alignment, expansion, and borders</li>
+  <li>Nest sizers for complex layouts</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch27_wxpython_intro.html">← Ch 27</a> &nbsp;|&nbsp; <a href="ch29_controls.html">Ch 29 — Controls →</a></p>
+</div></div></body>
+</html>

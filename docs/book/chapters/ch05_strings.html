@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 5: Strings &amp; Formatting - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2><div class="part-header">Part I</div><ul class="chapters"><li><a href="ch01_introduction.html">Ch 1</a></li><li><a href="ch02_variables.html">Ch 2</a></li><li><a href="ch03_control_flow.html">Ch 3</a></li><li><a href="ch04_functions.html">Ch 4</a></li><li><a href="ch05_strings.html" class="active">Ch 5: Strings</a></li><li><a href="ch06_collections.html">Ch 6</a></li><li><a href="ch07_file_io.html">Ch 7</a></li><li><a href="ch08_error_handling.html">Ch 8</a></li><li><a href="ch09_modules.html">Ch 9</a></li><li><a href="ch10_oop_basics.html">Ch 10</a></li></ul></nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 5</div>
+<h1>Strings &amp; Formatting</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Master string methods for manipulation, searching, and transformation</li>
+  <li>Learn advanced f-string formatting with format specifiers</li>
+  <li>Understand Unicode, encoding, and raw strings</li>
+  <li>Apply string processing to TTS text preparation in AIVS</li>
+</ul>
+
+<hr>
+
+<h2>5.1 String Creation Review</h2>
+
+<pre><code><span class="cm"># Single and double quotes are equivalent</span>
+s1 = <span class="str">'hello'</span>
+s2 = <span class="str">"hello"</span>
+
+<span class="cm"># Triple quotes for multi-line strings</span>
+text = <span class="str">"""This is
+a multi-line
+string."""</span>
+
+<span class="cm"># Escape sequences</span>
+s = <span class="str">"Line 1\nLine 2\tTabbed"</span>
+s = <span class="str">"She said \"hello\""</span>
+s = <span class="str">"Path: C:\\Users\\doc.txt"</span>
+
+<span class="cm"># Raw strings (no escape processing)</span>
+path = <span class="str">r"C:\Users\doc.txt"</span>        <span class="cm"># Backslashes are literal</span>
+regex = <span class="str">r"\d+\.\d+"</span>                <span class="cm"># Regex patterns</span>
+
+<span class="cm"># Bytes vs strings</span>
+text = <span class="str">"hello"</span>            <span class="cm"># str (Unicode)</span>
+data = <span class="str">b"hello"</span>           <span class="cm"># bytes (raw bytes)</span>
+encoded = text.encode(<span class="str">"utf-8"</span>)  <span class="cm"># str → bytes</span>
+decoded = data.decode(<span class="str">"utf-8"</span>)  <span class="cm"># bytes → str</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Single and double quotes are equivalent</code>
+        <br><span class="desc">A comment: <em>Single and double quotes are equivalent</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>s1 = &#x27;hello&#x27;</code>
+        <br><span class="desc">Assigns <code>&#x27;hello&#x27;</code> to <code>s1</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>s2 = &quot;hello&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;hello&quot;</code> to <code>s2</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># Triple quotes for multi-line strings</code>
+        <br><span class="desc">A comment: <em>Triple quotes for multi-line strings</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>text = &quot;&quot;&quot;This is</code>
+        <br><span class="desc">Assigns <code>&quot;&quot;&quot;This is</code> to <code>text</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>a multi-line</code>
+        <br><span class="desc"><code>a multi-line</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>string.&quot;&quot;&quot;</code>
+        <br><span class="desc"><code>string.&quot;&quot;&quot;</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># Escape sequences</code>
+        <br><span class="desc">A comment: <em>Escape sequences</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>s = &quot;Line 1\nLine 2\tTabbed&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;Line 1\nLine 2\tTabbed&quot;</code> to <code>s</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>s = &quot;She said \&quot;hello\&quot;&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;She said \&quot;hello\&quot;&quot;</code> to <code>s</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>s = &quot;Path: C:\\Users\\doc.txt&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;Path: C:\\Users\\doc.txt&quot;</code> to <code>s</code>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code># Raw strings (no escape processing)</code>
+        <br><span class="desc">A comment: <em>Raw strings (no escape processing)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>path = r&quot;C:\Users\doc.txt&quot;        # Backslashes are literal</code>
+        <br><span class="desc">Assigns <code>r&quot;C:\Users\doc.txt&quot;        # Backslashes are literal</code> to <code>path</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>regex = r&quot;\d+\.\d+&quot;                # Regex patterns</code>
+        <br><span class="desc">Assigns <code>r&quot;\d+\.\d+&quot;                # Regex patterns</code> to <code>regex</code>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code># Bytes vs strings</code>
+        <br><span class="desc">A comment: <em>Bytes vs strings</em>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>text = &quot;hello&quot;            # str (Unicode)</code>
+        <br><span class="desc">Assigns <code>&quot;hello&quot;            # str (Unicode)</code> to <code>text</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>data = b&quot;hello&quot;           # bytes (raw bytes)</code>
+        <br><span class="desc">Assigns <code>b&quot;hello&quot;           # bytes (raw bytes)</code> to <code>data</code>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>encoded = text.encode(&quot;utf-8&quot;)  # str → bytes</code>
+        <br><span class="desc">Encodes the string to bytes using the specified encoding (default UTF-8).</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>decoded = data.decode(&quot;utf-8&quot;)  # bytes → str</code>
+        <br><span class="desc">Assigns <code>data.decode(&quot;utf-8&quot;)  # bytes → str</code> to <code>decoded</code>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>5.2 Essential String Methods</h2>
+
+<h3>Case Methods</h3>
+
+<pre><code>s = <span class="str">"Hello, AI Voice Studio!"</span>
+<span class="kw">print</span>(s.upper())         <span class="cm"># "HELLO, AI VOICE STUDIO!"</span>
+<span class="kw">print</span>(s.lower())         <span class="cm"># "hello, ai voice studio!"</span>
+<span class="kw">print</span>(s.title())         <span class="cm"># "Hello, Ai Voice Studio!"</span>
+<span class="kw">print</span>(s.capitalize())    <span class="cm"># "Hello, ai voice studio!"</span>
+<span class="kw">print</span>(s.swapcase())      <span class="cm"># "hELLO, ai voice studio!"</span>
+<span class="kw">print</span>(s.casefold())      <span class="cm"># Like lower(), but more aggressive</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>s = &quot;Hello, AI Voice Studio!&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;Hello, AI Voice Studio!&quot;</code> to <code>s</code>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>print(s.upper())         # &quot;HELLO, AI VOICE STUDIO!&quot;</code>
+        <br><span class="desc">Converts all characters to uppercase. Returns a new string (strings are immutable).</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>print(s.lower())         # &quot;hello, ai voice studio!&quot;</code>
+        <br><span class="desc">Converts all characters to lowercase. Returns a new string.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>print(s.title())         # &quot;Hello, Ai Voice Studio!&quot;</code>
+        <br><span class="desc">Capitalizes the first letter of each word.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>print(s.capitalize())    # &quot;Hello, ai voice studio!&quot;</code>
+        <br><span class="desc">Capitalizes the first letter of the string.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>print(s.swapcase())      # &quot;hELLO, ai voice studio!&quot;</code>
+        <br><span class="desc">Swaps case of each character.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>print(s.casefold())      # Like lower(), but more aggressive</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>Search and Test Methods</h3>
+
+<pre><code>s = <span class="str">"The quick brown fox jumps over the lazy dog"</span>
+
+<span class="cm"># Finding positions</span>
+<span class="kw">print</span>(s.find(<span class="str">"fox"</span>))        <span class="cm"># 16 (index of first occurrence)</span>
+<span class="kw">print</span>(s.find(<span class="str">"fox"</span>, <span class="num">20</span>))    <span class="cm"># -1 (not found after index 20)</span>
+<span class="kw">print</span>(s.rfind(<span class="str">"the"</span>))       <span class="cm"># 31 (last occurrence)</span>
+<span class="kw">print</span>(s.count(<span class="str">"the"</span>))       <span class="cm"># 2</span>
+
+<span class="cm"># Boolean tests</span>
+<span class="kw">print</span>(s.startswith(<span class="str">"The"</span>))  <span class="cm"># True</span>
+<span class="kw">print</span>(s.endswith(<span class="str">"dog"</span>))    <span class="cm"># True</span>
+<span class="kw">print</span>(s.isalpha())          <span class="cm"># False (has spaces)</span>
+<span class="kw">print</span>(<span class="str">"abc123"</span>.isalnum())   <span class="cm"># True</span>
+<span class="kw">print</span>(<span class="str">"123"</span>.isdigit())     <span class="cm"># True</span>
+<span class="kw">print</span>(<span class="str">"  \t\n"</span>.isspace())  <span class="cm"># True</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>s = &quot;The quick brown fox jumps over the lazy dog&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;The quick brown fox jumps over the lazy dog&quot;</code> to <code>s</code>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Finding positions</code>
+        <br><span class="desc">A comment: <em>Finding positions</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>print(s.find(&quot;fox&quot;))        # 16 (index of first occurrence)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>print(s.find(&quot;fox&quot;, 20))    # -1 (not found after index 20)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>print(s.rfind(&quot;the&quot;))       # 31 (last occurrence)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>print(s.count(&quot;the&quot;))       # 2</code>
+        <br><span class="desc">Returns the number of occurrences of a value.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># Boolean tests</code>
+        <br><span class="desc">A comment: <em>Boolean tests</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>print(s.startswith(&quot;The&quot;))  # True</code>
+        <br><span class="desc">Returns True if the string starts with the given prefix.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>print(s.endswith(&quot;dog&quot;))    # True</code>
+        <br><span class="desc">Returns True if the string ends with the given suffix.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>print(s.isalpha())          # False (has spaces)</code>
+        <br><span class="desc">Returns True if all characters are alphabetic.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>print(&quot;abc123&quot;.isalnum())   # True</code>
+        <br><span class="desc">Returns True if all characters are alphanumeric.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>print(&quot;123&quot;.isdigit())     # True</code>
+        <br><span class="desc">Returns True if all characters are digits.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>print(&quot;  \t\n&quot;.isspace())  # True</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>Transformation Methods</h3>
+
+<pre><code><span class="cm"># Stripping whitespace</span>
+s = <span class="str">"  hello  \n"</span>
+<span class="kw">print</span>(s.strip())     <span class="cm"># "hello"</span>
+<span class="kw">print</span>(s.lstrip())    <span class="cm"># "hello  \n"</span>
+<span class="kw">print</span>(s.rstrip())    <span class="cm"># "  hello"</span>
+
+<span class="cm"># Strip specific characters</span>
+<span class="kw">print</span>(<span class="str">"###hello###"</span>.strip(<span class="str">"#"</span>))  <span class="cm"># "hello"</span>
+
+<span class="cm"># Replacing</span>
+s = <span class="str">"Piper / en_US / medium"</span>
+<span class="kw">print</span>(s.replace(<span class="str">" / "</span>, <span class="str">"/"</span>))  <span class="cm"># "Piper/en_US/medium"</span>
+
+<span class="cm"># Splitting and joining</span>
+parts = <span class="str">"en_US/medium"</span>.split(<span class="str">"/"</span>)  <span class="cm"># ["en_US", "medium"]</span>
+joined = <span class="str">" | "</span>.join(parts)          <span class="cm"># "en_US | medium"</span>
+
+<span class="cm"># Alignment and padding</span>
+<span class="kw">print</span>(<span class="str">f"'</span>{<span class="str">'hi'</span>:<span class="num">10</span>}<span class="str">'"</span>)    <span class="cm"># 'hi        ' (left-aligned)</span>
+<span class="kw">print</span>(<span class="str">f"'</span>{<span class="str">'hi'</span>:<span class="num">^10</span>}<span class="str">'"</span>)   <span class="cm"># '    hi    ' (centered)</span>
+<span class="kw">print</span>(<span class="str">f"'</span>{<span class="str">'hi'</span>:<span class="num">>10</span>}<span class="str">'"</span>)   <span class="cm"># '        hi' (right-aligned)</span>
+<span class="kw">print</span>(<span class="str">f"'</span>{<span class="str">'hi'</span>:<span class="num">*^10</span>}<span class="str">'"</span>)  <span class="cm"># '****hi****' (fill with *)</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 4)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Stripping whitespace</code>
+        <br><span class="desc">A comment: <em>Stripping whitespace</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>s = &quot;  hello  \n&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;  hello  \n&quot;</code> to <code>s</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>print(s.strip())     # &quot;hello&quot;</code>
+        <br><span class="desc">Removes leading and trailing whitespace (or specified characters). Returns a new string.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>print(s.lstrip())    # &quot;hello  \n&quot;</code>
+        <br><span class="desc">Removes leading whitespace only.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>print(s.rstrip())    # &quot;  hello&quot;</code>
+        <br><span class="desc">Removes trailing whitespace only.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># Strip specific characters</code>
+        <br><span class="desc">A comment: <em>Strip specific characters</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>print(&quot;###hello###&quot;.strip(&quot;#&quot;))  # &quot;hello&quot;</code>
+        <br><span class="desc">Removes leading and trailing whitespace (or specified characters). Returns a new string.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># Replacing</code>
+        <br><span class="desc">A comment: <em>Replacing</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>s = &quot;Piper / en_US / medium&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;Piper / en_US / medium&quot;</code> to <code>s</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>print(s.replace(&quot; / &quot;, &quot;/&quot;))  # &quot;Piper/en_US/medium&quot;</code>
+        <br><span class="desc">Returns a copy with all occurrences of old replaced by new. Strings are immutable.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># Splitting and joining</code>
+        <br><span class="desc">A comment: <em>Splitting and joining</em>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>parts = &quot;en_US/medium&quot;.split(&quot;/&quot;)  # [&quot;en_US&quot;, &quot;medium&quot;]</code>
+        <br><span class="desc">Splits a string into a list by the given delimiter. Without arguments, splits on whitespace.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>joined = &quot; | &quot;.join(parts)          # &quot;en_US | medium&quot;</code>
+        <br><span class="desc">Joins an iterable of strings with the calling string as separator. ', '.join(['a','b']) returns 'a, b'.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code># Alignment and padding</code>
+        <br><span class="desc">A comment: <em>Alignment and padding</em>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>print(f&quot;&#x27;{&#x27;hi&#x27;:10}&#x27;&quot;)    # &#x27;hi        &#x27; (left-aligned)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>print(f&quot;&#x27;{&#x27;hi&#x27;:^10}&#x27;&quot;)   # &#x27;    hi    &#x27; (centered)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>print(f&quot;&#x27;{&#x27;hi&#x27;:&gt;10}&#x27;&quot;)   # &#x27;        hi&#x27; (right-aligned)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>print(f&quot;&#x27;{&#x27;hi&#x27;:*^10}&#x27;&quot;)  # &#x27;****hi****&#x27; (fill with *)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>5.3 Advanced f-string Formatting</h2>
+
+<table>
+  <thead><tr><th>Format Spec</th><th>Meaning</th><th>Example</th><th>Output</th></tr></thead>
+  <tbody>
+    <tr><td><code>.Nf</code></td><td>N decimal places</td><td><code>f"{3.14159:.2f}"</code></td><td><code>3.14</code></td></tr>
+    <tr><td><code>:d</code></td><td>Decimal integer</td><td><code>f"{42:d}"</code></td><td><code>42</code></td></tr>
+    <tr><td><code>:05d</code></td><td>Zero-padded int</td><td><code>f"{42:05d}"</code></td><td><code>00042</code></td></tr>
+    <tr><td><code>:,</code></td><td>Thousands separator</td><td><code>f"{1000000:,}"</code></td><td><code>1,000,000</code></td></tr>
+    <tr><td><code>:.1%</code></td><td>Percentage</td><td><code>f"{0.857:.1%}"</code></td><td><code>85.7%</code></td></tr>
+    <tr><td><code>:e</code></td><td>Scientific notation</td><td><code>f"{12345:e}"</code></td><td><code>1.2345e+04</code></td></tr>
+    <tr><td><code>:b</code></td><td>Binary</td><td><code>f"{42:b}"</code></td><td><code>101010</code></td></tr>
+    <tr><td><code>:x</code></td><td>Hex lowercase</td><td><code>f"{255:x}"</code></td><td><code>ff</code></td></tr>
+    <tr><td><code>:=+10d</code></td><td>Sign + padding</td><td><code>f"{42:=+10d}"</code></td><td><code>+       42</code></td></tr>
+  </tbody>
+</table>
+
+<pre><code><span class="cm"># Debugging with = (Python 3.8+)</span>
+voices = [<span class="str">"af"</span>, <span class="str">"am_adam"</span>]
+<span class="kw">print</span>(<span class="str">f"<span class="op">{</span>len(voices) = <span class="op">}</span>"</span>)    <span class="cm"># len(voices) = 2</span>
+<span class="kw">print</span>(<span class="str">f"<span class="op">{</span>voices[0] = <span class="op">}</span>"</span>)    <span class="cm"># voices[0] = 'af'</span>
+
+<span class="cm"># Nested quotes work seamlessly</span>
+<span class="kw">print</span>(<span class="str">f"Engine: <span class="op">{</span>'Piper' if use_piper else 'Kokoro'<span class="op">}</span>"</span>)
+
+<span class="cm"># Calling methods in f-strings</span>
+name = <span class="str">"en_US"</span>
+<span class="kw">print</span>(<span class="str">f"Language: <span class="op">{</span>name.upper()<span class="op">}</span>"</span>)  <span class="cm"># "Language: EN_US"</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 5)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Debugging with = (Python 3.8+)</code>
+        <br><span class="desc">A comment: <em>Debugging with = (Python 3.8+)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>voices = [&quot;af&quot;, &quot;am_adam&quot;]</code>
+        <br><span class="desc">Assigns <code>[&quot;af&quot;, &quot;am_adam&quot;]</code> to <code>voices</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>print(f&quot;{len(voices) = }&quot;)    # len(voices) = 2</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>print(f&quot;{voices[0] = }&quot;)    # voices[0] = &#x27;af&#x27;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># Nested quotes work seamlessly</code>
+        <br><span class="desc">A comment: <em>Nested quotes work seamlessly</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>print(f&quot;Engine: {&#x27;Piper&#x27; if use_piper else &#x27;Kokoro&#x27;}&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># Calling methods in f-strings</code>
+        <br><span class="desc">A comment: <em>Calling methods in f-strings</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>name = &quot;en_US&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;en_US&quot;</code> to <code>name</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>print(f&quot;Language: {name.upper()}&quot;)  # &quot;Language: EN_US&quot;</code>
+        <br><span class="desc">Converts all characters to uppercase. Returns a new string (strings are immutable).</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>5.4 String Slicing Deep Dive</h2>
+
+<pre><code>s = <span class="str">"AI-Voice-Studio-v2.0"</span>
+
+<span class="cm"># s[start:stop:step]</span>
+<span class="kw">print</span>(s[<span class="num">0</span>:<span class="num">2</span>])       <span class="cm"># "AI" (indices 0, 1)</span>
+<span class="kw">print</span>(s[<span class="num">3</span>:<span class="num">8</span>])       <span class="cm"># "Voice"</span>
+<span class="kw">print</span>(s[::<span class="num">2</span>])        <span class="cm"># "AVcsod.0" (every other char)</span>
+<span class="kw">print</span>(s[::-<span class="num">1</span>])       <span class="cm"># Reversed string</span>
+
+<span class="cm"># Negative indices</span>
+<span class="kw">print</span>(s[-<span class="num">3</span>:])       <span class="cm"># "2.0" (last 3 chars)</span>
+<span class="kw">print</span>(s[-<span class="num">5</span>:-<span class="num">3</span>])     <span class="cm"># "v2"</span>
+
+<span class="cm"># Practical: extract version from filename</span>
+filename = <span class="str">"AI-Voice-Studio-v2.0.1"</span>
+version_start = filename.rfind(<span class="str">"v"</span>) + <span class="num">1</span>
+version = filename[version_start:]
+<span class="kw">print</span>(version)  <span class="cm"># "2.0.1"</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 6)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>s = &quot;AI-Voice-Studio-v2.0&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;AI-Voice-Studio-v2.0&quot;</code> to <code>s</code>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># s[start:stop:step]</code>
+        <br><span class="desc">A comment: <em>s[start:stop:step]</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>print(s[0:2])       # &quot;AI&quot; (indices 0, 1)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>print(s[3:8])       # &quot;Voice&quot;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>print(s[::2])        # &quot;AVcsod.0&quot; (every other char)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>print(s[::-1])       # Reversed string</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># Negative indices</code>
+        <br><span class="desc">A comment: <em>Negative indices</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>print(s[-3:])       # &quot;2.0&quot; (last 3 chars)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>print(s[-5:-3])     # &quot;v2&quot;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code># Practical: extract version from filename</code>
+        <br><span class="desc">A comment: <em>Practical: extract version from filename</em>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>filename = &quot;AI-Voice-Studio-v2.0.1&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;AI-Voice-Studio-v2.0.1&quot;</code> to <code>filename</code>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>version_start = filename.rfind(&quot;v&quot;) + 1</code>
+        <br><span class="desc">Assigns <code>filename.rfind(&quot;v&quot;) + 1</code> to <code>version_start</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>version = filename[version_start:]</code>
+        <br><span class="desc">Assigns <code>filename[version_start:]</code> to <code>version</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>print(version)  # &quot;2.0.1&quot;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>5.5 Multi-line Strings and Text Processing</h2>
+
+<pre><code><span class="cm"># Triple-quoted strings preserve formatting</span>
+template = <span class="str">"""
+Project: {name}
+Segments: {count}
+Duration: {duration:.1f}s
+"""</span>
+<span class="kw">print</span>(template.format(name=<span class="str">"My Book"</span>, count=<span class="num">42</span>, duration=<span class="num">3600.5</span>))
+
+<span class="cm"># Text wrapping</span>
+<span class="kw">import</span> textwrap
+long_text = <span class="str">"This is a very long line that needs to be wrapped at a certain width for display purposes."</span>
+wrapped = textwrap.fill(long_text, width=<span class="num">40</span>)
+<span class="kw">print</span>(wrapped)
+
+<span class="cm"># Dedent (remove common leading whitespace)</span>
+<span class="kw">import</span> textwrap
+code = <span class="str">"""
+    if True:
+        print("hello")
+        print("world")
+"""</span>
+<span class="kw">print</span>(textwrap.dedent(code))</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 7)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Triple-quoted strings preserve formatting</code>
+        <br><span class="desc">A comment: <em>Triple-quoted strings preserve formatting</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>template = &quot;&quot;&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;&quot;&quot;</code> to <code>template</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>Project: {name}</code>
+        <br><span class="desc"><code>Project: {name}</code></span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>Segments: {count}</code>
+        <br><span class="desc"><code>Segments: {count}</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>Duration: {duration:.1f}s</code>
+        <br><span class="desc"><code>Duration: {duration:.1f}s</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>&quot;&quot;&quot;</code>
+        <br><span class="desc">Opens a docstring block for documentation.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>print(template.format(name=&quot;My Book&quot;, count=42, duration=3600.5))</code>
+        <br><span class="desc">Formats the string with positional or keyword arguments. Superseded by f-strings.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># Text wrapping</code>
+        <br><span class="desc">A comment: <em>Text wrapping</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>import textwrap</code>
+        <br><span class="desc">Imports the <code>textwrap</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>long_text = &quot;This is a very long line that needs to be wrapped at a certain width for display purposes.&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;This is a very long line that needs to be wrapped at a certain width for display purposes.&quot;</code> to <code>long_text</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>wrapped = textwrap.fill(long_text, width=40)</code>
+        <br><span class="desc">Wraps text to a given width, inserting newlines.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>print(wrapped)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code># Dedent (remove common leading whitespace)</code>
+        <br><span class="desc">A comment: <em>Dedent (remove common leading whitespace)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>import textwrap</code>
+        <br><span class="desc">Imports the <code>textwrap</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>code = &quot;&quot;&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;&quot;&quot;</code> to <code>code</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>if True:</code>
+        <br><span class="desc">Checks condition: <code>True</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>print(&quot;hello&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>print(&quot;world&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>&quot;&quot;&quot;</code>
+        <br><span class="desc">Opens a docstring block for documentation.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>print(textwrap.dedent(code))</code>
+        <br><span class="desc">Removes common leading whitespace from all lines. Useful for multi-line strings.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>5.6 Strings in TTS Processing (AIVS)</h2>
+
+<p>The TTS engine requires careful text preparation before synthesis:</p>
+
+<pre><code><span class="cm"># From documents/splitter.py — text segmentation for TTS</span>
+<span class="kw">def</span> <span class="fn">_split_sentences</span>(text: str) -> list[str]:
+    <span class="str">"""Split text into sentences for TTS processing."""</span>
+    <span class="kw">import</span> re
+    <span class="cm"># Split on sentence-ending punctuation</span>
+    sentences = re.split(<span class="str">r'(?&lt;=[.!?])\s+'</span>, text)
+    <span class="kw">return</span> [s.strip() <span class="kw">for</span> s <span class="kw">in</span> sentences <span class="kw">if</span> s.strip()]
+
+<span class="cm"># From util.py — filename sanitization</span>
+<span class="kw">def</span> <span class="fn">sanitize_filename</span>(name: str, max_length: int = <span class="num">80</span>) -> str:
+    <span class="str">"""Remove unsafe characters from filenames."""</span>
+    <span class="kw">import</span> re
+    name = re.sub(r'[&lt;&gt;:"/\\|?*]', <span class="str">'_'</span>, name)
+    name = re.sub(r'\s+', <span class="str">' '</span>, name).strip()
+    <span class="kw">if</span> len(name) > max_length:
+        name = name[:max_length].rstrip()
+    <span class="kw">return</span> name
+
+<span class="cm"># From documents/parsers.py — text normalization</span>
+<span class="kw">def</span> <span class="fn">_normalize_text</span>(text: str) -> str:
+    <span class="str">"""Normalize text for TTS processing."""</span>
+    <span class="cm"># Remove excessive whitespace</span>
+    text = re.sub(<span class="str">r'\n{3,}</span>', <span class="str">'\n\n'</span>, text)
+    <span class="cm"># Normalize Unicode</span>
+    text = text.strip()
+    <span class="kw">return</span> text
+
+<span class="cm"># From tts/catalog.py — building voice labels</span>
+<span class="kw">def</span> <span class="fn">_build_voice_label</span>(voice: dict) -> str:
+    <span class="str">"""Build a display label like 'af_bella (af_bella)'."""</span>
+    name = voice.get(<span class="str">"name"</span>, voice[<span class="str">"id"</span>])
+    voice_id = voice[<span class="str">"id"</span>]
+    <span class="kw">if</span> name != voice_id:
+        <span class="kw">return</span> <span class="str">f"</span>{name}<span class="str"> (</span>{voice_id}<span class="str">)"</span>
+    <span class="kw">return</span> name</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 8)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From documents/splitter.py — text segmentation for TTS</code>
+        <br><span class="desc">A comment: <em>From documents/splitter.py — text segmentation for TTS</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def _split_sentences(text: str) -&gt; list[str]:</code>
+        <br><span class="desc">Defines function <code>_split_sentences</code> accepting (text), returning <code>list[str]</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;&quot;&quot;Split text into sentences for TTS processing.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Split text into sentences for TTS processing.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>import re</code>
+        <br><span class="desc">Imports the <code>re</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># Split on sentence-ending punctuation</code>
+        <br><span class="desc">A comment: <em>Split on sentence-ending punctuation</em>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>sentences = re.split(r&#x27;(?&lt;=[.!?])\s+&#x27;, text)</code>
+        <br><span class="desc">Splits a string into a list by the given delimiter. Without arguments, splits on whitespace.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>return [s.strip() for s in sentences if s.strip()]</code>
+        <br><span class="desc">Removes leading and trailing whitespace (or specified characters). Returns a new string.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># From util.py — filename sanitization</code>
+        <br><span class="desc">A comment: <em>From util.py — filename sanitization</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>def sanitize_filename(name: str, max_length: int = 80) -&gt; str:</code>
+        <br><span class="desc">Defines function <code>sanitize_filename</code> accepting (name, max_length), returning <code>str</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>&quot;&quot;&quot;Remove unsafe characters from filenames.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Remove unsafe characters from filenames.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>import re</code>
+        <br><span class="desc">Imports the <code>re</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>name = re.sub(r&#x27;[&lt;&gt;:&quot;/\\|?*]&#x27;, &#x27;_&#x27;, name)</code>
+        <br><span class="desc">Replaces all matches with the replacement string.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>name = re.sub(r&#x27;\s+&#x27;, &#x27; &#x27;, name).strip()</code>
+        <br><span class="desc">Removes leading and trailing whitespace (or specified characters). Returns a new string.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>if len(name) &gt; max_length:</code>
+        <br><span class="desc">Returns the number of items in a sequence (string, list, dict, tuple). Essential for loop bounds and validation.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>name = name[:max_length].rstrip()</code>
+        <br><span class="desc">Removes trailing whitespace only.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>return name</code>
+        <br><span class="desc">Returns <code>name</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code># From documents/parsers.py — text normalization</code>
+        <br><span class="desc">A comment: <em>From documents/parsers.py — text normalization</em>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>def _normalize_text(text: str) -&gt; str:</code>
+        <br><span class="desc">Defines function <code>_normalize_text</code> accepting (text), returning <code>str</code>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>&quot;&quot;&quot;Normalize text for TTS processing.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Normalize text for TTS processing.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code># Remove excessive whitespace</code>
+        <br><span class="desc">A comment: <em>Remove excessive whitespace</em>.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>text = re.sub(r&#x27;\n{3,}&#x27;, &#x27;\n\n&#x27;, text)</code>
+        <br><span class="desc">Replaces all matches with the replacement string.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code># Normalize Unicode</code>
+        <br><span class="desc">A comment: <em>Normalize Unicode</em>.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>text = text.strip()</code>
+        <br><span class="desc">Removes leading and trailing whitespace (or specified characters). Returns a new string.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>return text</code>
+        <br><span class="desc">Returns <code>text</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code># From tts/catalog.py — building voice labels</code>
+        <br><span class="desc">A comment: <em>From tts/catalog.py — building voice labels</em>.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>def _build_voice_label(voice: dict) -&gt; str:</code>
+        <br><span class="desc">Defines function <code>_build_voice_label</code> accepting (voice), returning <code>str</code>.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>&quot;&quot;&quot;Build a display label like &#x27;af_bella (af_bella)&#x27;.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Build a display label like &#x27;af_bella (af_bella)&#x27;.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>name = voice.get(&quot;name&quot;, voice[&quot;id&quot;])</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>voice_id = voice[&quot;id&quot;]</code>
+        <br><span class="desc">Assigns <code>voice[&quot;id&quot;]</code> to <code>voice_id</code>.</span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code>if name != voice_id:</code>
+        <br><span class="desc">Checks condition: <code>name != voice_id</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 31:</strong> <code>return f&quot;{name} ({voice_id})&quot;</code>
+        <br><span class="desc">Returns <code>f&quot;{name} ({voice_id})&quot;</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 32:</strong> <code>return name</code>
+        <br><span class="desc">Returns <code>name</code> to the caller.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>5.7 Unicode and Encoding</h2>
+
+<pre><code><span class="cm"># Python 3 strings are Unicode by default</span>
+s = <span class="str">"Hello 你好 مرحبا"</span>
+<span class="kw">print</span>(len(s))  <span class="cm"># 14 characters (not bytes)</span>
+
+<span class="cm"># Encode to bytes for storage/transmission</span>
+encoded = s.encode(<span class="str">"utf-8"</span>)
+<span class="kw">print</span>(len(encoded))  <span class="cm"># 18 bytes</span>
+
+<span class="cm"># Decode back to string</span>
+decoded = encoded.decode(<span class="str">"utf-8"</span>)
+
+<span class="cm"># Unicode categories useful for text processing</span>
+<span class="kw">import</span> unicodedata
+<span class="kw">for</span> char <span class="kw">in</span> <span class="str">"AÍ"</span>:
+    <span class="kw">print</span>(<span class="str">f"</span>{char}<span class="str">: </span>{unicodedata.name(char)}<span class="str">"</span>)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 9)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Python 3 strings are Unicode by default</code>
+        <br><span class="desc">A comment: <em>Python 3 strings are Unicode by default</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>s = &quot;Hello 你好 مرحبا&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;Hello 你好 مرحبا&quot;</code> to <code>s</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>print(len(s))  # 14 characters (not bytes)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># Encode to bytes for storage/transmission</code>
+        <br><span class="desc">A comment: <em>Encode to bytes for storage/transmission</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>encoded = s.encode(&quot;utf-8&quot;)</code>
+        <br><span class="desc">Encodes the string to bytes using the specified encoding (default UTF-8).</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>print(len(encoded))  # 18 bytes</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># Decode back to string</code>
+        <br><span class="desc">A comment: <em>Decode back to string</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>decoded = encoded.decode(&quot;utf-8&quot;)</code>
+        <br><span class="desc">Assigns <code>encoded.decode(&quot;utf-8&quot;)</code> to <code>decoded</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code># Unicode categories useful for text processing</code>
+        <br><span class="desc">A comment: <em>Unicode categories useful for text processing</em>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>import unicodedata</code>
+        <br><span class="desc">Imports the <code>unicodedata</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>for char in &quot;AÍ&quot;:</code>
+        <br><span class="desc">Iterates over <code>&quot;AÍ&quot;</code>, assigning each element to <code>char</code>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>print(f&quot;{char}: {unicodedata.name(char)}&quot;)</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>5.8 Regular Expressions (Preview)</h2>
+
+<p>Python's <code>re</code> module provides powerful pattern matching. We cover it in depth in Chapter 15:</p>
+
+<pre><code><span class="kw">import</span> re
+
+<span class="cm"># Find all voice IDs</span>
+text = <span class="str">"Voices: af, am_adam, bf_emma, bm_george"</span>
+ids = re.findall(r<span class="str">'\b[a-z]+(?:_[a-z]+)*\b'</span>, text)
+<span class="kw">print</span>(ids)  <span class="cm"># ['af', 'am_adam', 'bf_emma', 'bm_george']</span>
+
+<span class="cm"># Replace multiple spaces</span>
+clean = re.sub(r<span class="str">'\s+'</span>, <span class="str">' '</span>, <span class="str">"too   many    spaces"</span>)
+<span class="kw">print</span>(clean)  <span class="cm"># "too many spaces"</span>
+
+<span class="cm"># Validate email (simple pattern)</span>
+email_re = r<span class="str">'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 10)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>import re</code>
+        <br><span class="desc">Imports the <code>re</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Find all voice IDs</code>
+        <br><span class="desc">A comment: <em>Find all voice IDs</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>text = &quot;Voices: af, am_adam, bf_emma, bm_george&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;Voices: af, am_adam, bf_emma, bm_george&quot;</code> to <code>text</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>ids = re.findall(r&#x27;\b[a-z]+(?:_[a-z]+)*\b&#x27;, text)</code>
+        <br><span class="desc">Returns all non-overlapping matches as a list of strings.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>print(ids)  # [&#x27;af&#x27;, &#x27;am_adam&#x27;, &#x27;bf_emma&#x27;, &#x27;bm_george&#x27;]</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># Replace multiple spaces</code>
+        <br><span class="desc">A comment: <em>Replace multiple spaces</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>clean = re.sub(r&#x27;\s+&#x27;, &#x27; &#x27;, &quot;too   many    spaces&quot;)</code>
+        <br><span class="desc">Replaces all matches with the replacement string.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>print(clean)  # &quot;too many spaces&quot;</code>
+        <br><span class="desc">Outputs text to the console. The primary way to display information during development and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code># Validate email (simple pattern)</code>
+        <br><span class="desc">A comment: <em>Validate email (simple pattern)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>email_re = r&#x27;^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$&#x27;</code>
+        <br><span class="desc">Assigns <code>r&#x27;^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$&#x27;</code> to <code>email_re</code>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>5.9 Key Takeaways</h2>
+
+<ul>
+  <li><strong>Strings are immutable</strong> — every method returns a new string</li>
+  <li><strong>f-strings</strong> are the preferred formatting method (concise, readable, fast)</li>
+  <li><strong>str methods</strong> cover virtually all text processing needs</li>
+  <li><strong>str.split()</strong> and <strong>str.join()</strong> are your best friends for text manipulation</li>
+  <li><strong>Unicode is built-in</strong> — Python 3 handles international text natively</li>
+  <li>The AIVS project uses string processing for <strong>text normalization</strong>, <strong>filename sanitization</strong>, and <strong>voice label formatting</strong></li>
+</ul>
+
+<div class="exercise"><strong>Exercise 5.1:</strong> Write a function that takes a filename like <code>"my great book.txt"</code> and returns <code>"my_great_book.txt"</code> (replacing spaces with underscores, lowercasing).</div>
+<div class="exercise"><strong>Exercise 5.2:</strong> Using f-strings with format specifiers, format a table showing each TTS engine's name, voice count, and license. Right-align numbers and left-align text.</div>
+
+<hr>
+<p style="text-align: center;"><a href="ch04_functions.html">← Chapter 4</a> &nbsp;|&nbsp; <a href="ch06_collections.html">Chapter 6 — Collections →</a></p>
+
+</div></div></body>
+</html>

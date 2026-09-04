@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 43: Project Architecture - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part VI — Building AIVS</div><ul class="chapters"><li><a href="ch43_architecture.html" class="active">Ch 43: Architecture</a></li><li><a href="ch44_paths_settings.html">Ch 44</a></li><li><a href="ch45_project_model.html">Ch 45</a></li><li><a href="ch46_document_parsing.html">Ch 46</a></li><li><a href="ch47_tts_catalog.html">Ch 47</a></li><li><a href="ch48_tts_engine.html">Ch 48</a></li><li><a href="ch49_downloader.html">Ch 49</a></li><li><a href="ch50_compute_detection.html">Ch 50</a></li><li><a href="ch51_main_frame.html">Ch 51</a></li><li><a href="ch52_settings_dialog.html">Ch 52</a></li><li><a href="ch53_model_panels.html">Ch 53</a></li><li><a href="ch54_new_project_wizard.html">Ch 54</a></li><li><a href="ch55_recording.html">Ch 55</a></li><li><a href="ch56_synthesis_worker.html">Ch 56</a></li><li><a href="ch57_clone_engine.html">Ch 57</a></li><li><a href="ch58_omnivoice.html">Ch 58</a></li><li><a href="ch59_daisy_builder.html">Ch 59</a></li><li><a href="ch60_addons.html">Ch 60</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="part-divider">
+  <div class="part-number">Part VI</div>
+  <h2>Building AI Voice Studio</h2>
+</div>
+
+<div class="chapter-number">Chapter 43</div>
+<h1>Project Architecture</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand the complete architecture of AIVS</li>
+  <li>Map every module to its responsibility</li>
+  <li>Understand the data flow from document → audio</li>
+</ul>
+
+<hr>
+
+<h2>43.1 High-Level Architecture</h2>
+
+<pre><code>┌──────────────────────────────────────────────────────┐
+│                    main.py                           │
+│              (Entry point, wx.App)                    │
+├──────────────────────────────────────────────────────┤
+│                     GUI Layer                         │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌─────────┐ │
+│  │MainFrame │ │Settings  │ │NewProject│ │Recording│ │
+│  │(Menu+    │ │Dialog    │ │Wizard    │ │Dialog   │ │
+│  │ StatusBar)│ │(Tabs)   │ │(2 pages) │ │(Thread) │ │
+│  └──────────┘ └──────────┘ └──────────┘ └─────────┘ │
+├──────────────────────────────────────────────────────┤
+│                  Business Logic Layer                 │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌─────────┐ │
+│  │Settings  │ │Project   │ │Document  │ │Splitter │ │
+│  │(JSON)    │ │(JSON)    │ │Parsers   │ │(H1/Page)│ │
+│  └──────────┘ └──────────┘ └──────────┘ └─────────┘ │
+├──────────────────────────────────────────────────────┤
+│                  TTS Engine Layer                     │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌─────────┐ │
+│  │Catalog   │ │Engine    │ │ModelStore│ │Downloader│ │
+│  │(JSON)    │ │(sherpa)  │ │(disk)    │ │(HTTP)   │ │
+│  └──────────┘ └──────────┘ └──────────┘ └─────────┘ │
+├──────────────────────────────────────────────────────┤
+│               Optional Engines (Subprocess)           │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐            │
+│  │Clone     │ │OmniVoice │ │OmniVoice │            │
+│  │Worker    │ │Worker    │ │Server    │            │
+│  │(XTTS v2) │ │(Triton)  │ │(HTTP API)│            │
+│  └──────────┘ └──────────┘ └──────────┘            │
+├──────────────────────────────────────────────────────┤
+│                  Infrastructure                       │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌─────────┐ │
+│  │Paths     │ │Constants │ │Util      │ │Python   │ │
+│  │          │ │          │ │          │ │Runtime  │ │
+│  └──────────┘ └──────────┘ └──────────┘ └─────────┘ │
+└──────────────────────────────────────────────────────┘</code></pre>
+
+<div class="line-explanation diagram">
+  <h4>Architecture Diagram (Block 1)</h4>
+  <p>This is an ASCII art diagram showing the AIVoiceStudio architecture. The boxes represent modules and the connections show data flow between layers. Refer to Chapter 43 for a detailed explanation of each component.</p>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>43.2 Data Flow</h2>
+
+<pre><code>User opens document (PDF/DOCX/TXT)
+    │
+    ▼
+Document Parser (parsers.py)
+    │ Extract text blocks with headings
+    ▼
+Document Splitter (splitter.py)
+    │ Split into segments by page/heading
+    ▼
+Project Creator (project.py)
+    │ Save segments to project.json
+    ▼
+Recording Dialog (recording_dialog.py)
+    │ User selects voice, rate, pitch
+    ▼
+Synthesis Worker (synthesizer.py) — Background Thread
+    │ For each segment:
+    │   1. Get TTS engine (engine.py)
+    │   2. Synthesize text → numpy array
+    │   3. Apply pitch/volume adjustments
+    │   4. Save to WAV (or convert to MP3/FLAC)
+    │   5. Mark segment done in project.json
+    ▼
+DAISY Builder (daisy_builder.py) — If DAISY project
+    │ Generate ncc.html, package.opf, SMIL files
+    ▼
+Audio files in project directory</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>User opens document (PDF/DOCX/TXT)</code>
+        <br><span class="desc"><code>User opens document (PDF/DOCX/TXT)</code></span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>│</code>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>▼</code>
+        <br><span class="desc"><code>▼</code></span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>Document Parser (parsers.py)</code>
+        <br><span class="desc"><code>Document Parser (parsers.py)</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>│ Extract text blocks with headings</code>
+        <br><span class="desc"><code>│ Extract text blocks with headings</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>▼</code>
+        <br><span class="desc"><code>▼</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>Document Splitter (splitter.py)</code>
+        <br><span class="desc"><code>Document Splitter (splitter.py)</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>│ Split into segments by page/heading</code>
+        <br><span class="desc"><code>│ Split into segments by page/heading</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>▼</code>
+        <br><span class="desc"><code>▼</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>Project Creator (project.py)</code>
+        <br><span class="desc"><code>Project Creator (project.py)</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>│ Save segments to project.json</code>
+        <br><span class="desc"><code>│ Save segments to project.json</code></span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>▼</code>
+        <br><span class="desc"><code>▼</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>Recording Dialog (recording_dialog.py)</code>
+        <br><span class="desc"><code>Recording Dialog (recording_dialog.py)</code></span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>│ User selects voice, rate, pitch</code>
+        <br><span class="desc"><code>│ User selects voice, rate, pitch</code></span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>▼</code>
+        <br><span class="desc"><code>▼</code></span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>Synthesis Worker (synthesizer.py) — Background Thread</code>
+        <br><span class="desc"><code>Synthesis Worker (synthesizer.py) — Background Thread</code></span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>│ For each segment:</code>
+        <br><span class="desc"><code>│ For each segment:</code></span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>│   1. Get TTS engine (engine.py)</code>
+        <br><span class="desc"><code>│   1. Get TTS engine (engine.py)</code></span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>│   2. Synthesize text → numpy array</code>
+        <br><span class="desc"><code>│   2. Synthesize text → numpy array</code></span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>│   3. Apply pitch/volume adjustments</code>
+        <br><span class="desc"><code>│   3. Apply pitch/volume adjustments</code></span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>│   4. Save to WAV (or convert to MP3/FLAC)</code>
+        <br><span class="desc"><code>│   4. Save to WAV (or convert to MP3/FLAC)</code></span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>│   5. Mark segment done in project.json</code>
+        <br><span class="desc"><code>│   5. Mark segment done in project.json</code></span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>▼</code>
+        <br><span class="desc"><code>▼</code></span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>DAISY Builder (daisy_builder.py) — If DAISY project</code>
+        <br><span class="desc"><code>DAISY Builder (daisy_builder.py) — If DAISY project</code></span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>│ Generate ncc.html, package.opf, SMIL files</code>
+        <br><span class="desc"><code>│ Generate ncc.html, package.opf, SMIL files</code></span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>▼</code>
+        <br><span class="desc"><code>▼</code></span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>Audio files in project directory</code>
+        <br><span class="desc"><code>Audio files in project directory</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>43.3 Module Responsibilities</h2>
+
+<table>
+  <thead><tr><th>Module</th><th>Lines</th><th>Responsibility</th></tr></thead>
+  <tbody>
+    <tr><td><code>main.py</code></td><td>~80</td><td>Entry point, logging setup, app creation</td></tr>
+    <tr><td><code>constants.py</code></td><td>~80</td><td>All magic numbers, strings, choices</td></tr>
+    <tr><td><code>paths.py</code></td><td>~50</td><td>Cross-platform path resolution</td></tr>
+    <tr><td><code>settings.py</code></td><td>~120</td><td>JSON settings with dot-notation access</td></tr>
+    <tr><td><code>project.py</code></td><td>~100</td><td>Project save/load, segment management</td></tr>
+    <tr><td><code>compute.py</code></td><td>~80</td><td>GPU/CPU detection, provider mapping</td></tr>
+    <tr><td><code>util.py</code></td><td>~60</td><td>Filename sanitization, Python finder</td></tr>
+    <tr><td><code>tts/catalog.py</code></td><td>~400</td><td>TTS engine catalog (JSON data)</td></tr>
+    <tr><td><code>tts/engine.py</code></td><td>~200</td><td>Sherpa-onnx engine wrapper</td></tr>
+    <tr><td><code>tts/models.py</code></td><td>~250</td><td>Model store, file resolution</td></tr>
+    <tr><td><code>tts/downloader.py</code></td><td>~200</td><td>HTTP model downloads</td></tr>
+    <tr><td><code>gui/main_frame.py</code></td><td>~300</td><td>Main window, menus, keyboard shortcuts</td></tr>
+    <tr><td><code>gui/settings_dialog.py</code></td><td>~250</td><td>Multi-tab settings dialog</td></tr>
+    <tr><td><code>gui/recording_dialog.py</code></td><td>~400</td><td>Recording window with voice selection</td></tr>
+    <tr><td><code>gui/new_project_wizard.py</code></td><td>~250</td><td>2-page project creation wizard</td></tr>
+    <tr><td><code>gui/events.py</code></td><td>~80</td><td>Custom wx event types</td></tr>
+    <tr><td><code>gui/a11y.py</code></td><td>~50</td><td>Accessibility helpers</td></tr>
+    <tr><td><code>gui/theme.py</code></td><td>~70</td><td>Light/Dark/System theme</td></tr>
+    <tr><td><code>jobs/synthesizer.py</code></td><td>~150</td><td>Background TTS worker thread</td></tr>
+    <tr><td><code>documents/parsers.py</code></td><td>~200</td><td>PDF/DOCX/HTML/TXT parsing</td></tr>
+    <tr><td><code>documents/splitter.py</code></td><td>~150</td><td>Text splitting algorithms</td></tr>
+    <tr><td><code>documents/daisy_builder.py</code></td><td>~200</td><td>DAISY 2.02 book generation</td></tr>
+    <tr><td><code>clone/__init__.py</code></td><td>~250</td><td>Voice cloning (XTTS v2)</td></tr>
+    <tr><td><code>omnivoice/__init__.py</code></td><td>~200</td><td>OmniVoice TTS engine</td></tr>
+    <tr><td><code>addons/__init__.py</code></td><td>~250</td><td>Plugin/addon system</td></tr>
+    <tr><td><code>python_runtime/__init__.py</code></td><td>~200</td><td>Managed Python environment</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h2>43.4 Key Takeaways</h2>
+<ul>
+  <li>AIVS has <strong>53 Python source files</strong> across 13 subpackages</li>
+  <li>The architecture follows <strong>layered design</strong>: GUI → Business Logic → TTS Engine → Infrastructure</li>
+  <li>Heavy TTS engines run in <strong>separate subprocesses</strong> (Clone, OmniVoice)</li>
+  <li>The data flow is: <strong>Document → Parser → Splitter → Project → Recording → Audio</strong></li>
+  <li><strong>JSON</strong> is the universal data format (settings, projects, catalog, worker protocol)</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch42_virtualenvs.html">← Ch 42</a> &nbsp;|&nbsp; <a href="ch44_paths_settings.html">Ch 44 — Paths &amp; Settings →</a></p>
+</div></div></body>
+</html>

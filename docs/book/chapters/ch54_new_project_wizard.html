@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 54: New Project Wizard - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part VI</div><ul class="chapters"><li><a href="ch43_architecture.html">Ch 43</a></li><li><a href="ch44_paths_settings.html">Ch 44</a></li><li><a href="ch45_project_model.html">Ch 45</a></li><li><a href="ch46_document_parsing.html">Ch 46</a></li><li><a href="ch47_tts_catalog.html">Ch 47</a></li><li><a href="ch48_tts_engine.html">Ch 48</a></li><li><a href="ch49_downloader.html">Ch 49</a></li><li><a href="ch50_compute_detection.html">Ch 50</a></li><li><a href="ch51_main_frame.html">Ch 51</a></li><li><a href="ch52_settings_dialog.html">Ch 52</a></li><li><a href="ch53_model_panels.html">Ch 53</a></li><li><a href="ch54_new_project_wizard.html" class="active">Ch 54: Wizard</a></li><li><a href="ch55_recording.html">Ch 55</a></li><li><a href="ch56_synthesis_worker.html">Ch 56</a></li><li><a href="ch57_clone_engine.html">Ch 57</a></li><li><a href="ch58_omnivoice.html">Ch 58</a></li><li><a href="ch59_daisy_builder.html">Ch 59</a></li><li><a href="ch60_addons.html">Ch 60</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 54</div>
+<h1>New Project Wizard</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand the two-page wizard flow</li>
+  <li>See how project types affect document processing</li>
+  <li>Understand the clipboard mode</li>
+</ul>
+
+<hr>
+
+<h2>54.1 Wizard Pages</h2>
+
+<pre><code><span class="cm"># Page 1: Project Details</span>
+class _DetailsPage(WizardPage):
+    <span class="cm"># Controls:</span>
+    <span class="cm"># - Project name (TextCtrl)</span>
+    <span class="cm"># - Project type (ComboBox): Audio Playlist, DAISY Audio, etc.</span>
+    <span class="cm"># - Open document button (FileDialog)</span>
+    <span class="cm"># - Punctuation mode (ComboBox)</span>
+
+<span class="cm"># Page 2: Audio Mode</span>
+class _ModePage(WizardPage):
+    <span class="cm"># Controls:</span>
+    <span class="cm"># - Radio buttons for splitting mode</span>
+    <span class="cm"># - Description label (updates when selection changes)</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Page 1: Project Details</code>
+        <br><span class="desc">A comment: <em>Page 1: Project Details</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>class _DetailsPage(WizardPage):</code>
+        <br><span class="desc">Defines class <code>_DetailsPage</code> inheriting from <code>WizardPage</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># Controls:</code>
+        <br><span class="desc">A comment: <em>Controls:</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># - Project name (TextCtrl)</code>
+        <br><span class="desc">A comment: <em>- Project name (TextCtrl)</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># - Project type (ComboBox): Audio Playlist, DAISY Audio, etc.</code>
+        <br><span class="desc">A comment: <em>- Project type (ComboBox): Audio Playlist, DAISY Audio, etc.</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># - Open document button (FileDialog)</code>
+        <br><span class="desc">A comment: <em>- Open document button (FileDialog)</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># - Punctuation mode (ComboBox)</code>
+        <br><span class="desc">A comment: <em>- Punctuation mode (ComboBox)</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># Page 2: Audio Mode</code>
+        <br><span class="desc">A comment: <em>Page 2: Audio Mode</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>class _ModePage(WizardPage):</code>
+        <br><span class="desc">Defines class <code>_ModePage</code> inheriting from <code>WizardPage</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code># Controls:</code>
+        <br><span class="desc">A comment: <em>Controls:</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code># - Radio buttons for splitting mode</code>
+        <br><span class="desc">A comment: <em>- Radio buttons for splitting mode</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code># - Description label (updates when selection changes)</code>
+        <br><span class="desc">A comment: <em>- Description label (updates when selection changes)</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<h3>Project Types</h3>
+
+<table>
+  <thead><tr><th>Type</th><th>Requires Document?</th><th>Output</th></tr></thead>
+  <tbody>
+    <tr><td>Audio Playlist</td><td>Yes</td><td>Individual WAV/MP3 files per segment</td></tr>
+    <tr><td>DAISY Audio</td><td>Yes</td><td>DAISY 2.02 book (audio only)</td></tr>
+    <tr><td>DAISY Audio+Text</td><td>Yes</td><td>DAISY 2.02 book (audio + text sync)</td></tr>
+    <tr><td>Clipboard</td><td>No</td><td>Single segment from clipboard text</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h2>54.2 Finish Flow</h2>
+
+<pre><code><span class="kw">def</span> <span class="fn">_on_finish</span>(self, _):
+    <span class="cm"># 1. Get user selections</span>
+    name = self.page_details.name_ctrl.GetValue().strip()
+    ptype = self.page_details.selected_project_type()
+    mode = self.page_mode.selected()
+
+    <span class="cm"># 2. Clipboard mode — no document needed</span>
+    <span class="kw">if</span> ptype == PROJECT_TYPE_CLIPBOARD:
+        <span class="cm"># Create project with clipboard text</span>
+        project.create_project(pdir, name, <span class="str">"&lt;clipboard&gt;"</span>, ...)
+        self.EndModal(wx.ID_OK)
+        <span class="kw">return</span>
+
+    <span class="cm"># 3. Parse document</span>
+    wx.BeginBusyCursor()
+    doc = parse_document(self.source_path)
+    <span class="kw">if</span> ptype <span class="kw">in</span> (PROJECT_TYPE_DAISY_AUDIO, PROJECT_TYPE_DAISY_AUDIO_TEXT):
+        segments = split_daisy_chapters(doc.blocks)
+    <span class="kw">else</span>:
+        segments = split_document(doc, mode)
+    wx.EndBusyCursor()
+
+    <span class="cm"># 4. Create project and save</span>
+    project.create_project(pdir, name, self.source_path, mode, segments)
+    self.settings.add_recent_project(name, pdir)
+    self.EndModal(wx.ID_OK)
+
+    <span class="cm"># 5. Open recording window</span>
+    dlg = RecordingDialog(self.GetParent(), pdir, self.settings, self.store)
+    dlg.ShowModal()</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>def _on_finish(self, _):</code>
+        <br><span class="desc">Defines function <code>_on_finish</code> accepting parameters (self, _).</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># 1. Get user selections</code>
+        <br><span class="desc">A comment: <em>1. Get user selections</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>name = self.page_details.name_ctrl.GetValue().strip()</code>
+        <br><span class="desc">Assigns <code>self.page_details.name_ctrl.GetValue().strip()</code> to <code>name</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>ptype = self.page_details.selected_project_type()</code>
+        <br><span class="desc">Assigns <code>self.page_details.selected_project_type()</code> to <code>ptype</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>mode = self.page_mode.selected()</code>
+        <br><span class="desc">Assigns <code>self.page_mode.selected()</code> to <code>mode</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># 2. Clipboard mode — no document needed</code>
+        <br><span class="desc">A comment: <em>2. Clipboard mode — no document needed</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>if ptype == PROJECT_TYPE_CLIPBOARD:</code>
+        <br><span class="desc">Checks condition: <code>ptype == PROJECT_TYPE_CLIPBOARD</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># Create project with clipboard text</code>
+        <br><span class="desc">A comment: <em>Create project with clipboard text</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>project.create_project(pdir, name, &quot;&lt;clipboard&gt;&quot;, ...)</code>
+        <br><span class="desc"><code>project.create_project(pdir, name, &quot;&lt;clipboard&gt;&quot;, ...)</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>self.EndModal(wx.ID_OK)</code>
+        <br><span class="desc">Calls <code>self.EndModal()</code> to perform an operation.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>return</code>
+        <br><span class="desc">Returns <code>None</code> implicitly (exits the function).</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code># 3. Parse document</code>
+        <br><span class="desc">A comment: <em>3. Parse document</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>wx.BeginBusyCursor()</code>
+        <br><span class="desc">Creates a wxPython <code>wx.BeginBusyCursor</code> widget.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>doc = parse_document(self.source_path)</code>
+        <br><span class="desc">Assigns <code>parse_document(self.source_path)</code> to <code>doc</code>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>if ptype in (PROJECT_TYPE_DAISY_AUDIO, PROJECT_TYPE_DAISY_AUDIO_TEXT):</code>
+        <br><span class="desc">Checks condition: <code>ptype in (PROJECT_TYPE_DAISY_AUDIO, PROJECT_TYPE_DAISY_AUDIO_TEXT)</code>. The indented block below runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>segments = split_daisy_chapters(doc.blocks)</code>
+        <br><span class="desc">Assigns <code>split_daisy_chapters(doc.blocks)</code> to <code>segments</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>else:</code>
+        <br><span class="desc">Fallback: executes when none of the above conditions matched.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>segments = split_document(doc, mode)</code>
+        <br><span class="desc">Assigns <code>split_document(doc, mode)</code> to <code>segments</code>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>wx.EndBusyCursor()</code>
+        <br><span class="desc">Creates a wxPython <code>wx.EndBusyCursor</code> widget.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code># 4. Create project and save</code>
+        <br><span class="desc">A comment: <em>4. Create project and save</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>project.create_project(pdir, name, self.source_path, mode, segments)</code>
+        <br><span class="desc"><code>project.create_project(pdir, name, self.source_path, mode, segments)</code></span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>self.settings.add_recent_project(name, pdir)</code>
+        <br><span class="desc"><code>self.settings.add_recent_project(name, pdir)</code></span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>self.EndModal(wx.ID_OK)</code>
+        <br><span class="desc">Calls <code>self.EndModal()</code> to perform an operation.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code># 5. Open recording window</code>
+        <br><span class="desc">A comment: <em>5. Open recording window</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>dlg = RecordingDialog(self.GetParent(), pdir, self.settings, self.store)</code>
+        <br><span class="desc">Dialog for recording audio for a project. Shows the text to read, records microphone input, and plays TTS reference audio.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>dlg.ShowModal()</code>
+        <br><span class="desc">Displays a dialog modally (blocks input to the parent window until the dialog is closed). Returns wx.ID_OK or wx.ID_CANCEL.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>54.3 Key Takeaways</h2>
+<ul>
+  <li><strong>Two pages</strong>: Details (name, type, document, punctuation) and Mode (splitting)</li>
+  <li><strong>4 project types</strong> affect document processing and output format</li>
+  <li><strong>Clipboard mode</strong> allows recording without a document</li>
+  <li>The wizard <strong>automatically opens the Recording Dialog</strong> after project creation</li>
+  <li><strong>Busy cursor</strong> is shown during document parsing</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch53_model_panels.html">← Ch 53</a> &nbsp;|&nbsp; <a href="ch55_recording.html">Ch 55 — Recording →</a></p>
+</div></div></body>
+</html>

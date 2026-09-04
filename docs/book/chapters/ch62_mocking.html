@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 62: Mocking &amp; Test Doubles - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part VII</div><ul class="chapters"><li><a href="ch61_unit_testing.html">Ch 61</a></li><li><a href="ch62_mocking.html" class="active">Ch 62: Mocking</a></li><li><a href="ch63_integration.html">Ch 63</a></li><li><a href="ch64_pyinstaller.html">Ch 64</a></li><li><a href="ch65_inno_setup.html">Ch 65</a></li><li><a href="ch66_ci_cd.html">Ch 66</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 62</div>
+<h1>Mocking &amp; Test Doubles</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Use unittest.mock for test isolation</li>
+  <li>Mock subprocess calls, file system, and network</li>
+  <li>See mocking patterns in the AIVS test suite</li>
+</ul>
+
+<hr>
+
+<h2>62.1 Mock Basics</h2>
+
+<pre><code><span class="kw">from</span> unittest <span class="kw">import</span> mock
+
+<span class="cm"># Mock a function return value</span>
+<span class="kw">with</span> mock.patch(<span class="str">"ai_voice_studio.compute._has_nvidia_gpu"</span>, return_value=<span class="kw">True</span>):
+    result = compute._has_nvidia_gpu()
+    <span class="kw">assert</span> result <span class="kw">is</span> <span class="kw">True</span>
+
+<span class="cm"># Mock with side effects</span>
+mock_subprocess = mock.Mock()
+mock_subprocess.run.return_value.returncode = <span class="num">0</span>
+mock_subprocess.run.return_value.stdout = <span class="str">"NVIDIA RTX 3060\n"</span>
+
+<span class="cm"># Patch multiple targets</span>
+<span class="kw">with</span> mock.patch(<span class="str">"ai_voice_studio.compute.runtime.is_installed"</span>, return_value=<span class="kw">True</span>), \
+     mock.patch.object(compute.subprocess, <span class="str">"run"</span>, return_value=FakeResult(<span class="num">0</span>, <span class="str">"NVIDIA GPU\n"</span>)):
+    det = compute.detect(force=<span class="kw">True</span>)
+    <span class="kw">assert</span> det[<span class="str">"cuda"</span>] <span class="kw">is</span> <span class="kw">True</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>from unittest import mock</code>
+        <br><span class="desc">Imports a module.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Mock a function return value</code>
+        <br><span class="desc">A comment: <em>Mock a function return value</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>with mock.patch(&quot;ai_voice_studio.compute._has_nvidia_gpu&quot;, return_value=True):</code>
+        <br><span class="desc">Decorator/context manager that replaces a function/attribute with a Mock during testing.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>result = compute._has_nvidia_gpu()</code>
+        <br><span class="desc">Assigns <code>compute._has_nvidia_gpu()</code> to <code>result</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>assert result is True</code>
+        <br><span class="desc">Assertion that verifies a condition is True.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># Mock with side effects</code>
+        <br><span class="desc">A comment: <em>Mock with side effects</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>mock_subprocess = mock.Mock()</code>
+        <br><span class="desc">Creates a mock object. Any method call or attribute access returns a Mock.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>mock_subprocess.run.return_value.returncode = 0</code>
+        <br><span class="desc">Assigns <code>0</code> to <code>mock_subprocess.run.return_value.returncode</code>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>mock_subprocess.run.return_value.stdout = &quot;NVIDIA RTX 3060\n&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;NVIDIA RTX 3060\n&quot;</code> to <code>mock_subprocess.run.return_value.stdout</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code># Patch multiple targets</code>
+        <br><span class="desc">A comment: <em>Patch multiple targets</em>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>with mock.patch(&quot;ai_voice_studio.compute.runtime.is_installed&quot;, return_value=True), \</code>
+        <br><span class="desc">Decorator/context manager that replaces a function/attribute with a Mock during testing.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>mock.patch.object(compute.subprocess, &quot;run&quot;, return_value=FakeResult(0, &quot;NVIDIA GPU\n&quot;)):</code>
+        <br><span class="desc"><code>mock.patch.object(compute.subprocess, &quot;run&quot;, return_value=FakeResult(0, &quot;NVIDIA GPU\n&quot;)):</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>det = compute.detect(force=True)</code>
+        <br><span class="desc">Assigns <code>compute.detect(force=True)</code> to <code>det</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>assert det[&quot;cuda&quot;] is True</code>
+        <br><span class="desc">Assertion that verifies a condition is True.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>62.2 AIVS Mocking Patterns</h2>
+
+<pre><code><span class="cm"># Pattern 1: Mock paths to use temp directory</span>
+patcher = mock.patch(
+    <span class="str">"ai_voice_studio.paths.user_data_dir"</span>,
+    return_value=temp_dir,
+)
+patcher.start()
+self.addCleanup(patcher.stop)  <span class="cm"># Auto-cleanup</span>
+
+<span class="cm"># Pattern 2: Fake subprocess result</span>
+<span class="kw">class</span> <span class="cls">_FakeResult</span>:
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, returncode=<span class="num">0</span>, stdout=<span class="str">""</span>):
+        self.returncode = returncode
+        self.stdout = stdout
+
+<span class="cm"># Pattern 3: Mock GPU detection</span>
+<span class="kw">def</span> <span class="fn">_patch</span>(self, runtime_installed, nvidia):
+    patches = [
+        mock.patch(<span class="str">"ai_voice_studio.compute.runtime.is_installed"</span>,
+                   return_value=runtime_installed),
+        mock.patch.object(compute.subprocess, <span class="str">"run"</span>,
+            return_value=_FakeResult(<span class="num">0</span>, <span class="str">"NVIDIA GPU\n"</span>) <span class="kw">if</span> nvidia
+            <span class="kw">else</span> _FakeResult(<span class="num">1</span>, <span class="str">""</span>)),
+    ]
+    <span class="kw">for</span> p <span class="kw">in</span> patches:
+        p.start()
+        self.addCleanup(p.stop)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Pattern 1: Mock paths to use temp directory</code>
+        <br><span class="desc">A comment: <em>Pattern 1: Mock paths to use temp directory</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>patcher = mock.patch(</code>
+        <br><span class="desc">Decorator/context manager that replaces a function/attribute with a Mock during testing.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>&quot;ai_voice_studio.paths.user_data_dir&quot;,</code>
+        <br><span class="desc"><code>&quot;ai_voice_studio.paths.user_data_dir&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>return_value=temp_dir,</code>
+        <br><span class="desc">Assigns <code>temp_dir,</code> to <code>return_value</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>patcher.start()</code>
+        <br><span class="desc"><code>patcher.start()</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>self.addCleanup(patcher.stop)  # Auto-cleanup</code>
+        <br><span class="desc">Calls <code>self.addCleanup()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># Pattern 2: Fake subprocess result</code>
+        <br><span class="desc">A comment: <em>Pattern 2: Fake subprocess result</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>class _FakeResult:</code>
+        <br><span class="desc">Defines a new class.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>def __init__(self, returncode=0, stdout=&quot;&quot;):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>self.returncode = returncode</code>
+        <br><span class="desc">Stores <code>returncode</code> in instance attribute <code>returncode</code>.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>self.stdout = stdout</code>
+        <br><span class="desc">Stores <code>stdout</code> in instance attribute <code>stdout</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code># Pattern 3: Mock GPU detection</code>
+        <br><span class="desc">A comment: <em>Pattern 3: Mock GPU detection</em>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>def _patch(self, runtime_installed, nvidia):</code>
+        <br><span class="desc">Context manager that replaces a name with a Mock. Use 'as' to get the mock reference.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>patches = [</code>
+        <br><span class="desc">Assigns <code>[</code> to <code>patches</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>mock.patch(&quot;ai_voice_studio.compute.runtime.is_installed&quot;,</code>
+        <br><span class="desc">Decorator/context manager that replaces a function/attribute with a Mock during testing.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>return_value=runtime_installed),</code>
+        <br><span class="desc">Assigns <code>runtime_installed),</code> to <code>return_value</code>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>mock.patch.object(compute.subprocess, &quot;run&quot;,</code>
+        <br><span class="desc"><code>mock.patch.object(compute.subprocess, &quot;run&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>return_value=_FakeResult(0, &quot;NVIDIA GPU\n&quot;) if nvidia</code>
+        <br><span class="desc">Conditional check.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>else _FakeResult(1, &quot;&quot;)),</code>
+        <br><span class="desc"><code>else _FakeResult(1, &quot;&quot;)),</code></span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>]</code>
+        <br><span class="desc"><code>]</code></span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>for p in patches:</code>
+        <br><span class="desc">For loop iteration.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>p.start()</code>
+        <br><span class="desc"><code>p.start()</code></span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>self.addCleanup(p.stop)</code>
+        <br><span class="desc">Calls <code>self.addCleanup()</code>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>62.3 Key Takeaways</h2>
+<ul>
+  <li><strong>mock.patch()</strong> replaces functions/classes during tests</li>
+  <li>Always use <strong>addCleanup()</strong> or <strong>with</strong> to restore mocks</li>
+  <li>AIVS primarily mocks: <strong>paths</strong>, <strong>subprocess.run</strong>, <strong>nvidia-smi</strong></li>
+  <li><strong>tempfile.TemporaryDirectory</strong> + path mocking isolates file system tests</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch61_unit_testing.html">← Ch 61</a> &nbsp;|&nbsp; <a href="ch63_integration.html">Ch 63 — Integration →</a></p>
+</div></div></body>
+</html>

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 57: Voice Cloning (XTTS v2) - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part VI</div><ul class="chapters"><li><a href="ch43_architecture.html">Ch 43</a></li><li><a href="ch44_paths_settings.html">Ch 44</a></li><li><a href="ch45_project_model.html">Ch 45</a></li><li><a href="ch46_document_parsing.html">Ch 46</a></li><li><a href="ch47_tts_catalog.html">Ch 47</a></li><li><a href="ch48_tts_engine.html">Ch 48</a></li><li><a href="ch49_downloader.html">Ch 49</a></li><li><a href="ch50_compute_detection.html">Ch 50</a></li><li><a href="ch51_main_frame.html">Ch 51</a></li><li><a href="ch52_settings_dialog.html">Ch 52</a></li><li><a href="ch53_model_panels.html">Ch 53</a></li><li><a href="ch54_new_project_wizard.html">Ch 54</a></li><li><a href="ch55_recording.html">Ch 55</a></li><li><a href="ch56_synthesis_worker.html">Ch 56</a></li><li><a href="ch57_clone_engine.html" class="active">Ch 57: Voice Cloning</a></li><li><a href="ch58_omnivoice.html">Ch 58</a></li><li><a href="ch59_daisy_builder.html">Ch 59</a></li><li><a href="ch60_addons.html">Ch 60</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 57</div>
+<h1>Voice Cloning (XTTS v2)</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand the voice cloning pipeline</li>
+  <li>See the CloneClient subprocess architecture</li>
+  <li>Understand the JSON-lines IPC protocol</li>
+</ul>
+
+<hr>
+
+<h2>57.1 Cloning Flow</h2>
+
+<pre><code><span class="cm"># From clone/__init__.py</span>
+<span class="cm"># 1. Download cloning engine (coqui-tts + PyTorch, ~2.5 GB)</span>
+<span class="cm"># 2. User provides: name, language, 4-5 second WAV sample</span>
+<span class="cm"># 3. Sample is copied into models directory</span>
+<span class="cm"># 4. Voice appears in Available TTS and Recording windows</span>
+<span class="cm"># 5. Synthesis uses XtTsCloneEngine → CloneClient → subprocess</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># From clone/__init__.py</code>
+        <br><span class="desc">A comment indicating the source file: <em>From clone/__init__.py</em>. This helps the reader locate the code in the AIVoiceStudio codebase.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># 1. Download cloning engine (coqui-tts + PyTorch, ~2.5 GB)</code>
+        <br><span class="desc">A comment: <em>1. Download cloning engine (coqui-tts + PyTorch, ~2.5 GB)</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># 2. User provides: name, language, 4-5 second WAV sample</code>
+        <br><span class="desc">A comment: <em>2. User provides: name, language, 4-5 second WAV sample</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># 3. Sample is copied into models directory</code>
+        <br><span class="desc">A comment: <em>3. Sample is copied into models directory</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code># 4. Voice appears in Available TTS and Recording windows</code>
+        <br><span class="desc">A comment: <em>4. Voice appears in Available TTS and Recording windows</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># 5. Synthesis uses XtTsCloneEngine → CloneClient → subprocess</code>
+        <br><span class="desc">A comment: <em>5. Synthesis uses XtTsCloneEngine → CloneClient → subprocess</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>57.2 CloneClient IPC Protocol</h2>
+
+<pre><code><span class="cm"># JSON lines protocol over stdin/stdout</span>
+<span class="cm"># App → Worker:</span>
+{<span class="str">"cmd"</span>: <span class="str">"ping"</span>}                           <span class="cm"># Check engine availability</span>
+{<span class="str">"cmd"</span>: <span class="str">"synthesize"</span>, <span class="str">"text"</span>: <span class="str">"Hello"</span>,
+ <span class="str">"sample_wav"</span>: <span class="str">"/path/to/sample.wav"</span>,
+ <span class="str">"language"</span>: <span class="str">"en"</span>, <span class="str">"speed"</span>: <span class="num">1.0</span>}     <span class="cm"># Synthesize with cloned voice</span>
+{<span class="str">"cmd"</span>: <span class="str">"quit"</span>}                          <span class="cm"># Shutdown</span>
+
+<span class="cm"># Worker → App:</span>
+{<span class="str">"ok"</span>: <span class="kw">true</span>, <span class="str">"engine"</span>: <span class="kw">true</span>}              <span class="cm"># Ping response</span>
+{<span class="str">"ok"</span>: <span class="kw">true</span>, <span class="str">"wav"</span>: <span class="str">"&lt;base64&gt;"</span>}          <span class="cm"># Audio response</span>
+{<span class="str">"ok"</span>: <span class="kw">false</span>, <span class="str">"error"</span>: <span class="str">"..."</span>}            <span class="cm"># Error response</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># JSON lines protocol over stdin/stdout</code>
+        <br><span class="desc">A comment: <em>JSON lines protocol over stdin/stdout</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># App → Worker:</code>
+        <br><span class="desc">A comment: <em>App → Worker:</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>{&quot;cmd&quot;: &quot;ping&quot;}                           # Check engine availability</code>
+        <br><span class="desc"><code>{&quot;cmd&quot;: &quot;ping&quot;}                           # Check engine availability</code></span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>{&quot;cmd&quot;: &quot;synthesize&quot;, &quot;text&quot;: &quot;Hello&quot;,</code>
+        <br><span class="desc"><code>{&quot;cmd&quot;: &quot;synthesize&quot;, &quot;text&quot;: &quot;Hello&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>&quot;sample_wav&quot;: &quot;/path/to/sample.wav&quot;,</code>
+        <br><span class="desc"><code>&quot;sample_wav&quot;: &quot;/path/to/sample.wav&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>&quot;language&quot;: &quot;en&quot;, &quot;speed&quot;: 1.0}     # Synthesize with cloned voice</code>
+        <br><span class="desc"><code>&quot;language&quot;: &quot;en&quot;, &quot;speed&quot;: 1.0}     # Synthesize with cloned voice</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>{&quot;cmd&quot;: &quot;quit&quot;}                          # Shutdown</code>
+        <br><span class="desc"><code>{&quot;cmd&quot;: &quot;quit&quot;}                          # Shutdown</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># Worker → App:</code>
+        <br><span class="desc">A comment: <em>Worker → App:</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>{&quot;ok&quot;: true, &quot;engine&quot;: true}              # Ping response</code>
+        <br><span class="desc"><code>{&quot;ok&quot;: true, &quot;engine&quot;: true}              # Ping response</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>{&quot;ok&quot;: true, &quot;wav&quot;: &quot;&lt;base64&gt;&quot;}          # Audio response</code>
+        <br><span class="desc"><code>{&quot;ok&quot;: true, &quot;wav&quot;: &quot;&lt;base64&gt;&quot;}          # Audio response</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>{&quot;ok&quot;: false, &quot;error&quot;: &quot;...&quot;}            # Error response</code>
+        <br><span class="desc"><code>{&quot;ok&quot;: false, &quot;error&quot;: &quot;...&quot;}            # Error response</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>57.3 Supported Languages</h2>
+
+<pre><code><span class="cm"># XTTS v2 supports 17 languages:</span>
+XTTS_LANGUAGES = [
+    (<span class="str">"en"</span>, <span class="str">"English"</span>), (<span class="str">"es"</span>, <span class="str">"Spanish"</span>), (<span class="str">"fr"</span>, <span class="str">"French"</span>),
+    (<span class="str">"de"</span>, <span class="str">"German"</span>), (<span class="str">"it"</span>, <span class="str">"Italian"</span>), (<span class="str">"pt"</span>, <span class="str">"Portuguese"</span>),
+    (<span class="str">"pl"</span>, <span class="str">"Polish"</span>), (<span class="str">"tr"</span>, <span class="str">"Turkish"</span>), (<span class="str">"ru"</span>, <span class="str">"Russian"</span>),
+    (<span class="str">"nl"</span>, <span class="str">"Dutch"</span>), (<span class="str">"cs"</span>, <span class="str">"Czech"</span>), (<span class="str">"ar"</span>, <span class="str">"Arabic"</span>),
+    (<span class="str">"zh-cn"</span>, <span class="str">"Chinese"</span>), (<span class="str">"ja"</span>, <span class="str">"Japanese"</span>),
+    (<span class="str">"hu"</span>, <span class="str">"Hungarian"</span>), (<span class="str">"ko"</span>, <span class="str">"Korean"</span>), (<span class="str">"hi"</span>, <span class="str">"Hindi"</span>),
+]</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># XTTS v2 supports 17 languages:</code>
+        <br><span class="desc">A comment: <em>XTTS v2 supports 17 languages:</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>XTTS_LANGUAGES = [</code>
+        <br><span class="desc">Assigns <code>[</code> to <code>XTTS_LANGUAGES</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>(&quot;en&quot;, &quot;English&quot;), (&quot;es&quot;, &quot;Spanish&quot;), (&quot;fr&quot;, &quot;French&quot;),</code>
+        <br><span class="desc"><code>(&quot;en&quot;, &quot;English&quot;), (&quot;es&quot;, &quot;Spanish&quot;), (&quot;fr&quot;, &quot;French&quot;),</code></span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>(&quot;de&quot;, &quot;German&quot;), (&quot;it&quot;, &quot;Italian&quot;), (&quot;pt&quot;, &quot;Portuguese&quot;),</code>
+        <br><span class="desc"><code>(&quot;de&quot;, &quot;German&quot;), (&quot;it&quot;, &quot;Italian&quot;), (&quot;pt&quot;, &quot;Portuguese&quot;),</code></span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>(&quot;pl&quot;, &quot;Polish&quot;), (&quot;tr&quot;, &quot;Turkish&quot;), (&quot;ru&quot;, &quot;Russian&quot;),</code>
+        <br><span class="desc"><code>(&quot;pl&quot;, &quot;Polish&quot;), (&quot;tr&quot;, &quot;Turkish&quot;), (&quot;ru&quot;, &quot;Russian&quot;),</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>(&quot;nl&quot;, &quot;Dutch&quot;), (&quot;cs&quot;, &quot;Czech&quot;), (&quot;ar&quot;, &quot;Arabic&quot;),</code>
+        <br><span class="desc"><code>(&quot;nl&quot;, &quot;Dutch&quot;), (&quot;cs&quot;, &quot;Czech&quot;), (&quot;ar&quot;, &quot;Arabic&quot;),</code></span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>(&quot;zh-cn&quot;, &quot;Chinese&quot;), (&quot;ja&quot;, &quot;Japanese&quot;),</code>
+        <br><span class="desc"><code>(&quot;zh-cn&quot;, &quot;Chinese&quot;), (&quot;ja&quot;, &quot;Japanese&quot;),</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>(&quot;hu&quot;, &quot;Hungarian&quot;), (&quot;ko&quot;, &quot;Korean&quot;), (&quot;hi&quot;, &quot;Hindi&quot;),</code>
+        <br><span class="desc"><code>(&quot;hu&quot;, &quot;Hungarian&quot;), (&quot;ko&quot;, &quot;Korean&quot;), (&quot;hi&quot;, &quot;Hindi&quot;),</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>]</code>
+        <br><span class="desc"><code>]</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>57.4 Key Takeaways</h2>
+<ul>
+  <li><strong>XTTS v2</strong> is a zero-shot voice cloning model (4-5 second sample)</li>
+  <li>Runs in a <strong>separate subprocess</strong> to isolate PyTorch from sherpa-onnx</li>
+  <li><strong>JSON lines protocol</strong> over stdin/stdout for IPC</li>
+  <li>Supports <strong>17 languages</strong> with multi-lingual cloning</li>
+  <li>The cloning engine is <strong>optional</strong> — downloaded on-demand from Settings</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch56_synthesis_worker.html">← Ch 56</a> &nbsp;|&nbsp; <a href="ch58_omnivoice.html">Ch 58 — OmniVoice →</a></p>
+</div></div></body>
+</html>

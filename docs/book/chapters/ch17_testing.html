@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 17: Testing - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part II</div><ul class="chapters"><li><a href="ch11_oop_advanced.html">Ch 11</a></li><li><a href="ch12_iterators.html">Ch 12</a></li><li><a href="ch13_decorators.html">Ch 13</a></li><li><a href="ch14_context.html">Ch 14</a></li><li><a href="ch15_regex.html">Ch 15</a></li><li><a href="ch16_datetime.html">Ch 16</a></li><li><a href="ch17_testing.html" class="active">Ch 17: Testing</a></li><li><a href="ch18_json_xml.html">Ch 18</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 17</div>
+<h1>Testing with unittest &amp; pytest</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Write unit tests with <code>unittest</code> and <code>pytest</code></li>
+  <li>Use assertions effectively</li>
+  <li>Understand test organization and naming conventions</li>
+  <li>See the AIVS test suite structure</li>
+</ul>
+
+<hr>
+
+<h2>17.1 Why Test?</h2>
+
+<p>AI Voice Studio has <strong>99+ tests</strong> across 12 test files. Testing ensures:</p>
+
+<ul>
+  <li><strong>Correctness</strong> — code does what it's supposed to</li>
+  <li><strong>Regression prevention</strong> — changes don't break existing functionality</li>
+  <li><strong>Documentation</strong> — tests show how code is intended to be used</li>
+  <li><strong>Confidence</strong> — refactoring safely</li>
+</ul>
+
+<hr>
+
+<h2>17.2 unittest — The Standard Library</h2>
+
+<pre><code><span class="kw">import</span> unittest
+<span class="kw">from</span> ai_voice_studio.util <span class="kw">import</span> sanitize_filename
+
+<span class="kw">class</span> <span class="cls">SanitizeFilenameTest</span>(unittest.TestCase):
+    <span class="str">"""Tests for the sanitize_filename utility function."""</span>
+
+    <span class="kw">def</span> <span class="fn">test_removes_illegal_characters</span>(self):
+        <span class="str">"""Characters illegal on Windows should be replaced."""</span>
+        result = sanitize_filename(<span class="str">'File: "Name" &lt;bad&gt;?'</span>)
+        <span class="kw">assert</span> <span class="str">":"</span> <span class="kw">not in</span> result
+        <span class="kw">assert</span> <span class="str">'"'</span> <span class="kw">not in</span> result
+        <span class="kw">assert</span> <span class="str">"&lt;"</span> <span class="kw">not in</span> result
+
+    <span class="kw">def</span> <span class="fn">test_truncates_long_names</span>(self):
+        <span class="str">"""Names exceeding max_length should be truncated."""</span>
+        long_name = <span class="str">"A"</span> * <span class="num">200</span>
+        result = sanitize_filename(long_name, max_length=<span class="num">80</span>)
+        <span class="kw">assert</span> len(result) <= <span class="num">80</span>
+
+    <span class="kw">def</span> <span class="fn">test_strips_whitespace</span>(self):
+        <span class="str">"""Leading/trailing whitespace should be removed."""</span>
+        result = sanitize_filename(<span class="str">"  hello  "</span>)
+        <span class="kw">assert</span> result == <span class="str">"hello"</span>
+
+    <span class="kw">def</span> <span class="fn">test_empty_name_returns_fallback</span>(self):
+        <span class="str">"""Empty names should return a valid filename."""</span>
+        result = sanitize_filename(<span class="str">""</span>)
+        <span class="kw">assert</span> result  <span class="cm"># Non-empty</span>
+
+<span class="cm"># Run with: python -m unittest tests/test_util.py</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>import unittest</code>
+        <br><span class="desc">Imports the <code>unittest</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>from ai_voice_studio.util import sanitize_filename</code>
+        <br><span class="desc">Imports <code>sanitize_filename</code> from <code>ai_voice_studio.util</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>class SanitizeFilenameTest(unittest.TestCase):</code>
+        <br><span class="desc">Defines class <code>SanitizeFilenameTest</code> inheriting from <code>unittest.TestCase</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>&quot;&quot;&quot;Tests for the sanitize_filename utility function.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Tests for the sanitize_filename utility function.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>def test_removes_illegal_characters(self):</code>
+        <br><span class="desc">Defines function <code>test_removes_illegal_characters</code> accepting (self).</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>&quot;&quot;&quot;Characters illegal on Windows should be replaced.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Characters illegal on Windows should be replaced.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>result = sanitize_filename(&#x27;File: &quot;Name&quot; &lt;bad&gt;?&#x27;)</code>
+        <br><span class="desc">Assigns <code>sanitize_filename(&#x27;File: &quot;Name&quot; &lt;bad&gt;?&#x27;)</code> to <code>result</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>assert &quot;:&quot; not in result</code>
+        <br><span class="desc"><code>assert &quot;:&quot; not in result</code></span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>assert &#x27;&quot;&#x27; not in result</code>
+        <br><span class="desc"><code>assert &#x27;&quot;&#x27; not in result</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>assert &quot;&lt;&quot; not in result</code>
+        <br><span class="desc"><code>assert &quot;&lt;&quot; not in result</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>def test_truncates_long_names(self):</code>
+        <br><span class="desc">Defines function <code>test_truncates_long_names</code> accepting (self).</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>&quot;&quot;&quot;Names exceeding max_length should be truncated.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Names exceeding max_length should be truncated.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>long_name = &quot;A&quot; * 200</code>
+        <br><span class="desc">Assigns <code>&quot;A&quot; * 200</code> to <code>long_name</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>result = sanitize_filename(long_name, max_length=80)</code>
+        <br><span class="desc">Assigns <code>sanitize_filename(long_name, max_length=80)</code> to <code>result</code>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>assert len(result) &lt;= 80</code>
+        <br><span class="desc">Returns the number of items in a sequence (string, list, dict, tuple). Essential for loop bounds and validation.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>def test_strips_whitespace(self):</code>
+        <br><span class="desc">Defines function <code>test_strips_whitespace</code> accepting (self).</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>&quot;&quot;&quot;Leading/trailing whitespace should be removed.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Leading/trailing whitespace should be removed.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>result = sanitize_filename(&quot;  hello  &quot;)</code>
+        <br><span class="desc">Assigns <code>sanitize_filename(&quot;  hello  &quot;)</code> to <code>result</code>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>assert result == &quot;hello&quot;</code>
+        <br><span class="desc"><code>assert result == &quot;hello&quot;</code></span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>def test_empty_name_returns_fallback(self):</code>
+        <br><span class="desc">Defines function <code>test_empty_name_returns_fallback</code> accepting (self).</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>&quot;&quot;&quot;Empty names should return a valid filename.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Empty names should return a valid filename.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>result = sanitize_filename(&quot;&quot;)</code>
+        <br><span class="desc">Assigns <code>sanitize_filename(&quot;&quot;)</code> to <code>result</code>.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>assert result  # Non-empty</code>
+        <br><span class="desc"><code>assert result  # Non-empty</code></span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code># Run with: python -m unittest tests/test_util.py</code>
+        <br><span class="desc">A comment: <em>Run with: python -m unittest tests/test_util.py</em>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>17.3 pytest — The Preferred Framework</h2>
+
+<pre><code><span class="cm"># pytest tests are simpler — just use assert statements</span>
+<span class="kw">from</span> ai_voice_studio.tts <span class="kw">import</span> catalog
+
+<span class="kw">def</span> <span class="fn">test_tts_ids_are_unique</span>():
+    <span class="str">"""Every TTS engine must have a unique ID."""</span>
+    ids = [t[<span class="str">"id"</span>] <span class="kw">for</span> t <span class="kw">in</span> catalog.get_tts_list()]
+    <span class="kw">assert</span> len(ids) == len(set(ids))
+
+<span class="kw">def</span> <span class="fn">test_required_engines_present</span>():
+    <span class="str">"""Piper, Kokoro, and Matcha must be in the catalog."""</span>
+    ids = {t[<span class="str">"id"</span>] <span class="kw">for</span> t <span class="kw">in</span> catalog.get_tts_list()}
+    <span class="kw">assert</span> <span class="str">"piper"</span> <span class="kw">in</span> ids
+    <span class="kw">assert</span> <span class="str">"kokoro"</span> <span class="kw">in</span> ids
+    <span class="kw">assert</span> <span class="str">"matcha"</span> <span class="kw">in</span> ids
+
+<span class="kw">def</span> <span class="fn">test_piper_voices_have_artifacts</span>():
+    <span class="str">"""Every Piper voice must have a download artifact."""</span>
+    piper = catalog.find_tts(<span class="str">"piper"</span>)
+    <span class="kw">assert</span> piper <span class="kw">is not</span> <span class="kw">None</span>
+    <span class="kw">for</span> lang <span class="kw">in</span> piper[<span class="str">"languages"</span>]:
+        <span class="kw">for</span> variant <span class="kw">in</span> lang[<span class="str">"variants"</span>]:
+            <span class="kw">assert</span> variant.get(<span class="str">"artifact"</span>) <span class="kw">or</span> variant.get(<span class="str">"voices"</span>)
+
+<span class="cm"># Run with: python -m pytest tests/ -v</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># pytest tests are simpler — just use assert statements</code>
+        <br><span class="desc">A comment: <em>pytest tests are simpler — just use assert statements</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>from ai_voice_studio.tts import catalog</code>
+        <br><span class="desc">Imports <code>catalog</code> from <code>ai_voice_studio.tts</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>def test_tts_ids_are_unique():</code>
+        <br><span class="desc">Defines function <code>test_tts_ids_are_unique</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>&quot;&quot;&quot;Every TTS engine must have a unique ID.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Every TTS engine must have a unique ID.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>ids = [t[&quot;id&quot;] for t in catalog.get_tts_list()]</code>
+        <br><span class="desc">Assigns <code>[t[&quot;id&quot;] for t in catalog.get_tts_list()]</code> to <code>ids</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>assert len(ids) == len(set(ids))</code>
+        <br><span class="desc">Returns the number of items in a sequence (string, list, dict, tuple). Essential for loop bounds and validation.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>def test_required_engines_present():</code>
+        <br><span class="desc">Defines function <code>test_required_engines_present</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>&quot;&quot;&quot;Piper, Kokoro, and Matcha must be in the catalog.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Piper, Kokoro, and Matcha must be in the catalog.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>ids = {t[&quot;id&quot;] for t in catalog.get_tts_list()}</code>
+        <br><span class="desc">Assigns <code>{t[&quot;id&quot;] for t in catalog.get_tts_list()}</code> to <code>ids</code>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>assert &quot;piper&quot; in ids</code>
+        <br><span class="desc"><code>assert &quot;piper&quot; in ids</code></span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>assert &quot;kokoro&quot; in ids</code>
+        <br><span class="desc"><code>assert &quot;kokoro&quot; in ids</code></span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>assert &quot;matcha&quot; in ids</code>
+        <br><span class="desc"><code>assert &quot;matcha&quot; in ids</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>def test_piper_voices_have_artifacts():</code>
+        <br><span class="desc">Defines function <code>test_piper_voices_have_artifacts</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>&quot;&quot;&quot;Every Piper voice must have a download artifact.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Every Piper voice must have a download artifact.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>piper = catalog.find_tts(&quot;piper&quot;)</code>
+        <br><span class="desc">Assigns <code>catalog.find_tts(&quot;piper&quot;)</code> to <code>piper</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>assert piper is not None</code>
+        <br><span class="desc"><code>assert piper is not None</code></span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>for lang in piper[&quot;languages&quot;]:</code>
+        <br><span class="desc">Iterates over <code>piper[&quot;languages&quot;]</code>, assigning each element to <code>lang</code>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>for variant in lang[&quot;variants&quot;]:</code>
+        <br><span class="desc">Iterates over <code>lang[&quot;variants&quot;]</code>, assigning each element to <code>variant</code>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>assert variant.get(&quot;artifact&quot;) or variant.get(&quot;voices&quot;)</code>
+        <br><span class="desc">Returns the value for a key, or a default value if the key doesn't exist. Safer than direct access.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code># Run with: python -m pytest tests/ -v</code>
+        <br><span class="desc">A comment: <em>Run with: python -m pytest tests/ -v</em>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>17.4 Test Fixtures and Setup</h2>
+
+<pre><code><span class="kw">import</span> unittest
+<span class="kw">import</span> tempfile
+<span class="kw">from</span> unittest <span class="kw">import</span> mock
+
+<span class="kw">class</span> <span class="cls">ResolveVoiceFilesTest</span>(unittest.TestCase):
+    <span class="kw">def</span> <span class="fn">setUp</span>(self):
+        <span class="str">"""Called before each test method."""</span>
+        self.tmp = tempfile.TemporaryDirectory()
+        self.models_root = os.path.join(self.tmp.name, <span class="str">"models"</span>)
+        <span class="cm"># Mock the paths module to use our temp directory</span>
+        self.patcher = mock.patch(
+            <span class="str">"ai_voice_studio.paths.user_data_dir"</span>,
+            return_value=self.tmp.name,
+        )
+        self.patcher.start()
+
+    <span class="kw">def</span> <span class="fn">tearDown</span>(self):
+        <span class="str">"""Called after each test method."""</span>
+        self.patcher.stop()
+        self.tmp.cleanup()
+
+    <span class="kw">def</span> <span class="fn">_voice_dir</span>(self, name: str) -> str:
+        <span class="str">"""Create a voice directory in the temp area."""</span>
+        d = os.path.join(self.models_root, name)
+        os.makedirs(d, exist_ok=<span class="kw">True</span>)
+        <span class="kw">return</span> d
+
+    <span class="kw">def</span> <span class="fn">test_matcha_finds_acoustic_model</span>(self):
+        vdir = self._voice_dir(<span class="str">"matcha_en/default"</span>)
+        open(os.path.join(vdir, <span class="str">"model-steps-3.onnx"</span>), <span class="str">"w"</span>).close()
+        open(os.path.join(vdir, <span class="str">"tokens.txt"</span>), <span class="str">"w"</span>).close()
+        <span class="cm"># ... test resolve_voice_files finds the right files</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code>import unittest</code>
+        <br><span class="desc">Imports the <code>unittest</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>import tempfile</code>
+        <br><span class="desc">Imports the <code>tempfile</code> module.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>from unittest import mock</code>
+        <br><span class="desc">Imports <code>mock</code> from <code>unittest</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>class ResolveVoiceFilesTest(unittest.TestCase):</code>
+        <br><span class="desc">Defines class <code>ResolveVoiceFilesTest</code> inheriting from <code>unittest.TestCase</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>def setUp(self):</code>
+        <br><span class="desc">Defines function <code>setUp</code> accepting (self).</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>&quot;&quot;&quot;Called before each test method.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Called before each test method.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>self.tmp = tempfile.TemporaryDirectory()</code>
+        <br><span class="desc">Stores <code>tempfile.TemporaryDirectory()</code> in instance attribute <code>tmp</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>self.models_root = os.path.join(self.tmp.name, &quot;models&quot;)</code>
+        <br><span class="desc">OS-agnostic path manipulation. Use join(), exists(), dirname(), basename(), splitext().</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code># Mock the paths module to use our temp directory</code>
+        <br><span class="desc">A comment: <em>Mock the paths module to use our temp directory</em>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>self.patcher = mock.patch(</code>
+        <br><span class="desc">Stores <code>mock.patch(</code> in instance attribute <code>patcher</code>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>&quot;ai_voice_studio.paths.user_data_dir&quot;,</code>
+        <br><span class="desc"><code>&quot;ai_voice_studio.paths.user_data_dir&quot;,</code></span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>return_value=self.tmp.name,</code>
+        <br><span class="desc">Assigns <code>self.tmp.name,</code> to <code>return_value</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>self.patcher.start()</code>
+        <br><span class="desc"><code>self.patcher.start()</code></span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>def tearDown(self):</code>
+        <br><span class="desc">Defines function <code>tearDown</code> accepting (self).</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>&quot;&quot;&quot;Called after each test method.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Called after each test method.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>self.patcher.stop()</code>
+        <br><span class="desc"><code>self.patcher.stop()</code></span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>self.tmp.cleanup()</code>
+        <br><span class="desc"><code>self.tmp.cleanup()</code></span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>def _voice_dir(self, name: str) -&gt; str:</code>
+        <br><span class="desc">Returns a list of attributes and methods of an object. Useful for exploration and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>&quot;&quot;&quot;Create a voice directory in the temp area.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Create a voice directory in the temp area.</em>. Documents the purpose of the following code.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>d = os.path.join(self.models_root, name)</code>
+        <br><span class="desc">OS-agnostic path manipulation. Use join(), exists(), dirname(), basename(), splitext().</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>os.makedirs(d, exist_ok=True)</code>
+        <br><span class="desc">Recursively creates directories. exist_ok=True prevents errors if directory exists.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>return d</code>
+        <br><span class="desc">Returns <code>d</code> to the caller.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>def test_matcha_finds_acoustic_model(self):</code>
+        <br><span class="desc">Defines function <code>test_matcha_finds_acoustic_model</code> accepting (self).</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code>vdir = self._voice_dir(&quot;matcha_en/default&quot;)</code>
+        <br><span class="desc">Returns a list of attributes and methods of an object. Useful for exploration and debugging.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>open(os.path.join(vdir, &quot;model-steps-3.onnx&quot;), &quot;w&quot;).close()</code>
+        <br><span class="desc">Closes the file and flushes the write buffer. Prefer using 'with' instead.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>open(os.path.join(vdir, &quot;tokens.txt&quot;), &quot;w&quot;).close()</code>
+        <br><span class="desc">Closes the file and flushes the write buffer. Prefer using 'with' instead.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code># ... test resolve_voice_files finds the right files</code>
+        <br><span class="desc">A comment: <em>... test resolve_voice_files finds the right files</em>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>17.5 AIVS Test Suite Structure</h2>
+
+<table>
+  <thead><tr><th>Test File</th><th>Tests</th><th>What It Tests</th></tr></thead>
+  <tbody>
+    <tr><td><code>test_catalog.py</code></td><td>14</td><td>TTS catalog structure, voice entries, artifacts</td></tr>
+    <tr><td><code>test_compute.py</code></td><td>6</td><td>GPU/CPU detection logic</td></tr>
+    <tr><td><code>test_engine.py</code></td><td>8</td><td>TTS engine wrapper, pitch/volume</td></tr>
+    <tr><td><code>test_parsers.py</code></td><td>12</td><td>PDF, DOCX, HTML, Markdown parsing</td></tr>
+    <tr><td><code>test_project.py</code></td><td>10</td><td>Project save/load, segment management</td></tr>
+    <tr><td><code>test_splitter.py</code></td><td>15</td><td>Text splitting algorithms</td></tr>
+    <tr><td><code>test_settings.py</code></td><td>8</td><td>Settings persistence, dot-notation</td></tr>
+    <tr><td><code>test_paths.py</code></td><td>7</td><td>Path resolution</td></tr>
+    <tr><td><code>test_gui_smoke.py</code></td><td>6</td><td>GUI creation smoke tests</td></tr>
+    <tr><td><code>test_runtime.py</code></td><td>5</td><td>Python runtime management</td></tr>
+    <tr><td><code>test_clone.py</code></td><td>4</td><td>Voice cloning engine</td></tr>
+    <tr><td><code>test_daisy.py</code></td><td>4</td><td>DAISY book generation</td></tr>
+  </tbody>
+</table>
+
+<pre><code><span class="cm"># Running the test suite</span>
+<span class="cm"># Install pytest first</span>
+pip install pytest
+
+<span class="cm"># Run all tests with verbose output</span>
+python -m pytest tests/ -v
+
+<span class="cm"># Run a specific test file</span>
+python -m pytest tests/test_catalog.py -v
+
+<span class="cm"># Run a specific test</span>
+python -m pytest tests/test_catalog.py::CatalogStructureTest::test_tts_ids_unique -v
+
+<span class="cm"># Run tests matching a pattern</span>
+python -m pytest tests/ -k "piper" -v</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 4)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Running the test suite</code>
+        <br><span class="desc">A comment: <em>Running the test suite</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code># Install pytest first</code>
+        <br><span class="desc">A comment: <em>Install pytest first</em>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>pip install pytest</code>
+        <br><span class="desc"><code>pip install pytest</code></span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># Run all tests with verbose output</code>
+        <br><span class="desc">A comment: <em>Run all tests with verbose output</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>python -m pytest tests/ -v</code>
+        <br><span class="desc"><code>python -m pytest tests/ -v</code></span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code># Run a specific test file</code>
+        <br><span class="desc">A comment: <em>Run a specific test file</em>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>python -m pytest tests/test_catalog.py -v</code>
+        <br><span class="desc"><code>python -m pytest tests/test_catalog.py -v</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># Run a specific test</code>
+        <br><span class="desc">A comment: <em>Run a specific test</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>python -m pytest tests/test_catalog.py::CatalogStructureTest::test_tts_ids_unique -v</code>
+        <br><span class="desc"><code>python -m pytest tests/test_catalog.py::CatalogStructureTest::test_tts_ids_unique -v</code></span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code># Run tests matching a pattern</code>
+        <br><span class="desc">A comment: <em>Run tests matching a pattern</em>.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>python -m pytest tests/ -k &quot;piper&quot; -v</code>
+        <br><span class="desc"><code>python -m pytest tests/ -k &quot;piper&quot; -v</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>17.6 Key Takeaways</h2>
+<ul>
+  <li>Test names should be <strong>descriptive</strong>: <code>test_piper_voices_have_artifacts</code></li>
+  <li><strong>setUp/tearDown</strong> create and clean up test fixtures</li>
+  <li>Use <strong>tempfile.TemporaryDirectory</strong> for file system tests</li>
+  <li>The AIVS test suite has <strong>99+ tests</strong> across 12 files</li>
+  <li><strong>pytest</strong> is simpler than unittest but unittest is in the stdlib</li>
+</ul>
+
+<div class="exercise"><strong>Exercise 17.1:</strong> Write 5 tests for the <code>sanitize_filename</code> function covering: special characters, long names, empty input, whitespace, and unicode characters.</div>
+
+<hr>
+<p style="text-align: center;"><a href="ch16_datetime.html">← Ch 16</a> &nbsp;|&nbsp; <a href="ch18_json_xml.html">Ch 18 — JSON/XML →</a></p>
+</div></div></body>
+</html>

@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Building AI Voice Studio - A Complete Python &amp; wxPython Guide</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="book-container">
+
+<!-- ==================== SIDEBAR / TABLE OF CONTENTS ==================== -->
+<nav class="sidebar">
+  <h2>📖 Table of Contents</h2>
+
+  <div class="part-header">Part I — Python Fundamentals</div>
+  <ul class="chapters">
+    <li><a href="chapters/ch01_introduction.html">Ch 1: Introduction &amp; Setup</a></li>
+    <li><a href="chapters/ch02_variables.html">Ch 2: Variables &amp; Data Types</a></li>
+    <li><a href="chapters/ch03_control_flow.html">Ch 3: Control Flow</a></li>
+    <li><a href="chapters/ch04_functions.html">Ch 4: Functions</a></li>
+    <li><a href="chapters/ch05_strings.html">Ch 5: Strings &amp; Formatting</a></li>
+    <li><a href="chapters/ch06_collections.html">Ch 6: Lists, Tuples, Sets &amp; Dicts</a></li>
+    <li><a href="chapters/ch07_file_io.html">Ch 7: File I/O</a></li>
+    <li><a href="chapters/ch08_error_handling.html">Ch 8: Error Handling</a></li>
+    <li><a href="chapters/ch09_modules.html">Ch 9: Modules &amp; Packages</a></li>
+    <li><a href="chapters/ch10_oop_basics.html">Ch 10: OOP Basics</a></li>
+  </ul>
+
+  <div class="part-header">Part II — Intermediate Python</div>
+  <ul class="chapters">
+    <li><a href="chapters/ch11_oop_advanced.html">Ch 11: OOP Advanced</a></li>
+    <li><a href="chapters/ch12_iterators.html">Ch 12: Iterators &amp; Generators</a></li>
+    <li><a href="chapters/ch13_decorators.html">Ch 13: Decorators</a></li>
+    <li><a href="chapters/ch14_context.html">Ch 14: Context Managers</a></li>
+    <li><a href="chapters/ch15_regex.html">Ch 15: Regular Expressions</a></li>
+    <li><a href="chapters/ch16_datetime.html">Ch 16: Date &amp; Time</a></li>
+    <li><a href="chapters/ch17_testing.html">Ch 17: Testing with unittest &amp; pytest</a></li>
+    <li><a href="chapters/ch18_json_xml.html">Ch 18: JSON, XML &amp; Structured Data</a></li>
+  </ul>
+
+  <div class="part-header">Part III — Advanced Python</div>
+  <ul class="chapters">
+    <li><a href="chapters/ch19_concurrency.html">Ch 19: Concurrency &amp; Threading</a></li>
+    <li><a href="chapters/ch20_multiprocessing.html">Ch 20: Multiprocessing</a></li>
+    <li><a href="chapters/ch21_async.html">Ch 21: Async I/O</a></li>
+    <li><a href="chapters/ch22_type_hints.html">Ch 22: Type Hints &amp; Static Typing</a></li>
+    <li><a href="chapters/ch23_metaclasses.html">Ch 23: Metaclasses &amp; Descriptors</a></li>
+    <li><a href="chapters/ch24_design_patterns.html">Ch 24: Design Patterns in Python</a></li>
+    <li><a href="chapters/ch25_introspection.html">Ch 25: Introspection &amp; Reflection</a></li>
+    <li><a href="chapters/ch26_c_extensions.html">Ch 26: C Extensions &amp; ctypes</a></li>
+  </ul>
+
+  <div class="part-header">Part IV — wxPython GUI Development</div>
+  <ul class="chapters">
+    <li><a href="chapters/ch27_wxpython_intro.html">Ch 27: wxPython Introduction</a></li>
+    <li><a href="chapters/ch28_sizers_layout.html">Ch 28: Sizers &amp; Layout</a></li>
+    <li><a href="chapters/ch29_controls.html">Ch 29: Controls &amp; Widgets</a></li>
+    <li><a href="chapters/ch30_events.html">Ch 30: Event Handling</a></li>
+    <li><a href="chapters/ch31_dialogs.html">Ch 31: Dialogs &amp; Wizards</a></li>
+    <li><a href="chapters/ch32_custom_drawing.html">Ch 32: Custom Drawing &amp; DC</a></li>
+    <li><a href="chapters/ch33_threading_gui.html">Ch 33: Threading in GUI Apps</a></li>
+    <li><a href="chapters/ch34_accessibility.html">Ch 34: Accessibility (a11y)</a></li>
+    <li><a href="chapters/ch35_themes.html">Ch 35: Theming &amp; Styling</a></li>
+    <li><a href="chapters/ch36_wx_adv.html">Ch 36: wx.adv &amp; Advanced Widgets</a></li>
+  </ul>
+
+  <div class="part-header">Part V — Dependencies Deep Dive</div>
+  <ul class="chapters">
+    <li><a href="chapters/ch37_numpy.html">Ch 37: NumPy for Audio Processing</a></li>
+    <li><a href="chapters/ch38_requests.html">Ch 38: Requests &amp; HTTP</a></li>
+    <li><a href="chapters/ch39_sherpa_onnx.html">Ch 39: sherpa-onnx TTS Engine</a></li>
+    <li><a href="chapters/ch40_pypdf_docx.html">Ch 40: PDF &amp; DOCX Parsing</a></li>
+    <li><a href="chapters/ch41_ffmpeg.html">Ch 41: FFmpeg &amp; Audio Formats</a></li>
+    <li><a href="chapters/ch42_virtualenvs.html">Ch 42: Virtual Environments &amp; Packaging</a></li>
+  </ul>
+
+  <div class="part-header">Part VI — Building AI Voice Studio</div>
+  <ul class="chapters">
+    <li><a href="chapters/ch43_architecture.html">Ch 43: Project Architecture</a></li>
+    <li><a href="chapters/ch44_paths_settings.html">Ch 44: Paths, Settings &amp; Constants</a></li>
+    <li><a href="chapters/ch45_project_model.html">Ch 45: Project Model &amp; Persistence</a></li>
+    <li><a href="chapters/ch46_document_parsing.html">Ch 46: Document Parsing &amp; Splitting</a></li>
+    <li><a href="chapters/ch47_tts_catalog.html">Ch 47: TTS Catalog &amp; Model Store</a></li>
+    <li><a href="chapters/ch48_tts_engine.html">Ch 48: TTS Engine Integration</a></li>
+    <li><a href="chapters/ch49_downloader.html">Ch 49: Model Downloader &amp; Artifacts</a></li>
+    <li><a href="chapters/ch50_compute_detection.html">Ch 50: Compute Back-end Detection</a></li>
+    <li><a href="chapters/ch51_main_frame.html">Ch 51: Main Frame &amp; Menu System</a></li>
+    <li><a href="chapters/ch52_settings_dialog.html">Ch 52: Settings Dialog</a></li>
+    <li><a href="chapters/ch53_model_panels.html">Ch 53: Model Management Panels</a></li>
+    <li><a href="chapters/ch54_new_project_wizard.html">Ch 54: New Project Wizard</a></li>
+    <li><a href="chapters/ch55_recording.html">Ch 55: Recording Dialog</a></li>
+    <li><a href="chapters/ch56_synthesis_worker.html">Ch 56: Background Synthesis Worker</a></li>
+    <li><a href="chapters/ch57_clone_engine.html">Ch 57: Voice Cloning (XTTS v2)</a></li>
+    <li><a href="chapters/ch58_omnivoice.html">Ch 58: OmniVoice TTS Engine</a></li>
+    <li><a href="chapters/ch59_daisy_builder.html">Ch 59: DAISY Book Builder</a></li>
+    <li><a href="chapters/ch60_addons.html">Ch 60: Addon System</a></li>
+  </ul>
+
+  <div class="part-header">Part VII — Testing &amp; Deployment</div>
+  <ul class="chapters">
+    <li><a href="chapters/ch61_unit_testing.html">Ch 61: Unit Testing Strategies</a></li>
+    <li><a href="chapters/ch62_mocking.html">Ch 62: Mocking &amp; Test Doubles</a></li>
+    <li><a href="chapters/ch63_integration.html">Ch 63: Integration Testing</a></li>
+    <li><a href="chapters/ch64_pyinstaller.html">Ch 64: PyInstaller Packaging</a></li>
+    <li><a href="chapters/ch65_inno_setup.html">Ch 65: Inno Setup Installers</a></li>
+    <li><a href="chapters/ch66_ci_cd.html">Ch 66: CI/CD &amp; Release</a></li>
+  </ul>
+
+  <div class="part-header">Part VIII — Advanced Topics</div>
+  <ul class="chapters">
+    <li><a href="chapters/ch67_python_runtime.html">Ch 67: Managed Python Runtime</a></li>
+    <li><a href="chapters/ch68_subprocess.html">Ch 68: Subprocess Architecture</a></li>
+    <li><a href="chapters/ch69_logging.html">Ch 69: Logging &amp; Diagnostics</a></li>
+    <li><a href="chapters/ch70_performance.html">Ch 70: Performance Optimization</a></li>
+    <li><a href="chapters/ch71_security.html">Ch 71: Security Considerations</a></li>
+    <li><a href="chapters/ch72_roadmap.html">Ch 72: Future Directions &amp; Roadmap</a></li>
+  </ul>
+
+  <div class="part-header">Appendices</div>
+  <ul class="chapters">
+    <li><a href="chapters/appendix_a_reference.html">A: Python Quick Reference</a></li>
+    <li><a href="chapters/appendix_b_api.html">B: AIVS API Reference</a></li>
+    <li><a href="chapters/appendix_c_glossary.html">C: Glossary</a></li>
+  </ul>
+</nav>
+
+<!-- ==================== MAIN CONTENT ==================== -->
+<div class="main-content">
+
+<div class="book-cover">
+  <h1>Building AI Voice Studio</h1>
+  <div class="subtitle">A Complete Python &amp; wxPython Guide<br>From Zero to Desktop Application</div>
+  <hr>
+  <p style="font-size: 1.05rem; color: #475569; max-width: 600px; margin: 0 auto;">
+    This book teaches you every concept of Python — basic, intermediate, and advanced —
+    through the lens of a real-world desktop application: <strong>AI Voice Studio</strong>,
+    a text-to-speech studio built with wxPython, sherpa-onnx, and NumPy.
+  </p>
+  <p style="font-size: 0.95rem; color: #6b7280; margin-top: 24px;">
+    By the time you finish, you will be able to build, test, and package a complete
+    Python desktop application on your own.
+  </p>
+  <hr>
+  <p class="edition">
+    First Edition &bull; 2026 &bull; Python 3.13 &bull; wxPython 4.3<br>
+    Based on AI Voice Studio (AIVS) open-source project
+  </p>
+</div>
+
+<hr>
+
+<!-- ==================== PREFACE ==================== -->
+<h2 id="preface">Preface</h2>
+
+<h3>Who This Book Is For</h3>
+<p>
+  This book is designed for programmers who want to learn Python from the ground up
+  and apply their knowledge to build a real, functional desktop application. Whether
+  you are a complete beginner, an intermediate developer expanding your skills, or an
+  experienced programmer new to Python, this book provides a structured path from
+  fundamentals to advanced topics.
+</p>
+
+<h3>How This Book Is Organized</h3>
+<p>The book is divided into eight parts:</p>
+<ol>
+  <li><strong>Part I — Python Fundamentals</strong> (Chapters 1–10): Variables, control flow, functions, file I/O, error handling, modules, and object-oriented basics.</li>
+  <li><strong>Part II — Intermediate Python</strong> (Chapters 11–18): Advanced OOP, decorators, context managers, regular expressions, testing, and structured data.</li>
+  <li><strong>Part III — Advanced Python</strong> (Chapters 19–26): Concurrency, multiprocessing, async I/O, type hints, metaclasses, design patterns, and introspection.</li>
+  <li><strong>Part IV — wxPython GUI Development</strong> (Chapters 27–36): Building desktop interfaces, event handling, threading in GUI apps, accessibility, and theming.</li>
+  <li><strong>Part V — Dependencies Deep Dive</strong> (Chapters 37–42): NumPy, Requests, sherpa-onnx, PDF/DOCX parsing, FFmpeg, and virtual environments.</li>
+  <li><strong>Part VI — Building AI Voice Studio</strong> (Chapters 43–60): The complete project from architecture to every major subsystem.</li>
+  <li><strong>Part VII — Testing &amp; Deployment</strong> (Chapters 61–66): Unit testing, mocking, PyInstaller, Inno Setup, and CI/CD.</li>
+  <li><strong>Part VIII — Advanced Topics</strong> (Chapters 67–72): Managed runtime, subprocess architecture, logging, performance, and security.</li>
+</ol>
+
+<h3>The Running Example: AI Voice Studio</h3>
+<p>
+  Rather than teaching concepts in isolation, every chapter applies what it teaches
+  to <strong>AI Voice Studio</strong> (AIVS) — a production-quality desktop application
+  that converts text documents into spoken audio using neural TTS engines. The project
+  demonstrates:
+</p>
+<ul>
+  <li>wxPython GUI with accessibility support (NVDA, JAWS, Narrator)</li>
+  <li>Multiple TTS engines (Piper, Kokoro, Matcha, Kitten, XTTS v2 cloning)</li>
+  <li>Document parsing (PDF, DOCX, HTML, Markdown, EPUB)</li>
+  <li>Background threading for non-blocking synthesis</li>
+  <li>Virtual environment management and addon architecture</li>
+  <li>PyInstaller packaging and Inno Setup installers</li>
+  <li>99+ unit tests with comprehensive coverage</li>
+</ul>
+
+<h3>Prerequisites</h3>
+<ul>
+  <li>A computer running Windows (primary), macOS, or Linux</li>
+  <li>Python 3.11 or later installed</li>
+  <li>A text editor or IDE (VS Code, PyCharm, or similar)</li>
+  <li>No prior Python experience required — we start from scratch</li>
+</ul>
+
+<hr>
+
+<!-- ==================== HOW TO USE THIS BOOK ==================== -->
+<h2 id="how-to-use">How to Use This Book</h2>
+
+<p>Each chapter follows a consistent structure:</p>
+
+<table>
+  <thead>
+    <tr><th>Section</th><th>Purpose</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><strong>Learning Objectives</strong></td><td>What you will master in this chapter</td></tr>
+    <tr><td><strong>Core Concepts</strong></td><td>Thorough explanation with syntax and semantics</td></tr>
+    <tr><td><strong>Code Examples</strong></td><td>Working examples with output, drawn from the AIVS project</td></tr>
+    <tr><td><strong>AIVS in Action</strong></td><td>How the concept appears in the real project</td></tr>
+    <tr><td><strong>Exercises</strong></td><td>Practice problems to reinforce learning</td></tr>
+    <tr><td><strong>Key Takeaways</strong></td><td>Summary of the most important points</td></tr>
+  </tbody>
+</table>
+
+<div class="info">
+  <strong>Interactive Learning:</strong> Every code example in this book can be typed into a
+  Python REPL or saved to a <code>.py</code> file and executed. The AI Voice Studio
+  project files are referenced by their actual paths in the repository.
+</div>
+
+<hr>
+
+<p style="text-align: center; color: #9ca3af; font-size: 0.9rem;">
+  <em>Begin your journey: start with <a href="chapters/ch01_introduction.html">Chapter 1: Introduction &amp; Setup</a></em>
+</p>
+
+</div><!-- /.main-content -->
+</div><!-- /.book-container -->
+</body>
+</html>

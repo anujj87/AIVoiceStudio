@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 33: Threading in GUI Apps - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part IV</div><ul class="chapters"><li><a href="ch27_wxpython_intro.html">Ch 27</a></li><li><a href="ch28_sizers_layout.html">Ch 28</a></li><li><a href="ch29_controls.html">Ch 29</a></li><li><a href="ch30_events.html">Ch 30</a></li><li><a href="ch31_dialogs.html">Ch 31</a></li><li><a href="ch32_custom_drawing.html">Ch 32</a></li><li><a href="ch33_threading_gui.html" class="active">Ch 33: Threading+GUI</a></li><li><a href="ch34_accessibility.html">Ch 34</a></li><li><a href="ch35_themes.html">Ch 35</a></li><li><a href="ch36_wx_adv.html">Ch 36</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 33</div>
+<h1>Threading in GUI Applications</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand why threading + GUI requires special care</li>
+  <li>Master the wx.PostEvent pattern for thread-safe GUI updates</li>
+  <li>See the complete SynthesisWorker pattern in AIVS</li>
+</ul>
+
+<hr>
+
+<h2>33.1 The Rule: Never Touch GUI from Worker Threads</h2>
+
+<div class="warning">
+  <strong>Rule #1:</strong> wxPython widgets are NOT thread-safe. You must NEVER call
+  widget methods from a worker thread. Always use <code>wx.PostEvent()</code> to
+  send messages to the main thread, where the GUI handler updates the widgets.
+</div>
+
+<pre><code><span class="cm"># ❌ WRONG — crashes or corrupts GUI</span>
+<span class="kw">def</span> <span class="fn">worker</span>(self):
+    self.status_label.SetLabel(<span class="str">"Working..."</span>)  <span class="cm"># DANGER!</span>
+
+<span class="cm"># ✓ CORRECT — post event to main thread</span>
+<span class="kw">def</span> <span class="fn">worker</span>(self):
+    wx.PostEvent(self, SynthStatusEvent(<span class="str">"Working..."</span>))
+
+<span class="cm"># ✓ CORRECT — use wx.CallAfter for simple cases</span>
+<span class="kw">def</span> <span class="fn">worker</span>(self):
+    wx.CallAfter(self.status_label.SetLabel, <span class="str">"Working..."</span>)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># ❌ WRONG — crashes or corrupts GUI</code>
+        <br><span class="desc">A comment: <em>❌ WRONG — crashes or corrupts GUI</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>def worker(self):</code>
+        <br><span class="desc">Defines function <code>worker</code> accepting (self).</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>self.status_label.SetLabel(&quot;Working...&quot;)  # DANGER!</code>
+        <br><span class="desc"><code>self.status_label.SetLabel(&quot;Working...&quot;)  # DANGER!</code></span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code># ✓ CORRECT — post event to main thread</code>
+        <br><span class="desc">A comment: <em>✓ CORRECT — post event to main thread</em>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>def worker(self):</code>
+        <br><span class="desc">Defines function <code>worker</code> accepting (self).</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>wx.PostEvent(self, SynthStatusEvent(&quot;Working...&quot;))</code>
+        <br><span class="desc">Creates a wxPython <code>wx.PostEvent</code> widget.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code># ✓ CORRECT — use wx.CallAfter for simple cases</code>
+        <br><span class="desc">A comment: <em>✓ CORRECT — use wx.CallAfter for simple cases</em>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code>def worker(self):</code>
+        <br><span class="desc">Defines function <code>worker</code> accepting (self).</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>wx.CallAfter(self.status_label.SetLabel, &quot;Working...&quot;)</code>
+        <br><span class="desc">Schedules a function to run on the main thread after the current event handler. Essential for thread-safe GUI updates.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>33.2 The Complete Pattern</h2>
+
+<p>The AIVS Recording Dialog demonstrates the full pattern:</p>
+
+<pre><code><span class="cm"># 1. Define custom events</span>
+_SYNTH_STATUS = wx.NewEventType()
+EVT_SYNTH_STATUS = wx.PyEventBinder(_SYNTH_STATUS, <span class="num">1</span>)
+
+<span class="kw">class</span> <span class="cls">SynthStatusEvent</span>(wx.PyCommandEvent):
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, message: str):
+        <span class="kw">super</span>().__init__(_SYNTH_STATUS)
+        self.message = message
+
+<span class="cm"># 2. Create the worker thread</span>
+<span class="kw">class</span> <span class="cls">SynthesisWorker</span>(threading.Thread):
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, ..., on_status, on_segment_done, on_all_done, on_error):
+        <span class="kw">super</span>().__init__(daemon=<span class="kw">True</span>)
+        self._on_status = on_status
+        self._on_done = on_segment_done
+        self._on_all_done = on_all_done
+        self._on_error = on_error
+
+    <span class="kw">def</span> <span class="fn">run</span>(self):
+        <span class="kw">try</span>:
+            <span class="kw">for</span> i, seg <span class="kw">in</span> enumerate(self._segments):
+                self._on_status(<span class="str">f"Recording </span>{seg.title}<span class="str">..."</span>)
+                <span class="cm"># ... synthesize ...</span>
+                self._on_done(i, seg.title, path)
+            self._on_all_done()
+        <span class="kw">except</span> Exception <span class="kw">as</span> exc:
+            self._on_error(str(exc))
+
+<span class="cm"># 3. Launch from GUI (main thread)</span>
+<span class="kw">def</span> <span class="fn">_on_start</span>(self, _):
+    self._worker = SynthesisWorker(
+        segments=self._segments,
+        on_status=<span class="kw">lambda</span> msg: wx.PostEvent(self, SynthStatusEvent(msg)),
+        on_segment_done=<span class="kw">lambda</span> i, t, p: wx.PostEvent(self, SynthSegmentDoneEvent(i, t, p)),
+        on_all_done=<span class="kw">lambda</span>: wx.PostEvent(self, SynthFinishedEvent()),
+        on_error=<span class="kw">lambda</span> msg: wx.PostEvent(self, SynthErrorEvent(msg)),
+    )
+    self._worker.start()
+
+<span class="cm"># 4. Handle events (main thread)</span>
+self.Bind(EVT_SYNTH_STATUS, self._on_synth_status)
+self.Bind(EVT_SYNTH_SEGMENT_DONE, self._on_segment_done)
+self.Bind(EVT_SYNTH_FINISHED, self._on_finished)
+self.Bind(EVT_SYNTH_ERROR, self._on_error)
+
+<span class="kw">def</span> <span class="fn">_on_synth_status</span>(self, evt):
+    self.status_label.SetLabel(evt.message)  <span class="cm"># Safe — main thread</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># 1. Define custom events</code>
+        <br><span class="desc">A comment: <em>1. Define custom events</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>_SYNTH_STATUS = wx.NewEventType()</code>
+        <br><span class="desc">Assigns <code>wx.NewEventType()</code> to <code>_SYNTH_STATUS</code>.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code>EVT_SYNTH_STATUS = wx.PyEventBinder(_SYNTH_STATUS, 1)</code>
+        <br><span class="desc">Assigns <code>wx.PyEventBinder(_SYNTH_STATUS, 1)</code> to <code>EVT_SYNTH_STATUS</code>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>class SynthStatusEvent(wx.PyCommandEvent):</code>
+        <br><span class="desc">Defines class <code>SynthStatusEvent</code> inheriting from <code>wx.PyCommandEvent</code>.</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>def __init__(self, message: str):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>super().__init__(_SYNTH_STATUS)</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>self.message = message</code>
+        <br><span class="desc">Stores <code>message</code> in instance attribute <code>message</code>.</span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># 2. Create the worker thread</code>
+        <br><span class="desc">A comment: <em>2. Create the worker thread</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code>class SynthesisWorker(threading.Thread):</code>
+        <br><span class="desc">Creates a background thread. Use daemon=True for threads that should not block app exit.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>def __init__(self, ..., on_status, on_segment_done, on_all_done, on_error):</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>super().__init__(daemon=True)</code>
+        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>self._on_status = on_status</code>
+        <br><span class="desc">Stores <code>on_status</code> in instance attribute <code>_on_status</code>.</span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code>self._on_done = on_segment_done</code>
+        <br><span class="desc">Stores <code>on_segment_done</code> in instance attribute <code>_on_done</code>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>self._on_all_done = on_all_done</code>
+        <br><span class="desc">Stores <code>on_all_done</code> in instance attribute <code>_on_all_done</code>.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>self._on_error = on_error</code>
+        <br><span class="desc">Stores <code>on_error</code> in instance attribute <code>_on_error</code>.</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>def run(self):</code>
+        <br><span class="desc">Defines function <code>run</code> accepting (self).</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>try:</code>
+        <br><span class="desc">Begins exception handling. Code in this block is monitored for errors.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>for i, seg in enumerate(self._segments):</code>
+        <br><span class="desc">Adds a counter to an iterable, returning (index, value) pairs. Preferred over manual index tracking.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>self._on_status(f&quot;Recording {seg.title}...&quot;)</code>
+        <br><span class="desc">Calls <code>self._on_status()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code># ... synthesize ...</code>
+        <br><span class="desc">A comment: <em>... synthesize ...</em>.</span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code>self._on_done(i, seg.title, path)</code>
+        <br><span class="desc">Calls <code>self._on_done()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 22:</strong> <code>self._on_all_done()</code>
+        <br><span class="desc">Calls <code>self._on_all_done()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 23:</strong> <code>except Exception as exc:</code>
+        <br><span class="desc">Catches <code>Exception</code> exceptions.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>self._on_error(str(exc))</code>
+        <br><span class="desc">Converts a value to its string representation. Essential for string concatenation and formatting.</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code># 3. Launch from GUI (main thread)</code>
+        <br><span class="desc">A comment: <em>3. Launch from GUI (main thread)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 26:</strong> <code>def _on_start(self, _):</code>
+        <br><span class="desc">Defines function <code>_on_start</code> accepting (self, _).</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>self._worker = SynthesisWorker(</code>
+        <br><span class="desc">Stores <code>SynthesisWorker(</code> in instance attribute <code>_worker</code>.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>segments=self._segments,</code>
+        <br><span class="desc">Assigns <code>self._segments,</code> to <code>segments</code>.</span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>on_status=lambda msg: wx.PostEvent(self, SynthStatusEvent(msg)),</code>
+        <br><span class="desc">Creates an anonymous function and assigns it to <code>on_status</code>.</span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code>on_segment_done=lambda i, t, p: wx.PostEvent(self, SynthSegmentDoneEvent(i, t, p)),</code>
+        <br><span class="desc">Creates an anonymous function and assigns it to <code>on_segment_done</code>.</span>
+      </li>
+      <li>
+        <strong>Line 31:</strong> <code>on_all_done=lambda: wx.PostEvent(self, SynthFinishedEvent()),</code>
+        <br><span class="desc">Assigns <code>lambda: wx.PostEvent(self, SynthFinishedEvent()),</code> to <code>on_all_done</code>.</span>
+      </li>
+      <li>
+        <strong>Line 32:</strong> <code>on_error=lambda msg: wx.PostEvent(self, SynthErrorEvent(msg)),</code>
+        <br><span class="desc">Creates an anonymous function and assigns it to <code>on_error</code>.</span>
+      </li>
+      <li>
+        <strong>Line 33:</strong> <code>)</code>
+        <br><span class="desc"><code>)</code></span>
+      </li>
+      <li>
+        <strong>Line 34:</strong> <code>self._worker.start()</code>
+        <br><span class="desc"><code>self._worker.start()</code></span>
+      </li>
+      <li>
+        <strong>Line 35:</strong> <code># 4. Handle events (main thread)</code>
+        <br><span class="desc">A comment: <em>4. Handle events (main thread)</em>.</span>
+      </li>
+      <li>
+        <strong>Line 36:</strong> <code>self.Bind(EVT_SYNTH_STATUS, self._on_synth_status)</code>
+        <br><span class="desc">Registers an event handler on the frame/window itself. Used for frame-level events.</span>
+      </li>
+      <li>
+        <strong>Line 37:</strong> <code>self.Bind(EVT_SYNTH_SEGMENT_DONE, self._on_segment_done)</code>
+        <br><span class="desc">Registers an event handler on the frame/window itself. Used for frame-level events.</span>
+      </li>
+      <li>
+        <strong>Line 38:</strong> <code>self.Bind(EVT_SYNTH_FINISHED, self._on_finished)</code>
+        <br><span class="desc">Registers an event handler on the frame/window itself. Used for frame-level events.</span>
+      </li>
+      <li>
+        <strong>Line 39:</strong> <code>self.Bind(EVT_SYNTH_ERROR, self._on_error)</code>
+        <br><span class="desc">Registers an event handler on the frame/window itself. Used for frame-level events.</span>
+      </li>
+      <li>
+        <strong>Line 40:</strong> <code>def _on_synth_status(self, evt):</code>
+        <br><span class="desc">Defines function <code>_on_synth_status</code> accepting (self, evt).</span>
+      </li>
+      <li>
+        <strong>Line 41:</strong> <code>self.status_label.SetLabel(evt.message)  # Safe — main thread</code>
+        <br><span class="desc"><code>self.status_label.SetLabel(evt.message)  # Safe — main thread</code></span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>33.3 Cancel and Pause Patterns</h2>
+
+<pre><code><span class="cm"># Using threading.Event for cancellation</span>
+self._cancel_event = threading.Event()
+
+<span class="cm"># Worker checks periodically</span>
+<span class="kw">def</span> <span class="fn">run</span>(self):
+    <span class="kw">for</span> seg <span class="kw">in</span> self._segments:
+        <span class="kw">if</span> self._cancel_event.is_set():
+            <span class="kw">break</span>  <span class="cm"># Exit gracefully</span>
+        <span class="cm"># ... process segment ...</span>
+
+<span class="cm"># GUI signals cancellation</span>
+<span class="kw">def</span> <span class="fn">_on_stop</span>(self, _):
+    self._cancel_event.set()
+    self.status_label.SetLabel(<span class="str">"Stopping..."</span>)
+
+<span class="cm"># Pause uses a separate event</span>
+self._pause_event = threading.Event()
+
+<span class="kw">def</span> <span class="fn">run</span>(self):
+    <span class="kw">for</span> seg <span class="kw">in</span> self._segments:
+        <span class="kw">while</span> self._pause_event.is_set():
+            <span class="kw">if</span> self._cancel_event.is_set():
+                <span class="kw">break</span>
+            time.sleep(<span class="num">0.1</span>)  <span class="cm"># Wait while paused</span>
+        <span class="cm"># ... process segment ...</span></code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+      <li>
+        <strong>Line 1:</strong> <code># Using threading.Event for cancellation</code>
+        <br><span class="desc">A comment: <em>Using threading.Event for cancellation</em>.</span>
+      </li>
+      <li>
+        <strong>Line 2:</strong> <code>self._cancel_event = threading.Event()</code>
+        <br><span class="desc">A flag that threads can wait on. Used for signaling between threads.</span>
+      </li>
+      <li>
+        <strong>Line 3:</strong> <code># Worker checks periodically</code>
+        <br><span class="desc">A comment: <em>Worker checks periodically</em>.</span>
+      </li>
+      <li>
+        <strong>Line 4:</strong> <code>def run(self):</code>
+        <br><span class="desc">Defines function <code>run</code> accepting (self).</span>
+      </li>
+      <li>
+        <strong>Line 5:</strong> <code>for seg in self._segments:</code>
+        <br><span class="desc">Iterates over <code>self._segments</code>, assigning each element to <code>seg</code>.</span>
+      </li>
+      <li>
+        <strong>Line 6:</strong> <code>if self._cancel_event.is_set():</code>
+        <br><span class="desc">Checks condition: <code>self._cancel_event.is_set()</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 7:</strong> <code>break  # Exit gracefully</code>
+        <br><span class="desc"><code>break  # Exit gracefully</code></span>
+      </li>
+      <li>
+        <strong>Line 8:</strong> <code># ... process segment ...</code>
+        <br><span class="desc">A comment: <em>... process segment ...</em>.</span>
+      </li>
+      <li>
+        <strong>Line 9:</strong> <code># GUI signals cancellation</code>
+        <br><span class="desc">A comment: <em>GUI signals cancellation</em>.</span>
+      </li>
+      <li>
+        <strong>Line 10:</strong> <code>def _on_stop(self, _):</code>
+        <br><span class="desc">Defines function <code>_on_stop</code> accepting (self, _).</span>
+      </li>
+      <li>
+        <strong>Line 11:</strong> <code>self._cancel_event.set()</code>
+        <br><span class="desc"><code>self._cancel_event.set()</code></span>
+      </li>
+      <li>
+        <strong>Line 12:</strong> <code>self.status_label.SetLabel(&quot;Stopping...&quot;)</code>
+        <br><span class="desc"><code>self.status_label.SetLabel(&quot;Stopping...&quot;)</code></span>
+      </li>
+      <li>
+        <strong>Line 13:</strong> <code># Pause uses a separate event</code>
+        <br><span class="desc">A comment: <em>Pause uses a separate event</em>.</span>
+      </li>
+      <li>
+        <strong>Line 14:</strong> <code>self._pause_event = threading.Event()</code>
+        <br><span class="desc">A flag that threads can wait on. Used for signaling between threads.</span>
+      </li>
+      <li>
+        <strong>Line 15:</strong> <code>def run(self):</code>
+        <br><span class="desc">Defines function <code>run</code> accepting (self).</span>
+      </li>
+      <li>
+        <strong>Line 16:</strong> <code>for seg in self._segments:</code>
+        <br><span class="desc">Iterates over <code>self._segments</code>, assigning each element to <code>seg</code>.</span>
+      </li>
+      <li>
+        <strong>Line 17:</strong> <code>while self._pause_event.is_set():</code>
+        <br><span class="desc">While loop: repeats as long as <code>self._pause_event.is_set()</code>.</span>
+      </li>
+      <li>
+        <strong>Line 18:</strong> <code>if self._cancel_event.is_set():</code>
+        <br><span class="desc">Checks condition: <code>self._cancel_event.is_set()</code>. The indented block runs only when this is <code>True</code>.</span>
+      </li>
+      <li>
+        <strong>Line 19:</strong> <code>break</code>
+        <br><span class="desc">Exits the innermost loop.</span>
+      </li>
+      <li>
+        <strong>Line 20:</strong> <code>time.sleep(0.1)  # Wait while paused</code>
+        <br><span class="desc"><code>time.sleep(0.1)  # Wait while paused</code></span>
+      </li>
+      <li>
+        <strong>Line 21:</strong> <code># ... process segment ...</code>
+        <br><span class="desc">A comment: <em>... process segment ...</em>.</span>
+      </li>
+  </ol>
+</div>
+
+
+
+
+
+
+
+
+<hr>
+
+<h2>33.4 Key Takeaways</h2>
+<ul>
+  <li><strong>Never touch GUI widgets from worker threads</strong></li>
+  <li><strong>wx.PostEvent()</strong> sends events from worker → GUI safely</li>
+  <li><strong>wx.CallAfter()</strong> is a simpler alternative for single calls</li>
+  <li>Use <strong>threading.Event</strong> for cancel/pause signaling</li>
+  <li>The AIVS pattern: <strong>Worker thread → custom wx events → GUI handlers</strong></li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch32_custom_drawing.html">← Ch 32</a> &nbsp;|&nbsp; <a href="ch34_accessibility.html">Ch 34 — Accessibility →</a></p>
+</div></div></body>
+</html>
