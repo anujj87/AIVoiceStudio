@@ -4,16 +4,20 @@ Each segment has a ``title`` (used for the file name) and ``text`` (sent to the
 TTS engine). Naming rules:
 
 * page segments:      ``01 page 1``, ``02 page 2``, ...
+* grouped pages:      ``01 pages 1 to 3``, ``02 pages 4 to 6``, ...
 * heading segments:   ``01 <heading text>``, ``02 <heading text>``, ...
   (heading text is sanitized for use as a file name)
 
 Modes:
 * ``page_with_h1``  -- page by page; when a Heading-1 appears inside a page the
   text before it is emitted first, then the heading plus the rest of the page.
-* ``page_only``     -- one segment per page.
+* ``page_only``     -- one segment per page (or N pages per file when
+  ``pages_per_file`` > 1, used by the New Project wizard).
 * ``h1_only``       -- each Heading-1 together with the text up to the next
   Heading-1; text before the first Heading-1 becomes a leading "page 1" file.
 * ``all_headings``  -- every heading (levels 1-6) as its own short segment.
+* ``one_file``      -- the whole document as a single segment (no resume in
+  the middle of the one audio file).
 """
 
 from __future__ import annotations
@@ -25,6 +29,7 @@ from typing import List
 from ..constants import (
     MODE_ALL_HEADINGS,
     MODE_H1_ONLY,
+    MODE_ONE_FILE,
     MODE_PAGE_ONLY,
     MODE_PAGE_WITH_H1,
 )
@@ -52,6 +57,13 @@ def _pad(index: int) -> str:
 
 def _page_title(index: int, page_no: int) -> str:
     return f"{_pad(index)} page {page_no}"
+
+
+def _pages_title(index: int, first_page_no: int, last_page_no: int) -> str:
+    """Title for a group of consecutive pages, e.g. ``01 pages 1 to 3``."""
+    if first_page_no == last_page_no:
+        return _page_title(index, first_page_no)
+    return f"{_pad(index)} pages {first_page_no} to {last_page_no}"
 
 
 def _heading_title(index: int, heading_text: str) -> str:
@@ -106,20 +118,52 @@ def split_page_with_h1(blocks: List[Block]) -> List[Segment]:
     return segments
 
 
-def split_page_only(blocks: List[Block]) -> List[Segment]:
-    """One segment per page (SPEC 3.4 mode 2)."""
-    segments: List[Segment] = []
-    counter = 0
+def split_page_only(blocks: List[Block], pages_per_file: int = 1) -> List[Segment]:
+    """One segment per page (SPEC 3.4 mode 2).
+
+    When ``pages_per_file`` > 1, consecutive pages are grouped together and
+    each group becomes one segment (one audio file), so a group of 3 pages
+    is recorded as a single file named ``01 pages 1 to 3``.  Resume works per
+    group: every finished group is saved immediately.
+    """
+    pages_per_file = max(1, int(pages_per_file or 1))
     pages: dict[int, List[Block]] = {}
     for block in blocks:
         pages.setdefault(block.page, []).append(block)
-    for page_no in sorted(pages):
+    ordered = sorted(pages)
+    segments: List[Segment] = []
+    counter = 0
+    for start in range(0, len(ordered), pages_per_file):
+        group_pages = ordered[start:start + pages_per_file]
         counter += 1
-        text = "\n\n".join(b.text for b in pages[page_no])
+        parts: List[str] = []
+        for page_no in group_pages:
+            parts.append("\n\n".join(b.text for b in pages[page_no]))
         segments.append(
-            Segment(index=counter, title=_page_title(counter, page_no + 1), text=text, page=page_no)
+            Segment(
+                index=counter,
+                title=_pages_title(counter, group_pages[0] + 1, group_pages[-1] + 1),
+                text="\n\n".join(p for p in parts if p),
+                page=group_pages[0],
+            )
         )
     return segments
+
+
+def split_one_file(blocks: List[Block]) -> List[Segment]:
+    """Whole document as one single segment (no file separation).
+
+    Everything is joined into one audio file.  Recording can only be resumed
+    from the very beginning, never from the middle of the file - the wizard
+    and the Recording window warn about that.
+    """
+    text = "\n\n".join(b.text for b in blocks if b.text and b.text.strip())
+    if not text.strip():
+        return []
+    page = blocks[0].page if blocks else 0
+    return [
+        Segment(index=1, title=f"{_pad(1)} full recording", text=text, page=page)
+    ]
 
 
 def split_h1_only(blocks: List[Block]) -> List[Segment]:
@@ -328,14 +372,29 @@ SPLITTERS = {
     MODE_PAGE_ONLY: split_page_only,
     MODE_H1_ONLY: split_h1_only,
     MODE_ALL_HEADINGS: split_all_headings,
+    MODE_ONE_FILE: split_one_file,
 }
 
 
-def split_document(doc: Document, mode: str) -> List[Segment]:
-    splitter = SPLITTERS.get(mode)
-    if splitter is None:
-        raise ValueError(f"Unknown audio mode: {mode}")
-    segments = splitter(doc.blocks)
+def split_document(
+    doc: Document,
+    mode: str,
+    pages_per_file: int = 1,
+) -> List[Segment]:
+    """Split ``doc`` into segments for ``mode``.
+
+    ``pages_per_file`` only applies to :data:`MODE_PAGE_ONLY` (how many pages
+    go into one audio file).  It is ignored for every other mode.
+    """
+    if mode == MODE_ONE_FILE:
+        segments = split_one_file(doc.blocks)
+    elif mode == MODE_PAGE_ONLY:
+        segments = split_page_only(doc.blocks, pages_per_file=pages_per_file)
+    else:
+        splitter = SPLITTERS.get(mode)
+        if splitter is None:
+            raise ValueError(f"Unknown audio mode: {mode}")
+        segments = splitter(doc.blocks)
     # Renumber sequentially and enforce unique titles.
     seen: set[str] = set()
     for idx, seg in enumerate(segments, start=1):

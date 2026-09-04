@@ -40,9 +40,13 @@ _DEFAULTS: Dict[str, Any] = {
         "pitch": DEFAULT_PITCH,
         "volume": DEFAULT_VOLUME,
         "output_format": FORMAT_WAV,
+        # per-TTS defaults: {tts_id: {"rate": x, "pitch": y, "volume": z}}
+        "per_tts": {},
     },
     # audio file creation mode used by the New Project wizard
     "audio_mode": MODE_PAGE_WITH_H1,
+    # default number of pages per audio file for "Page by page only"
+    "audio_mode_pages_per_file": 1,
     # last used model selection (helps the wizard to preselect)
     "last_model": {
         "tts": None,

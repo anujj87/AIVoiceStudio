@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from ai_voice_studio.constants import (
     MODE_ALL_HEADINGS,
     MODE_H1_ONLY,
+    MODE_ONE_FILE,
     MODE_PAGE_ONLY,
     MODE_PAGE_WITH_H1,
 )
@@ -33,6 +34,63 @@ class TestPageOnly(unittest.TestCase):
         self.assertEqual([s.title for s in segs], ["01 page 1", "02 page 2", "03 page 3"])
         self.assertEqual([s.text for s in segs],
                          ["Page one content.", "Page two content.", "Page three content."])
+
+
+class TestPageOnlyGrouped(unittest.TestCase):
+    def test_pages_per_file_groups_consecutive_pages(self):
+        doc = doc_from(
+            [
+                Block(kind="text", text="Page one content.", page=0),
+                Block(kind="text", text="Page two content.", page=1),
+                Block(kind="text", text="Page three content.", page=2),
+                Block(kind="text", text="Page four content.", page=3),
+            ]
+        )
+        segs = split_document(doc, MODE_PAGE_ONLY, pages_per_file=2)
+        self.assertEqual(
+            [s.title for s in segs], ["01 pages 1 to 2", "02 pages 3 to 4"]
+        )
+        self.assertIn("Page one content.", segs[0].text)
+        self.assertIn("Page two content.", segs[0].text)
+        self.assertNotIn("Page three content.", segs[0].text)
+        self.assertIn("Page three content.", segs[1].text)
+
+    def test_pages_per_file_larger_than_document_is_one_file(self):
+        doc = doc_from(
+            [
+                Block(kind="text", text="A.", page=0),
+                Block(kind="text", text="B.", page=1),
+            ]
+        )
+        segs = split_document(doc, MODE_PAGE_ONLY, pages_per_file=50)
+        self.assertEqual(len(segs), 1)
+        self.assertEqual(segs[0].title, "01 pages 1 to 2")
+
+    def test_pages_per_file_does_not_change_page_with_h1(self):
+        doc = doc_from([Block(kind="text", text="A.", page=0)])
+        segs = split_document(doc, MODE_PAGE_WITH_H1, pages_per_file=3)
+        self.assertEqual([s.title for s in segs], ["01 page 1"])
+
+
+class TestOneFile(unittest.TestCase):
+    def test_whole_document_is_one_segment(self):
+        doc = doc_from(
+            [
+                Block(kind="text", text="First paragraph.", page=0),
+                Block(kind="heading", level=1, text="A Heading", page=0),
+                Block(kind="text", text="Second paragraph.", page=0),
+            ]
+        )
+        segs = split_document(doc, MODE_ONE_FILE)
+        self.assertEqual(len(segs), 1)
+        self.assertEqual(segs[0].title, "01 full recording")
+        self.assertIn("First paragraph.", segs[0].text)
+        self.assertIn("A Heading", segs[0].text)
+        self.assertIn("Second paragraph.", segs[0].text)
+
+    def test_blank_document_has_no_segments(self):
+        doc = doc_from([])
+        self.assertEqual(split_document(doc, MODE_ONE_FILE), [])
 
 
 class TestPageWithH1(unittest.TestCase):

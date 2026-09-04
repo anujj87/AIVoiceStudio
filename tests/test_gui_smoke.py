@@ -277,10 +277,13 @@ class RecordingDialogTest(_AppMixin):
                 # The read-only text preview is first and shows the document.
                 self.assertEqual(dlg.text_preview.GetName(), "Text to record")
                 self.assertIn("Hello.", dlg.text_preview.GetValue())
-                # No voices installed -> start disabled (progress label is set
-                # afterwards by _update_progress, so only the button state and
-                # a sensible status label are checked).
-                self.assertFalse(dlg.start_btn.IsEnabled())
+                # Start is enabled exactly when a voice is selectable. With
+                # OmniVoice pip-installed machine-wide this is true even for a
+                # throwaway store; on a machine with no voices installed the
+                # TTS combo stays empty and the button stays disabled.
+                has_voices = (dlg.tts_combo.GetCount() > 0
+                              and dlg.voice_combo.GetCount() > 0)
+                self.assertEqual(dlg.start_btn.IsEnabled(), has_voices)
                 self.assertTrue(dlg.status.GetLabel())
                 # Volume must default to 100%.
                 self.assertEqual(dlg.volume.GetValue(), 100)

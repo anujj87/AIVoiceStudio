@@ -19,6 +19,7 @@ from ..audio import ffmpeg as ffmpeg_mod
 from ..constants import (
     AUDIO_MODE_DESCRIPTIONS,
     FORMAT_WAV,
+    MODE_ONE_FILE,
     OUTPUT_FORMAT_CHOICES,
     PITCH_MAX,
     PITCH_MIN,
@@ -33,7 +34,13 @@ from ..settings import Settings
 from ..tts import catalog
 from ..util import sanitize_filename
 from ..tts.models import ModelStore
-from .a11y import add_labeled
+from . import dialogs
+from .a11y import (
+    add_labeled,
+    finalize_accessibility,
+    set_accessible_name,
+    update_accessible_name,
+)
 from .events import (
     EVT_SYNTH_ERROR,
     EVT_SYNTH_FINISHED,
@@ -44,6 +51,7 @@ from .events import (
     SynthSegmentDoneEvent,
     SynthStatusEvent,
 )
+from .progress import TaskProgressDialog
 
 log = logging.getLogger(__name__)
 
@@ -76,6 +84,8 @@ class RecordingDialog(wx.Dialog):
         self._worker: SynthesisWorker | None = None
         self._cancel_event = threading.Event()
         self._pause_event = threading.Event()
+        self._progress_dlg: TaskProgressDialog | None = None
+        self._warned_one_file = False
 
         self._load_segments()
         self._build_ui()
@@ -84,6 +94,8 @@ class RecordingDialog(wx.Dialog):
         self._update_progress()
         # Announce the project name and focus the text preview.
         self.SetName(f"Recording: {self.data.get('name', '')}")
+        # Real MSAA accNames for every labelled control.
+        finalize_accessibility(self)
         wx.CallAfter(self.text_preview.SetFocus)
 
     # ------------------------------------------------------------------ UI
@@ -118,16 +130,14 @@ class RecordingDialog(wx.Dialog):
         self.text_preview.SetFocus()
 
         # -- model selectors ------------------------------------------------
+        # Order: the TTS engine combo lists every downloaded/ready engine;
+        # the Compute back-end combo right below it offers only the options
+        # that engine supports (ONNX engines: Auto/CPU/GPU ONNX; OmniVoice
+        # engines: CUDA GPU). Language / variant / voice follow the cascade.
         grid = wx.FlexGridSizer(cols=2, vgap=6, hgap=8)
         grid.AddGrowableCol(1)
         self.compute_combo = wx.ComboBox(self, style=wx.CB_READONLY,
                                          name="Compute back-end")
-        for value in compute.available_compute():
-            self.compute_combo.Append(_COMPUTE_LABELS.get(value, value), value)
-        # Add CUDA GPU (OmniVoice) option if NVIDIA GPU is detected
-        self._add_cuda_gpu_option()
-        if self.compute_combo.GetCount():
-            self.compute_combo.SetSelection(0)
         self.tts_combo = wx.ComboBox(self, style=wx.CB_READONLY,
                                      name="Select TTS engine")
         self.lang_combo = wx.ComboBox(self, style=wx.CB_READONLY,
@@ -136,8 +146,8 @@ class RecordingDialog(wx.Dialog):
                                          name="Select variant")
         self.voice_combo = wx.ComboBox(self, style=wx.CB_READONLY,
                                        name="Select voice")
-        add_labeled(self, grid, "Compute back-end", self.compute_combo, flag=wx.LEFT | wx.RIGHT, border=2)
         add_labeled(self, grid, "TTS engine", self.tts_combo, flag=wx.LEFT | wx.RIGHT, border=2)
+        add_labeled(self, grid, "Compute back-end", self.compute_combo, flag=wx.LEFT | wx.RIGHT, border=2)
         add_labeled(self, grid, "Language", self.lang_combo, flag=wx.LEFT | wx.RIGHT, border=2)
         add_labeled(self, grid, "Variant", self.variant_combo, flag=wx.LEFT | wx.RIGHT, border=2)
         add_labeled(self, grid, "Voice", self.voice_combo, flag=wx.LEFT | wx.RIGHT, border=2)
@@ -251,19 +261,6 @@ class RecordingDialog(wx.Dialog):
         self.Bind(EVT_SYNTH_FINISHED, self._on_finished)
         self.Bind(EVT_SYNTH_ERROR, self._on_error)
 
-    def _add_cuda_gpu_option(self):
-        """Add CUDA GPU (OmniVoice) option if NVIDIA GPU is available."""
-        try:
-            import subprocess as _sp  # noqa: PLC0415
-            result = _sp.run(
-                ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
-                capture_output=True, text=True, timeout=10,
-            )
-            if result.returncode == 0 and result.stdout.strip():
-                self.compute_combo.Append("CUDA GPU (OmniVoice)", "cuda_gpu")
-        except Exception:  # noqa: BLE001
-            pass
-
     def _selected_compute(self) -> str:
         """Return the selected compute mode key (resolves auto)."""
         sel = self.compute_combo.GetSelection()
@@ -288,14 +285,14 @@ class RecordingDialog(wx.Dialog):
         grid.Add(label, 0, wx.LEFT | wx.RIGHT | wx.ALIGN_CENTER_VERTICAL, 2)
         slider = wx.Slider(self, minValue=int(lo * 100), maxValue=int(hi * 100),
                            value=int(1.0 * 100))
-        slider.SetName(f"{name}: 1.00")
+        set_accessible_name(slider, f"{name}: 1.00")
         slider.value_label = label  # type: ignore[attr-defined]
         grid.Add(slider, 1, wx.EXPAND)
         slider.Bind(
             wx.EVT_SLIDER,
             lambda evt, s=slider, lb=label, n=name: (
                 lb.SetLabel(f"{n}: {s.GetValue() / 100.0:.2f}"),
-                s.SetName(f"{n}: {s.GetValue() / 100.0:.2f}"),
+                update_accessible_name(s, f"{n}: {s.GetValue() / 100.0:.2f}"),
             ),
         )
         return slider
@@ -350,9 +347,9 @@ class RecordingDialog(wx.Dialog):
             pass
         # Inject pip-installed OmniVoice voices (not in artifact system)
         self._inject_omnivoice_voices()
-        # Bind compute combo change to refresh TTS list
+        # Bind compute combo change to refresh the voice cascade
         self.compute_combo.Bind(wx.EVT_COMBOBOX, self._on_compute_change)
-        self._refresh_tts_for_compute()
+        self._populate_tts_engines()
 
     def _inject_omnivoice_voices(self):
         """Add OmniVoice voices from catalog if pip package is installed."""
@@ -393,24 +390,12 @@ class RecordingDialog(wx.Dialog):
             pass
 
     def _on_compute_change(self, _):
-        """Refresh TTS engine list when compute mode changes."""
-        self._refresh_tts_for_compute()
+        """Refresh the voice cascade when the compute back-end changes."""
+        self._refresh_voices_for_selection()
 
-    def _refresh_tts_for_compute(self):
-        """Show only TTS engines compatible with the selected compute mode."""
-        is_omni = self._is_omnivoice_compute()
-        self._voices = []
-        for v in self._all_voices:
-            engine = v.get("engine", "vits")
-            if is_omni:
-                # CUDA GPU mode: show OmniVoice engines only
-                if engine in _OMNIVOICE_ENGINES:
-                    self._voices.append(v)
-            else:
-                # CPU/GPU ONNX mode: show ONNX engines only
-                if engine in _ONNX_TTS_ENGINES:
-                    self._voices.append(v)
-        tts_ids = sorted({v["tts"] for v in self._voices})
+    def _populate_tts_engines(self):
+        """List every downloaded/ready TTS engine (compute-agnostic)."""
+        tts_ids = sorted({v["tts"] for v in self._all_voices})
         self.tts_combo.Clear()
         for tts_id in tts_ids:
             tts = catalog.find_tts(tts_id)
@@ -419,15 +404,71 @@ class RecordingDialog(wx.Dialog):
             self.tts_combo.SetSelection(0)
             self._on_tts(None)
         else:
+            for combo in (self.compute_combo, self.lang_combo,
+                          self.variant_combo, self.voice_combo):
+                combo.Clear()
             self.start_btn.Disable()
             self.status.SetLabel(
-                "No voices available for this compute mode. "
-                + ("Install OmniVoice from the Compute tab." if is_omni
-                   else "Download voices from Settings > Download and remove.")
+                "No voices are installed. Download some from "
+                "Settings > Download and remove."
             )
+
+    def _compute_options_for_tts(self, tts_id: str | None):
+        """Fill the compute combo with the options the selected TTS supports.
+
+        ONNX engines (Piper, Kokoro, Kitten, ...) run on Auto / CPU / GPU
+        (ONNX); OmniVoice engines run on CUDA GPU.
+        """
+        self.compute_combo.Clear()
+        if tts_id in _OMNIVOICE_ENGINES:
+            self.compute_combo.Append(_COMPUTE_LABELS["cuda_gpu"], "cuda_gpu")
+        else:
+            for value in compute.available_compute():
+                self.compute_combo.Append(_COMPUTE_LABELS.get(value, value), value)
+        if self.compute_combo.GetCount():
+            self.compute_combo.SetSelection(0)
+
+    def _refresh_voices_for_selection(self):
+        """Keep language/variant/voice lists in sync with the selected TTS
+        engine and compute back-end."""
+        tts_sel = self.tts_combo.GetSelection()
+        tts_id = self.tts_combo.GetClientData(tts_sel) if tts_sel >= 0 else None
+        is_omni = self._is_omnivoice_compute() or (tts_id in _OMNIVOICE_ENGINES)
+        self._voices = []
+        for v in self._all_voices:
+            if v.get("tts") != tts_id:
+                continue
+            engine = v.get("engine", "vits")
+            if is_omni:
+                if engine in _OMNIVOICE_ENGINES or v.get("custom_omni"):
+                    self._voices.append(v)
+            else:
+                if engine in _ONNX_TTS_ENGINES:
+                    self._voices.append(v)
+        if not self._voices:
             for combo in (self.lang_combo, self.variant_combo, self.voice_combo):
                 combo.Clear()
+            self.start_btn.Disable()
+            self.status.SetLabel(
+                "No voices available for this TTS engine with the selected "
+                "compute back-end."
+            )
+            self._update_omni_ui()
+            return
+        self.start_btn.Enable()
+        self._populate_langs(tts_id)
         self._update_omni_ui()
+
+    def _populate_langs(self, tts_id):
+        tts = catalog.find_tts(tts_id) if tts_id else None
+        langs = sorted({v["language"] for v in self._voices if v["tts"] == tts_id})
+        self.lang_combo.Clear()
+        for code in langs:
+            label = catalog.language_display_name(tts, code) if tts else code
+            self.lang_combo.Append(label, code)
+        if self.lang_combo.GetCount():
+            self.lang_combo.SetSelection(0)
+        self._on_lang(None)
 
     def _voices_for(self):
         tts_sel = self.tts_combo.GetSelection()
@@ -444,17 +485,12 @@ class RecordingDialog(wx.Dialog):
         ]
 
     def _on_tts(self, _):
+        """TTS engine changed: rebuild the compute options for that engine,
+        then refresh the language/variant/voice cascade."""
         sel = self.tts_combo.GetSelection()
         tts_id = self.tts_combo.GetClientData(sel) if sel >= 0 else None
-        tts = catalog.find_tts(tts_id) if tts_id else None
-        langs = sorted({v["language"] for v in self._voices if v["tts"] == tts_id})
-        self.lang_combo.Clear()
-        for code in langs:
-            label = catalog.language_display_name(tts, code) if tts else code
-            self.lang_combo.Append(label, code)
-        if self.lang_combo.GetCount():
-            self.lang_combo.SetSelection(0)
-        self._on_lang(None)
+        self._compute_options_for_tts(tts_id)
+        self._refresh_voices_for_selection()
 
     def _on_lang(self, _):
         tts_sel = self.tts_combo.GetSelection()
@@ -585,6 +621,15 @@ class RecordingDialog(wx.Dialog):
 
     def _apply_project_tts(self):
         tts = self.data.get("tts", {})
+        # Select the stored TTS engine first (this rebuilds the compute
+        # options for that engine).
+        stored_tts = tts.get("tts")
+        if stored_tts:
+            idx = next((i for i in range(self.tts_combo.GetCount())
+                        if self.tts_combo.GetClientData(i) == stored_tts), -1)
+            if idx >= 0:
+                self.tts_combo.SetSelection(idx)
+                self._on_tts(None)
         if tts.get("compute") and self.compute_combo.GetCount():
             # Map stored "cuda" compute to "cuda_gpu" combo value if present
             target = tts["compute"]
@@ -597,27 +642,40 @@ class RecordingDialog(wx.Dialog):
             idx = next((i for i in range(self.compute_combo.GetCount())
                         if self.compute_combo.GetClientData(i) == target), 0)
             self.compute_combo.SetSelection(idx)
+            self._refresh_voices_for_selection()
         # best-effort preselect the voice the project used
-        self._select_project_voice(tts)
+        self._select_project_cascade(tts)
         for name, slider in (("rate", self.rate), ("pitch", self.pitch), ("volume", self.volume)):
             value = float(tts.get(name, 1.0))
             slider.SetValue(int(value * 100))
             slider.value_label.SetLabel(f"{name}: {value:.2f}")  # type: ignore[attr-defined]
+            update_accessible_name(slider, f"{name}: {value:.2f}")
         self._update_omni_ui()
         fmt = tts.get("output_format", FORMAT_WAV)
         idx = next((i for i in range(self.format_combo.GetCount())
                     if self.format_combo.GetClientData(i) == fmt), 0)
         self.format_combo.SetSelection(idx)
 
-    def _select_project_voice(self, tts):
+    def _select_project_cascade(self, tts):
+        """Preselect language / variant / voice stored in the project."""
+        for combo, key, apply in (
+            (self.lang_combo, tts.get("language"), self._on_lang),
+            (self.variant_combo, tts.get("variant"), self._on_variant),
+        ):
+            if not key:
+                continue
+            for i in range(combo.GetCount()):
+                if combo.GetClientData(i) == key:
+                    combo.SetSelection(i)
+                    apply(None)
+                    break
         voice_id = tts.get("voice")
-        if not voice_id:
-            return
-        for i in range(self.voice_combo.GetCount()):
-            voice = self.voice_combo.GetClientData(i)
-            if voice and voice.get("voice") == voice_id:
-                self.voice_combo.SetSelection(i)
-                break
+        if voice_id:
+            for i in range(self.voice_combo.GetCount()):
+                voice = self.voice_combo.GetClientData(i)
+                if voice and voice.get("voice") == voice_id:
+                    self.voice_combo.SetSelection(i)
+                    break
 
     # ------------------------------------------------------------- actions
     def _current_params(self):
@@ -659,6 +717,18 @@ class RecordingDialog(wx.Dialog):
             tts_data["omni"] = omni
         self.data["tts"] = tts_data
         project.save_project(self.project_dir, self.data)
+        # Remember the selection so the next new project can seed its
+        # per-TTS rate/pitch/volume defaults (Settings > Recording settings).
+        if voice:
+            try:
+                self.settings.set("last_model", {
+                    "tts": voice.get("tts"),
+                    "language": voice.get("language"),
+                    "variant": voice.get("variant"),
+                    "voice": voice.get("voice"),
+                })
+            except Exception:  # noqa: BLE001
+                pass
 
     def _on_start(self, _):
         voice = self._selected_voice()
@@ -666,6 +736,20 @@ class RecordingDialog(wx.Dialog):
             wx.MessageBox("Select a voice first.", "Recording",
                           style=wx.OK | wx.ICON_INFORMATION)
             return
+        # "One audio file" projects cannot be resumed from the middle of the
+        # single file; warn about it once per window so the user does not
+        # close it and lose a long recording.
+        if self.data.get("audio_mode") == MODE_ONE_FILE and not self._warned_one_file:
+            self._warned_one_file = True
+            wx.MessageBox(
+                "This project records the whole document into one audio "
+                "file. Resume is not supported: if you stop or close this "
+                "window before the file is finished, the recording starts "
+                "again from the beginning. Keep this window open until "
+                "recording is complete.",
+                "One audio file", style=wx.OK | wx.ICON_INFORMATION,
+            )
+
         # Enrich the voice entry with this project's OmniVoice options
         # (cloning reference, design instructions, language hint, knobs).
         # Voice-library voices (Settings > OmniVoice engines) carry their own
@@ -743,6 +827,7 @@ class RecordingDialog(wx.Dialog):
             on_status=lambda msg: wx.PostEvent(self, SynthStatusEvent(msg)),
         )
         self._set_running(True)
+        self._show_progress_dialog()
         self._worker.start()
         self.status.SetLabel(f"Recording started (resuming from segment {start_index + 1}).")
 
@@ -769,30 +854,78 @@ class RecordingDialog(wx.Dialog):
         project.mark_segment_done(self.project_dir, index + 1, path)
         wx.PostEvent(self, SynthSegmentDoneEvent(index, title, path))
 
+    # recording progress dialog ---------------------------------------------
+    def _show_progress_dialog(self):
+        """Show the non-modal progress bar dialog for the current run."""
+        if self._progress_dlg is not None:
+            return
+        self._progress_dlg = TaskProgressDialog(
+            self,
+            title="Recording in progress",
+            message="Starting recording...",
+            cancel_label="Stop recording",
+            on_cancel=lambda: self._on_stop(None),
+        )
+        self._progress_dlg.Show()
+        self._progress_dlg.start_pulse()
+
+    def _finish_progress_dialog(self):
+        dlg = self._progress_dlg
+        self._progress_dlg = None
+        if dlg is not None:
+            dlg.finish()
+
+    def _update_progress_dialog(self, value: int | None = None,
+                                message: str | None = None):
+        dlg = self._progress_dlg
+        if dlg is None:
+            return
+        if value is None:
+            dlg.set_message(message)
+        elif message is None:
+            dlg.show_progress(value)
+        else:
+            dlg.update(value, message)
+
     # UI handlers -----------------------------------------------------------
     def _on_synth_status(self, evt: SynthStatusEvent):
         self.status.SetLabel(evt.message)
+        if evt.message == "Stopped.":
+            # Stop (not pause): the worker has finished; re-enable the
+            # controls and close the progress dialog.
+            self._finish_progress_dialog()
+            self._set_running(False)
+        elif self._progress_dlg is not None:
+            self._update_progress_dialog(message=evt.message)
 
     def _on_segment_done(self, evt: SynthSegmentDoneEvent):
         done = evt.index + 1
         total = len(self._segments)
-        self.gauge.SetValue(int(done * 100 / total) if total else 0)
+        value = int(done * 100 / total) if total else 0
+        self.gauge.SetValue(value)
         self.status.SetLabel(f"Saved segment {done} of {total}: {evt.title}")
+        self._update_progress_dialog(
+            value=value,
+            message=f"Saved segment {done} of {total}.",
+        )
 
     def _on_finished(self, _):
         self._set_running(False)
         self.status.SetLabel("Recording complete.")
         self.gauge.SetValue(100)
+        self._finish_progress_dialog()
         # Generate DAISY book structure if this is a DAISY project
         self._build_daisy_if_needed()
         # Enable DAISY export if applicable
         ptype = self.data.get("project_type", "audio_playlist")
         if ptype in ("daisy_audio", "daisy_audio_text"):
             self.export_daisy_btn.Enable()
-        wx.MessageBox("Recording complete. All audio files were saved to the "
-                      "project folder." + self._daisy_summary(),
-                      "Recording complete",
-                      style=wx.OK | wx.ICON_INFORMATION)
+        dialogs.show_recording_complete(
+            self,
+            "Recording complete. All audio files were saved to the "
+            "project folder." + self._daisy_summary(),
+            self.project_dir,
+        )
 
     def _daisy_summary(self) -> str:
         """Return a note about DAISY files if they were generated."""
@@ -827,8 +960,9 @@ class RecordingDialog(wx.Dialog):
 
     def _on_error(self, evt: SynthErrorEvent):
         self._set_running(False)
+        self._finish_progress_dialog()
         self.status.SetLabel(evt.message)
-        wx.MessageBox(evt.message, "Recording error", style=wx.OK | wx.ICON_ERROR)
+        dialogs.notify_engine_error(self, "Recording error", evt.message)
 
     def _on_pause(self, _):
         if self._worker:
@@ -837,6 +971,8 @@ class RecordingDialog(wx.Dialog):
             self.resume_btn.Enable()
             self.status.SetLabel("Paused. The current segment will finish, then "
                                  "recording stops until you resume.")
+            self._update_progress_dialog(message="Paused. The current segment will "
+                                                 "finish, then recording stops.")
 
     def _on_resume(self, _):
         if self._worker:
@@ -844,11 +980,15 @@ class RecordingDialog(wx.Dialog):
             self.resume_btn.Disable()
             self.pause_btn.Enable()
             self.status.SetLabel("Resumed.")
+            self._update_progress_dialog(message="Resumed.")
 
     def _on_stop(self, _):
         if self._worker:
             self._worker.cancel()
             self.status.SetLabel("Stopping after the current segment...")
+            self._update_progress_dialog(
+                message="Stopping after the current segment..."
+            )
             self.stop_btn.Disable()
 
     def _set_running(self, running: bool):
@@ -930,5 +1070,6 @@ class RecordingDialog(wx.Dialog):
                 return
             self._worker.cancel()
             self._worker.join(timeout=3)
+        self._finish_progress_dialog()
         self._save_tts_to_project()
         self.EndModal(wx.ID_CLOSE)

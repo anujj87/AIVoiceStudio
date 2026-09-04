@@ -292,9 +292,13 @@ class OmniVoiceError(Exception):
 def has_nvidia_gpu() -> bool:
     """Return True when an NVIDIA GPU with a working driver is detected."""
     try:
+        flags = 0
+        if sys.platform == "win32":
+            flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
         result = subprocess.run(
             ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
             capture_output=True, text=True, timeout=10,
+            creationflags=flags,
         )
         return result.returncode == 0 and bool(result.stdout.strip())
     except Exception:  # noqa: BLE001
@@ -423,6 +427,9 @@ class OmniVoiceWorker:
                 os.path.dirname(os.path.abspath(__file__)), "worker.py",
             )
             cmd = [worker_python, worker_script]
+        flags = 0
+        if sys.platform == "win32":
+            flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
         self._proc = subprocess.Popen(
             cmd,
             stdin=subprocess.PIPE,
@@ -430,6 +437,7 @@ class OmniVoiceWorker:
             stderr=subprocess.DEVNULL,
             text=True,
             bufsize=1,
+            creationflags=flags,
         )
         resp = self._request({"cmd": "ping"})
         if not resp.get("ok"):

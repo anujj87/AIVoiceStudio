@@ -74,8 +74,8 @@ PROJECT_TYPE_AUDIO_PLAYLIST = "audio_playlist"
 PROJECT_TYPE_DAISY_AUDIO = "daisy_audio"
 PROJECT_TYPE_DAISY_AUDIO_TEXT = "daisy_audio_text"
 PROJECT_TYPES = [
-    (PROJECT_TYPE_CLIPBOARD, "Clipboard"),
     (PROJECT_TYPE_AUDIO_PLAYLIST, "Audio files with playlist"),
+    (PROJECT_TYPE_CLIPBOARD, "Clipboard"),
     (PROJECT_TYPE_DAISY_AUDIO, "DAISY audio book"),
     (PROJECT_TYPE_DAISY_AUDIO_TEXT, "DAISY audio and text book"),
 ]
@@ -116,11 +116,18 @@ MODE_PAGE_WITH_H1 = "page_with_h1"
 MODE_PAGE_ONLY = "page_only"
 MODE_H1_ONLY = "h1_only"
 MODE_ALL_HEADINGS = "all_headings"
+MODE_ONE_FILE = "one_file"
+
+# "Page by page only" can group several pages into one audio file.
+PAGES_PER_FILE_MIN = 1
+PAGES_PER_FILE_MAX = 50
+
 AUDIO_MODE_CHOICES = [
     (MODE_PAGE_WITH_H1, "Page by page with heading style 1"),
     (MODE_PAGE_ONLY, "Page by page only"),
     (MODE_H1_ONLY, "Heading style 1 only"),
     (MODE_ALL_HEADINGS, "All headings only"),
+    (MODE_ONE_FILE, "One audio file (whole document, no separation)"),
 ]
 AUDIO_MODE_DESCRIPTIONS = {
     MODE_PAGE_WITH_H1: (
@@ -132,7 +139,10 @@ AUDIO_MODE_DESCRIPTIONS = {
     ),
     MODE_PAGE_ONLY: (
         "Text is sent page by page and one audio file is created per page, named "
-        "'01 page 1', '02 page 2', ..."
+        "'01 page 1', '02 page 2', ... When it is selected you can also choose how "
+        "many pages go into one audio file (1 to 50); several pages are then "
+        "recorded together into one file, named e.g. '01 pages 1 to 3'. Recording "
+        "can be resumed from any unrecorded group."
     ),
     MODE_H1_ONLY: (
         "Audio files are created per heading style 1, each containing the heading "
@@ -142,6 +152,12 @@ AUDIO_MODE_DESCRIPTIONS = {
     MODE_ALL_HEADINGS: (
         "Each heading (style 1 to 6) is spoken as its own short audio file. Files "
         "are named '01 <heading>', '02 <heading>', ..."
+    ),
+    MODE_ONE_FILE: (
+        "The whole document is synthesized into one single audio file with no "
+        "separation. A recording that is stopped or interrupted before the file "
+        "is finished cannot be resumed from the middle - it starts from the "
+        "beginning again, so keep this window open until recording finishes."
     ),
 }
 

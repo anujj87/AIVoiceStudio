@@ -37,11 +37,15 @@ def _has_cuda() -> bool:
     if not runtime.is_installed():
         return False
     try:
+        flags = 0
+        if sys.platform == "win32":
+            flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
         result = subprocess.run(
             ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
             capture_output=True,
             text=True,
             timeout=10,
+            creationflags=flags,
         )
         return result.returncode == 0 and bool(result.stdout.strip())
     except Exception:  # noqa: BLE001

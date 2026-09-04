@@ -30,7 +30,7 @@ from typing import Any, Dict, Optional
 import wx
 
 from ..omnivoice import spec
-from .a11y import add_labeled
+from .a11y import add_labeled, finalize_accessibility
 
 _NONE = "(not set)"
 
@@ -71,6 +71,8 @@ class OmniVoiceOptionsDialog(wx.Dialog):
         self._build_ui()
         self._load(self._omni)
         self._on_mode(None)
+        # Real MSAA accNames for every labelled control.
+        finalize_accessibility(self)
         wx.CallAfter(self.mode_box.SetFocus)
 
     # ------------------------------------------------------------------ UI

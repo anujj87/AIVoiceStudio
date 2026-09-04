@@ -274,10 +274,14 @@ def log_system_info() -> None:
     try:
         log.info("GPU info:")
         import subprocess
+        flags = 0
+        if sys.platform == "win32":
+            flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
         result = subprocess.run(
             ["nvidia-smi", "--query-gpu=name,memory.total,driver_version",
              "--format=csv,noheader"],
             capture_output=True, text=True, timeout=5,
+            creationflags=flags,
         )
         if result.returncode == 0:
             for line in result.stdout.strip().splitlines():

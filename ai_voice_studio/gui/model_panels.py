@@ -20,7 +20,8 @@ from ..tts.downloader import (
     ModelDownloader,
 )
 from ..tts.models import ModelStore
-from .a11y import add_labeled
+from . import dialogs
+from .a11y import add_labeled, finalize_accessibility
 from .events import (
     DownloadFinishedEvent,
     DownloadProgressEvent,
@@ -174,6 +175,7 @@ class DownloadPanel(_ManagerPanel):
         ]
         populate_tts(self.tts_combo, downloadable)
         self._on_tts(None)
+        finalize_accessibility(self)
 
     def _build_selector(self, sizer: wx.BoxSizer):
         grid = wx.FlexGridSizer(cols=2, vgap=6, hgap=8)
@@ -356,6 +358,7 @@ class AvailablePanel(_ManagerPanel):
         self.variant_combo.Bind(wx.EVT_COMBOBOX, self._on_variant)
         self.preview_btn.Bind(wx.EVT_BUTTON, self._on_preview)
         self.refresh()
+        finalize_accessibility(self)
 
     def on_activated(self):
         """Refresh the voice lists when the category is opened so voices
@@ -631,7 +634,7 @@ class AvailablePanel(_ManagerPanel):
         self.preview_btn.Enable()
         if error:
             self.detail.SetLabel(error)
-            wx.MessageBox(error, "Preview unavailable", style=wx.OK | wx.ICON_ERROR)
+            dialogs.notify_engine_error(self, "Preview unavailable", error)
             return
         self._play_wav(tmp)
 

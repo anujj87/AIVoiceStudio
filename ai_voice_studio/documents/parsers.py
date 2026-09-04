@@ -22,7 +22,7 @@ import os
 import re
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 from ..constants import TEXT_PAGE_CHARS
 
@@ -226,7 +226,10 @@ def parse_html(path: str) -> Document:
     return Document(blocks=blocks, source=path, format="html")
 
 
-def parse_pdf(path: str) -> Document:
+def parse_pdf(
+    path: str,
+    on_progress: Optional[Callable[[str, float], None]] = None,
+) -> Document:
     try:
         from pypdf import PdfReader  # lazy: heavy dependency
     except ImportError as exc:
@@ -236,7 +239,13 @@ def parse_pdf(path: str) -> Document:
     except Exception as exc:  # noqa: BLE001
         raise ParseError(f"Could not open PDF: {exc}") from exc
     blocks: List[Block] = []
+    total_pages = len(reader.pages)
     for page_idx, page in enumerate(reader.pages):
+        if on_progress is not None and total_pages > 1:
+            on_progress(
+                f"Reading the document... page {page_idx + 1} of {total_pages}",
+                0.05 + 0.8 * (page_idx / total_pages),
+            )
         try:
             page_text = page.extract_text() or ""
         except Exception:  # noqa: BLE001
@@ -333,7 +342,10 @@ def parse_doc(path: str) -> Document:
     return Document(blocks=blocks, source=path, format="doc")
 
 
-def parse_epub(path: str) -> Document:
+def parse_epub(
+    path: str,
+    on_progress: Optional[Callable[[str, float], None]] = None,
+) -> Document:
     """Parse an EPUB e-book file.
 
     EPUB is a ZIP archive containing XHTML content. We extract the XHTML files,
@@ -358,7 +370,13 @@ def parse_epub(path: str) -> Document:
                 base_dir = ""
 
             blocks: List[Block] = []
+            total_files = len(content_files)
             for i, filename in enumerate(content_files):
+                if on_progress is not None and total_files > 1:
+                    on_progress(
+                        f"Reading the document... chapter {i + 1} of {total_files}",
+                        0.05 + 0.8 * (i / total_files),
+                    )
                 try:
                     raw = zf.read(filename)
                 except KeyError:
@@ -467,7 +485,16 @@ _EXT_PARSERS = {
 }
 
 
-def parse_document(path: str) -> Document:
+def parse_document(
+    path: str,
+    on_progress: Optional[Callable[[str, float], None]] = None,
+) -> Document:
+    """Parse a file into a Document.
+
+    ``on_progress(message, fraction)`` is an optional callback invoked while
+    parsing so the GUI can drive a progress dialog (PDF and EPUB pages are
+    reported one by one; other formats report start/end phases).
+    """
     ext = os.path.splitext(path)[1].lower()
     parser = _EXT_PARSERS.get(ext)
     if parser is None:
@@ -475,7 +502,16 @@ def parse_document(path: str) -> Document:
             f"Unsupported file type '{ext or '(none)'}'. Supported: "
             + ", ".join(sorted(_EXT_PARSERS))
         )
-    doc = parser(path)
+    if on_progress is not None:
+        on_progress("Reading the document...", 0.02)
+    if ext == ".pdf":
+        doc = parse_pdf(path, on_progress=on_progress)
+    elif ext == ".epub":
+        doc = parse_epub(path, on_progress=on_progress)
+    else:
+        doc = parser(path)
+    if on_progress is not None:
+        on_progress("Analyzing the document...", 0.9)
     # Split oversized blocks so pages stay uniform.
     split_blocks: List[Block] = []
     for block in doc.blocks:

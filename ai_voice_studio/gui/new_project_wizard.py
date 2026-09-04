@@ -18,7 +18,10 @@ from .. import project
 from ..constants import (
     AUDIO_MODE_CHOICES,
     AUDIO_MODE_DESCRIPTIONS,
+    MODE_PAGE_ONLY,
     MODE_PAGE_WITH_H1,
+    PAGES_PER_FILE_MAX,
+    PAGES_PER_FILE_MIN,
     PROJECT_TYPE_AUDIO_PLAYLIST,
     PROJECT_TYPE_CLIPBOARD,
     PROJECT_TYPE_DAISY_AUDIO,
@@ -34,7 +37,8 @@ from ..documents.splitter import split_document
 from ..paths import project_dir
 from ..settings import Settings
 from ..tts.models import ModelStore
-from .a11y import add_labeled
+from .a11y import add_labeled, finalize_accessibility
+from .progress import TaskProgressDialog
 from .recording_dialog import RecordingDialog
 
 log = logging.getLogger(__name__)
@@ -53,9 +57,14 @@ class NewProjectWizard(Wizard):
         self.GetPageAreaSizer().Add(self.page_details)
         if initial_name:
             self.page_details.name_ctrl.SetValue(initial_name)
+        # Real MSAA accNames for the name box / type combo (SetName alone is
+        # ignored by MSAA on this wx build).
+        finalize_accessibility(self)
 
         self.Bind(EVT_WIZARD_FINISHED, self._on_finish)
         self.Bind(wx.adv.EVT_WIZARD_PAGE_CHANGED, self._on_page_changed)
+        # Announce the first field (project name) when the wizard opens.
+        wx.CallAfter(self.page_details.name_ctrl.SetFocus)
 
     def _on_page_changed(self, evt):
         # NVDA-friendly: focus lands on the first control of the new page.
@@ -66,6 +75,28 @@ class NewProjectWizard(Wizard):
             elif page is self.page_mode and self.page_mode.radios:
                 wx.CallAfter(self.page_mode.radios[0][0].SetFocus)
         evt.Skip()
+
+    def _recording_defaults(self) -> dict:
+        """Rate/pitch/volume defaults for the new project.
+
+        When the last used TTS engine has its own Speed/Pitch/Volume saved in
+        Settings > Recording settings, those are used; otherwise the global
+        defaults apply.
+        """
+        per_tts = self.settings.get("recording.per_tts", {}) or {}
+        last_tts = self.settings.get("last_model", {}).get("tts")
+        if last_tts and per_tts.get(last_tts):
+            entry = per_tts[last_tts]
+            return {
+                "rate": float(entry.get("rate", 1.0)),
+                "pitch": float(entry.get("pitch", 1.0)),
+                "volume": float(entry.get("volume", 1.0)),
+            }
+        return {
+            "rate": self.settings.get("recording.rate", 1.0),
+            "pitch": self.settings.get("recording.pitch", 1.0),
+            "volume": self.settings.get("recording.volume", 1.0),
+        }
 
     def _on_finish(self, _):
         from ..documents.splitter import split_daisy_chapters  # noqa: PLC0415
@@ -86,9 +117,7 @@ class NewProjectWizard(Wizard):
                     "language": last.get("language"),
                     "variant": last.get("variant"),
                     "voice": last.get("voice"),
-                    "rate": self.settings.get("recording.rate", 1.0),
-                    "pitch": self.settings.get("recording.pitch", 1.0),
-                    "volume": self.settings.get("recording.volume", 1.0),
+                    **self._recording_defaults(),
                     "punctuation": self.page_details.selected_punctuation(),
                     "output_format": self.settings.get("recording.output_format", "wav"),
                     "compute": self.settings.compute,
@@ -108,29 +137,41 @@ class NewProjectWizard(Wizard):
                           style=wx.OK | wx.ICON_INFORMATION)
             return
 
+        # Progress dialog while the document is read and split into segments
+        # (item-level feedback between the wizard and the Recording window).
+        progress = TaskProgressDialog(self, "New Project",
+                                      "Reading the document...")
+        progress.Show()
         try:
-            wx.BeginBusyCursor()
-            doc = parse_document(self.source_path)
+
+            def _report(message, fraction):
+                progress.update(int(max(0.0, min(1.0, fraction)) * 100), message)
+
+            doc = parse_document(self.source_path, on_progress=_report)
             if ptype in (PROJECT_TYPE_DAISY_AUDIO, PROJECT_TYPE_DAISY_AUDIO_TEXT):
                 segments = split_daisy_chapters(doc.blocks)
             else:
-                segments = split_document(doc, mode)
-            wx.EndBusyCursor()
+                pages = self.page_mode.pages_per_file() if mode == MODE_PAGE_ONLY else 1
+                progress.update(90, "Splitting the text into audio segments...")
+                segments = split_document(doc, mode, pages_per_file=pages)
+            progress.update(100, "Opening the Recording window...")
         except ParseError as exc:
-            wx.EndBusyCursor()
+            progress.finish()
             wx.MessageBox(str(exc), "Could not read the document",
                           style=wx.OK | wx.ICON_ERROR)
             return
         except Exception as exc:  # noqa: BLE001
-            wx.EndBusyCursor()
+            progress.finish()
             wx.MessageBox(f"Preparing the document failed: {exc}",
                           "New project", style=wx.OK | wx.ICON_ERROR)
             return
 
         if not segments:
+            progress.finish()
             wx.MessageBox("The document contains no readable text.",
                           "New project", style=wx.OK | wx.ICON_WARNING)
             return
+        progress.finish()
 
         pdir = project_dir(name)
         last = self.settings.get("last_model", {})
@@ -148,9 +189,7 @@ class NewProjectWizard(Wizard):
                 "language": last.get("language"),
                 "variant": last.get("variant"),
                 "voice": last.get("voice"),
-                "rate": self.settings.get("recording.rate", 1.0),
-                "pitch": self.settings.get("recording.pitch", 1.0),
-                "volume": self.settings.get("recording.volume", 1.0),
+                **self._recording_defaults(),
                 "punctuation": self.page_details.selected_punctuation(),
                 "output_format": self.settings.get("recording.output_format", "wav"),
                 "compute": self.settings.compute,
@@ -184,23 +223,34 @@ class _DetailsPage(WizardPage):
 
         grid = wx.FlexGridSizer(cols=2, vgap=6, hgap=8)
         grid.AddGrowableCol(1)
+
+        # Project name edit box.  The visible label and the accessible name
+        # must agree exactly so a screen reader never confuses this field
+        # with the Project type combo below it.
         self.name_ctrl = wx.TextCtrl(self)
         self.name_ctrl.SetName("Project name")
-        add_labeled(self, grid, "Project name", self.name_ctrl, flag=wx.LEFT | wx.RIGHT, border=2)
+        name_lbl = add_labeled(self, grid, "Project name", self.name_ctrl,
+                               flag=wx.LEFT | wx.RIGHT, border=2)
+        name_lbl.SetName("Project name")
+        self.name_ctrl.SetName("Project name")
 
-        # Project type combo
+        # Project type combo: "Audio files with playlist" first, "Clipboard"
+        # second, then the DAISY types (order comes from PROJECT_TYPES).
         self.project_type_combo = wx.ComboBox(self, style=wx.CB_READONLY,
                                                name="Project type")
         for value, label in PROJECT_TYPES:
             self.project_type_combo.Append(label, value)
-        # Default to audio playlist (old behavior)
+        # Default to audio playlist (first choice).
         default_idx = next(
             (i for i, (v, _) in enumerate(PROJECT_TYPES)
              if v == PROJECT_TYPE_AUDIO_PLAYLIST), 0
         )
         self.project_type_combo.SetSelection(default_idx)
-        add_labeled(self, grid, "Project type", self.project_type_combo,
-                    flag=wx.LEFT | wx.RIGHT, border=2)
+        type_lbl = add_labeled(self, grid, "Project type", self.project_type_combo,
+                               flag=wx.LEFT | wx.RIGHT, border=2)
+        type_lbl.SetName("Project type")
+        self.project_type_combo.SetName("Project type")
+        self.project_type_combo.Bind(wx.EVT_COMBOBOX, lambda _: self._update_type_desc())
         sizer.Add(grid, 0, wx.EXPAND | wx.ALL, 6)
 
         self.type_desc = wx.StaticText(self, label="")
@@ -330,15 +380,54 @@ class _ModePage(WizardPage):
             radio.SetName(label)
             radio.SetValue(value == current)
             sizer.Add(radio, 0, wx.ALL, 4)
-            radio.Bind(wx.EVT_RADIOBUTTON, lambda _: self._update_description())
+            radio.Bind(
+                wx.EVT_RADIOBUTTON,
+                lambda _evt, v=value: self._on_select(v),
+            )
             self.radios.append((radio, value))
             first = False
+
+        # Pages per audio file: only meaningful for "Page by page only".
+        # It is disabled for every other mode (and skipped by screen readers
+        # in that state) so its label never gets confused with another field.
+        pages_row = wx.BoxSizer(wx.HORIZONTAL)
+        pages_label = wx.StaticText(self, label="Pages per audio file:")
+        pages_label.SetName("Pages per audio file")
+        pages_row.Add(pages_label, 0,
+                      wx.LEFT | wx.RIGHT | wx.ALIGN_CENTER_VERTICAL, 4)
+        pages_default = int(settings.get("audio_mode_pages_per_file", 1) or 1)
+        pages_default = max(PAGES_PER_FILE_MIN,
+                           min(PAGES_PER_FILE_MAX, pages_default))
+        self.pages_spin = wx.SpinCtrl(
+            self, min=PAGES_PER_FILE_MIN, max=PAGES_PER_FILE_MAX,
+            initial=pages_default, name="Pages per audio file",
+        )
+        self.pages_spin.SetToolTip(
+            "How many pages are recorded into one audio file (1 to 50). "
+            "Each finished group can be resumed later."
+        )
+        pages_row.Add(self.pages_spin, 0, wx.RIGHT, 4)
+        self.pages_row = pages_row
+        sizer.Add(pages_row, 0, wx.ALL, 4)
+
+        self._on_select(self.selected())
         self._update_description()
         self.SetSizer(sizer)
+
+    def _on_select(self, value: str):
+        """Radio changed: enable the pages-per-file control only for
+        "Page by page only", and refresh the mode description."""
+        self.pages_spin.Enable(value == MODE_PAGE_ONLY)
+        self._update_description()
 
     def _update_description(self):
         self.description.SetLabel(AUDIO_MODE_DESCRIPTIONS.get(self.selected(), ""))
         self.description.Wrap(680)
+
+    def pages_per_file(self) -> int:
+        """Selected pages-per-file value (clamped to the valid range)."""
+        value = self.pages_spin.GetValue()
+        return max(PAGES_PER_FILE_MIN, min(PAGES_PER_FILE_MAX, int(value)))
 
     def selected(self) -> str:
         for radio, value in self.radios:

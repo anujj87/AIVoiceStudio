@@ -143,6 +143,9 @@ class CloneClient:
         if self._proc is not None and self._proc.poll() is None:
             return
         cmd = [sys.executable, "-m", "ai_voice_studio.clone.worker"]
+        flags = 0
+        if sys.platform == "win32":
+            flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
         self._proc = subprocess.Popen(
             cmd,
             stdin=subprocess.PIPE,
@@ -151,6 +154,7 @@ class CloneClient:
             text=True,
             bufsize=1,
             cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            creationflags=flags,
         )
         # Bring the worker up and verify the runtime is importable.
         resp = self._request({"cmd": "ping"})

@@ -22,6 +22,7 @@ import wx
 from .. import __version__, project
 from ..settings import Settings
 from ..tts.models import ModelStore
+from .a11y import finalize_accessibility
 from .new_project_wizard import NewProjectWizard
 from .recording_dialog import RecordingDialog
 from .settings_dialog import SettingsDialog
@@ -62,6 +63,9 @@ class MainFrame(wx.Frame):
         self._build_welcome()
         self._build_statusbar()
         self.Centre()
+        # Startup focus lands on the Recent projects list (all projects),
+        # with its accessible name already set by finalize_accessibility.
+        wx.CallAfter(self.recent_list.SetFocus)
 
     # ------------------------------------------------------------------ UI
     def _build_menu(self):
@@ -178,6 +182,8 @@ class MainFrame(wx.Frame):
 
         panel.SetSizer(sizer)
         self._refresh_recent_list()
+        # Real MSAA accNames (e.g. the Recent projects list name).
+        finalize_accessibility(self)
 
     def _build_statusbar(self):
         self.CreateStatusBar(1)

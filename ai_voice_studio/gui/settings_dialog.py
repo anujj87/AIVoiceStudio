@@ -17,7 +17,7 @@ Categories:
 4. OmniVoice engines      -- GPU TTS engine variants (Server, Triton, Hybrid)
 5. Recording settings     -- speed, pitch, volume, preview
 6. Punctuation            -- default punctuation mode (spoken-word expansion)
-7. Audio file creation    -- 4 radio modes with descriptions
+7. Audio file creation    -- audio modes with descriptions + pages per file
 8. DAISY settings         -- DAISY 2.02 audio book defaults
 9. Compute                -- optional GPU (CUDA) runtime + OmniVoice
 10. Developer             -- addon management, pip, diagnostics
@@ -39,7 +39,10 @@ from .. import paths, runtime
 from ..constants import (
     AUDIO_MODE_CHOICES,
     AUDIO_MODE_DESCRIPTIONS,
+    MODE_PAGE_ONLY,
     MODE_PAGE_WITH_H1,
+    PAGES_PER_FILE_MAX,
+    PAGES_PER_FILE_MIN,
     PITCH_MAX,
     PITCH_MIN,
     PROJECT_TYPE_DAISY_AUDIO,
@@ -58,13 +61,19 @@ from ..settings import Settings
 from ..tts import catalog
 from ..tts.downloader import ModelDownloader
 from ..tts.models import ModelStore
-from .a11y import add_labeled
+from .a11y import (
+    add_labeled,
+    finalize_accessibility,
+    set_accessible_name,
+    update_accessible_name,
+)
 from .events import (
     DownloadFinishedEvent,
     DownloadProgressEvent,
     EVT_DOWNLOAD_FINISHED,
     EVT_DOWNLOAD_PROGRESS,
 )
+from . import dialogs
 from .model_panels import AvailablePanel, DownloadPanel
 from .theme import apply_theme
 
@@ -175,6 +184,9 @@ class SettingsDialog(wx.Dialog):
 
         self._show_category(0)
         apply_theme(self, self.settings.theme)
+        # Real MSAA accNames for every labelled control (SetName alone is
+        # ignored by MSAA on this wx build).
+        finalize_accessibility(self)
         # NVDA-style postInit: focus lands on the category list.
         wx.CallAfter(self.cat_list.SetFocus)
 
@@ -257,7 +269,7 @@ class SettingsDialog(wx.Dialog):
             return (self.settings, self.store)
         if cls in (_OmniVoiceServerPanel,):
             return (self.settings,)
-        if cls in (_PunctuationPanel,):
+        if cls in (_RecordingSettingsPanel, _PunctuationPanel):
             return (self.settings, self.store)
         return (self.settings,)
 
@@ -613,16 +625,35 @@ class _GeneralPanel(_SettingsPanel):
 class _RecordingSettingsPanel(_SettingsPanel):
     title = "Recording settings"
 
-    def __init__(self, parent, settings: Settings):
+    def __init__(self, parent, settings: Settings, store: ModelStore):
         super().__init__(parent)
         self.settings = settings
+        self.store = store
+        self._voices: list = []
         sizer = wx.BoxSizer(wx.VERTICAL)
-        self.rate = self._slider_row(sizer, "Speed", settings.get("recording.rate", 1.0),
-                                     RATE_MIN, RATE_MAX)
-        self.pitch = self._slider_row(sizer, "Pitch", settings.get("recording.pitch", 1.0),
-                                      PITCH_MIN, PITCH_MAX)
-        self.volume = self._slider_row(sizer, "Volume", settings.get("recording.volume", 1.0),
-                                       VOLUME_MIN, VOLUME_MAX)
+
+        # Voice cascade: choose which downloaded/ready TTS engine these
+        # Speed/Pitch/Volume defaults apply to (same cascade as the
+        # Punctuation panel).
+        grid = wx.FlexGridSizer(cols=2, vgap=6, hgap=8)
+        grid.AddGrowableCol(1)
+        self.tts_combo = wx.ComboBox(self, style=wx.CB_READONLY,
+                                     name="TTS engine for recording defaults")
+        self.variant_combo = wx.ComboBox(self, style=wx.CB_READONLY,
+                                         name="Variant for recording defaults")
+        self.voice_combo = wx.ComboBox(self, style=wx.CB_READONLY,
+                                       name="Voice for recording defaults")
+        add_labeled(self, grid, "TTS engine", self.tts_combo,
+                    flag=wx.LEFT | wx.RIGHT, border=2)
+        add_labeled(self, grid, "Variant", self.variant_combo,
+                    flag=wx.LEFT | wx.RIGHT, border=2)
+        add_labeled(self, grid, "Voice", self.voice_combo,
+                    flag=wx.LEFT | wx.RIGHT, border=2)
+        sizer.Add(grid, 0, wx.EXPAND | wx.ALL, 6)
+
+        self.rate = self._slider_row(sizer, "Speed", 1.0, RATE_MIN, RATE_MAX)
+        self.pitch = self._slider_row(sizer, "Pitch", 1.0, PITCH_MIN, PITCH_MAX)
+        self.volume = self._slider_row(sizer, "Volume", 1.0, VOLUME_MIN, VOLUME_MAX)
 
         sizer.Add(
             wx.StaticText(self, label="Preview text (edit it, then press Preview):"),
@@ -643,7 +674,177 @@ class _RecordingSettingsPanel(_SettingsPanel):
         sizer.Add(self.preview_status, 0, wx.ALL, 4)
         self.SetSizer(sizer)
 
+        self.tts_combo.Bind(wx.EVT_COMBOBOX, self._on_tts)
+        self.variant_combo.Bind(wx.EVT_COMBOBOX, self._on_variant)
         self.preview_btn.Bind(wx.EVT_BUTTON, self._on_preview)
+        self._populate_voices()
+
+    def on_activated(self):
+        """Refresh the voice cascade when the category is opened so voices
+        created elsewhere (e.g. the OmniVoice voice library) appear without
+        closing the dialog."""
+        super().on_activated()
+        self._populate_voices()
+
+    # -- voice cascade ------------------------------------------------------
+    def _populate_voices(self):
+        self._voices = self.store.installed_voices()
+        self._inject_pip_installed_voices()
+        for voice in self.store.custom_voices():
+            self._voices.append({
+                "tts": voice["tts"], "tts_name": voice["tts"],
+                "language": "custom", "variant": "custom",
+                "voice": voice["name"],
+                "voice_name": f"Cloned voice: {voice['name']}",
+                "sid": 0, "engine": voice.get("engine", "vits"),
+                "dir": voice["dir"], "custom": True,
+                "sample": voice.get("sample", ""),
+                "reference": voice.get("reference", ""),
+                "xtts_lang": voice.get("language", "en"),
+            })
+        # Universal OmniVoice voice library: created voices are engine
+        # agnostic, so register them under every installed OmniVoice engine.
+        try:
+            from ..omnivoice import voice_store  # noqa: PLC0415
+            if voice_store.omni_custom_voices(self.store):
+                installed = voice_store.engine_ids_installed()
+                self._voices.extend(
+                    voice_store.consumer_entries(self.store, installed)
+                )
+        except Exception:  # noqa: BLE001
+            pass
+        tts_ids = sorted({v["tts"] for v in self._voices})
+        self.tts_combo.Clear()
+        for tts_id in tts_ids:
+            tts = catalog.find_tts(tts_id)
+            self.tts_combo.Append(tts["name"] if tts else tts_id, tts_id)
+        if self.tts_combo.GetCount():
+            self.tts_combo.SetSelection(0)
+            self._on_tts(None)
+        else:
+            self.variant_combo.Clear()
+            self.voice_combo.Clear()
+            self.preview_btn.Disable()
+            self.preview_status.SetLabel(
+                "No voices downloaded. Use the 'Download and remove' tab first."
+            )
+            self._load_defaults_for_tts(None)
+
+    def _inject_pip_installed_voices(self):
+        """Inject voices for TTS engines installed via pip (e.g. OmniVoice)."""
+        try:
+            from ..python_runtime import get_runtime  # noqa: PLC0415
+            rt = get_runtime()
+            if not rt.is_created:
+                return
+            for tts_entry in catalog.get_tts_list():
+                pkg = tts_entry.get("requires_package")
+                if not pkg:
+                    continue
+                result = rt.run_in_env(
+                    f"import importlib.metadata; "
+                    f"print(importlib.metadata.version('{pkg}'))"
+                )
+                if result.returncode != 0 or not result.stdout.strip():
+                    continue
+                for lang in tts_entry.get("languages", []):
+                    for variant in lang.get("variants", []):
+                        for voice in variant.get("voices", []):
+                            self._voices.append(
+                                {
+                                    "tts": tts_entry["id"],
+                                    "tts_name": tts_entry["name"],
+                                    "language": lang["code"],
+                                    "variant": variant["id"],
+                                    "voice": voice["id"],
+                                    "voice_name": voice.get("name", voice["id"]),
+                                    "sid": voice.get("sid", 0),
+                                    "engine": tts_entry.get("engine", "vits"),
+                                    "dir": "",
+                                    "requires_gpu": tts_entry.get("requires_gpu", False),
+                                    "requires_package": pkg,
+                                }
+                            )
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _on_tts(self, _):
+        tts_sel = self.tts_combo.GetSelection()
+        tts_id = self.tts_combo.GetClientData(tts_sel) if tts_sel >= 0 else None
+        tts = catalog.find_tts(tts_id) if tts_id else None
+        languages = sorted({v["language"] for v in self._voices if v["tts"] == tts_id})
+        keys = sorted({
+            (v["language"], v["variant"])
+            for v in self._voices if v["tts"] == tts_id
+        })
+        self.variant_combo.Clear()
+        for lang, vid in keys:
+            variant = catalog.find_variant(tts, lang, vid) if tts else None
+            label = variant["name"] if variant else vid
+            if len(languages) > 1:
+                lang_label = catalog.language_display_name(tts, lang) if tts else lang
+                label = f"{label} ({lang_label})"
+            self.variant_combo.Append(label, (lang, vid))
+        if self.variant_combo.GetCount():
+            self.variant_combo.SetSelection(0)
+        self._on_variant(None)
+        self._load_defaults_for_tts(tts_id)
+
+    def _on_variant(self, _):
+        key = self.variant_combo.GetClientData(self.variant_combo.GetSelection()) \
+            if self.variant_combo.GetSelection() >= 0 else None
+        self.voice_combo.Clear()
+        if not key:
+            return
+        lang, vid = key
+        tts_id = self.tts_combo.GetClientData(self.tts_combo.GetSelection())
+        for v in self._voices:
+            if (v["tts"], v["language"], v["variant"]) == (tts_id, lang, vid):
+                self.voice_combo.Append(v["voice_name"], v)
+        if self.voice_combo.GetCount():
+            self.voice_combo.SetSelection(0)
+
+    def selected_voice(self):
+        sel = self.voice_combo.GetSelection()
+        if sel < 0:
+            return None
+        return self.voice_combo.GetClientData(sel)
+
+    def _selected_tts_id(self):
+        sel = self.tts_combo.GetSelection()
+        return self.tts_combo.GetClientData(sel) if sel >= 0 else None
+
+    # -- per-TTS defaults ---------------------------------------------------
+    def _per_tts(self) -> dict:
+        return self.settings.get("recording.per_tts", {}) or {}
+
+    def _tts_defaults(self, tts_id):
+        per = self._per_tts()
+        if tts_id and per.get(tts_id):
+            return per[tts_id]
+        return {
+            "rate": self.settings.get("recording.rate", 1.0),
+            "pitch": self.settings.get("recording.pitch", 1.0),
+            "volume": self.settings.get("recording.volume", 1.0),
+        }
+
+    def _load_defaults_for_tts(self, tts_id):
+        """Move the stored per-TTS Speed/Pitch/Volume into the sliders."""
+        defaults = self._tts_defaults(tts_id)
+        for slider, name, key in (
+            (self.rate, "Speed", "rate"),
+            (self.pitch, "Pitch", "pitch"),
+            (self.volume, "Volume", "volume"),
+        ):
+            value = float(defaults.get(key, 1.0))
+            self._set_slider_value(slider, value, name)
+
+    def _set_slider_value(self, slider, value: float, name: str):
+        slider.SetValue(int(round(float(value) * 100)))
+        label = getattr(slider, "value_label", None)
+        if label is not None:
+            label.SetLabel(f"{name}: {value:.2f}")
+        update_accessible_name(slider, f"{name}: {value:.2f}")
 
     def _slider_row(self, sizer, name: str, value: float, lo: float, hi: float):
         """A labelled slider row.
@@ -661,36 +862,46 @@ class _RecordingSettingsPanel(_SettingsPanel):
         grid.Add(label, 0, wx.LEFT | wx.RIGHT | wx.ALIGN_CENTER_VERTICAL, 2)
         slider = wx.Slider(self, minValue=int(lo * 100), maxValue=int(hi * 100),
                            value=int(value * 100))
-        slider.SetName(f"{name}: {value:.2f}")
+        set_accessible_name(slider, f"{name}: {value:.2f}")
         grid.Add(slider, 1, wx.EXPAND)
+        slider.value_label = label  # type: ignore[attr-defined]
         sizer.Add(grid, 0, wx.EXPAND | wx.ALL, 4)
 
         def _on_change(_evt, s=slider, lb=label, n=name):
             lb.SetLabel(f"{n}: {s.GetValue() / 100.0:.2f}")
-            s.SetName(f"{n}: {s.GetValue() / 100.0:.2f}")
+            update_accessible_name(s, f"{n}: {s.GetValue() / 100.0:.2f}")
 
         slider.Bind(wx.EVT_SLIDER, _on_change)
         return slider
 
     def apply_to_settings(self):
-        self.settings.set("recording.rate", self.rate.GetValue() / 100.0)
-        self.settings.set("recording.pitch", self.pitch.GetValue() / 100.0)
-        self.settings.set("recording.volume", self.volume.GetValue() / 100.0)
+        tts_id = self._selected_tts_id()
+        values = {
+            "rate": self.rate.GetValue() / 100.0,
+            "pitch": self.pitch.GetValue() / 100.0,
+            "volume": self.volume.GetValue() / 100.0,
+        }
+        if tts_id:
+            # Per-TTS defaults: each engine remembers its own sliders.
+            per_tts = dict(self._per_tts())
+            per_tts[tts_id] = values
+            self.settings.set("recording.per_tts", per_tts)
+        else:
+            # No TTS selected: adjust the global defaults instead.
+            self.settings.set("recording.rate", values["rate"])
+            self.settings.set("recording.pitch", values["pitch"])
+            self.settings.set("recording.volume", values["volume"])
 
     def _on_preview(self, _):
-        from ..tts.models import ModelStore
-
-        store = ModelStore()
-        voices = store.installed_voices()
-        if not voices:
+        voice = self.selected_voice()
+        if not voice:
             wx.MessageBox(
-                "No voices are downloaded yet. Use the 'Download and remove' tab "
-                "to install a voice first.",
+                "Select a TTS engine and voice first. Use the 'Download and "
+                "remove' tab to install voices if none are ready.",
                 "Preview unavailable",
                 style=wx.OK | wx.ICON_INFORMATION,
             )
             return
-        voice = voices[0]
         # Snapshot the UI state on the UI thread; the job runs on a worker.
         text = self.sample_text.GetValue() or "Hello."
         punct = self.settings.get("recording.punctuation", "default")
@@ -739,7 +950,7 @@ class _RecordingSettingsPanel(_SettingsPanel):
         self.preview_btn.Enable()
         if error:
             self.preview_status.SetLabel(error)
-            wx.MessageBox(error, "Preview failed", style=wx.OK | wx.ICON_ERROR)
+            dialogs.notify_engine_error(self, "Preview failed", error)
             return
         self._stop_preview_sound()
         sound = wx.adv.Sound(tmp)
@@ -1052,7 +1263,7 @@ class _PunctuationPanel(_SettingsPanel):
         self.preview_btn.Enable()
         if error:
             self.preview_status.SetLabel(error)
-            wx.MessageBox(error, "Preview failed", style=wx.OK | wx.ICON_ERROR)
+            dialogs.notify_engine_error(self, "Preview failed", error)
             return
         self._stop_preview_sound()
 
@@ -1098,13 +1309,40 @@ class _AudioModePanel(_SettingsPanel):
             radio.SetName(label)
             radio.SetValue(value == current)
             sizer.Add(radio, 0, wx.ALL, 4)
-            radio.Bind(wx.EVT_RADIOBUTTON, self._on_select)
+            radio.Bind(
+                wx.EVT_RADIOBUTTON,
+                lambda _evt, v=value: self._on_select(v),
+            )
             self.radios.append((radio, value))
             first = False
+
+        # Default pages per audio file (used by the wizard's "Page by page
+        # only" mode). Enabled only while that mode is selected.
+        pages_row = wx.BoxSizer(wx.HORIZONTAL)
+        pages_label = wx.StaticText(self, label="Pages per audio file:")
+        pages_label.SetName("Pages per audio file")
+        pages_row.Add(pages_label, 0,
+                      wx.LEFT | wx.RIGHT | wx.ALIGN_CENTER_VERTICAL, 4)
+        pages_default = int(settings.get("audio_mode_pages_per_file", 1) or 1)
+        pages_default = max(PAGES_PER_FILE_MIN,
+                           min(PAGES_PER_FILE_MAX, pages_default))
+        self.pages_spin = wx.SpinCtrl(
+            self, min=PAGES_PER_FILE_MIN, max=PAGES_PER_FILE_MAX,
+            initial=pages_default, name="Pages per audio file",
+        )
+        self.pages_spin.SetToolTip(
+            "Default number of pages recorded into one audio file when the "
+            "'Page by page only' mode is used in the New Project wizard."
+        )
+        pages_row.Add(self.pages_spin, 0, wx.RIGHT, 4)
+        sizer.Add(pages_row, 0, wx.ALL, 4)
+
+        self._on_select(self.selected())
         self._update_description()
         self.SetSizer(sizer)
 
-    def _on_select(self, _):
+    def _on_select(self, value: str):
+        self.pages_spin.Enable(value == MODE_PAGE_ONLY)
         self._update_description()
 
     def _update_description(self):
@@ -1119,7 +1357,10 @@ class _AudioModePanel(_SettingsPanel):
         return MODE_PAGE_WITH_H1
 
     def apply_to_settings(self):
-        self.settings.set("audio_mode", self.selected())
+        mode = self.selected()
+        self.settings.set("audio_mode", mode)
+        if mode == MODE_PAGE_ONLY:
+            self.settings.set("audio_mode_pages_per_file", self.pages_spin.GetValue())
 
 
 # ---------------------------------------------------------------------------
@@ -1668,7 +1909,7 @@ class _OmniVoiceEnginesPanel(_SettingsPanel):
         self.preview_btn.Enable()
         if error:
             self.lib_status.SetLabel(error)
-            wx.MessageBox(error, "Preview failed", style=wx.OK | wx.ICON_ERROR)
+            dialogs.notify_engine_error(self, "Preview failed", error)
             return
         self._stop_preview_sound()
         sound = wx.adv.Sound(tmp)
