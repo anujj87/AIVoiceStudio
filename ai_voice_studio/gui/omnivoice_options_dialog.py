@@ -80,9 +80,7 @@ class OmniVoiceOptionsDialog(wx.Dialog):
         sizer.Add(
             wx.StaticText(
                 self,
-                label=f"{self._engine_label} gives you three ways to choose a "
-                      "voice plus full control over how the audio is generated. "
-                      "These options are saved with this project only.",
+                label="These options are saved with this project only.",
             ),
             0, wx.ALL, 6,
         )

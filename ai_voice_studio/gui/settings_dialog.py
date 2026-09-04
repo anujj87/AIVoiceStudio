@@ -504,9 +504,6 @@ class SettingsDialog(wx.Dialog):
 # ---------------------------------------------------------------------------
 class _GeneralPanel(_SettingsPanel):
     title = "General"
-    description = (
-        "Appearance, folders, and developer mode for AI Voice Studio."
-    )
 
     def __init__(self, parent, settings: Settings):
         super().__init__(parent)
@@ -615,21 +612,11 @@ class _GeneralPanel(_SettingsPanel):
 # ---------------------------------------------------------------------------
 class _RecordingSettingsPanel(_SettingsPanel):
     title = "Recording settings"
-    description = (
-        "Default voice settings (speed, pitch, volume) used for new projects "
-        "and a preview of the selected voice."
-    )
 
     def __init__(self, parent, settings: Settings):
         super().__init__(parent)
         self.settings = settings
         sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(
-            wx.StaticText(self, label="Default speed, pitch, and volume for new projects. "
-                                      "Can be changed per project in the Recording window."),
-            0, wx.ALL, 6,
-        )
-
         self.rate = self._slider_row(sizer, "Speed", settings.get("recording.rate", 1.0),
                                      RATE_MIN, RATE_MAX)
         self.pitch = self._slider_row(sizer, "Pitch", settings.get("recording.pitch", 1.0),
@@ -659,28 +646,30 @@ class _RecordingSettingsPanel(_SettingsPanel):
         self.preview_btn.Bind(wx.EVT_BUTTON, self._on_preview)
 
     def _slider_row(self, sizer, name: str, value: float, lo: float, hi: float):
+        """A labelled slider row.
+
+        The value lives in the row label's own text ("Speed: 1.00"), NOT in a
+        separate bare-number static: screen readers announce static text by
+        its visible text, so a standalone "1.00" node would be read with no
+        context ("1.0", "1.0", ...).  One text node carries the word and the
+        number together.
+        """
         grid = wx.FlexGridSizer(cols=2, vgap=6, hgap=8)
         grid.AddGrowableCol(1)
+        label = wx.StaticText(self, label=f"{name}: {value:.2f}")
+        label.SetName(f"{name} value")
+        grid.Add(label, 0, wx.LEFT | wx.RIGHT | wx.ALIGN_CENTER_VERTICAL, 2)
         slider = wx.Slider(self, minValue=int(lo * 100), maxValue=int(hi * 100),
                            value=int(value * 100))
         slider.SetName(f"{name}: {value:.2f}")
-        label = wx.StaticText(self, label=name + ":")
-        label.SetName(name + " label")
-        grid.Add(label, 0, wx.LEFT | wx.RIGHT | wx.ALIGN_CENTER_VERTICAL, 2)
-        value_label = wx.StaticText(self, label=f"{value:.2f}")
-        slider.value_label = value_label  # type: ignore[attr-defined]
-        box = wx.BoxSizer(wx.HORIZONTAL)
-        box.Add(slider, 1, wx.EXPAND)
-        box.Add(value_label, 0, wx.LEFT | wx.ALIGN_CENTER_VERTICAL, 6)
-        grid.Add(box, 1, wx.EXPAND)
+        grid.Add(slider, 1, wx.EXPAND)
         sizer.Add(grid, 0, wx.EXPAND | wx.ALL, 4)
-        slider.Bind(
-            wx.EVT_SLIDER,
-            lambda evt, s=slider, vl=value_label, n=name: (
-                vl.SetLabel(f"{s.GetValue() / 100.0:.2f}"),
-                s.SetName(f"{n}: {s.GetValue() / 100.0:.2f}"),
-            ),
-        )
+
+        def _on_change(_evt, s=slider, lb=label, n=name):
+            lb.SetLabel(f"{n}: {s.GetValue() / 100.0:.2f}")
+            s.SetName(f"{n}: {s.GetValue() / 100.0:.2f}")
+
+        slider.Bind(wx.EVT_SLIDER, _on_change)
         return slider
 
     def apply_to_settings(self):
@@ -778,11 +767,6 @@ class _RecordingSettingsPanel(_SettingsPanel):
 # ---------------------------------------------------------------------------
 class _PunctuationPanel(_SettingsPanel):
     title = "Punctuation"
-    description = (
-        "Default punctuation mode for new projects. 'All' reads every "
-        "punctuation mark as a word so TTS voices that cannot pronounce "
-        "punctuation still read text correctly."
-    )
 
     """Default punctuation mode used by the New Project wizard.
 
@@ -800,10 +784,6 @@ class _PunctuationPanel(_SettingsPanel):
         self.store = store
         self._voices: list = []
         sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(
-            wx.StaticText(self, label="Default punctuation mode for new projects."),
-            0, wx.ALL, 6,
-        )
         sizer.Add(
             wx.StaticText(self, label="'All' reads every punctuation mark as a word "
                                       "(quote, dot, left paren, tic)."),
@@ -1099,17 +1079,11 @@ class _PunctuationPanel(_SettingsPanel):
 # ---------------------------------------------------------------------------
 class _AudioModePanel(_SettingsPanel):
     title = "Audio file creation"
-    description = "Choose how the document is split into audio files."
 
     def __init__(self, parent, settings: Settings):
         super().__init__(parent)
         self.settings = settings
         sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(
-            wx.StaticText(self, label="Choose how the document is split into "
-                                      "audio files."),
-            0, wx.ALL, 6,
-        )
 
         self.radios = []
         self.description = wx.StaticText(self, label="")
@@ -1153,22 +1127,11 @@ class _AudioModePanel(_SettingsPanel):
 # ---------------------------------------------------------------------------
 class _DaisySettingsPanel(_SettingsPanel):
     title = "DAISY settings"
-    description = (
-        "Default settings for DAISY 2.02 audio book creation: language, "
-        "publisher, and whether to include text in audio+text books."
-    )
 
     def __init__(self, parent, settings: Settings):
         super().__init__(parent)
         self.settings = settings
         sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(
-            wx.StaticText(
-                self,
-                label="Default DAISY 2.02 audio book settings for new projects.",
-            ),
-            0, wx.ALL, 6,
-        )
 
         grid = wx.FlexGridSizer(cols=2, vgap=6, hgap=8)
         grid.AddGrowableCol(1)
@@ -1213,10 +1176,6 @@ class _DaisySettingsPanel(_SettingsPanel):
 # ---------------------------------------------------------------------------
 class _OmniVoiceEnginesPanel(_SettingsPanel):
     title = "OmniVoice engines"
-    description = (
-        "Create reusable OmniVoice voices (voice clone or voice design) that "
-        "work with every OmniVoice engine, and check the engine install status."
-    )
 
     """OmniVoice Engines panel.
 
@@ -1245,14 +1204,6 @@ class _OmniVoiceEnginesPanel(_SettingsPanel):
         self._installed: list = []  # engine ids with packages installed
 
         sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(
-            wx.StaticText(
-                self,
-                label="Create reusable OmniVoice voices (voice clone or voice design) "
-                      "and check the engine install status.",
-            ),
-            0, wx.ALL, 6,
-        )
 
         # -- Voice library (universal, both engines) -----------------------
         self._build_voice_library(sizer)
@@ -1293,14 +1244,6 @@ class _OmniVoiceEnginesPanel(_SettingsPanel):
         title = wx.StaticText(self, label="Create a reusable voice")
         title.SetFont(title.GetFont().Bold())
         sizer.Add(title, 0, wx.LEFT | wx.RIGHT | wx.TOP, 6)
-        hint = wx.StaticText(
-            self,
-            label="Voices you create here are saved in your voice library and work "
-                  "with every OmniVoice engine - choose the engine that will preview "
-                  "them, then either clone a voice from a short sample or describe one.",
-        )
-        hint.Wrap(640)
-        sizer.Add(hint, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 4)
 
         # -- engine + mode selectors --------------------------------------
         grid = wx.FlexGridSizer(cols=2, vgap=6, hgap=8)
@@ -1430,14 +1373,6 @@ class _OmniVoiceEnginesPanel(_SettingsPanel):
         # -- voice library list -------------------------------------------
         lib_box = wx.StaticBox(self, label="My OmniVoice voices (shared by both engines)")
         lib = wx.StaticBoxSizer(lib_box, wx.VERTICAL)
-        lib_hint = wx.StaticText(
-            lib_box,
-            label="These voices work with every OmniVoice engine and appear in "
-                  "Available TTS, Punctuation and the Recording window - no matter "
-                  "which TTS version you select.",
-        )
-        lib_hint.Wrap(640)
-        lib.Add(lib_hint, 0, wx.LEFT | wx.RIGHT | wx.TOP, 4)
         self.voices_list = wx.ListBox(lib_box, size=(-1, 130),
                                       name="My OmniVoice voices")
         lib.Add(self.voices_list, 1, wx.EXPAND | wx.ALL, 4)
@@ -1892,10 +1827,6 @@ class _OmniVoiceEnginesPanel(_SettingsPanel):
 # ---------------------------------------------------------------------------
 class _OmniVoiceServerPanel(_SettingsPanel):
     title = "OmniVoice Server"
-    description = (
-        "Configure the OmniVoice HTTP server for network TTS access. "
-        "Other apps on the same network can also use the server."
-    )
 
     """OmniVoice Server settings panel.
 
@@ -1914,17 +1845,6 @@ class _OmniVoiceServerPanel(_SettingsPanel):
         self._thread: threading.Thread | None = None
 
         sizer = wx.BoxSizer(wx.VERTICAL)
-
-        # -- Overview ----------------------------------------------------
-        sizer.Add(
-            wx.StaticText(
-                self,
-                label="OmniVoice Server provides an OpenAI-compatible HTTP API "
-                      "for TTS. Other applications on the same network can use "
-                      "it as a drop-in replacement for the OpenAI TTS endpoint."
-            ),
-            0, wx.ALL, 6,
-        )
 
         # -- Enable / Auto-start ----------------------------------------
         ov_cfg = settings.get("omnivoice_server", {})
@@ -2526,9 +2446,6 @@ class _OmniVoiceServerPanel(_SettingsPanel):
 # ---------------------------------------------------------------------------
 class _ComputePanel(_SettingsPanel):
     title = "Compute"
-    description = (
-        "Compute back-ends and the optional GPU (CUDA) runtime."
-    )
 
     """Manages the optional GPU (CUDA) runtime download.
 
@@ -2544,10 +2461,6 @@ class _ComputePanel(_SettingsPanel):
         self._cancel_event = threading.Event()
 
         sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(
-            wx.StaticText(self, label=        "Compute back-ends and the optional GPU (CUDA) runtime."),
-            0, wx.ALL, 6,
-        )
         sizer.Add(
             wx.StaticText(self, label="CPU is always available. GPU (CUDA) requires "
                                       f"downloading the optional runtime (~{runtime.DOWNLOAD_SIZE_MB / 1024:.0f} GB)."),
@@ -3288,10 +3201,6 @@ class _ComputePanel(_SettingsPanel):
 # ---------------------------------------------------------------------------
 class _DeveloperPanel(_SettingsPanel):
     title = "Developer"
-    description = (
-        "Addon management, pip environment, and diagnostic tools. "
-        "Enable Developer Mode in General first."
-    )
 
     def __init__(self, parent, settings: Settings):
         super().__init__(parent)
@@ -3374,10 +3283,10 @@ class _DeveloperPanel(_SettingsPanel):
         log_box = wx.StaticBox(self, label="Log Viewer")
         log_sizer = wx.StaticBoxSizer(log_box, wx.VERTICAL)
         log_row = wx.BoxSizer(wx.HORIZONTAL)
-        log_row.Add(wx.StaticText(log_box, label="Log file:"), 0,
+        log_row.Add(wx.StaticText(log_box, label="Log file to view:"), 0,
                      wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 4)
         self.log_file_combo = wx.ComboBox(log_box, style=wx.CB_READONLY,
-                                             name="Select log file to view")
+                                             name="Log file to view")
         self.log_file_combo.SetToolTip("Choose which log file to display in the viewer below")
         self.log_file_combo.Append("app.log", "app.log")
         self.log_file_combo.Append("gui.log", "gui.log")
@@ -3647,18 +3556,11 @@ class _DeveloperPanel(_SettingsPanel):
 # ---------------------------------------------------------------------------
 class _ResetPanel(_SettingsPanel):
     title = "Reset"
-    description = "Restore every setting to its default value."
 
     def __init__(self, parent, settings: Settings):
         super().__init__(parent)
         self.settings = settings
         sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(
-            wx.StaticText(self, label="Restore every setting in this window to "
-                                      "its default value. Downloaded voices are "
-                                      "not deleted."),
-            0, wx.ALL, 6,
-        )
         self.reset_btn = wx.Button(self, label="Reset to default")
         self.reset_btn.SetName("Reset to default")
         sizer.Add(self.reset_btn, 0, wx.ALL, 4)

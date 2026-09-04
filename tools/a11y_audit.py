@@ -38,19 +38,52 @@ _INPUT_CLASSES = (
 )
 
 
+# Composite controls whose child windows are implementation internals
+# (e.g. the edit box inside a SpinCtrlDouble, or the item buttons inside a
+# wx.RadioBox).  They are announced as a single control by screen readers,
+# so walking into them only produces false "unnamed child" reports.
+# Leaf composite inputs whose child windows are implementation internals
+# (e.g. the edit box inside a SpinCtrlDouble, or the item buttons inside a
+# wx.RadioBox).  They are announced as a single control by screen readers,
+# so walking into them only produces false "unnamed child" reports.
+# wx.StaticBox is intentionally NOT here: its children are the labelled
+# rows inside a group box and must be audited.
+_COMPOSITE = (
+    wx.SpinCtrl, wx.SpinCtrlDouble, wx.RadioBox, wx.ComboBox, wx.Choice,
+    wx.ListBox, wx.ListCtrl, wx.TreeCtrl, wx.Slider, wx.Gauge, wx.Button,
+    wx.ToggleButton, wx.CheckBox,
+)
+
+
+def _effectively_shown(win: wx.Window) -> bool:
+    """True when `win` and every ancestor is shown.
+
+    wx.Window.IsShown() only reflects the window's own flag, so a box inside
+    a hidden sub-panel still reports True.  Screen readers see the native
+    WS_VISIBLE chain instead, so mirror that here.
+    """
+    w = win
+    while w is not None:
+        if not w.IsShown():
+            return False
+        w = w.GetParent()
+    return True
+
+
 def walk(win, out):
     for child in win.GetChildren():
         if not isinstance(child, wx.Window):
             continue
-        cls = child.GetClassInfo().GetClassName()
-        name = (child.GetName() or "").strip()
+        if not _effectively_shown(child):
+            continue
+        is_composite = isinstance(child, _COMPOSITE)
         if isinstance(child, _INPUT_CLASSES):
+            cls = child.GetClassInfo().GetClassName()
+            name = (child.GetName() or "").strip()
             extra = ""
             label = ""
             if isinstance(child, wx.Button) or isinstance(child, wx.ToggleButton):
                 label = child.GetLabel()
-                if name and not label:
-                    extra = f" (btn label {label!r})"
                 if not name or name in _DEFAULT_NAMES:
                     if label:
                         # Windows usually derives a name from the button text,
@@ -72,17 +105,14 @@ def walk(win, out):
                 "categories", "options", "select", "none", "description",
             }:
                 child._audit_label = txt  # stash for parent-level checks
-        # Recurse into every window that can contain child windows (panels,
-        # scrolled windows, static boxes, notebooks, ...).
-        if isinstance(child, wx.Panel) or isinstance(child, wx.ScrolledWindow) \
-                or isinstance(child, wx.StaticBox) or isinstance(child, wx.Notebook) \
-                or isinstance(child, wx.BoxSizer) or child.GetChildren():
-            if isinstance(child, wx.Window) and child.GetChildren():
-                walk(child, out)
-            elif not isinstance(child, wx.Window):
-                pass
-            else:
-                walk(child, out)
+        # Descend only into genuine containers (panels, static boxes,
+        # notebooks, ...).  Composite inputs (spin boxes, combos, radio
+        # boxes, sliders) are announced as a single control by screen
+        # readers, so their internal children must not be walked.
+        if not is_composite and isinstance(
+            child, (wx.Panel, wx.ScrolledWindow, wx.StaticBox, wx.Notebook),
+        ):
+            walk(child, out)
 
 
 def dup_check(rows):

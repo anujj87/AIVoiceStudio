@@ -155,7 +155,12 @@ class RecordingDialog(wx.Dialog):
             self.format_combo.Append(label, value)
         self.format_combo.SetSelection(0)
         self.format_combo.SetToolTip("Choose the audio file format: WAV is always available, MP3 and FLAC need FFmpeg")
-        add_labeled(self, params, "Output format", self.format_combo, flag=wx.LEFT | wx.RIGHT, border=2)
+        fmt_label = add_labeled(self, params, "Output format", self.format_combo,
+                                flag=wx.LEFT | wx.RIGHT, border=2)
+        # The label cell is itself announced by screen readers; give it the
+        # same accessible name as the combo so the row always reads as
+        # "Output format" and never as a bare value or default class name.
+        fmt_label.SetName("Output format")
         sizer.Add(params, 0, wx.EXPAND | wx.ALL, 6)
 
         # -- OmniVoice voice options (per project) ---------------------------
@@ -272,23 +277,24 @@ class RecordingDialog(wx.Dialog):
         return self._selected_compute() == "cuda_gpu"
 
     def _slider(self, grid, name: str, lo: float, hi: float) -> wx.Slider:
-        label = wx.StaticText(self, label=name + ":")
-        label.SetName(name + " label")
+        """A labelled slider row (see settings dialog ``_slider_row``).
+
+        The current value is part of the row label's own text ("Rate: 1.00")
+        instead of a separate bare-number static text, so a screen reader
+        always announces the word together with the number.
+        """
+        label = wx.StaticText(self, label=f"{name}: 1.00")
+        label.SetName(name + " value")
+        grid.Add(label, 0, wx.LEFT | wx.RIGHT | wx.ALIGN_CENTER_VERTICAL, 2)
         slider = wx.Slider(self, minValue=int(lo * 100), maxValue=int(hi * 100),
                            value=int(1.0 * 100))
         slider.SetName(f"{name}: 1.00")
-        value_label = wx.StaticText(self, label="1.00")
-        value_label.SetName(name + " value")
-        slider.value_label = value_label  # type: ignore[attr-defined]
-        box = wx.BoxSizer(wx.HORIZONTAL)
-        box.Add(slider, 1, wx.EXPAND)
-        box.Add(value_label, 0, wx.LEFT | wx.ALIGN_CENTER_VERTICAL, 6)
-        grid.Add(label, 0, wx.LEFT | wx.RIGHT | wx.ALIGN_CENTER_VERTICAL, 2)
-        grid.Add(box, 1, wx.EXPAND)
+        slider.value_label = label  # type: ignore[attr-defined]
+        grid.Add(slider, 1, wx.EXPAND)
         slider.Bind(
             wx.EVT_SLIDER,
-            lambda evt, s=slider, vl=value_label, n=name: (
-                vl.SetLabel(f"{s.GetValue() / 100.0:.2f}"),
+            lambda evt, s=slider, lb=label, n=name: (
+                lb.SetLabel(f"{n}: {s.GetValue() / 100.0:.2f}"),
                 s.SetName(f"{n}: {s.GetValue() / 100.0:.2f}"),
             ),
         )
@@ -596,7 +602,7 @@ class RecordingDialog(wx.Dialog):
         for name, slider in (("rate", self.rate), ("pitch", self.pitch), ("volume", self.volume)):
             value = float(tts.get(name, 1.0))
             slider.SetValue(int(value * 100))
-            slider.value_label.SetLabel(f"{value:.2f}")  # type: ignore[attr-defined]
+            slider.value_label.SetLabel(f"{name}: {value:.2f}")  # type: ignore[attr-defined]
         self._update_omni_ui()
         fmt = tts.get("output_format", FORMAT_WAV)
         idx = next((i for i in range(self.format_combo.GetCount())

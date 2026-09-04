@@ -114,7 +114,6 @@ def populate_voices(combo: wx.ComboBox, variant, voices_only: bool = False) -> N
 # ---------------------------------------------------------------------------
 class DownloadPanel(_ManagerPanel):
     title = "Download and remove"
-    description = "Download or remove neural TTS voices from the official open-source releases."
 
     def __init__(self, parent, store: ModelStore, downloader: ModelDownloader,
                  on_models_changed=None):
@@ -126,11 +125,6 @@ class DownloadPanel(_ManagerPanel):
         self._cancel_event = threading.Event()
 
         sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(
-            wx.StaticText(self, label="Choose a TTS engine, language, and variant, "
-                                      "then press Download or Remove."),
-            0, wx.ALL, 6,
-        )
         self._build_selector(sizer)
         sizer.AddSpacer(8)
 
@@ -324,7 +318,6 @@ class DownloadPanel(_ManagerPanel):
 class AvailablePanel(_ManagerPanel):
     """Lists downloaded voices (incl. cloned ones) with a voice combo."""
     title = "Available TTS"
-    description = "Voices you have downloaded or cloned, with a preview button."
 
     def __init__(self, parent, store: ModelStore):
         super().__init__(parent)
@@ -332,11 +325,6 @@ class AvailablePanel(_ManagerPanel):
         self._voices: list = []  # parallel list of voice entries
 
         sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(
-            wx.StaticText(self, label="Voices you have downloaded. Select a voice "
-                                      "to preview it."),
-            0, wx.ALL, 6,
-        )
         grid = wx.FlexGridSizer(cols=2, vgap=6, hgap=8)
         grid.AddGrowableCol(1)
         self.tts_combo = wx.ComboBox(self, style=wx.CB_READONLY,
