@@ -11,6 +11,8 @@ Headings are extracted per format:
 * DOCX -> paragraphs whose style starts with "Heading" (level 1-6)
 * Markdown -> ATX headings (# .. ######)
 * HTML -> <h1>..<h6>
+* EPUB -> <h1>..<h6>, or Calibre-style heading classes (cn/ct/cst/fmh) when
+  the chapters carry no semantic heading tags
 * PDF -> best-effort heuristic on short title-like lines
 * TXT / clipboard -> paragraph blocks (no heading markup)
 """
@@ -20,6 +22,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from typing import Callable, List, Optional
@@ -106,6 +109,33 @@ def _decode_text(data: bytes) -> str:
     raise ParseError("Could not decode the file as text")
 
 
+_CHARSET_RE = re.compile(r"charset\s*=\s*[\"']?([\w.-]+)", re.IGNORECASE)
+
+
+def _decode_html_bytes(data: bytes) -> str:
+    """Decode an HTML/XML document honouring its declared charset.
+
+    Many EPUB chapters are Windows-1252 (curly quotes, dashes) while others are
+    UTF-8; decoding everything as UTF-8 turns valid characters into U+FFFD.
+    Order: declared charset -> UTF-8 (strict) -> cp1252 -> latin-1.
+    """
+    head = data[:2048]
+    declared = _CHARSET_RE.search(head.decode("latin-1", errors="ignore"))
+    encodings = [declared.group(1)] if declared else []
+    encodings += ["utf-8-sig", "utf-8", "cp1252"]
+    seen: set[str] = set()
+    for enc in encodings:
+        if not enc or enc.lower() in seen:
+            continue
+        seen.add(enc.lower())
+        try:
+            return data.decode(enc)
+        except (UnicodeDecodeError, LookupError):
+            continue
+    # latin-1 never raises; last resort.
+    return data.decode("latin-1", errors="replace")
+
+
 # ---------------------------------------------------------------------------
 # Individual parsers
 # ---------------------------------------------------------------------------
@@ -164,13 +194,29 @@ def parse_markdown(path: str) -> Document:
     return Document(blocks=blocks, source=path, format="markdown")
 
 
+#: Class-name conventions used by Calibre-produced EPUBs.  When the source
+#: document used heading styles, the conversion keeps the structure but writes
+#: it as styled <p>/<div> blocks instead of <h1>..<h6> tags:
+#:   cn  = chapter number ("Chapter 1"),  ct  = chapter title,
+#:   cst = chapter sub-title,            fmh = front-matter heading
+#: Only the EPUB parser enables this mapping; plain HTML keeps h1-h6 only.
+_EPUB_HEADING_CLASSES = {
+    "cn": 1,
+    "ct": 1,
+    "cst": 2,
+    "fmh": 1,
+}
+
+
 class _HtmlTextExtractor(HTMLParser):
-    def __init__(self):
+    def __init__(self, class_levels: Optional[dict[str, int]] = None):
         super().__init__(convert_charrefs=True)
         self.blocks: List[Block] = []
         self._current: List[str] = []
         self._heading_stack: List[int] = []
         self._in_heading: Optional[int] = None
+        self._class_heading_tag: Optional[str] = None
+        self._class_levels: dict[str, int] = class_levels or {}
         self._skip_depth = 0
 
     def _flush(self):
@@ -189,6 +235,19 @@ class _HtmlTextExtractor(HTMLParser):
         if re.fullmatch(r"h[1-6]", tag):
             self._flush()
             self._in_heading = int(tag[1])
+            self._class_heading_tag = None
+        elif tag in ("p", "div") and self._class_levels:
+            classes = {c.lower() for c in dict(attrs).get("class", "").split()}
+            level = next(
+                (self._class_levels[c] for c in classes if c in self._class_levels),
+                None,
+            )
+            if level is not None:
+                self._flush()
+                self._in_heading = level
+                self._class_heading_tag = tag
+                return
+            self._flush()
         elif tag in ("p", "div", "br", "li", "tr", "section", "article"):
             self._flush()
 
@@ -206,6 +265,16 @@ class _HtmlTextExtractor(HTMLParser):
                 last.kind = "heading"
                 last.level = self._in_heading
             self._in_heading = None
+            self._class_heading_tag = None
+        elif self._in_heading and self._class_heading_tag == tag:
+            # A Calibre-style <p class="cn|ct|cst|fmh"> heading block ended.
+            self._flush()
+            if self.blocks and self.blocks[-1].kind == "text":
+                last = self.blocks[-1]
+                last.kind = "heading"
+                last.level = self._in_heading
+            self._in_heading = None
+            self._class_heading_tag = None
         elif tag in ("p", "div", "li", "tr"):
             self._flush()
 
@@ -381,8 +450,10 @@ def parse_epub(
                     raw = zf.read(filename)
                 except KeyError:
                     continue
-                html_text = raw.decode("utf-8", errors="replace")
-                parser = _HtmlTextExtractor()
+                html_text = _decode_html_bytes(raw)
+                # EPUBs converted by Calibre often replace <h1>..<h6> with styled
+                # <p>/<div> blocks (cn/ct/cst/fmh); recognize those as headings.
+                parser = _HtmlTextExtractor(class_levels=_EPUB_HEADING_CLASSES)
                 parser.feed(html_text)
                 parser.close()
                 for block in parser.blocks:
