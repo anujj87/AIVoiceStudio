@@ -39,6 +39,10 @@ from .. import paths, runtime
 from ..constants import (
     AUDIO_MODE_CHOICES,
     AUDIO_MODE_DESCRIPTIONS,
+    DAISY_SPLIT_ALL_HEADINGS,
+    DAISY_SPLIT_CHOICES,
+    DAISY_SPLIT_DESCRIPTIONS,
+    DAISY_SPLIT_H1,
     MODE_PAGE_ONLY,
     MODE_PAGE_WITH_H1,
     PAGES_PER_FILE_MAX,
@@ -1374,6 +1378,38 @@ class _DaisySettingsPanel(_SettingsPanel):
         self.settings = settings
         sizer = wx.BoxSizer(wx.VERTICAL)
 
+        sizer.Add(
+            wx.StaticText(self, label="Chapter splitting"),
+            0, wx.ALL, 6,
+        )
+        sizer.Add(
+            wx.StaticText(
+                self,
+                label="How the document is split into DAISY chapters when a "
+                      "DAISY project is created.",
+            ),
+            0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 6,
+        )
+        self.radios = []
+        self.description = wx.StaticText(self, label="")
+        sizer.Add(self.description, 0, wx.ALL, 6)
+        current = settings.get("daisy.splitting", DAISY_SPLIT_H1)
+        first = True
+        for value, label in DAISY_SPLIT_CHOICES:
+            radio = wx.RadioButton(
+                self, label=label, style=wx.RB_GROUP if first else 0
+            )
+            radio.SetName(label)
+            radio.SetValue(value == current)
+            sizer.Add(radio, 0, wx.ALL, 4)
+            radio.Bind(
+                wx.EVT_RADIOBUTTON,
+                lambda _evt, v=value: self._update_description(),
+            )
+            self.radios.append((radio, value))
+            first = False
+        self._update_description()
+
         grid = wx.FlexGridSizer(cols=2, vgap=6, hgap=8)
         grid.AddGrowableCol(1)
 
@@ -1400,13 +1436,28 @@ class _DaisySettingsPanel(_SettingsPanel):
         sizer.Add(
             wx.StaticText(
                 self,
-                label="Language code (en, hi, fr, de, es) and optional publisher name.",
+                label="Language code (en, hi, fr, de, es) and optional publisher "
+                      "name are written into the DAISY book metadata (dc:language, "
+                      "dc:publisher).",
             ),
             0, wx.ALL, 6,
         )
         self.SetSizer(sizer)
 
+    def selected(self) -> str:
+        for radio, value in self.radios:
+            if radio.GetValue():
+                return value
+        return DAISY_SPLIT_H1
+
+    def _update_description(self):
+        self.description.SetLabel(
+            DAISY_SPLIT_DESCRIPTIONS.get(self.selected(), "")
+        )
+        self.description.Wrap(680)
+
     def apply_to_settings(self):
+        self.settings.set("daisy.splitting", self.selected())
         self.settings.set("daisy.language", self.lang_ctrl.GetValue().strip() or "en")
         self.settings.set("daisy.publisher", self.publisher_ctrl.GetValue().strip())
         self.settings.set("daisy.include_text", self.include_text_cb.GetValue())

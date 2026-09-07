@@ -18,6 +18,10 @@ from .. import project
 from ..constants import (
     AUDIO_MODE_CHOICES,
     AUDIO_MODE_DESCRIPTIONS,
+    DAISY_SPLIT_ALL_HEADINGS,
+    DAISY_SPLIT_CHOICES,
+    DAISY_SPLIT_DESCRIPTIONS,
+    DAISY_SPLIT_H1,
     MODE_PAGE_ONLY,
     MODE_PAGE_WITH_H1,
     PAGES_PER_FILE_MAX,
@@ -54,6 +58,7 @@ class NewProjectWizard(Wizard):
 
         self.page_details = _DetailsPage(self)
         self.page_mode = _ModePage(self, settings)
+        self.page_daisy = _DaisyPage(self, settings)
         self.GetPageAreaSizer().Add(self.page_details)
         if initial_name:
             self.page_details.name_ctrl.SetValue(initial_name)
@@ -74,6 +79,8 @@ class NewProjectWizard(Wizard):
                 self.page_details.name_ctrl.SetFocus()
             elif page is self.page_mode and self.page_mode.radios:
                 wx.CallAfter(self.page_mode.radios[0][0].SetFocus)
+            elif page is self.page_daisy and self.page_daisy.radios:
+                wx.CallAfter(self.page_daisy.radios[0][0].SetFocus)
         evt.Skip()
 
     def _recording_defaults(self) -> dict:
@@ -104,6 +111,7 @@ class NewProjectWizard(Wizard):
         name = self.page_details.name_ctrl.GetValue().strip() or "Untitled project"
         ptype = self.page_details.selected_project_type()
         mode = self.page_mode.selected()
+        is_daisy = ptype in (PROJECT_TYPE_DAISY_AUDIO, PROJECT_TYPE_DAISY_AUDIO_TEXT)
 
         # Clipboard mode: no document needed
         if ptype == PROJECT_TYPE_CLIPBOARD:
@@ -148,8 +156,11 @@ class NewProjectWizard(Wizard):
                 progress.update(int(max(0.0, min(1.0, fraction)) * 100), message)
 
             doc = parse_document(self.source_path, on_progress=_report)
-            if ptype in (PROJECT_TYPE_DAISY_AUDIO, PROJECT_TYPE_DAISY_AUDIO_TEXT):
-                segments = split_daisy_chapters(doc.blocks)
+            if is_daisy:
+                progress.update(90, "Splitting the text into DAISY chapters...")
+                segments = split_daisy_chapters(
+                    doc.blocks, break_level=self.page_daisy.selected_splitting()
+                )
             else:
                 pages = self.page_mode.pages_per_file() if mode == MODE_PAGE_ONLY else 1
                 progress.update(90, "Splitting the text into audio segments...")
@@ -175,6 +186,17 @@ class NewProjectWizard(Wizard):
 
         pdir = project_dir(name)
         last = self.settings.get("last_model", {})
+        daisy_settings = None
+        if is_daisy:
+            daisy_settings = {
+                "splitting": self.page_daisy.selected_splitting(),
+                "language": self.page_daisy.language(),
+                "publisher": self.page_daisy.publisher(),
+                "include_text": (
+                    ptype == PROJECT_TYPE_DAISY_AUDIO_TEXT
+                    and self.page_daisy.include_text()
+                ),
+            }
         project.create_project(
             pdir,
             name,
@@ -195,6 +217,7 @@ class NewProjectWizard(Wizard):
                 "compute": self.settings.compute,
             },
             project_type=ptype,
+            daisy_settings=daisy_settings,
         )
         self.settings.add_recent_project(name, pdir)
         self.EndModal(wx.ID_OK)
@@ -211,6 +234,12 @@ class _DetailsPage(WizardPage):
         self._build_ui()
 
     def GetNext(self):
+        """DAISY project types get the DAISY-specific second page; every other
+        type gets the regular audio file creation page."""
+        if self.selected_project_type() in (
+            PROJECT_TYPE_DAISY_AUDIO, PROJECT_TYPE_DAISY_AUDIO_TEXT,
+        ):
+            return self.wizard.page_daisy
         return self.wizard.page_mode
 
     def GetPrev(self):
@@ -434,3 +463,114 @@ class _ModePage(WizardPage):
             if radio.GetValue():
                 return value
         return MODE_PAGE_WITH_H1
+
+
+class _DaisyPage(WizardPage):
+    """Second wizard page for DAISY project types.
+
+    Replaces the generic audio file creation page when the user chooses a
+    DAISY book type: here the chapter splitting, text inclusion and the DAISY
+    metadata (language, publisher) are chosen. The choices are stored in the
+    project and in Settings > DAISY settings.
+    """
+
+    def __init__(self, wizard, settings: Settings):
+        super().__init__(wizard)
+        self.wizard = wizard
+        self._build_ui(settings)
+
+    def GetNext(self):
+        return None
+
+    def GetPrev(self):
+        return self.wizard.page_details
+
+    def _build_ui(self, settings: Settings):
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(wx.StaticText(self, label="DAISY book setup"),
+                  0, wx.ALL, 6)
+        sizer.Add(
+            wx.StaticText(self, label="Choose how the document is split into "
+                                      "DAISY chapters, then press Finish to "
+                                      "prepare the document and open the "
+                                      "Recording window."),
+            0, wx.ALL, 6,
+        )
+
+        self.radios = []
+        self.description = wx.StaticText(self, label="")
+        sizer.Add(self.description, 0, wx.ALL, 6)
+        current = settings.get("daisy.splitting", DAISY_SPLIT_H1)
+        first = True
+        for value, label in DAISY_SPLIT_CHOICES:
+            radio = wx.RadioButton(
+                self, label=label, style=wx.RB_GROUP if first else 0
+            )
+            radio.SetName(label)
+            radio.SetValue(value == current)
+            sizer.Add(radio, 0, wx.ALL, 4)
+            radio.Bind(
+                wx.EVT_RADIOBUTTON,
+                lambda _evt, v=value: self._update_description(),
+            )
+            self.radios.append((radio, value))
+            first = False
+        self._update_description()
+
+        grid = wx.FlexGridSizer(cols=2, vgap=6, hgap=8)
+        grid.AddGrowableCol(1)
+
+        self.include_text_cb = wx.CheckBox(self, label="Include text (audio+text book)")
+        self.include_text_cb.SetName("Include text in the DAISY book")
+        self.include_text_cb.SetValue(
+            settings.get("daisy.include_text", True)
+            and self.wizard.page_details.selected_project_type()
+            == PROJECT_TYPE_DAISY_AUDIO_TEXT
+        )
+        grid.Add((1, 1))
+        grid.Add(self.include_text_cb, 0, wx.ALL, 2)
+
+        self.lang_ctrl = wx.TextCtrl(self)
+        self.lang_ctrl.SetName("DAISY language code")
+        self.lang_ctrl.SetValue(settings.get("daisy.language", "en"))
+        add_labeled(self, grid, "Language code (ISO 639)", self.lang_ctrl,
+                    flag=wx.LEFT | wx.RIGHT, border=2)
+
+        self.publisher_ctrl = wx.TextCtrl(self)
+        self.publisher_ctrl.SetName("DAISY publisher")
+        self.publisher_ctrl.SetValue(settings.get("daisy.publisher", ""))
+        add_labeled(self, grid, "Publisher (optional)", self.publisher_ctrl,
+                    flag=wx.LEFT | wx.RIGHT, border=2)
+
+        sizer.Add(grid, 0, wx.EXPAND | wx.ALL, 6)
+        sizer.Add(
+            wx.StaticText(
+                self,
+                label="After recording, a DAISY 2.02 book (ncc.html, SMIL "
+                      "files and audio) is created in the project's DAISY "
+                      "folder and can be exported as a ZIP for DAISY readers.",
+            ),
+            0, wx.ALL, 6,
+        )
+        self.SetSizer(sizer)
+
+    def selected_splitting(self) -> str:
+        for radio, value in self.radios:
+            if radio.GetValue():
+                return value
+        return DAISY_SPLIT_H1
+
+    def include_text(self) -> bool:
+        return self.include_text_cb.GetValue()
+
+    def language(self) -> str:
+        return (self.lang_ctrl.GetValue().strip() or "en").lower()
+
+    def publisher(self) -> str:
+        return self.publisher_ctrl.GetValue().strip()
+
+    def _update_description(self):
+        self.description.SetLabel(
+            DAISY_SPLIT_DESCRIPTIONS.get(self.selected_splitting(), "")
+        )
+        self.description.Wrap(680)

@@ -106,8 +106,31 @@ PROJECT_TYPE_DESCRIPTIONS = {
 # ---------------------------------------------------------------------------
 DAISY_OUTPUT_DIR_NAME = "DAISY"
 DAISY_AUDIO_DIR_NAME = "audio"
+DAISY_SMIL_DIR_NAME = "smil"
+DAISY_TEXT_DIR_NAME = "text"
 DAISY_NCC_FILE = "ncc.html"
 DAISY_PACKAGE_FILE = "package.opf"
+DAISY_MASTER_SMIL_FILE = "master.smil"
+
+# DAISY chapter splitting modes (used by the wizard DAISY page and Settings)
+DAISY_SPLIT_H1 = "h1"
+DAISY_SPLIT_ALL_HEADINGS = "all"
+DAISY_SPLIT_CHOICES = [
+    (DAISY_SPLIT_H1, "Heading style 1 only"),
+    (DAISY_SPLIT_ALL_HEADINGS, "Break on every heading"),
+]
+DAISY_SPLIT_DESCRIPTIONS = {
+    DAISY_SPLIT_H1: (
+        "Each heading style 1 starts a new DAISY chapter; the text after it up "
+        "to the next heading style 1 is recorded into that chapter's audio "
+        "file. Chapters that stay too long are split into parts."
+    ),
+    DAISY_SPLIT_ALL_HEADINGS: (
+        "Any heading (styles 1 to 6) starts a new DAISY chapter. The heading "
+        "and the text that follows it up to the next heading are recorded "
+        "into that chapter's audio file."
+    ),
+}
 
 # ---------------------------------------------------------------------------
 # Audio file creation modes (SPEC 3.4)

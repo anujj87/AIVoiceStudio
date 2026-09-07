@@ -715,8 +715,20 @@ class RecordingDialog(wx.Dialog):
         }
         if omni:
             tts_data["omni"] = omni
-        self.data["tts"] = tts_data
-        project.save_project(self.project_dir, self.data)
+        # Merge into the freshest on-disk state instead of saving the stale
+        # in-memory copy: the recording worker marks segments done in
+        # project.json while the dialog runs, and a wholesale save here would
+        # revert them to "pending" (which breaks DAISY builds and resume).
+        try:
+            fresh = project.load_project(self.project_dir)
+        except Exception:  # noqa: BLE001
+            fresh = None
+        if fresh is not None:
+            fresh["tts"] = tts_data
+            project.save_project(self.project_dir, fresh)
+        else:
+            self.data["tts"] = tts_data
+            project.save_project(self.project_dir, self.data)
         # Remember the selection so the next new project can seed its
         # per-TTS rate/pitch/volume defaults (Settings > Recording settings).
         if voice:
@@ -930,31 +942,53 @@ class RecordingDialog(wx.Dialog):
     def _daisy_summary(self) -> str:
         """Return a note about DAISY files if they were generated."""
         ptype = self.data.get("project_type", "audio_playlist")
-        if ptype in ("daisy_audio", "daisy_audio_text"):
-            return ("\n\nDAISY 2.02 files (ncc.html, SMIL, package.opf) were "
-                    "generated in the project folder.")
-        return ""
+        if ptype not in ("daisy_audio", "daisy_audio_text"):
+            return ""
+        from ..constants import DAISY_NCC_FILE, DAISY_OUTPUT_DIR_NAME  # noqa: PLC0415
+        ncc = os.path.join(self.project_dir, DAISY_OUTPUT_DIR_NAME, DAISY_NCC_FILE)
+        if os.path.isfile(ncc):
+            return ("\n\nThe DAISY 2.02 book (ncc.html, SMIL files and audio) "
+                    "was generated in the 'DAISY' folder of the project. Use "
+                    "'Export DAISY as ZIP' to share it.")
+        return ("\n\nDAISY book not generated yet - no segments had been "
+                "recorded when recording finished.")
 
     def _build_daisy_if_needed(self):
-        """Build DAISY 2.02 book structure after recording completes."""
+        """Build DAISY 2.02 book structure after recording completes.
+
+        Reads the fresh segment status from disk (the in-memory copy loaded at
+        dialog open never sees the 'done' status written by the worker), then
+        generates the book into the project's ``DAISY`` folder.
+        """
         ptype = self.data.get("project_type", "audio_playlist")
         if ptype not in ("daisy_audio", "daisy_audio_text"):
             return
         from ..documents.daisy_builder import build_daisy_book  # noqa: PLC0415
         try:
-            lang = self.settings.get("daisy.language", "en")
-            publisher = self.settings.get("daisy.publisher", "")
-            include_text = ptype == "daisy_audio_text" and self.settings.get("daisy.include_text", True)
-            fmt = self.data.get("tts", {}).get("output_format", "wav")
-            build_daisy_book(
+            fresh = project.load_project(self.project_dir)
+            # Per-project DAISY settings (chosen in the wizard) win; fall back
+            # to the global Settings > DAISY defaults.
+            pd = fresh.get("daisy") or {}
+            lang = pd.get("language") or self.settings.get("daisy.language", "en")
+            publisher = pd.get("publisher") or self.settings.get("daisy.publisher", "")
+            include_text = ptype == "daisy_audio_text" and bool(
+                pd.get("include_text", self.settings.get("daisy.include_text", True))
+            )
+            fmt = fresh.get("tts", {}).get("output_format", "wav")
+            ncc_path = build_daisy_book(
                 output_dir=self.project_dir,
-                project_name=self.data.get("name", "Untitled"),
-                segments=self.data.get("segments", []),
+                project_name=fresh.get("name", "Untitled"),
+                segments=fresh.get("segments", []),
                 audio_format=fmt,
                 include_text=include_text,
                 language=lang,
                 publisher=publisher,
+                source_file=fresh.get("source_file", ""),
             )
+            if ncc_path:
+                self.export_daisy_btn.Enable()
+            else:
+                log.warning("DAISY book not built: no completed segments on disk")
         except Exception as exc:  # noqa: BLE001
             log.warning("DAISY book generation failed: %s", exc)
 
@@ -1013,8 +1047,20 @@ class RecordingDialog(wx.Dialog):
     def _on_export_daisy(self, _):
         """Package the DAISY book into a ZIP file for distribution."""
         from ..documents.daisy_builder import export_daisy_zip  # noqa: PLC0415
+        from ..constants import DAISY_NCC_FILE, DAISY_OUTPUT_DIR_NAME  # noqa: PLC0415
         ptype = self.data.get("project_type", "audio_playlist")
         if ptype not in ("daisy_audio", "daisy_audio_text"):
+            return
+        if not os.path.isfile(os.path.join(
+            self.project_dir, DAISY_OUTPUT_DIR_NAME, DAISY_NCC_FILE
+        )):
+            wx.MessageBox(
+                "No DAISY book has been generated yet. Finish recording every "
+                "segment first (press Start recording and let it complete), "
+                "then export again.",
+                "DAISY book missing",
+                style=wx.OK | wx.ICON_INFORMATION,
+            )
             return
 
         default_name = sanitize_filename(self.data.get("name", "daisy_book"), 50) + ".zip"

@@ -288,23 +288,36 @@ def split_all_headings(blocks: List[Block]) -> List[Segment]:
 DAISY_MAX_CHARS = 1200
 
 
-def split_daisy_chapters(blocks: List[Block]) -> List[Segment]:
+def split_daisy_chapters(blocks: List[Block], break_level: str = "h1") -> List[Segment]:
     """Split into DAISY-sized chapters using headings when available.
 
     Strategy:
-    1. Group text by Heading-1 (or Heading-2 if no Heading-1 exists).
+    1. Group text by Heading-1 (default), or by every heading level when
+       ``break_level == "all"`` (or Heading-2 if no Heading-1 exists).
     2. If a heading group exceeds DAISY_MAX_CHARS, split at paragraph
        boundaries into sub-segments.
     3. If there are no headings at all, split by pseudo-pages.
     """
+    from ..constants import DAISY_SPLIT_ALL_HEADINGS  # noqa: PLC0415
+
     # Detect which heading level to use
     h1_blocks = [b for b in blocks if b.kind == "heading" and b.level == 1]
     h2_blocks = [b for b in blocks if b.kind == "heading" and b.level == 2]
-    target_level = 1 if h1_blocks else (2 if h2_blocks else 0)
+    if break_level == DAISY_SPLIT_ALL_HEADINGS:
+        any_heading = [b for b in blocks if b.kind == "heading" and 1 <= b.level <= 6]
+        target_level = 0 if any_heading else 0
+        use_any = bool(any_heading)
+    else:
+        use_any = False
+        target_level = 1 if h1_blocks else (2 if h2_blocks else 0)
 
-    if target_level == 0:
-        # No headings: fall back to page-based splitting
-        return _split_by_pages(blocks)
+    if use_any:
+        is_heading = lambda b: b.kind == "heading" and 1 <= b.level <= 6  # noqa: E731
+    else:
+        if target_level == 0:
+            # No headings: fall back to page-based splitting
+            return _split_by_pages(blocks)
+        is_heading = lambda b: b.kind == "heading" and b.level == target_level  # noqa: E731
 
     # Group by heading level
     sections: List[tuple[str, List[Block]]] = []
@@ -313,7 +326,7 @@ def split_daisy_chapters(blocks: List[Block]) -> List[Segment]:
     current: List[Block] = []
 
     for block in blocks:
-        if block.kind == "heading" and block.level == target_level:
+        if is_heading(block):
             if current_heading is not None or current:
                 sections.append((current_heading, current))
             current_heading = block.text

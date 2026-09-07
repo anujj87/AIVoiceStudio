@@ -196,6 +196,54 @@ class TestAllHeadings(unittest.TestCase):
         self.assertNotIn("Sub A", segs[0].text)
 
 
+class TestDaisyChapters(unittest.TestCase):
+    def test_h1_splitting_groups_by_heading_1(self):
+        from ai_voice_studio.documents.splitter import split_daisy_chapters
+
+        doc = doc_from(
+            [
+                Block(kind="heading", level=1, text="One", page=0),
+                Block(kind="text", text="content one", page=0),
+                Block(kind="heading", level=2, text="Sub", page=0),
+                Block(kind="text", text="sub content", page=0),
+                Block(kind="heading", level=1, text="Two", page=1),
+                Block(kind="text", text="content two", page=1),
+            ]
+        )
+        segs = split_daisy_chapters(doc.blocks, break_level="h1")
+        # Deeper headings stay inside their H1 chapter for DAISY chapters.
+        self.assertEqual([s.title for s in segs], ["01 One", "02 Two"])
+        self.assertIn("sub content", segs[0].text)
+
+    def test_all_headings_splitting_breaks_on_any_level(self):
+        from ai_voice_studio.documents.splitter import split_daisy_chapters
+
+        doc = doc_from(
+            [
+                Block(kind="heading", level=1, text="One", page=0),
+                Block(kind="text", text="under one", page=0),
+                Block(kind="heading", level=2, text="Sub", page=0),
+                Block(kind="text", text="under sub", page=0),
+            ]
+        )
+        segs = split_daisy_chapters(doc.blocks, break_level="all")
+        self.assertEqual([s.title for s in segs], ["01 One", "02 Sub"])
+        self.assertIn("under one", segs[0].text)
+        self.assertIn("under sub", segs[1].text)
+
+    def test_no_headings_falls_back_to_pages(self):
+        from ai_voice_studio.documents.splitter import split_daisy_chapters
+
+        doc = doc_from(
+            [
+                Block(kind="text", text="paragraph one", page=0),
+                Block(kind="text", text="paragraph two", page=1),
+            ]
+        )
+        segs = split_daisy_chapters(doc.blocks)
+        self.assertEqual([s.title for s in segs], ["01 page 1", "02 page 2"])
+
+
 class TestUniqueTitles(unittest.TestCase):
     def test_duplicate_headings_get_suffix(self):
         doc = doc_from(
