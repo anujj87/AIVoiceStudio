@@ -69,6 +69,10 @@ _XHTML_DOCTYPE = (
     '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"\n'
     '  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">'
 )
+_STRICT_DOCTYPE = (
+    '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"\n'
+    '  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">'
+)
 _SMIL_DOCTYPE = (
     '<!DOCTYPE smil PUBLIC "-//W3C//DTD SMIL 1.0//EN"\n'
     '  "http://www.w3.org/TR/REC-smil/SMIL10.dtd">'
@@ -166,6 +170,15 @@ def build_daisy_book(
 
     total_ms = int(sum(e["duration"] for e in entries) * 1000)
 
+    # 1b. Split each segment into synchronized text blocks.  Full-text books
+    #     get one <par> per text block (heading + each paragraph) with the
+    #     segment audio sliced proportionally by character count -- the
+    #     structure genuine DAISY 2.02 full-text books use.  Without this,
+    #     players only ever see the heading and treat the book as audio-only.
+    id_counter = [0]
+    for entry in entries:
+        entry["blocks"] = _entry_blocks(entry, include_text, id_counter)
+
     # 2. Per-segment XHTML text content documents (siblings of the SMILs).
     for entry in entries:
         _write_text_document(daisy_dir, entry, language, include_text)
@@ -195,6 +208,44 @@ def build_daisy_book(
     return ncc_path
 
 
+# ---------------------------------------------------------------------------
+# Synchronized text blocks
+# ---------------------------------------------------------------------------
+def _entry_blocks(
+    entry: Dict[str, Any],
+    include_text: bool,
+    id_counter: List[int],
+) -> List[Dict[str, Any]]:
+    """Compute the synchronized text blocks of one segment.
+
+    The first block is always the segment heading; when ``include_text`` is
+    True every paragraph follows.  Ids (``txt_``/``par_``/``aud_``) are
+    assigned from a book-wide counter so SMIL, text and NCC references agree.
+    """
+    blocks: List[Dict[str, Any]] = []
+
+    def add(html_id: str, text: str) -> None:
+        id_counter[0] += 1
+        blocks.append({
+            "html_id": html_id,
+            "text_id": f"txt_{id_counter[0]:04d}",
+            "par_id": f"par_{id_counter[0]:04d}",
+            "aud_id": f"aud_{id_counter[0]:04d}",
+            "text": text,
+            "chars": max(1, len(text)),
+        })
+
+    add(f"seg_{entry['number']:04d}", str(entry["title"]))
+    if include_text:
+        paras = [p.strip() for p in (entry.get("text") or "").splitlines() if p.strip()]
+        for j, para in enumerate(paras, start=1):
+            add(f"p_{entry['number']:04d}_{j:03d}", para)
+    return blocks
+
+
+# ---------------------------------------------------------------------------
+# Public API (continued)
+# ---------------------------------------------------------------------------
 def export_daisy_zip(project_dir: str, zip_path: str, book_folder: Optional[str] = None) -> str:
     """Package the generated DAISY book into a distributable ZIP archive.
 
@@ -335,23 +386,48 @@ def _write_smil(
           </head>
           <body>
             <seq dur="123.456s">
-              <par endsync="last">
+              <par endsync="last" id="par_0001">
                 <text src="0001.html#seg_0001" id="txt_0001" />
                 <seq>
                   <audio src="aud0001.mp3" clip-begin="npt=0.000s"
-                         clip-end="npt=123.456s" id="aud_0001" />
+                         clip-end="npt=12.345s" id="aud_0001" />
                 </seq>
               </par>
+              ... one <par> per text block, audio sliced proportionally ...
             </seq>
           </body>
         </smil>
+
+    Full-text books carry one ``<par>`` per synchronized text block (heading
+    plus each paragraph); the single segment audio is divided between them
+    proportionally by character count, exactly the mechanism the official
+    samples use to slice one audio file across several ``<par>``s.
     """
     smil_name = _smil_name(entry)
-    text_id = _text_id(entry)
-    seg_id = f"seg_{entry['number']:04d}"
-    audio_ref = entry["audio"]
-    text_ref = f"{entry['number']:04d}.html#{seg_id}"
     dur = max(0.001, entry["duration"])
+    blocks = entry["blocks"]
+    total_chars = sum(b["chars"] for b in blocks)
+
+    pars: List[str] = []
+    elapsed = 0.0
+    for idx, block in enumerate(blocks):
+        if idx == len(blocks) - 1:
+            clip_end = dur
+        else:
+            clip_end = min(dur, elapsed + dur * block["chars"] / total_chars)
+        pars.append(
+            f'      <par endsync="last" id="{block["par_id"]}">\n'
+            f'        <text src="{entry["number"]:04d}.html#{block["html_id"]}" '
+            f'id="{block["text_id"]}" />\n'
+            '        <seq>\n'
+            f'          <audio src="{entry["audio"]}" '
+            f'clip-begin="npt={elapsed:.3f}s" clip-end="npt={clip_end:.3f}s" '
+            f'id="{block["aud_id"]}" />\n'
+            '        </seq>\n'
+            '      </par>'
+        )
+        elapsed = clip_end
+
     smil = (
         '<?xml version="1.0" encoding="utf-8"?>\n'
         f"{_SMIL_DOCTYPE}\n"
@@ -369,14 +445,7 @@ def _write_smil(
         '  </head>\n'
         '  <body>\n'
         f'    <seq dur="{dur:.3f}s">\n'
-        f'      <par endsync="last" id="par_{entry["number"]:04d}">\n'
-        f'        <text src="{text_ref}" id="{text_id}" />\n'
-        '        <seq>\n'
-        f'          <audio src="{audio_ref}" '
-        f'clip-begin="npt=0.000s" clip-end="npt={dur:.3f}s" '
-        f'id="aud_{entry["number"]:04d}" />\n'
-        '        </seq>\n'
-        '      </par>\n'
+        + "\n".join(pars) + "\n"
         '    </seq>\n'
         '  </body>\n'
         '</smil>\n'
@@ -436,31 +505,45 @@ def _write_text_document(
 
     The document always contains a heading element with the segment's sync id
     (``seg_0001``) that the content SMIL ``<text>`` points at.  When
-    ``include_text`` is True the full segment text follows as paragraphs.
+    ``include_text`` is True the full segment text follows as paragraphs and
+    every text block carries a back-link to its SMIL ``<text>`` element (the
+    bidirectional linking genuine DAISY 2.02 full-text books use, which
+    players rely on to render and highlight the text view)::
+
+        <h1 id="seg_0001"><a href="0001.smil#txt_0001">Chapter</a></h1>
+        <p id="p_0001_001"><a href="0001.smil#txt_0002">Paragraph.</a></p>
     """
     text_name = f"{entry['number']:04d}.html"
-    seg_id = f"seg_{entry['number']:04d}"
-    paras = [
-        p.strip() for p in (entry.get("text") or "").splitlines() if p.strip()
-    ]
-    if include_text and paras:
-        body_inner = (
-            f'    <h1 id="{seg_id}">{_escape_html(entry["title"])}</h1>\n'
-            + "\n".join(f"    <p>{_escape_html(p)}</p>" for p in paras)
-        )
+    blocks = entry["blocks"]
+    smil_name = _smil_name(entry)
+    if include_text:
+        doctype = _STRICT_DOCTYPE
+        content_type = "application/xhtml+xml; charset=utf-8"
     else:
-        body_inner = f'    <h1 id="{seg_id}">{_escape_html(entry["title"])}</h1>'
+        doctype = _XHTML_DOCTYPE
+        content_type = "text/html; charset=utf-8"
+
+    body_lines: List[str] = []
+    for block in blocks:
+        escaped = _escape_html(block["text"])
+        if include_text:
+            back = f'<a href="{smil_name}#{block["text_id"]}">{escaped}</a>'
+        else:
+            back = escaped
+        tag = "h1" if block is blocks[0] else "p"
+        body_lines.append(f'    <{tag} id="{block["html_id"]}">{back}</{tag}>')
+
     html = (
         '<?xml version="1.0" encoding="utf-8"?>\n'
-        f"{_XHTML_DOCTYPE}\n"
+        f"{doctype}\n"
         '<html xmlns="http://www.w3.org/1999/xhtml" '
         f'xml:lang="{_escape_html(language)}" lang="{_escape_html(language)}">\n'
         '  <head>\n'
         f'    <title>{_escape_html(entry["title"])}</title>\n'
-        '    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />\n'
+        f'    <meta http-equiv="Content-Type" content="{content_type}" />\n'
         '  </head>\n'
         '  <body>\n'
-        + body_inner + "\n"
+        + "\n".join(body_lines) + "\n"
         '  </body>\n'
         '</html>\n'
     )
@@ -537,6 +620,10 @@ def _smil_name(entry: Dict[str, Any]) -> str:
 
 
 def _text_id(entry: Dict[str, Any]) -> str:
+    """The SMIL ``<text>`` id of the segment's first (heading) block."""
+    blocks = entry.get("blocks")
+    if blocks:
+        return blocks[0]["text_id"]
     return f"txt_{entry['number']:04d}"
 
 

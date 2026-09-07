@@ -135,13 +135,25 @@ class TestDaisyBuilder(unittest.TestCase):
         self.assertTrue(os.path.isfile(os.path.join(text_dir, "0001.html")))
         with open(os.path.join(text_dir, "0001.html"), encoding="utf-8") as fh:
             text = fh.read()
-        self.assertIn('<h1 id="seg_0001">Chapter 1</h1>', text)
-        self.assertIn("<p>This is the text for chapter 1.</p>", text)
+        # Full-text docs are XHTML 1.0 Strict with bidirectional links:
+        # every text block links back to its SMIL <text> element.
+        self.assertIn('XHTML 1.0 Strict', text)
+        self.assertIn('<h1 id="seg_0001"><a href="0001.smil#txt_0001">Chapter 1</a></h1>', text)
+        self.assertIn(
+            '<p id="p_0001_001"><a href="0001.smil#txt_0002">'
+            'This is the text for chapter 1.</a></p>',
+            text,
+        )
 
         with open(os.path.join(daisy_dir, "0001.smil"), encoding="utf-8") as fh:
             smil = fh.read()
+        # One <par> per text block (heading + paragraph), audio sliced
+        # proportionally, last clip ending exactly at the segment duration.
+        self.assertEqual(smil.count("<par "), 2)
         self.assertIn('<text src="0001.html#seg_0001" id="txt_0001" />', smil)
-        self.assertIn('clip-begin="npt=0.000s" clip-end="npt=1.000s"', smil)
+        self.assertIn('<text src="0001.html#p_0001_001" id="txt_0002" />', smil)
+        self.assertIn('clip-begin="npt=0.000s"', smil)
+        self.assertIn('clip-end="npt=1.000s"', smil)
 
         # OPF lists the text documents (flat hrefs)
         with open(os.path.join(daisy_dir, "package.opf"), encoding="utf-8") as fh:
