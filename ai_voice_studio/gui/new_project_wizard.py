@@ -90,7 +90,7 @@ class NewProjectWizard(Wizard):
             elif page is self.page_daisy and self.page_daisy.radios:
                 wx.CallAfter(self.page_daisy.radios[0][0].SetFocus)
             elif page is self.page_info:
-                wx.CallAfter(self.page_info.title_ctrl.SetFocus)
+                wx.CallAfter(self.page_info.focus_first_field)
         evt.Skip()
 
     def _recording_defaults(self) -> dict:
@@ -691,6 +691,10 @@ class _DaisyInfoPage(WizardPage):
         if title_ctrl.GetValue().strip() in ("", self._last_name_value):
             title_ctrl.SetValue(evt.GetString().strip())
         self._last_name_value = evt.GetString().strip()
+
+    def focus_first_field(self):
+        """Move focus to the Title box (the page's first field)."""
+        self._controls["title"].SetFocus()
 
     def metadata(self) -> dict:
         """Collected DAISY book information for ``project.json``."""

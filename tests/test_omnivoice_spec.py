@@ -13,6 +13,7 @@ import os
 import tempfile
 import unittest
 import urllib.request
+import urllib.error
 import wave
 from unittest import mock
 
@@ -323,6 +324,71 @@ class ServerSpeechPayloadTest(unittest.TestCase):
             self.assertEqual(
                 info["design_attributes"], {"gender": ["male", "female"]}
             )
+
+
+class ServerRobustnessTest(unittest.TestCase):
+    """Regression tests: the server client must not declare a healthy server
+    "not responding" (cloning stalls /health briefly) and must not kill long
+    recordings with a fixed 120s timeout."""
+
+    def setUp(self):
+        self.captured = {}
+        self.calls = []
+        self.health_failures = 2  # first N /health probes fail
+        self._patch = mock.patch.object(urllib.request, "urlopen", self._fake_urlopen)
+        self._patch.start()
+        self.mgr = OmniVoiceServerManager(host="127.0.0.1", port=8881)
+
+    def tearDown(self):
+        self._patch.stop()
+
+    def _fake_urlopen(self, req, timeout=None):
+        self.calls.append((req.full_url, timeout))
+        self.captured["url"] = req.full_url
+        self.captured["timeout"] = timeout
+        if req.full_url.endswith("/health"):
+            if len(self.calls) <= self.health_failures:
+                raise urllib.error.URLError("timed out")
+            return _FakeResponse(b"OK")
+        return _FakeResponse(_wav_bytes())
+
+    def test_health_check_retries_transient_failures(self):
+        self.assertTrue(self.mgr.health_check(retries=3, delay=0.0))
+        self.assertEqual(len(self.calls), 3)
+
+    def test_health_check_gives_up_after_retries(self):
+        self.health_failures = 99  # every probe fails
+        self.assertFalse(self.mgr.health_check(retries=3, delay=0.0))
+        self.assertEqual(len(self.calls), 3)
+
+    def test_health_check_default_is_retried(self):
+        """The zero-arg call used by the engine must also retry."""
+        self.assertTrue(self.mgr.health_check())
+
+    def test_synthesize_timeout_scales_with_text(self):
+        """A long text must get a longer socket timeout than the old fixed
+        120s, and request_timeout_s still wins when given."""
+        short = "hello"
+        long_text = "word " * 2000  # 10000 chars
+        self.mgr.synthesize(short)
+        short_timeout = self.captured["timeout"]
+        self.mgr.synthesize(long_text)
+        long_timeout = self.captured["timeout"]
+        self.assertGreaterEqual(short_timeout, 120.0)
+        self.assertGreater(long_timeout, short_timeout)
+        self.assertLessEqual(long_timeout, 1800.0)
+
+        self.mgr.synthesize(short, request_timeout_s=25)
+        self.assertEqual(self.captured["timeout"], 25.0)
+
+    def test_clone_timeout_scales_with_text(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ref = os.path.join(tmp, "ref.wav")
+            with open(ref, "wb") as fh:
+                fh.write(_wav_bytes())
+            self.mgr.synthesize_clone(
+                "word " * 2000, ref_audio_path=ref)
+        self.assertGreater(self.captured["timeout"], 120.0)
 
 
 class EmbeddedWorkerParityTest(unittest.TestCase):

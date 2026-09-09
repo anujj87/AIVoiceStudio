@@ -290,18 +290,28 @@ class OmniVoiceServerManager:
         self.stop()
         self.start(timeout=timeout)
 
-    def health_check(self) -> bool:
-        """Return True if the server responds to /health."""
+    def health_check(self, retries: int = 3, delay: float = 1.0,
+                     timeout: float = 10.0) -> bool:
+        """Return True if the server responds to /health.
+
+        Retries a few times with short delays: while the server is busy
+        (cloning reference-audio preprocessing, long synthesis), the health
+        endpoint can be slow to answer, and a single 5s probe used to
+        mis-report a perfectly healthy server as "not responding".
+        """
         import urllib.request  # noqa: PLC0415
         import urllib.error  # noqa: PLC0415
 
-        try:
-            url = f"{self.base_url}/health"
-            req = urllib.request.Request(url, method="GET")
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                return resp.status == 200
-        except Exception:  # noqa: BLE001
-            return False
+        for attempt in range(max(1, retries)):
+            try:
+                url = f"{self.base_url}/health"
+                req = urllib.request.Request(url, method="GET")
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    return resp.status == 200
+            except Exception:  # noqa: BLE001
+                if attempt < retries - 1:
+                    time.sleep(delay)
+        return False
 
     # -- Synthesis -----------------------------------------------------------
 
@@ -389,8 +399,12 @@ class OmniVoiceServerManager:
         if self._api_key:
             req.add_header("Authorization", f"Bearer {self._api_key}")
 
+        # Long texts legitimately take minutes on CPU; the socket timeout
+        # must scale with the text or long recordings die mid-flight with
+        # "Synthesis failed: timed out".
+        request_timeout = self._request_timeout(request_timeout_s, text)
         try:
-            with urllib.request.urlopen(req, timeout=120) as resp:
+            with urllib.request.urlopen(req, timeout=request_timeout) as resp:
                 wav_bytes = resp.read()
         except Exception as exc:
             raise OmniVoiceServerError(
@@ -490,8 +504,11 @@ class OmniVoiceServerManager:
         if self._api_key:
             req.add_header("Authorization", f"Bearer {self._api_key}")
 
+        # Cloning adds reference-audio preprocessing on top of generation, so
+        # its timeout gets the same text-aware scale plus headroom.
+        request_timeout = self._request_timeout(request_timeout_s, text)
         try:
-            with urllib.request.urlopen(req, timeout=120) as resp:
+            with urllib.request.urlopen(req, timeout=request_timeout) as resp:
                 wav_bytes = resp.read()
         except Exception as exc:
             raise OmniVoiceServerError(
@@ -499,6 +516,24 @@ class OmniVoiceServerManager:
             ) from exc
 
         return self._wav_bytes_to_samples(wav_bytes)
+
+    @staticmethod
+    def _request_timeout(request_timeout_s: int | None, text: str) -> float:
+        """Socket timeout for one synthesis request, in seconds.
+
+        ``request_timeout_s`` (the server's per-request limit) wins when set.
+        Otherwise the timeout scales with the text length: generation runs at
+        roughly real-time or slower on CPU, so a long paragraph can need
+        several minutes.  The previous fixed 120s timeout killed long
+        recordings mid-synthesis; the server kept working.
+        """
+        if request_timeout_s:
+            return float(request_timeout_s)
+        chars = max(1, len(text or ""))
+        # 30s base for connection/startup + 4s of headroom per 100 chars,
+        # bounded to at least 120s and at most 30 minutes.
+        scaled = 30.0 + chars * 0.04
+        return float(min(max(scaled, 120.0), 1800.0))
 
     @staticmethod
     def _wav_bytes_to_samples(wav_bytes: bytes) -> np.ndarray:
@@ -761,11 +796,17 @@ class OmniVoiceServerEngine:
         if not text.strip():
             raise ValueError("Nothing to synthesize")
 
-        # Quick health check — avoid hanging on a stuck server.
-        if not self._server.health_check():
-            raise OmniVoiceServerError(
-                f"OmniVoice server at {self._server.base_url} is not responding. "
-                "Try restarting it from Settings > OmniVoice Server."
+        # Quick health check with retries — avoid hanging on a dead server
+        # without mis-judging a busy one (cloning preprocessing can stall
+        # /health for several seconds).  If the probe still fails we do NOT
+        # abort here: the synthesis request itself is the real test, and it
+        # carries a text-aware timeout plus its own error reporting.  A
+        # single missed probe used to kill clone requests with "server not
+        # responding" while the server was merely busy.
+        if not self._server.health_check(retries=3, delay=1.0):
+            log.warning(
+                "OmniVoice server health probe failed before synthesis; "
+                "attempting the request anyway"
             )
 
         kwargs = self._omni_kwargs()

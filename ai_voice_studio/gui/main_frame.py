@@ -32,7 +32,6 @@ log = logging.getLogger(__name__)
 
 ID_NEW_PROJECT = wx.NewIdRef()
 ID_OPEN_PROJECT = wx.NewIdRef()
-ID_RECENT_BASE = wx.NewIdRef()
 ID_RECORD = wx.NewIdRef()
 ID_SETTINGS = wx.NewIdRef()
 ID_README = wx.NewIdRef()
@@ -123,6 +122,16 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, lambda _: self._remove_project(), id=ID_REMOVE_PROJECT)
         self.Bind(wx.EVT_MENU, lambda _: self.Close(), id=wx.ID_EXIT)
         self.Bind(wx.EVT_MENU_OPEN, lambda _: self._rebuild_recent())
+
+        # Frame-level accelerator table for the three global shortcuts.
+        # These fire the same menu IDs, but do not depend on the menu
+        # bar's own accelerator parsing, which can be unreliable for
+        # Shift+letter combos on some wx builds.
+        self.SetAcceleratorTable(wx.AcceleratorTable([
+            (wx.ACCEL_CTRL | wx.ACCEL_SHIFT, ord("N"), ID_NEW_PROJECT),
+            (wx.ACCEL_CTRL | wx.ACCEL_SHIFT, ord("R"), ID_RECORD),
+            (wx.ACCEL_CTRL, ord(","), ID_SETTINGS),
+        ]))
 
     def _build_welcome(self):
         panel = wx.Panel(self)
@@ -404,8 +413,13 @@ class MainFrame(wx.Frame):
             item.Enable(False)
             return
         for idx, recent in enumerate(recents):
+            # Unique ID per item (wx.NewIdRef()): manual arithmetic on
+            # ID_RECENT_BASE used to collide with the sequentially-generated
+            # IDs of Record/Settings/Help menu items, so Ctrl+, (Settings)
+            # opened the Recording window of a recent project instead.
+            item_id = wx.NewIdRef()
             item = self._recent_menu.Append(
-                int(ID_RECENT_BASE) + idx,
+                item_id,
                 f"{recent['name']}  ({os.path.dirname(recent['path'])})",
             )
             self.Bind(
