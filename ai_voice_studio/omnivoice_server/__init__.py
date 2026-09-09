@@ -148,6 +148,11 @@ class OmniVoiceServerManager:
         self._proc: subprocess.Popen | None = None
         self._lock = threading.RLock()
         self._ready = threading.Event()
+        # Server subprocess log (see start()): the server writes its log to
+        # stdout, which must go to a real file — an undrained PIPE fills up
+        # and makes every server-side write fail with [Errno 22].
+        self._log_fh = None
+        self._log_path: str | None = None
 
     @property
     def base_url(self) -> str:
@@ -218,18 +223,40 @@ class OmniVoiceServerManager:
         if sys.platform == "win32":
             flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
-        log.info("Starting OmniVoice server: %s", " ".join(cmd))
+        # The server logs to stdout.  It used to run with stdout=PIPE, but
+        # nothing drained that pipe: once the OS pipe buffer filled, every
+        # log write inside the server failed with "[Errno 22] Invalid
+        # argument" and each synthesis request returned HTTP 500 — the
+        # server looked broken while it was perfectly healthy.  Send the
+        # output to a log file (truncated on each start) instead.
+        from ..paths import logs_dir  # noqa: PLC0415
+        self._log_path = os.path.join(logs_dir(), "omnivoice_server.log")
+        try:
+            self._log_fh = open(
+                self._log_path, "w", encoding="utf-8", errors="replace"
+            )
+        except OSError as exc:
+            self._log_fh = None
+            self._log_path = None
+            log.warning("Could not open OmniVoice server log file: %s", exc)
+
+        log.info(
+            "Starting OmniVoice server: %s (log: %s)",
+            " ".join(cmd),
+            self._log_path or "<discarded>",
+        )
         try:
             self._proc = subprocess.Popen(
                 cmd,
-                stdout=subprocess.PIPE,
+                stdout=self._log_fh if self._log_fh else subprocess.DEVNULL,
                 stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
                 creationflags=flags,
                 env=env,
             )
         except OSError as exc:
+            if self._log_fh:
+                self._log_fh.close()
+                self._log_fh = None
             raise OmniVoiceServerError(f"Failed to start server: {exc}") from exc
 
         # Wait for the server to become ready (health check).
@@ -245,12 +272,7 @@ class OmniVoiceServerManager:
         while time.monotonic() < deadline:
             if not self.is_running:
                 # Server exited before becoming ready
-                output = ""
-                if self._proc and self._proc.stdout:
-                    try:
-                        output = self._proc.stdout.read(4096)
-                    except Exception:  # noqa: BLE001
-                        pass
+                output = self._log_tail()
                 raise OmniVoiceServerError(
                     f"Server exited prematurely. Output:\n{output}"
                 )
@@ -283,7 +305,23 @@ class OmniVoiceServerManager:
                     pass
             self._proc = None
             self._ready.clear()
+            if self._log_fh:
+                try:
+                    self._log_fh.close()
+                except Exception:  # noqa: BLE001
+                    pass
+                self._log_fh = None
             log.info("OmniVoice server stopped.")
+
+    def _log_tail(self, lines: int = 40) -> str:
+        """Last lines of the server log file (for error reporting)."""
+        if not self._log_path or not os.path.isfile(self._log_path):
+            return ""
+        try:
+            with open(self._log_path, encoding="utf-8", errors="replace") as fh:
+                return "".join(fh.readlines()[-lines:])
+        except Exception:  # noqa: BLE001
+            return ""
 
     def restart(self, timeout: float = 120.0) -> None:
         """Restart the server (stop then start)."""
@@ -408,7 +446,7 @@ class OmniVoiceServerManager:
                 wav_bytes = resp.read()
         except Exception as exc:
             raise OmniVoiceServerError(
-                f"Synthesis failed: {exc}"
+                f"Synthesis failed: {self._http_error_detail(exc)}"
             ) from exc
 
         return self._wav_bytes_to_samples(wav_bytes)
@@ -512,10 +550,41 @@ class OmniVoiceServerManager:
                 wav_bytes = resp.read()
         except Exception as exc:
             raise OmniVoiceServerError(
-                f"Clone synthesis failed: {exc}"
+                f"Clone synthesis failed: {self._http_error_detail(exc)}"
             ) from exc
 
         return self._wav_bytes_to_samples(wav_bytes)
+
+    @staticmethod
+    def _http_error_detail(exc: Exception) -> str:
+        """Best readable message from a failed HTTP request.
+
+        The server puts the real reason (e.g. the inference traceback line)
+        in the JSON error body; ``str(HTTPError)`` only says
+        "HTTP Error 500", which hid the cause and made every request-level
+        failure look like a dead server.
+        """
+        import json  # noqa: PLC0415
+        import urllib.error  # noqa: PLC0415
+
+        if not isinstance(exc, urllib.error.HTTPError):
+            return str(exc)
+        try:
+            raw = exc.read().decode("utf-8", errors="replace")
+        except Exception:  # noqa: BLE001
+            return str(exc)
+        detail = raw.strip()
+        try:
+            payload = json.loads(raw)
+            if isinstance(payload, dict):
+                err = payload.get("error")
+                if isinstance(err, dict) and err.get("message"):
+                    detail = str(err["message"])
+                elif payload.get("detail"):
+                    detail = str(payload["detail"])
+        except Exception:  # noqa: BLE001
+            pass
+        return f"server returned HTTP {exc.code}: {detail}"
 
     @staticmethod
     def _request_timeout(request_timeout_s: int | None, text: str) -> float:

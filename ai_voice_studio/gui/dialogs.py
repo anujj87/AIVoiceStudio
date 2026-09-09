@@ -148,10 +148,28 @@ _SERVER_HINTS = (
     "connection test failed",
 )
 
+# Request-level failures: the server answered (4xx/5xx with a JSON error
+# body), so it is alive and a restart would not change the outcome.  The
+# message now includes the server's own detail via _http_error_detail
+# ("server returned HTTP 500: ...").
+_REQUEST_LEVEL_HINTS = (
+    "server returned http 4",
+    "server returned http 5",
+)
+
 
 def looks_like_server_error(message: str) -> bool:
-    """True when an engine error message points at the OmniVoice HTTP server."""
+    """True when an engine error message points at the OmniVoice HTTP server.
+
+    Request-level failures (the server answered with an HTTP error and its
+    own message, e.g. "server returned HTTP 500: Synthesis failed: ...")
+    do NOT count: the server is demonstrably up, so offering a restart
+    would only confuse.  Those show as a plain error box with the real
+    server-side detail.
+    """
     low = (message or "").lower()
+    if any(hint in low for hint in _REQUEST_LEVEL_HINTS):
+        return False
     return any(hint in low for hint in _SERVER_HINTS)
 
 

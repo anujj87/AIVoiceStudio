@@ -7,6 +7,7 @@ pure logic added to enable OmniVoice's full feature set in both the direct
 
 from __future__ import annotations
 
+import email.message
 import io
 import json
 import os
@@ -20,7 +21,7 @@ from unittest import mock
 import numpy as np
 
 from ai_voice_studio.omnivoice import build_synthesize_request, spec
-from ai_voice_studio.omnivoice_server import OmniVoiceServerManager
+from ai_voice_studio.omnivoice_server import OmniVoiceServerManager, OmniVoiceServerError
 
 
 class CleanLanguageTest(unittest.TestCase):
@@ -389,6 +390,104 @@ class ServerRobustnessTest(unittest.TestCase):
             self.mgr.synthesize_clone(
                 "word " * 2000, ref_audio_path=ref)
         self.assertGreater(self.captured["timeout"], 120.0)
+
+
+class ServerHttpErrorDetailTest(unittest.TestCase):
+    """HTTP 500/4xx bodies carry the server's real error; the client must
+    surface it ("server returned HTTP 500: ...") instead of the bare
+    "HTTP Error 500", and the GUI must not offer a restart for these
+    request-level failures (the server is demonstrably up)."""
+
+    def _http_error(self, code: int, body: bytes) -> urllib.error.HTTPError:
+        return urllib.error.HTTPError(
+            url="http://127.0.0.1:8880/v1/audio/speech/clone",
+            code=code, msg="Internal Server Error",
+            hdrs=email.message.Message(), fp=io.BytesIO(body),
+        )
+
+    def test_detail_extracted_from_json_error_body(self):
+        body = json.dumps(
+            {"error": {"code": "inference_failed",
+                        "message": "Synthesis failed: [Errno 22] Invalid argument"}}
+        ).encode()
+        detail = OmniVoiceServerManager._http_error_detail(self._http_error(500, body))
+        self.assertIn("server returned HTTP 500", detail)
+        self.assertIn("[Errno 22] Invalid argument", detail)
+
+    def test_detail_extracts_fastapi_detail_field(self):
+        body = json.dumps({"detail": "Upload too large"}).encode()
+        detail = OmniVoiceServerManager._http_error_detail(self._http_error(413, body))
+        self.assertIn("Upload too large", detail)
+
+    def test_detail_falls_back_to_plain_body(self):
+        detail = OmniVoiceServerManager._http_error_detail(
+            self._http_error(502, b"bad gateway"))
+        self.assertIn("bad gateway", detail)
+
+    def test_non_http_errors_pass_through(self):
+        self.assertEqual(
+            OmniVoiceServerManager._http_error_detail(TimeoutError("timed out")),
+            "timed out",
+        )
+
+    def test_synthesize_error_includes_server_detail(self):
+        def fake_urlopen(req, timeout=None):
+            raise self._http_error(
+                500,
+                json.dumps({"error": {"message": "boom reason"}}).encode())
+        with mock.patch.object(urllib.request, "urlopen", fake_urlopen):
+            mgr = OmniVoiceServerManager(host="127.0.0.1", port=8881)
+            with self.assertRaises(OmniVoiceServerError) as ctx:
+                mgr.synthesize("hello")
+        self.assertIn("server returned HTTP 500", str(ctx.exception))
+        self.assertIn("boom reason", str(ctx.exception))
+
+    def test_clone_error_includes_server_detail(self):
+        def fake_urlopen(req, timeout=None):
+            raise self._http_error(
+                500,
+                json.dumps({"error": {"message": "clone boom"}}).encode())
+        with mock.patch.object(urllib.request, "urlopen", fake_urlopen):
+            with tempfile.TemporaryDirectory() as tmp:
+                ref = os.path.join(tmp, "ref.wav")
+                with open(ref, "wb") as fh:
+                    fh.write(_wav_bytes())
+                mgr = OmniVoiceServerManager(host="127.0.0.1", port=8881)
+                with self.assertRaises(OmniVoiceServerError) as ctx:
+                    mgr.synthesize_clone("hello", ref_audio_path=ref)
+        self.assertIn("clone boom", str(ctx.exception))
+
+
+class ServerErrorDialogClassificationTest(unittest.TestCase):
+    """Request-level failures must NOT trigger the "restart the server?"
+    dialog: the server answered, so it is alive."""
+
+    def test_http_500_is_not_restartable(self):
+        from ai_voice_studio.gui.dialogs import looks_like_server_error
+        msg = ("Clone synthesis failed: server returned HTTP 500: "
+               "Synthesis failed: [Errno 22] Invalid argument")
+        self.assertFalse(looks_like_server_error(msg))
+
+    def test_dead_server_still_offers_restart(self):
+        from ai_voice_studio.gui.dialogs import looks_like_server_error
+        self.assertTrue(looks_like_server_error(
+            "Synthesis failed: server is not responding"))
+        self.assertTrue(looks_like_server_error(
+            "Server did not become ready within 120s."))
+
+
+class ServerLogRedirectionTest(unittest.TestCase):
+    """The server subprocess must log to a real file, not an undrained
+    PIPE (a full pipe made every server log write fail with [Errno 22],
+    which surfaced as HTTP 500 on every request)."""
+
+    def test_manager_has_log_path_helpers(self):
+        mgr = OmniVoiceServerManager(host="127.0.0.1", port=8881)
+        self.assertIsNone(mgr._log_path)
+        self.assertIsNone(mgr._log_fh)
+        tail = mgr._log_tail()
+        self.assertIsInstance(tail, str)
+
 
 
 class EmbeddedWorkerParityTest(unittest.TestCase):
