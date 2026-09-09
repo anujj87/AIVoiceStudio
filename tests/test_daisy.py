@@ -381,7 +381,6 @@ class TestDaisy3Builder(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):
             export_daisy3_zip(self.tmpdir, zip_path)
 
-
     def test_build_daisy3_with_images(self):
         """Images from a DOCX source land in DAISY3/images and the DTBook."""
         png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
@@ -406,6 +405,154 @@ class TestDaisy3Builder(unittest.TestCase):
         with open(opf_path, encoding="utf-8") as fh:
             opf = fh.read()
         self.assertIn('href="images/img0001.png" media-type="image/png"', opf)
+
+
+class TestDaisyMeta(unittest.TestCase):
+    """DAISY book information entered in the wizard lands in the book metadata."""
+
+    META = {
+        "title": "My Custom Title",
+        "creator": "Jane Writer",
+        "date": "2026-09-01",
+        "subject": "Testing, accessibility",
+        "narrator": "Sam Voice",
+        "producer": "Acme Productions",
+        "show_software": True,
+    }
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def _make_segments(self, count=1):
+        segments = []
+        for i in range(1, count + 1):
+            saved = f"chapter{i:02d}.wav"
+            _write_wav(os.path.join(self.tmpdir, saved), seconds=i)
+            segments.append({
+                "index": i,
+                "title": f"Chapter {i}",
+                "text": f"Text for chapter {i}.",
+                "saved": saved,
+                "status": "done",
+            })
+        return segments
+
+    def test_daisy2_meta_in_ncc_and_opf(self):
+        """DAISY 2.02: title, creator, date, subject, narrator, producer land
+        in ncc.html; the generator line is written when show_software is on."""
+        ncc_path = build_daisy_book(
+            output_dir=self.tmpdir,
+            project_name="Fallback Title",
+            segments=self._make_segments(),
+            audio_format="wav",
+            include_text=False,
+            meta=dict(self.META),
+        )
+        with open(ncc_path, encoding="utf-8") as fh:
+            ncc = fh.read()
+        self.assertIn('dc:title" content="My Custom Title"', ncc)
+        self.assertIn('dc:creator" content="Jane Writer"', ncc)
+        self.assertIn('dc:date" content="2026-09-01"', ncc)
+        self.assertIn('dc:subject" content="Testing, accessibility"', ncc)
+        self.assertIn('ncc:narrator" content="Sam Voice"', ncc)
+        self.assertIn('ncc:producer" content="Acme Productions"', ncc)
+        self.assertIn('ncc:generator" content="AI Voice Studio"', ncc)
+        # The NCC <title> and heading carry the custom title too.
+        self.assertIn("<title>My Custom Title</title>", ncc)
+        self.assertIn(">My Custom Title</a></h1>", ncc)
+
+        daisy_dir = os.path.join(self.tmpdir, DAISY_OUTPUT_DIR_NAME)
+        with open(os.path.join(daisy_dir, "package.opf"), encoding="utf-8") as fh:
+            opf = fh.read()
+        self.assertIn("<dc:creator>Jane Writer</dc:creator>", opf)
+        self.assertIn("<dc:subject>Testing, accessibility</dc:subject>", opf)
+
+    def test_daisy2_meta_software_hidden(self):
+        """With show_software=False no generator/software metadata is written."""
+        meta = dict(self.META, show_software=False, producer="")
+        ncc_path = build_daisy_book(
+            output_dir=self.tmpdir,
+            project_name="T",
+            segments=self._make_segments(),
+            audio_format="wav",
+            meta=meta,
+        )
+        with open(ncc_path, encoding="utf-8") as fh:
+            ncc = fh.read()
+        self.assertNotIn("ncc:generator", ncc)
+        self.assertNotIn("ncc:producer", ncc)
+
+    def test_daisy3_meta_in_dtbook_ncx_opf(self):
+        """DAISY 3: metadata lands in DTBook head, NCX docTitle/docAuthor and
+        OPF; show_software adds "AI Voice Studio" as second producer."""
+        opf_path = build_daisy3_book(
+            output_dir=self.tmpdir,
+            project_name="Fallback Title",
+            segments=self._make_segments(),
+            audio_format="wav",
+            meta=dict(self.META),
+        )
+        daisy_dir = os.path.join(self.tmpdir, DAISY3_OUTPUT_DIR_NAME)
+        with open(os.path.join(daisy_dir, "book.xml"), encoding="utf-8") as fh:
+            dtbook = fh.read()
+        self.assertIn("<doctitle id=\"doctitle\">My Custom Title</doctitle>", dtbook)
+        self.assertIn("<docauthor id=\"docauthor\">Jane Writer</docauthor>", dtbook)
+        self.assertIn('<meta name="dc:Creator" content="Jane Writer" />', dtbook)
+        self.assertIn('<meta name="dc:Date" content="2026-09-01" />', dtbook)
+        self.assertIn('<meta name="dc:Subject" content="Testing, accessibility" />', dtbook)
+        self.assertIn('<meta name="dtb:narrator" content="Sam Voice" />', dtbook)
+        self.assertIn('<meta name="dtb:producer" content="Acme Productions" />', dtbook)
+        self.assertIn('<meta name="dtb:producer" content="AI Voice Studio" />', dtbook)
+
+        with open(os.path.join(daisy_dir, "ncx.xml"), encoding="utf-8") as fh:
+            ncx = fh.read()
+        self.assertIn("<docTitle><text>My Custom Title</text></docTitle>", ncx)
+        self.assertIn("<docAuthor><text>Jane Writer</text></docAuthor>", ncx)
+
+        with open(opf_path, encoding="utf-8") as fh:
+            opf = fh.read()
+        self.assertIn("<dc:title>My Custom Title</dc:title>", opf)
+        self.assertIn("<dc:creator>Jane Writer</dc:creator>", opf)
+        self.assertIn("<dc:date>2026-09-01</dc:date>", opf)
+        self.assertIn("<dc:subject>Testing, accessibility</dc:subject>", opf)
+        self.assertIn('<meta name="dtb:narrator" content="Sam Voice" />', opf)
+        self.assertIn('<meta name="dtb:producer" content="Acme Productions" />', opf)
+        self.assertIn('<meta name="dtb:producer" content="AI Voice Studio" />', opf)
+
+    def test_daisy3_meta_software_hidden(self):
+        """With show_software=False only the user producer is written."""
+        opf_path = build_daisy3_book(
+            output_dir=self.tmpdir,
+            project_name="T",
+            segments=self._make_segments(),
+            audio_format="wav",
+            meta=dict(self.META, show_software=False),
+        )
+        daisy_dir = os.path.join(self.tmpdir, DAISY3_OUTPUT_DIR_NAME)
+        with open(opf_path, encoding="utf-8") as fh:
+            opf = fh.read()
+        self.assertIn('dtb:producer" content="Acme Productions"', opf)
+        self.assertNotIn('dtb:producer" content="AI Voice Studio"', opf)
+
+    def test_daisy_meta_defaults(self):
+        """Empty meta falls back: title from project name, date from today."""
+        ncc_path = build_daisy_book(
+            output_dir=self.tmpdir,
+            project_name="Fallback Book",
+            segments=self._make_segments(),
+            audio_format="wav",
+            meta={},
+        )
+        with open(ncc_path, encoding="utf-8") as fh:
+            ncc = fh.read()
+        self.assertIn('dc:title" content="Fallback Book"', ncc)
+        self.assertNotIn("dc:creator", ncc)
+        self.assertNotIn("ncc:narrator", ncc)
+        # show_software defaults True -> generator present.
+        self.assertIn('ncc:generator" content="AI Voice Studio"', ncc)
 
 
 if __name__ == "__main__":

@@ -1001,6 +1001,22 @@ class RecordingDialog(wx.Dialog):
             # Per-project DAISY settings (chosen in the wizard) win; fall back
             # to the global Settings > DAISY defaults.
             pd = fresh.get("daisy") or {}
+            meta = {
+                "title": pd.get("title") or fresh.get("name", "Untitled"),
+                "creator": pd.get("creator")
+                    or self.settings.get("daisy.creator", ""),
+                "date": pd.get("date"),
+                "subject": pd.get("subject")
+                    or self.settings.get("daisy.subject", ""),
+                "narrator": pd.get("narrator")
+                    or self.settings.get("daisy.narrator", ""),
+                "producer": pd.get("producer")
+                    or self.settings.get("daisy.producer", ""),
+                "show_software": pd.get(
+                    "show_software",
+                    self.settings.get("daisy.show_software", True),
+                ),
+            }
             lang = pd.get("language") or self.settings.get("daisy.language", "en")
             publisher = pd.get("publisher") or self.settings.get("daisy.publisher", "")
             include_text = ptype == "daisy_audio_text" and bool(
@@ -1015,6 +1031,7 @@ class RecordingDialog(wx.Dialog):
                 language=lang,
                 publisher=publisher,
                 source_file=fresh.get("source_file", ""),
+                meta=meta,
             )
             if ptype == "daisy3_audio_text":
                 from ..documents.daisy3_builder import build_daisy3_book  # noqa: PLC0415

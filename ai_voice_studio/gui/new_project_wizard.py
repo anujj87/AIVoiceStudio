@@ -9,6 +9,7 @@ Finishing parses the document, splits it per the chosen mode, writes
 
 from __future__ import annotations
 
+import datetime
 import logging
 import os
 import wx
@@ -41,7 +42,7 @@ from ..documents.splitter import split_document
 from ..paths import project_dir
 from ..settings import Settings
 from ..tts.models import ModelStore
-from .a11y import add_labeled, finalize_accessibility
+from .a11y import add_check, add_labeled, finalize_accessibility
 from .progress import TaskProgressDialog
 from .recording_dialog import RecordingDialog
 
@@ -65,6 +66,7 @@ class NewProjectWizard(Wizard):
         self.page_details = _DetailsPage(self)
         self.page_mode = _ModePage(self, settings)
         self.page_daisy = _DaisyPage(self, settings)
+        self.page_info = _DaisyInfoPage(self, settings)
         self.GetPageAreaSizer().Add(self.page_details)
         if initial_name:
             self.page_details.name_ctrl.SetValue(initial_name)
@@ -87,6 +89,8 @@ class NewProjectWizard(Wizard):
                 wx.CallAfter(self.page_mode.radios[0][0].SetFocus)
             elif page is self.page_daisy and self.page_daisy.radios:
                 wx.CallAfter(self.page_daisy.radios[0][0].SetFocus)
+            elif page is self.page_info:
+                wx.CallAfter(self.page_info.title_ctrl.SetFocus)
         evt.Skip()
 
     def _recording_defaults(self) -> dict:
@@ -196,8 +200,7 @@ class NewProjectWizard(Wizard):
         if is_daisy:
             daisy_settings = {
                 "splitting": self.page_daisy.selected_splitting(),
-                "language": self.page_daisy.language(),
-                "publisher": self.page_daisy.publisher(),
+                **self.page_info.metadata(),
             }
         project.create_project(
             pdir,
@@ -469,9 +472,10 @@ class _DaisyPage(WizardPage):
     """Second wizard page for DAISY project types.
 
     Replaces the generic audio file creation page when the user chooses a
-    DAISY book type: here the chapter splitting, text inclusion and the DAISY
-    metadata (language, publisher) are chosen. The choices are stored in the
-    project and in Settings > DAISY settings.
+    DAISY book type: here the chapter splitting is chosen.  The DAISY book
+    information (title, creator, dates and so on) is asked on the next page
+    (:class:`_DaisyInfoPage`).  The choices are stored in the project and in
+    Settings > DAISY settings.
     """
 
     def __init__(self, wizard, settings: Settings):
@@ -480,7 +484,7 @@ class _DaisyPage(WizardPage):
         self._build_ui(settings)
 
     def GetNext(self):
-        return None
+        return self.wizard.page_info
 
     def GetPrev(self):
         return self.wizard.page_details
@@ -491,9 +495,8 @@ class _DaisyPage(WizardPage):
                   0, wx.ALL, 6)
         sizer.Add(
             wx.StaticText(self, label="Choose how the document is split into "
-                                      "DAISY chapters, then press Finish to "
-                                      "prepare the document and open the "
-                                      "Recording window."),
+                                      "DAISY chapters, then press Next to "
+                                      "enter the DAISY book information."),
             0, wx.ALL, 6,
         )
 
@@ -517,22 +520,6 @@ class _DaisyPage(WizardPage):
             first = False
         self._update_description()
 
-        grid = wx.FlexGridSizer(cols=2, vgap=6, hgap=8)
-        grid.AddGrowableCol(1)
-
-        self.lang_ctrl = wx.TextCtrl(self)
-        self.lang_ctrl.SetName("DAISY language code")
-        self.lang_ctrl.SetValue(settings.get("daisy.language", "en"))
-        add_labeled(self, grid, "Language code (ISO 639)", self.lang_ctrl,
-                    flag=wx.LEFT | wx.RIGHT, border=2)
-
-        self.publisher_ctrl = wx.TextCtrl(self)
-        self.publisher_ctrl.SetName("DAISY publisher")
-        self.publisher_ctrl.SetValue(settings.get("daisy.publisher", ""))
-        add_labeled(self, grid, "Publisher (optional)", self.publisher_ctrl,
-                    flag=wx.LEFT | wx.RIGHT, border=2)
-
-        sizer.Add(grid, 0, wx.EXPAND | wx.ALL, 6)
         sizer.Add(
             wx.StaticText(
                 self,
@@ -551,14 +538,116 @@ class _DaisyPage(WizardPage):
                 return value
         return DAISY_SPLIT_H1
 
-    def language(self) -> str:
-        return (self.lang_ctrl.GetValue().strip() or "en").lower()
-
-    def publisher(self) -> str:
-        return self.publisher_ctrl.GetValue().strip()
-
     def _update_description(self):
         self.description.SetLabel(
             DAISY_SPLIT_DESCRIPTIONS.get(self.selected_splitting(), "")
         )
         self.description.Wrap(680)
+
+
+class _DaisyInfoPage(WizardPage):
+    """Third wizard page (DAISY types): the DAISY book information.
+
+    Asks Title, Creator, Date, Language, Publisher, Subject and Narrator in
+    edit boxes and stores them in the project; the builders write them into
+    the generated book metadata.  Running time is measured automatically from
+    the recorded audio and Producer/Software are filled automatically.
+    """
+
+    # (key, label, settings key, default).  Order defines tab order.
+    _FIELDS = (
+        ("title", "Title", None, ""),
+        ("creator", "Creator", "daisy.creator", ""),
+        ("date", "Date", "daisy.date", ""),
+        ("language", "Language", "daisy.language", "en"),
+        ("publisher", "Publisher", "daisy.publisher", ""),
+        ("subject", "Subject", "daisy.subject", ""),
+        ("narrator", "Narrator", "daisy.narrator", ""),
+        ("producer", "Producer", "daisy.producer", ""),
+    )
+
+    def __init__(self, wizard, settings: Settings):
+        super().__init__(wizard)
+        self.wizard = wizard
+        self.settings = settings
+        self._last_name_value = ""
+        self._build_ui(settings)
+
+    def GetNext(self):
+        return None
+
+    def GetPrev(self):
+        return self.wizard.page_daisy
+
+    def _build_ui(self, settings: Settings):
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(wx.StaticText(self, label="DAISY book information"),
+                  0, wx.ALL, 6)
+        sizer.Add(
+            wx.StaticText(self, label="Enter the book information stored in "
+                                      "the DAISY book. Running time is "
+                                      "filled automatically from the "
+                                      "recording."),
+            0, wx.ALL, 6,
+        )
+
+        grid = wx.FlexGridSizer(cols=2, vgap=6, hgap=8)
+        grid.AddGrowableCol(1)
+
+        self._controls: dict = {}
+        for key, label, skey, default in self._FIELDS:
+            ctrl = wx.TextCtrl(self)
+            ctrl.SetName(f"DAISY {label}")
+            if skey:
+                ctrl.SetValue(str(self.settings.get(skey, default) or default))
+            else:
+                ctrl.SetValue(default)
+            add_labeled(self, grid, label, ctrl,
+                        flag=wx.LEFT | wx.RIGHT, border=2)
+            self._controls[key] = ctrl
+
+        # Title defaults to the project name (kept in sync until edited).
+        self._controls["title"].SetValue(
+            self.wizard.page_details.name_ctrl.GetValue().strip()
+        )
+        self.wizard.page_details.name_ctrl.Bind(
+            wx.EVT_TEXT, self._on_name_changed
+        )
+
+        # Optional software information: when unchecked the book carries no
+        # producer/software metadata at all.
+        self.software_check = add_check(
+            self, sizer, "Show software information in book",
+            checked=bool(settings.get("daisy.show_software", True)),
+        )
+
+        sizer.Add(grid, 0, wx.EXPAND | wx.ALL, 6)
+        sizer.Add(
+            wx.StaticText(
+                self,
+                label="Press Finish to prepare the document and open the "
+                      "Recording window.",
+            ),
+            0, wx.ALL, 6,
+        )
+        self.SetSizer(sizer)
+
+    def _on_name_changed(self, evt):
+        """Keep the Title box in sync with the project name while the title
+        has not been customized."""
+        title_ctrl = self._controls["title"]
+        if title_ctrl.GetValue().strip() in ("", self._last_name_value):
+            title_ctrl.SetValue(evt.GetString().strip())
+        self._last_name_value = evt.GetString().strip()
+
+    def metadata(self) -> dict:
+        """Collected DAISY book information for ``project.json``."""
+        out: dict = {}
+        for key, _label, _skey, _default in self._FIELDS:
+            out[key] = self._controls[key].GetValue().strip()
+        out["language"] = (out.get("language") or "en").lower()
+        out["show_software"] = self.software_check.GetValue()
+        # Date: fill with today when left empty (yyyy-mm-dd).
+        if not out.get("date"):
+            out["date"] = datetime.date.today().isoformat()
+        return out

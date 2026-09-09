@@ -93,6 +93,7 @@ def build_daisy_book(
     language: str = "en",
     publisher: str = "",
     source_file: str = "",
+    meta: Optional[Dict[str, str]] = None,
 ) -> str:
     """Build the complete DAISY 2.02 book structure.
 
@@ -122,6 +123,11 @@ def build_daisy_book(
         Publisher name for ``dc:publisher``.
     source_file:
         Original document path, stored as ``dc:source`` metadata.
+    meta:
+        Optional DAISY book information entered in the wizard: ``title``,
+        ``creator``, ``date``, ``subject``, ``narrator``, ``producer``.
+        Empty or missing values fall back to sensible defaults; the running
+        time is always computed from the recorded audio.
 
     Returns
     -------
@@ -205,13 +211,13 @@ def build_daisy_book(
     # 5. NCC -- the file players actually open.
     ncc_path = _write_ncc(
         daisy_dir, project_name, entries, book_uid, now_iso, language,
-        publisher, source_file, multimedia, total_ms,
+        publisher, source_file, multimedia, total_ms, meta or {},
     )
 
     # 6. Optional OPF package manifest (informational; AMIS reads ncc.html).
     _write_opf(
         daisy_dir, project_name, entries, book_uid, now_iso, language,
-        publisher, multimedia,
+        publisher, multimedia, meta or {},
     )
 
     return ncc_path
@@ -314,9 +320,18 @@ def _write_ncc(
     source_file: str,
     multimedia: str,
     total_ms: int,
+    meta: Optional[Dict[str, str]] = None,
 ) -> str:
     """Write the Navigation Control Center (XHTML 1.0 + DAISY metadata)."""
     publisher = publisher.strip() or "AI Voice Studio"
+    meta = meta or {}
+    title = meta.get("title") or title
+    creator = meta.get("creator", "")
+    date = meta.get("date") or now_iso[:10]
+    subject = meta.get("subject", "")
+    narrator = meta.get("narrator", "")
+    producer = meta.get("producer", "")
+    show_software = bool(meta.get("show_software", True))
 
     # First body entry must be an <h1 class="title"> pointing into the first
     # content SMIL (spec 2.1.6.1). Then one heading per recorded segment.
@@ -338,6 +353,24 @@ def _write_ncc(
         if source_file else ""
     )
 
+    optional_meta = ""
+    if creator:
+        optional_meta += (
+            '\n    <meta name="dc:creator" content="'
+            + _escape_html(creator) + '" scheme="DCCreator" />')
+    if subject:
+        optional_meta += (
+            '\n    <meta name="dc:subject" content="'
+            + _escape_html(subject) + '" scheme="DCSubject" />')
+    if narrator:
+        optional_meta += (
+            '\n    <meta name="ncc:narrator" content="'
+            + _escape_html(narrator) + '" />')
+    if producer:
+        optional_meta += (
+            '\n    <meta name="ncc:producer" content="'
+            + _escape_html(producer) + '" />')
+
     ncc = (
         '<?xml version="1.0" encoding="utf-8"?>\n'
         f"{_XHTML_DOCTYPE}\n"
@@ -347,10 +380,11 @@ def _write_ncc(
         '    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />\n'
         '    <meta name="dc:title" content="' + _escape_html(title) + '" />\n'
         '    <meta name="dc:identifier" content="' + _escape_html(book_uid) + '" />\n'
-        '    <meta name="dc:date" content="' + now_iso[:10] + '" scheme="yyyy-mm-dd" />\n'
+        '    <meta name="dc:date" content="' + _escape_html(date) + '" scheme="yyyy-mm-dd" />\n'
         '    <meta name="dc:format" content="Daisy 2.02" />\n'
         '    <meta name="dc:language" content="' + _escape_html(language) + '" scheme="ISO 639" />\n'
         '    <meta name="dc:publisher" content="' + _escape_html(publisher) + '" />'
+        + optional_meta
         + source_meta + '\n'
         '    <meta name="ncc:pageFront" content="0" />\n'
         '    <meta name="ncc:pageNormal" content="0" />\n'
@@ -359,7 +393,10 @@ def _write_ncc(
         '    <meta name="ncc:setInfo" content="1 of 1" />\n'
         '    <meta name="ncc:depth" content="1" />\n'
         '    <meta name="ncc:multimediaType" content="' + multimedia + '" />\n'
-        '    <meta name="ncc:generator" content="AI Voice Studio" />\n'
+        + (
+            '    <meta name="ncc:generator" content="AI Voice Studio" />\n'
+            if show_software else ""
+        ) +
         '    <meta name="ncc:totalTime" content="' + _format_duration(total_ms) + '" scheme="hh:mm:ss" />\n'
         '    <meta name="ncc:charset" content="utf-8" />\n'
         '    <meta name="ncc:tocItems" content="' + str(len(entries) + 1) + '" />\n'
@@ -579,9 +616,18 @@ def _write_opf(
     language: str,
     publisher: str,
     multimedia: str,
+    meta: Optional[Dict[str, str]] = None,
 ) -> None:
     """Write an OPF package file listing every component of the book."""
     publisher = publisher.strip() or "AI Voice Studio"
+    meta = meta or {}
+    title = meta.get("title") or title
+    creator = meta.get("creator", "")
+    date = meta.get("date") or now_iso[:10]
+    subject = meta.get("subject", "")
+    narrator = meta.get("narrator", "")
+    producer = meta.get("producer", "")
+    show_software = bool(meta.get("show_software", True))
 
     items = [
         f'    <item id="ncc" href="{DAISY_NCC_FILE}" media-type="application/xhtml+xml"/>',
@@ -603,6 +649,20 @@ def _write_opf(
             f' media-type="{mime}"/>'
         )
 
+    optional_meta = ""
+    if creator:
+        optional_meta += f'\n    <dc:creator>{_escape_html(creator)}</dc:creator>'
+    if subject:
+        optional_meta += f'\n    <dc:subject>{_escape_html(subject)}</dc:subject>'
+    if narrator:
+        optional_meta += (
+            '\n    <meta name="ncc:narrator" content="'
+            + _escape_html(narrator) + '" />')
+    if producer:
+        optional_meta += (
+            '\n    <meta name="ncc:producer" content="'
+            + _escape_html(producer) + '" />')
+
     opf = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         '<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="uid" version="2.0">\n'
@@ -610,8 +670,9 @@ def _write_opf(
         f'    <dc:title>{_escape_html(title)}</dc:title>\n'
         f'    <dc:identifier id="uid">{_escape_html(book_uid)}</dc:identifier>\n'
         f'    <dc:language>{_escape_html(language)}</dc:language>\n'
-        f'    <dc:date>{now_iso[:10]}</dc:date>\n'
+        f'    <dc:date>{_escape_html(date)}</dc:date>\n'
         f'    <dc:publisher>{_escape_html(publisher)}</dc:publisher>\n'
+        + optional_meta +
         '    <dc:format>Daisy 2.02</dc:format>\n'
         f'    <meta name="ncc:multimediaType" content="{multimedia}" />\n'
         '  </metadata>\n'

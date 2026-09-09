@@ -104,6 +104,7 @@ def build_daisy3_book(
     publisher: str = "",
     source_file: str = "",
     author: str = "",
+    meta: Optional[Dict[str, str]] = None,
 ) -> str:
     """Build the complete DAISY 3 book structure into ``<output_dir>/DAISY3``.
 
@@ -111,6 +112,11 @@ def build_daisy3_book(
     Text is always included: DAISY 3 is a full-text/full-audio format.  Images
     found in the source document are embedded as DTBook ``<imggroup>``
     elements at the end of the book.
+
+    ``meta`` carries the DAISY book information entered in the wizard
+    (``title``, ``creator``, ``date``, ``subject``, ``narrator``,
+    ``producer``); empty or missing values fall back to sensible defaults and
+    the running time is always computed from the recorded audio.
 
     Returns the path of the generated ``package.opf`` (the entry point DAISY 3
     players open), or ``""`` when no segment has been recorded yet.
@@ -163,15 +169,16 @@ def build_daisy3_book(
     images = _stage_images(_extract_images(source_file), daisy_dir)
 
     # 3. DTBook text document.
+    meta = meta or {}
     _write_dtbook(
         daisy_dir, project_name, entries, book_uid, now_iso, language,
-        publisher, source_file, author, images,
+        publisher, source_file, author, images, meta,
     )
 
     # 4. NCX navigation.
     _write_ncx(
         daisy_dir, project_name, entries, book_uid, now_iso, language,
-        publisher, total_ms,
+        publisher, total_ms, meta,
     )
 
     # 5. Per-segment SMIL 2.0 content documents.  Each SMIL carries the
@@ -193,7 +200,7 @@ def build_daisy3_book(
     # 6. OPF package manifest.
     opf_path = _write_opf(
         daisy_dir, project_name, entries, book_uid, now_iso, language,
-        publisher, source_file, author, total_ms, smil_files, images,
+        publisher, source_file, author, total_ms, smil_files, images, meta,
     )
     return opf_path
 
@@ -265,10 +272,18 @@ def _write_dtbook(
     source_file: str,
     author: str,
     images: Optional[List[Tuple[str, str, bytes]]] = None,
+    meta: Optional[Dict[str, str]] = None,
 ) -> None:
     """Write the DTBook 2005-3 text content document."""
     publisher = publisher.strip() or "AI Voice Studio"
-    author = author.strip() or publisher
+    meta = meta or {}
+    title = meta.get("title") or title
+    author = (meta.get("creator") or author).strip() or publisher
+    date = meta.get("date") or now_iso[:10]
+    subject = meta.get("subject", "")
+    narrator = meta.get("narrator", "")
+    producer = meta.get("producer", "")
+    show_software = bool(meta.get("show_software", True))
     images = images or []
 
     head_meta = (
@@ -277,6 +292,22 @@ def _write_dtbook(
         '    <meta name="dtb:totalPageCount" content="0" />\n'
         '    <meta name="dtb:maxPageNumber" content="0" />\n'
     )
+
+    optional_meta = ""
+    if subject:
+        optional_meta += (
+            '\n    <meta name="dc:Subject" content="' + _escape(subject) + '" />')
+    if narrator:
+        optional_meta += (
+            '\n    <meta name="dtb:narrator" content="' + _escape(narrator) + '" />')
+    # dtb:producer is repeatable: the user producer and, when the software
+    # checkbox is on, the producing software are both listed.
+    producers = ([producer] if producer else [])
+    if show_software and "AI Voice Studio" not in producers:
+        producers.append("AI Voice Studio")
+    for prod in producers:
+        optional_meta += (
+            '\n    <meta name="dtb:producer" content="' + _escape(prod) + '" />')
 
     frontmatter = (
         '    <frontmatter>\n'
@@ -320,8 +351,9 @@ def _write_dtbook(
         '    <meta name="dc:Title" content="' + _escape(title) + '" />\n'
         '    <meta name="dc:Creator" content="' + _escape(author) + '" />\n'
         '    <meta name="dc:Language" content="' + _escape(language) + '" />\n'
-        '    <meta name="dc:Date" content="' + now_iso[:10] + '" />\n'
+        '    <meta name="dc:Date" content="' + _escape(date) + '" />\n'
         '    <meta name="dc:Publisher" content="' + _escape(publisher) + '" />'
+        + optional_meta
         + source_meta + '\n'
         '  </head>\n'
         '  <book>\n'
@@ -489,8 +521,12 @@ def _write_ncx(
     language: str,
     publisher: str,
     total_ms: int,
+    meta: Optional[Dict[str, str]] = None,
 ) -> None:
     """Write the NCX navigation file (navMap with one navPoint per segment)."""
+    meta = meta or {}
+    title = meta.get("title") or title
+    author = (meta.get("creator") or publisher).strip() or "AI Voice Studio"
     nav_points: List[str] = []
     for entry in entries:
         blocks = entry["blocks"]
@@ -517,7 +553,7 @@ def _write_ncx(
         '    <meta name="dtb:maxPageNumber" content="0" />\n'
         '  </head>\n'
         '  <docTitle><text>' + _escape(title) + '</text></docTitle>\n'
-        '  <docAuthor><text>' + _escape(publisher.strip() or "AI Voice Studio") + '</text></docAuthor>\n'
+        '  <docAuthor><text>' + _escape(author) + '</text></docAuthor>\n'
         '  <navMap>\n'
         + "\n".join(nav_points) + '\n'
         '  </navMap>\n'
@@ -629,11 +665,19 @@ def _write_opf(
     total_ms: int,
     smil_files: List[str],
     images: Optional[List[Tuple[str, str, bytes]]] = None,
+    meta: Optional[Dict[str, str]] = None,
 ) -> str:
     """Write the OPF package manifest and return its path."""
     images = images or []
+    meta = meta or {}
     publisher = publisher.strip() or "AI Voice Studio"
-    author = author.strip() or publisher
+    title = meta.get("title") or title
+    author = (meta.get("creator") or author).strip() or publisher
+    date = meta.get("date") or now_iso[:10]
+    subject = meta.get("subject", "")
+    narrator = meta.get("narrator", "")
+    producer = meta.get("producer", "")
+    show_software = bool(meta.get("show_software", True))
 
     items = [
         f'    <item id="dtbook" href="{DAISY3_DTBOOK_FILE}" media-type="application/x-dtbook+xml"/>',
@@ -661,6 +705,19 @@ def _write_opf(
         if source_file else ""
     )
 
+    optional_meta = ""
+    if subject:
+        optional_meta += f'\n    <dc:subject>{_escape(subject)}</dc:subject>'
+    if narrator:
+        optional_meta += (
+            '\n    <meta name="dtb:narrator" content="' + _escape(narrator) + '" />')
+    producers = ([producer] if producer else [])
+    if show_software and "AI Voice Studio" not in producers:
+        producers.append("AI Voice Studio")
+    for prod in producers:
+        optional_meta += (
+            '\n    <meta name="dtb:producer" content="' + _escape(prod) + '" />')
+
     opf = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         '<package xmlns="http://www.idpf.org/2007/opf" '
@@ -671,8 +728,9 @@ def _write_opf(
         f'    <dc:creator>{_escape(author)}</dc:creator>\n'
         f'    <dc:language>{_escape(language)}</dc:language>\n'
         f'    <dc:identifier id="uid">{_escape(book_uid)}</dc:identifier>\n'
-        f'    <dc:date>{now_iso[:10]}</dc:date>\n'
+        f'    <dc:date>{_escape(date)}</dc:date>\n'
         f'    <dc:publisher>{_escape(publisher)}</dc:publisher>\n'
+        + optional_meta +
         f'    <dc:format>Daisy 3</dc:format>'
         + source_meta + '\n'
         '    <meta name="dtb:uid" content="' + _escape(book_uid) + '" />\n'
