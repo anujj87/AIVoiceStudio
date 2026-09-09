@@ -123,13 +123,22 @@ class NewProjectWizard(Wizard):
         mode = self.page_mode.selected()
         is_daisy = ptype in _DAISY_TYPES
 
-        # Clipboard mode: no document needed
+        # Clipboard mode: no document needed; the pasted text is the content.
         if ptype == PROJECT_TYPE_CLIPBOARD:
+            text = self.page_details.clipboard_content()
+            if not text:
+                wx.MessageBox(
+                    "Paste or type the text to record in the Clipboard text "
+                    "box first.",
+                    "New project",
+                    style=wx.OK | wx.ICON_INFORMATION,
+                )
+                return
             pdir = project_dir(name)
             last = self.settings.get("last_model", {})
             project.create_project(
                 pdir, name, "<clipboard>", "clipboard",
-                [{"index": 1, "title": "clipboard text", "text": ""}],
+                [{"index": 1, "title": name, "text": text}],
                 tts_settings={
                     "tts": last.get("tts"),
                     "language": last.get("language"),
@@ -239,10 +248,14 @@ class _DetailsPage(WizardPage):
         self._build_ui()
 
     def GetNext(self):
-        """DAISY project types get the DAISY-specific second page; every other
-        type gets the regular audio file creation page."""
-        if self.selected_project_type() in _DAISY_TYPES:
+        """DAISY project types get the DAISY-specific second page; Clipboard
+        finishes straight from this page; every other type gets the regular
+        audio file creation page."""
+        ptype = self.selected_project_type()
+        if ptype in _DAISY_TYPES:
             return self.wizard.page_daisy
+        if ptype == PROJECT_TYPE_CLIPBOARD:
+            return None  # Finish button instead of Next
         return self.wizard.page_mode
 
     def GetPrev(self):
@@ -283,6 +296,10 @@ class _DetailsPage(WizardPage):
         type_lbl.SetName("Project type")
         self.project_type_combo.SetName("Project type")
         self.project_type_combo.Bind(wx.EVT_COMBOBOX, lambda _: self._update_type_desc())
+        # Clipboard projects: show a multi-line edit box for pasting text.
+        self.project_type_combo.Bind(
+            wx.EVT_COMBOBOX, lambda _: self._update_clipboard_visibility()
+        )
         sizer.Add(grid, 0, wx.EXPAND | wx.ALL, 6)
 
         self.type_desc = wx.StaticText(self, label="")
@@ -328,18 +345,53 @@ class _DetailsPage(WizardPage):
             0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 6,
         )
 
-        sizer.Add(
-            wx.StaticText(
-                self,
-                label="Supported files: PDF, TXT, DOC, DOCX, HTML, Markdown, "
-                      "EPUB. You can also copy text to the clipboard and "
-                      "paste it here.",
-            ),
-            0, wx.ALL, 6,
+        # Clipboard text: only shown when the Clipboard project type is
+        # selected. Paste or type the text to record here.
+        self.clipboard_label = wx.StaticText(self, label="Clipboard text:")
+        self.clipboard_label.SetName("Clipboard text")
+        sizer.Add(self.clipboard_label, 0, wx.LEFT | wx.RIGHT | wx.TOP, 6)
+        self.clipboard_text = wx.TextCtrl(
+            self, style=wx.TE_MULTILINE | wx.TE_DONTWRAP, name="Clipboard text",
+            size=wx.Size(-1, 140),
         )
+        self.clipboard_text.SetName("Clipboard text")
+        sizer.Add(self.clipboard_text, 1, wx.EXPAND | wx.ALL, 6)
+        self.clipboard_hint = wx.StaticText(
+            self,
+            label="Paste (Ctrl+V) or type the text to record, then press "
+                  "Finish to open the Recording window.",
+        )
+        sizer.Add(self.clipboard_hint, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 6)
+
+        self.files_note = wx.StaticText(
+            self,
+            label="Supported files: PDF, TXT, DOC, DOCX, HTML, Markdown, "
+                  "EPUB. You can also copy text to the clipboard and "
+                  "paste it here.",
+        )
+        sizer.Add(self.files_note, 0, wx.ALL, 6)
         self.SetSizer(sizer)
 
         self.open_btn.Bind(wx.EVT_BUTTON, self._on_open)
+        self._update_clipboard_visibility()
+
+    def _update_clipboard_visibility(self):
+        """Clipboard projects: hide the document controls and show the paste
+        box instead.  Every other type: the reverse."""
+        is_clipboard = (
+            self.selected_project_type() == PROJECT_TYPE_CLIPBOARD
+        )
+        # Clipboard: name + type + punctuation + paste box, no document.
+        self.open_btn.Show(not is_clipboard)
+        self.file_label.Show(not is_clipboard)
+        self.files_note.Show(not is_clipboard)
+        for ctrl in (self.clipboard_label, self.clipboard_text,
+                     self.clipboard_hint):
+            ctrl.Show(is_clipboard)
+        self.Layout()
+
+    def clipboard_content(self) -> str:
+        return self.clipboard_text.GetValue().strip()
 
     def selected_punctuation(self) -> str:
         sel = self.punct_combo.GetSelection()
