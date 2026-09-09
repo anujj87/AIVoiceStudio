@@ -29,7 +29,7 @@ from ..constants import (
     PROJECT_TYPE_AUDIO_PLAYLIST,
     PROJECT_TYPE_CLIPBOARD,
     PROJECT_TYPE_DAISY_AUDIO,
-    PROJECT_TYPE_DAISY_AUDIO_TEXT,
+    PROJECT_TYPE_DAISY3_AUDIO_TEXT,
     PROJECT_TYPES,
     PROJECT_TYPE_DESCRIPTIONS,
     PUNCTUATION_CHOICES,
@@ -46,6 +46,12 @@ from .progress import TaskProgressDialog
 from .recording_dialog import RecordingDialog
 
 log = logging.getLogger(__name__)
+
+# Project types routed to the DAISY-specific second wizard page.
+_DAISY_TYPES = (
+    PROJECT_TYPE_DAISY_AUDIO,
+    PROJECT_TYPE_DAISY3_AUDIO_TEXT,
+)
 
 
 class NewProjectWizard(Wizard):
@@ -111,7 +117,7 @@ class NewProjectWizard(Wizard):
         name = self.page_details.name_ctrl.GetValue().strip() or "Untitled project"
         ptype = self.page_details.selected_project_type()
         mode = self.page_mode.selected()
-        is_daisy = ptype in (PROJECT_TYPE_DAISY_AUDIO, PROJECT_TYPE_DAISY_AUDIO_TEXT)
+        is_daisy = ptype in _DAISY_TYPES
 
         # Clipboard mode: no document needed
         if ptype == PROJECT_TYPE_CLIPBOARD:
@@ -192,10 +198,6 @@ class NewProjectWizard(Wizard):
                 "splitting": self.page_daisy.selected_splitting(),
                 "language": self.page_daisy.language(),
                 "publisher": self.page_daisy.publisher(),
-                "include_text": (
-                    ptype == PROJECT_TYPE_DAISY_AUDIO_TEXT
-                    and self.page_daisy.include_text()
-                ),
             }
         project.create_project(
             pdir,
@@ -236,9 +238,7 @@ class _DetailsPage(WizardPage):
     def GetNext(self):
         """DAISY project types get the DAISY-specific second page; every other
         type gets the regular audio file creation page."""
-        if self.selected_project_type() in (
-            PROJECT_TYPE_DAISY_AUDIO, PROJECT_TYPE_DAISY_AUDIO_TEXT,
-        ):
+        if self.selected_project_type() in _DAISY_TYPES:
             return self.wizard.page_daisy
         return self.wizard.page_mode
 
@@ -520,16 +520,6 @@ class _DaisyPage(WizardPage):
         grid = wx.FlexGridSizer(cols=2, vgap=6, hgap=8)
         grid.AddGrowableCol(1)
 
-        self.include_text_cb = wx.CheckBox(self, label="Include text (audio+text book)")
-        self.include_text_cb.SetName("Include text in the DAISY book")
-        self.include_text_cb.SetValue(
-            settings.get("daisy.include_text", True)
-            and self.wizard.page_details.selected_project_type()
-            == PROJECT_TYPE_DAISY_AUDIO_TEXT
-        )
-        grid.Add((1, 1))
-        grid.Add(self.include_text_cb, 0, wx.ALL, 2)
-
         self.lang_ctrl = wx.TextCtrl(self)
         self.lang_ctrl.SetName("DAISY language code")
         self.lang_ctrl.SetValue(settings.get("daisy.language", "en"))
@@ -546,9 +536,10 @@ class _DaisyPage(WizardPage):
         sizer.Add(
             wx.StaticText(
                 self,
-                label="After recording, a DAISY 2.02 book (ncc.html, SMIL "
-                      "files and audio) is created in the project's DAISY "
-                      "folder and can be exported as a ZIP for DAISY readers.",
+                label="After recording, the DAISY book is created in the "
+                      "project folder (DAISY for DAISY 2.02 audio books, "
+                      "DAISY3 for DAISY 3 audio and text with images books) "
+                      "and can be exported as a ZIP for DAISY readers.",
             ),
             0, wx.ALL, 6,
         )
@@ -559,9 +550,6 @@ class _DaisyPage(WizardPage):
             if radio.GetValue():
                 return value
         return DAISY_SPLIT_H1
-
-    def include_text(self) -> bool:
-        return self.include_text_cb.GetValue()
 
     def language(self) -> str:
         return (self.lang_ctrl.GetValue().strip() or "en").lower()

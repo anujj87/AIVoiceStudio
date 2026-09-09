@@ -170,6 +170,15 @@ def build_daisy_book(
 
     total_ms = int(sum(e["duration"] for e in entries) * 1000)
 
+    # 1a. Cumulative book offset for every segment.  Each content SMIL
+    #     declares its start position (ncc:totalElapsedTime); genuine DAISY
+    #     2.02 books set this per SMIL, and players use it for book-level
+    #     positioning.
+    cumulative_ms = 0
+    for entry in entries:
+        entry["offset_ms"] = cumulative_ms
+        cumulative_ms += int(entry["duration"] * 1000)
+
     # 1b. Split each segment into synchronized text blocks.  Full-text books
     #     get one <par> per text block (heading + each paragraph) with the
     #     segment audio sliced proportionally by character count -- the
@@ -412,7 +421,12 @@ def _write_smil(
     elapsed = 0.0
     for idx, block in enumerate(blocks):
         if idx == len(blocks) - 1:
-            clip_end = dur
+            # Give the final clip a small tail beyond the measured duration:
+            # MP3 encoder delay means decodable audio usually runs slightly
+            # LONGER than the container duration.  A clip-end exactly at the
+            # measured value makes strict players stop just before the real
+            # end of the narration.
+            clip_end = dur + 0.25
         else:
             clip_end = min(dur, elapsed + dur * block["chars"] / total_chars)
         pars.append(
@@ -438,13 +452,14 @@ def _write_smil(
         '    <meta name="dc:title" content="' + _escape_html(book_title) + '" />\n'
         '    <meta name="title" content="' + _escape_html(entry["title"]) + '" />\n'
         '    <meta name="ncc:generator" content="AI Voice Studio" />\n'
-        '    <meta name="ncc:totalElapsedTime" content="00:00:00" />\n'
+        '    <meta name="ncc:totalElapsedTime" content="'
+        + _format_duration(_total_ms(entry.get("offset_ms"))) + '" />\n'
         '    <meta name="ncc:timeInThisSmil" content="'
         + _format_duration(int(dur * 1000)) + '" />\n'
         + _SMIL_LAYOUT +
         '  </head>\n'
         '  <body>\n'
-        f'    <seq dur="{dur:.3f}s">\n'
+        f'    <seq dur="{dur + 0.25:.3f}s">\n'
         + "\n".join(pars) + "\n"
         '    </seq>\n'
         '  </body>\n'
@@ -660,9 +675,23 @@ def _audio_duration(path: str, ext: str) -> float:
     return 0.0
 
 
+def _total_ms(total_ms_value: Any) -> int:
+    """Coerce a milliseconds value (int or str) safely."""
+    try:
+        return max(0, int(total_ms_value))
+    except (TypeError, ValueError):
+        return 0
+
+
 def _format_duration(total_ms: int) -> str:
-    """Format milliseconds as ``hh:mm:ss`` for ``ncc:totalTime``."""
-    total_s = max(0, total_ms) // 1000
+    """Format milliseconds as ``hh:mm:ss``, rounding UP to the next second.
+
+    Declared times must never be shorter than the real audio: players that
+    pace or clamp playback against ``ncc:totalTime`` /
+    ``ncc:timeInThisSmil`` would otherwise stop before the audio ends
+    (the "last part of a file does not play" bug).
+    """
+    total_s = -(-max(0, int(total_ms)) // 1000)  # ceiling division
     h, rem = divmod(total_s, 3600)
     m, s = divmod(rem, 60)
     return f"{h:02d}:{m:02d}:{s:02d}"

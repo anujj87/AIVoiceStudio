@@ -18,6 +18,10 @@ from .. import compute, project
 from ..audio import ffmpeg as ffmpeg_mod
 from ..constants import (
     AUDIO_MODE_DESCRIPTIONS,
+    DAISY3_PACKAGE_FILE,
+    DAISY3_OUTPUT_DIR_NAME,
+    DAISY_NCC_FILE,
+    DAISY_OUTPUT_DIR_NAME,
     FORMAT_WAV,
     MODE_ONE_FILE,
     OUTPUT_FORMAT_CHOICES,
@@ -54,6 +58,34 @@ from .events import (
 from .progress import TaskProgressDialog
 
 log = logging.getLogger(__name__)
+
+# Project types that produce a DAISY book (2.02 audio-only or the legacy
+# 2.02 audio+text, plus DAISY 3 audio+text with images).
+_DAISY_PROJECT_TYPES = (
+    "daisy_audio", "daisy_audio_text", "daisy3_audio_text",
+)
+
+
+def _daisy_entry_point(project_dir: str, ptype: str) -> tuple[str, str]:
+    """Return ``(kind, entry_path)`` for a DAISY project type.
+
+    ``kind`` is ``"2.02 audio"``, ``"2.02 audio+text"`` or ``"DAISY 3"``;
+    ``entry_path`` is the file a player opens (the NCC or the OPF).
+    """
+    if ptype == "daisy_audio":
+        return "2.02 audio", os.path.join(
+            project_dir, DAISY_OUTPUT_DIR_NAME, DAISY_NCC_FILE)
+    if ptype == "daisy_audio_text":
+        return "2.02 audio+text", os.path.join(
+            project_dir, DAISY_OUTPUT_DIR_NAME, DAISY_NCC_FILE)
+    return "DAISY 3", os.path.join(
+        project_dir, DAISY3_OUTPUT_DIR_NAME, DAISY3_PACKAGE_FILE)
+
+
+def _daisy_book_exists(project_dir: str, ptype: str) -> bool:
+    """True when the generated book for ``ptype`` exists on disk."""
+    _kind, entry = _daisy_entry_point(project_dir, ptype)
+    return os.path.isfile(entry)
 
 _COMPUTE_LABELS = {
     compute.COMPUTE_AUTO: "Auto (best available)",
@@ -237,7 +269,7 @@ class RecordingDialog(wx.Dialog):
         self.export_daisy_btn = wx.Button(self, label="Export DAISY as ZIP")
         self.export_daisy_btn.SetName("Export DAISY book as ZIP archive")
         self.export_daisy_btn.SetToolTip("Package the DAISY book into a ZIP file for distribution")
-        self.export_daisy_btn.Show(ptype in ("daisy_audio", "daisy_audio_text"))
+        self.export_daisy_btn.Show(ptype in _DAISY_PROJECT_TYPES)
         self.export_daisy_btn.Disable()
         close_sizer.Add(self.export_daisy_btn, 0, wx.ALL, 4)
         close_sizer.Add(close_btn, 0, wx.ALL, 4)
@@ -926,11 +958,11 @@ class RecordingDialog(wx.Dialog):
         self.status.SetLabel("Recording complete.")
         self.gauge.SetValue(100)
         self._finish_progress_dialog()
-        # Generate DAISY book structure if this is a DAISY project
+        # Generate the DAISY/EPUB book structure if this is a DAISY project
         self._build_daisy_if_needed()
         # Enable DAISY export if applicable
         ptype = self.data.get("project_type", "audio_playlist")
-        if ptype in ("daisy_audio", "daisy_audio_text"):
+        if ptype in _DAISY_PROJECT_TYPES:
             self.export_daisy_btn.Enable()
         dialogs.show_recording_complete(
             self,
@@ -942,28 +974,28 @@ class RecordingDialog(wx.Dialog):
     def _daisy_summary(self) -> str:
         """Return a note about DAISY files if they were generated."""
         ptype = self.data.get("project_type", "audio_playlist")
-        if ptype not in ("daisy_audio", "daisy_audio_text"):
+        if ptype not in _DAISY_PROJECT_TYPES:
             return ""
-        from ..constants import DAISY_NCC_FILE, DAISY_OUTPUT_DIR_NAME  # noqa: PLC0415
-        ncc = os.path.join(self.project_dir, DAISY_OUTPUT_DIR_NAME, DAISY_NCC_FILE)
-        if os.path.isfile(ncc):
-            return ("\n\nThe DAISY 2.02 book (ncc.html, SMIL files and audio) "
-                    "was generated in the 'DAISY' folder of the project. Use "
-                    "'Export DAISY as ZIP' to share it.")
+        kind, entry = _daisy_entry_point(self.project_dir, ptype)
+        if os.path.isfile(entry):
+            return (f"\n\nThe {kind} book was generated in the project folder. "
+                    "Use 'Export DAISY as ZIP' to share it.")
         return ("\n\nDAISY book not generated yet - no segments had been "
                 "recorded when recording finished.")
 
     def _build_daisy_if_needed(self):
-        """Build DAISY 2.02 book structure after recording completes.
+        """Build the DAISY book structure after recording completes.
 
         Reads the fresh segment status from disk (the in-memory copy loaded at
         dialog open never sees the 'done' status written by the worker), then
-        generates the book into the project's ``DAISY`` folder.
+        generates the book:
+
+        * ``daisy_audio`` / ``daisy_audio_text`` -> DAISY 2.02 in ``DAISY/``
+        * ``daisy3_audio_text``                  -> DAISY 3 in ``DAISY3/``
         """
         ptype = self.data.get("project_type", "audio_playlist")
-        if ptype not in ("daisy_audio", "daisy_audio_text"):
+        if ptype not in _DAISY_PROJECT_TYPES:
             return
-        from ..documents.daisy_builder import build_daisy_book  # noqa: PLC0415
         try:
             fresh = project.load_project(self.project_dir)
             # Per-project DAISY settings (chosen in the wizard) win; fall back
@@ -975,17 +1007,22 @@ class RecordingDialog(wx.Dialog):
                 pd.get("include_text", self.settings.get("daisy.include_text", True))
             )
             fmt = fresh.get("tts", {}).get("output_format", "wav")
-            ncc_path = build_daisy_book(
+            common = dict(
                 output_dir=self.project_dir,
                 project_name=fresh.get("name", "Untitled"),
                 segments=fresh.get("segments", []),
                 audio_format=fmt,
-                include_text=include_text,
                 language=lang,
                 publisher=publisher,
                 source_file=fresh.get("source_file", ""),
             )
-            if ncc_path:
+            if ptype == "daisy3_audio_text":
+                from ..documents.daisy3_builder import build_daisy3_book  # noqa: PLC0415
+                result = build_daisy3_book(**common)
+            else:
+                from ..documents.daisy_builder import build_daisy_book  # noqa: PLC0415
+                result = build_daisy_book(include_text=include_text, **common)
+            if result:
                 self.export_daisy_btn.Enable()
             else:
                 log.warning("DAISY book not built: no completed segments on disk")
@@ -1046,14 +1083,10 @@ class RecordingDialog(wx.Dialog):
 
     def _on_export_daisy(self, _):
         """Package the DAISY book into a ZIP file for distribution."""
-        from ..documents.daisy_builder import export_daisy_zip  # noqa: PLC0415
-        from ..constants import DAISY_NCC_FILE, DAISY_OUTPUT_DIR_NAME  # noqa: PLC0415
         ptype = self.data.get("project_type", "audio_playlist")
-        if ptype not in ("daisy_audio", "daisy_audio_text"):
+        if ptype not in _DAISY_PROJECT_TYPES:
             return
-        if not os.path.isfile(os.path.join(
-            self.project_dir, DAISY_OUTPUT_DIR_NAME, DAISY_NCC_FILE
-        )):
+        if not _daisy_book_exists(self.project_dir, ptype):
             wx.MessageBox(
                 "No DAISY book has been generated yet. Finish recording every "
                 "segment first (press Start recording and let it complete), "
@@ -1078,14 +1111,20 @@ class RecordingDialog(wx.Dialog):
         self.status.SetLabel("Creating DAISY ZIP archive...")
         self.export_daisy_btn.Disable()
         threading.Thread(
-            target=self._export_daisy_job, args=(zip_path,), daemon=True
+            target=self._export_daisy_job,
+            args=(zip_path, self.data.get("project_type", "audio_playlist")),
+            daemon=True,
         ).start()
 
-    def _export_daisy_job(self, zip_path: str):
+    def _export_daisy_job(self, zip_path: str, ptype: str):
         """Background thread to build the ZIP."""
-        from ..documents.daisy_builder import export_daisy_zip  # noqa: PLC0415
         try:
-            result = export_daisy_zip(self.project_dir, zip_path)
+            if ptype == "daisy3_audio_text":
+                from ..documents.daisy3_builder import export_daisy3_zip  # noqa: PLC0415
+                result = export_daisy3_zip(self.project_dir, zip_path)
+            else:
+                from ..documents.daisy_builder import export_daisy_zip  # noqa: PLC0415
+                result = export_daisy_zip(self.project_dir, zip_path)
             wx.CallAfter(self._export_daisy_done, None, result)
         except Exception as exc:  # noqa: BLE001
             wx.CallAfter(self._export_daisy_done, str(exc), None)

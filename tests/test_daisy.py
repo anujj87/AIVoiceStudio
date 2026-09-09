@@ -85,7 +85,7 @@ class TestDaisyBuilder(unittest.TestCase):
         # official samples
         self.assertIn(
             '<audio src="aud0001.wav" clip-begin="npt=0.000s" '
-            'clip-end="npt=1.000s" id="aud_0001" />',
+            'clip-end="npt=1.250s" id="aud_0001" />',
             smil,
         )
         self.assertIn("<seq>\n          <audio", smil)
@@ -153,7 +153,7 @@ class TestDaisyBuilder(unittest.TestCase):
         self.assertIn('<text src="0001.html#seg_0001" id="txt_0001" />', smil)
         self.assertIn('<text src="0001.html#p_0001_001" id="txt_0002" />', smil)
         self.assertIn('clip-begin="npt=0.000s"', smil)
-        self.assertIn('clip-end="npt=1.000s"', smil)
+        self.assertIn('clip-end="npt=1.250s"', smil)
 
         # OPF lists the text documents (flat hrefs)
         with open(os.path.join(daisy_dir, "package.opf"), encoding="utf-8") as fh:
@@ -244,6 +244,168 @@ class TestExportDaisyZip(unittest.TestCase):
         with zipfile.ZipFile(zip_path, "r") as zf:
             names = zf.namelist()
         self.assertIn("My Nice Book/ncc.html", names)
+
+
+# ---------------------------------------------------------------------------
+# DAISY 3 (Z39.86-2005)
+# ---------------------------------------------------------------------------
+from ai_voice_studio.constants import DAISY3_OUTPUT_DIR_NAME  # noqa: E402
+from ai_voice_studio.documents.daisy3_builder import (  # noqa: E402
+    build_daisy3_book,
+    export_daisy3_zip,
+)
+
+
+class TestDaisy3Builder(unittest.TestCase):
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def _make_segments(self, count=3, done=True):
+        segments = []
+        for i in range(1, count + 1):
+            saved = f"chapter{i:02d}.wav"
+            if done:
+                _write_wav(os.path.join(self.tmpdir, saved), seconds=i)
+            segments.append({
+                "index": i,
+                "title": f"Chapter {i}",
+                "text": f"This is the text for chapter {i}.",
+                "saved": saved,
+                "status": "done" if done else "pending",
+            })
+        return segments
+
+    def test_build_daisy3_audio_text(self):
+        """DAISY 3 books get DTBook, NCX, OPF, SMILs and copied audio."""
+        segments = self._make_segments()
+        opf_path = build_daisy3_book(
+            output_dir=self.tmpdir,
+            project_name="Test Book 3",
+            segments=segments,
+            audio_format="wav",
+            language="en",
+            publisher="Test Publisher",
+        )
+        daisy_dir = os.path.join(self.tmpdir, DAISY3_OUTPUT_DIR_NAME)
+        self.assertTrue(os.path.isfile(opf_path))
+        for name in ("book.xml", "ncx.xml", "package.opf"):
+            self.assertTrue(os.path.isfile(os.path.join(daisy_dir, name)), name)
+        daisy_files = sorted(os.listdir(daisy_dir))
+        for i in range(1, len(segments) + 1):
+            self.assertIn(f"{i:04d}.smil", daisy_files)
+            self.assertIn(f"aud{i:04d}.wav", daisy_files)
+
+        # DTBook: official doctype, frontmatter, bodymatter with level1/h1/p
+        with open(os.path.join(daisy_dir, "book.xml"), encoding="utf-8") as fh:
+            dtbook = fh.read()
+        self.assertIn('PUBLIC "-//NISO//DTD dtbook 2005-3//EN"', dtbook)
+        self.assertIn("<frontmatter>", dtbook)
+        self.assertIn("<doctitle id=\"doctitle\">Test Book 3</doctitle>", dtbook)
+        self.assertIn("<bodymatter>", dtbook)
+        self.assertIn("<rearmatter>", dtbook)
+        self.assertIn('<h1 id="seg_0001">Chapter 1</h1>', dtbook)
+        self.assertIn('<p id="p_0001_001">This is the text for chapter 1.</p>', dtbook)
+
+        # NCX: navMap with one navPoint per segment pointing into the SMILs
+        with open(os.path.join(daisy_dir, "ncx.xml"), encoding="utf-8") as fh:
+            ncx = fh.read()
+        self.assertIn('xmlns="http://www.daisy.org/z3986/2005/ncx/"', ncx)
+        self.assertIn('<navPoint id="nav_0001" playOrder="1">', ncx)
+        self.assertIn('<content src="0001.smil#txt_0001" />', ncx)
+
+        # SMIL 2.0: dtb namespace, clipBegin/clipEnd, text -> book.xml ids.
+        # The <audio> sits directly inside <par> (no wrapping <seq>, which
+        # DAISY 3 players do not play through).
+        with open(os.path.join(daisy_dir, "0001.smil"), encoding="utf-8") as fh:
+            smil = fh.read()
+        self.assertIn('PUBLIC "-//NISO//DTD xml-smil 2005-1//EN"', smil)
+        self.assertIn('xmlns:dtb="http://www.daisy.org/z3986/2005/dtbook/"', smil)
+        self.assertIn('<text src="book.xml#seg_0001" id="txt_0001" />', smil)
+        self.assertIn('clipBegin="0.000s"', smil)
+        self.assertIn('clipEnd="1.250s"', smil)
+        self.assertNotIn("<seq>\n          <audio", smil)
+        # Audio directly inside <par>, sliced proportionally across the two
+        # text blocks (heading + paragraph); the final clip carries a tail
+        # beyond the measured duration so players never stop early.
+        self.assertIn(
+            '<audio src="aud0001.wav" clipBegin="0.000s" clipEnd="0.225s" />',
+            smil,
+        )
+        self.assertIn(
+            '<audio src="aud0001.wav" clipBegin="0.225s" clipEnd="1.250s" />',
+            smil,
+        )
+
+        # OPF: spine references every SMIL, dtb:totalTime present
+        with open(opf_path, encoding="utf-8") as fh:
+            opf = fh.read()
+        self.assertIn('<spine toc="ncx">', opf)
+        self.assertIn('<itemref idref="smil_0001"/>', opf)
+        self.assertIn('name="dtb:totalTime"', opf)
+
+    def test_build_daisy3_no_ready_segments(self):
+        """No recorded segments -> no book, empty path returned."""
+        segments = self._make_segments(done=False)
+        result = build_daisy3_book(
+            output_dir=self.tmpdir, project_name="Empty", segments=segments)
+        self.assertEqual(result, "")
+        self.assertFalse(os.path.isdir(
+            os.path.join(self.tmpdir, DAISY3_OUTPUT_DIR_NAME)))
+
+    def test_export_daisy3_zip(self):
+        """The ZIP contains the book under one top-level folder."""
+        build_daisy3_book(
+            output_dir=self.tmpdir,
+            project_name="Test Book 3",
+            segments=self._make_segments(count=2),
+            audio_format="wav",
+        )
+        zip_path = os.path.join(self.tmpdir, "export3.zip")
+        result = export_daisy3_zip(self.tmpdir, zip_path, book_folder="Book3")
+        self.assertTrue(os.path.isfile(result))
+        with zipfile.ZipFile(result, "r") as zf:
+            names = zf.namelist()
+        self.assertIn("Book3/package.opf", names)
+        self.assertIn("Book3/book.xml", names)
+        self.assertIn("Book3/ncx.xml", names)
+        self.assertIn("Book3/0001.smil", names)
+        self.assertIn("Book3/aud0001.wav", names)
+        for name in names:
+            self.assertTrue(name.startswith("Book3/"), name)
+
+    def test_export_daisy3_without_book_raises(self):
+        zip_path = os.path.join(self.tmpdir, "empty3.zip")
+        with self.assertRaises(FileNotFoundError):
+            export_daisy3_zip(self.tmpdir, zip_path)
+
+
+    def test_build_daisy3_with_images(self):
+        """Images from a DOCX source land in DAISY3/images and the DTBook."""
+        png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
+        docx_path = os.path.join(self.tmpdir, "source.docx")
+        with zipfile.ZipFile(docx_path, "w") as zf:
+            zf.writestr("word/media/image1.png", png)
+        segments = self._make_segments(count=1)
+        opf_path = build_daisy3_book(
+            output_dir=self.tmpdir,
+            project_name="Image Book 3",
+            segments=segments,
+            audio_format="wav",
+            source_file=docx_path,
+        )
+        daisy_dir = os.path.join(self.tmpdir, DAISY3_OUTPUT_DIR_NAME)
+        self.assertTrue(os.path.isfile(
+            os.path.join(daisy_dir, "images", "img0001.png")))
+        with open(os.path.join(daisy_dir, "book.xml"), encoding="utf-8") as fh:
+            dtbook = fh.read()
+        self.assertIn('<img id="img_0001" src="images/img0001.png"', dtbook)
+        self.assertIn("<imggroup", dtbook)
+        with open(opf_path, encoding="utf-8") as fh:
+            opf = fh.read()
+        self.assertIn('href="images/img0001.png" media-type="image/png"', opf)
 
 
 if __name__ == "__main__":

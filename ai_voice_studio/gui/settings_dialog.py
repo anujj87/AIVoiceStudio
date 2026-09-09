@@ -50,7 +50,6 @@ from ..constants import (
     PITCH_MAX,
     PITCH_MIN,
     PROJECT_TYPE_DAISY_AUDIO,
-    PROJECT_TYPE_DAISY_AUDIO_TEXT,
     PUNCTUATION_CHOICES,
     PUNCTUATION_DEFAULT,
     RATE_MAX,
@@ -1425,12 +1424,6 @@ class _DaisySettingsPanel(_SettingsPanel):
         add_labeled(self, grid, "Publisher (optional)", self.publisher_ctrl,
                     flag=wx.LEFT | wx.RIGHT, border=2)
 
-        self.include_text_cb = wx.CheckBox(self, label="Include text in audio+text books")
-        self.include_text_cb.SetName("Include text")
-        self.include_text_cb.SetValue(settings.get("daisy.include_text", True))
-        grid.Add((1, 1))  # spacer
-        grid.Add(self.include_text_cb, 0, wx.ALL, 2)
-
         sizer.Add(grid, 0, wx.EXPAND | wx.ALL, 6)
 
         sizer.Add(
@@ -1460,7 +1453,6 @@ class _DaisySettingsPanel(_SettingsPanel):
         self.settings.set("daisy.splitting", self.selected())
         self.settings.set("daisy.language", self.lang_ctrl.GetValue().strip() or "en")
         self.settings.set("daisy.publisher", self.publisher_ctrl.GetValue().strip())
-        self.settings.set("daisy.include_text", self.include_text_cb.GetValue())
 
 
 # ---------------------------------------------------------------------------

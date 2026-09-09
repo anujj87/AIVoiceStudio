@@ -72,12 +72,15 @@ OUTPUT_FORMAT_CHOICES = [
 PROJECT_TYPE_CLIPBOARD = "clipboard"
 PROJECT_TYPE_AUDIO_PLAYLIST = "audio_playlist"
 PROJECT_TYPE_DAISY_AUDIO = "daisy_audio"
+# Legacy alias kept for reading older projects (project_type no longer
+# selectable in the wizard; such projects keep working and build books).
 PROJECT_TYPE_DAISY_AUDIO_TEXT = "daisy_audio_text"
+PROJECT_TYPE_DAISY3_AUDIO_TEXT = "daisy3_audio_text"
 PROJECT_TYPES = [
     (PROJECT_TYPE_AUDIO_PLAYLIST, "Audio files with playlist"),
     (PROJECT_TYPE_CLIPBOARD, "Clipboard"),
-    (PROJECT_TYPE_DAISY_AUDIO, "DAISY audio book"),
-    (PROJECT_TYPE_DAISY_AUDIO_TEXT, "DAISY audio and text book"),
+    (PROJECT_TYPE_DAISY3_AUDIO_TEXT, "DAISY audio and text with images book (3)"),
+    (PROJECT_TYPE_DAISY_AUDIO, "DAISY audio book (2.02)"),
 ]
 PROJECT_TYPE_DESCRIPTIONS = {
     PROJECT_TYPE_CLIPBOARD: (
@@ -94,10 +97,17 @@ PROJECT_TYPE_DESCRIPTIONS = {
         "audio file. SMIL navigation and NCC metadata are generated "
         "automatically."
     ),
+    # Legacy type (no longer offered in the wizard) still builds correctly.
     PROJECT_TYPE_DAISY_AUDIO_TEXT: (
         "Create a DAISY 2.02 audio + text book. Like audio-only, but each "
         "chapter also stores the full text, enabling synchronized text+audio "
         "playback in DAISY readers."
+    ),
+    PROJECT_TYPE_DAISY3_AUDIO_TEXT: (
+        "Create a DAISY 3 (Z39.86-2005) audio + text book. The whole book "
+        "text is stored as DTBook XML with an NCX navigation file and SMIL "
+        "files that synchronize every paragraph with the recorded audio. "
+        "Images found in the source document are embedded too."
     ),
 }
 
@@ -111,6 +121,13 @@ DAISY_TEXT_DIR_NAME = "text"
 DAISY_NCC_FILE = "ncc.html"
 DAISY_PACKAGE_FILE = "package.opf"
 DAISY_MASTER_SMIL_FILE = "master.smil"
+
+# DAISY 3 (Z39.86-2005) output location.  The builder writes a flat fileset
+# like the DAISY 2.02 one (book.xml + ncx.xml + package.opf + SMILs + audio).
+DAISY3_OUTPUT_DIR_NAME = "DAISY3"
+DAISY3_DTBOOK_FILE = "book.xml"
+DAISY3_NCX_FILE = "ncx.xml"
+DAISY3_PACKAGE_FILE = "package.opf"
 
 # DAISY chapter splitting modes (used by the wizard DAISY page and Settings)
 DAISY_SPLIT_H1 = "h1"
