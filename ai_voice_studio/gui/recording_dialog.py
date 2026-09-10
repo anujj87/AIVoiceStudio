@@ -987,6 +987,8 @@ class RecordingDialog(wx.Dialog):
         self._finish_progress_dialog()
         # Generate the DAISY/EPUB book structure if this is a DAISY project
         self._build_daisy_if_needed()
+        # Generate the M3U8/PLS/WPL playlists for audio-playlist projects.
+        self._build_playlists_if_needed()
         # Enable DAISY export if applicable
         ptype = self.data.get("project_type", "audio_playlist")
         if ptype in _DAISY_PROJECT_TYPES:
@@ -994,9 +996,43 @@ class RecordingDialog(wx.Dialog):
         dialogs.show_recording_complete(
             self,
             "Recording complete. All audio files were saved to the "
-            "project folder." + self._daisy_summary(),
+            "project folder." + self._daisy_summary()
+            + self._playlist_summary(),
             self.project_dir,
         )
+
+    def _playlist_summary(self) -> str:
+        """Return a note about generated playlist files (audio projects)."""
+        ptype = self.data.get("project_type", "audio_playlist")
+        if ptype != "audio_playlist" or not self._playlist_files:
+            return ""
+        names = ", ".join(os.path.basename(p) for p in self._playlist_files)
+        return ("\n\nPlaylists were generated in the project folder "
+                f"({names}) - open them in VLC, Windows Media Player, "
+                "PotPlayer or any modern player to play the whole "
+                "recording in order.")
+
+    def _build_playlists_if_needed(self):
+        """Write M3U8/PLS/WPL playlists after recording completes.
+
+        Only for ``audio_playlist`` projects: the playlists reference the
+        recorded audio by file name so modern players (VLC, PotPlayer, GOM,
+        Windows Media Player, ...) can play the whole narration in order.
+        """
+        self._playlist_files = []
+        ptype = self.data.get("project_type", "audio_playlist")
+        if ptype != "audio_playlist":
+            return
+        try:
+            fresh = project.load_project(self.project_dir)
+            from ..documents.playlist_builder import build_playlists  # noqa: PLC0415
+            self._playlist_files = build_playlists(
+                self.project_dir,
+                fresh.get("name", "playlist"),
+                fresh.get("segments", []),
+            )
+        except Exception as exc:  # noqa: BLE001
+            log.warning("Playlist generation failed: %s", exc)
 
     def _daisy_summary(self) -> str:
         """Return a note about DAISY files if they were generated."""
