@@ -36,6 +36,7 @@ Conformance notes:
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 import shutil
@@ -54,6 +55,8 @@ from ..constants import (
     DAISY3_PACKAGE_FILE,
 )
 from ..util import sanitize_filename
+
+log = logging.getLogger(__name__)
 
 # SMIL 2.0 DAISY namespace (dtb: prefix) used on smil/customTest attributes.
 _SMIL_DTB_NS = "http://www.daisy.org/z3986/2005/dtbook/"
@@ -135,6 +138,10 @@ def build_daisy3_book(
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # 1. Copy recorded audio under digit-only names and measure durations.
+    #    MP3 segments are re-encoded to 44.1 kHz MPEG-1 Layer III when
+    #    needed (see daisy_builder._stage_audio): DAISY players decode that
+    #    profile reliably, while the engines' native low-rate MPEG-2 LSF
+    #    MP3s cut out in strict players.
     entries: List[Dict[str, Any]] = []
     for i, seg in enumerate(ready, start=1):
         src = os.path.join(output_dir, os.path.basename(seg["saved"]))
@@ -142,10 +149,9 @@ def build_daisy3_book(
                "." + (audio_format or "wav")).lstrip(".").lower()
         audio_name = f"aud{i:04d}.{ext}"
         dst = os.path.join(daisy_dir, audio_name)
-        if os.path.isfile(src) and os.path.abspath(src) != os.path.abspath(dst):
-            shutil.copy2(src, dst)
-        elif not os.path.isfile(dst) and os.path.isfile(src):
-            shutil.copy2(src, dst)
+        from .daisy_builder import _stage_audio  # noqa: PLC0415
+
+        _stage_audio(src, dst, ext)
         dur = _audio_duration(dst, ext)
         entries.append({
             "index": seg.get("index", i),

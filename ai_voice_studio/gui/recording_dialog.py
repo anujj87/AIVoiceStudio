@@ -196,7 +196,10 @@ class RecordingDialog(wx.Dialog):
         for value, label in OUTPUT_FORMAT_CHOICES:
             self.format_combo.Append(label, value)
         self.format_combo.SetSelection(0)
-        self.format_combo.SetToolTip("Choose the audio file format: WAV is always available, MP3 and FLAC need FFmpeg")
+        self.format_combo.SetToolTip(
+            "Choose the audio file format: WAV is always available, MP3 and "
+            "FLAC need FFmpeg. WAV is recommended for DAISY projects.")
+        self.format_combo.Bind(wx.EVT_COMBOBOX, self._on_format_changed)
         fmt_label = add_labeled(self, params, "Output format", self.format_combo,
                                 flag=wx.LEFT | wx.RIGHT, border=2)
         # The label cell is itself announced by screen readers; give it the
@@ -687,6 +690,30 @@ class RecordingDialog(wx.Dialog):
         idx = next((i for i in range(self.format_combo.GetCount())
                     if self.format_combo.GetClientData(i) == fmt), 0)
         self.format_combo.SetSelection(idx)
+
+    def _on_format_changed(self, evt):
+        """Warn on every non-WAV format selection in a DAISY project.
+
+        DAISY book players are much more reliable with WAV narration; the
+        engines' MP3s cut out in strict players unless the book builder can
+        re-encode them.  The warning intentionally has no "don't show
+        again" option: it appears every time MP3 or FLAC is picked for a
+        DAISY project (any DAISY project type).
+        """
+        try:
+            sel = self.format_combo.GetSelection()
+            fmt = self.format_combo.GetClientData(sel) if sel >= 0 else None
+        except Exception:  # noqa: BLE001
+            fmt = None
+        ptype = self.data.get("project_type", "audio_playlist")
+        if ptype in _DAISY_PROJECT_TYPES and fmt and fmt != FORMAT_WAV:
+            wx.MessageBox(
+                "MP3 and FLAC recordings can cut out in DAISY book players. "
+                "WAV is the recommended output format for DAISY projects.",
+                "DAISY audio format warning",
+                style=wx.OK | wx.ICON_WARNING,
+            )
+        evt.Skip()
 
     def _select_project_cascade(self, tts):
         """Preselect language / variant / voice stored in the project."""

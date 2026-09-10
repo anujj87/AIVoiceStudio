@@ -1555,11 +1555,11 @@ class _OmniVoiceEnginesPanel(_SettingsPanel):
         self.mode_tip.Wrap(640)
         sizer.Add(self.mode_tip, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 4)
 
-        # -- clone group (sample -> name -> transcript) --------------------
-        # Rows follow the order the user asked for (voice name right after
-        # the sample, with the optional transcript last) so each labelled
-        # box is unambiguous; every row uses one label directly to the
-        # left of its box.
+        # -- clone group (sample -> name -> transcript -> create) ----------
+        # Rows follow the order the user asked for: voice name right after
+        # the sample, then the optional transcript, and the Create voice
+        # button last so each labelled box is unambiguous; every row uses
+        # one label directly to the left of its box.
         self.clone_panel = wx.Panel(self)
         c_sizer = wx.BoxSizer(wx.VERTICAL)
 
@@ -1588,19 +1588,16 @@ class _OmniVoiceEnginesPanel(_SettingsPanel):
         )
         c_sizer.Add(sample_hint, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 4)
 
-        # 2) voice name (+ create) -----------------------------------------
+        # 2) voice name ----------------------------------------------------
         name_grid = wx.FlexGridSizer(cols=2, vgap=6, hgap=8)
         name_grid.AddGrowableCol(1)
         self.clone_name_ctrl = wx.TextCtrl(self.clone_panel)
         self.clone_name_ctrl.SetName("Voice name")
         add_labeled(self.clone_panel, name_grid, "Voice name", self.clone_name_ctrl,
                     flag=wx.LEFT | wx.RIGHT, border=2)
-        self.clone_create_btn = wx.Button(self.clone_panel, label="Create voice")
-        self.clone_create_btn.SetName("Create clone voice")
-        name_grid.Add(self.clone_create_btn, 0, wx.ALL, 2)
         c_sizer.Add(name_grid, 0, wx.EXPAND | wx.ALL, 4)
 
-        # 3) optional transcript -------------------------------------------
+        # 3) optional transcript (before the Create button) -----------------
         ref_grid = wx.FlexGridSizer(cols=2, vgap=6, hgap=8)
         ref_grid.AddGrowableCol(1)
         self.ref_text_ctrl = wx.TextCtrl(self.clone_panel)
@@ -1611,6 +1608,11 @@ class _OmniVoiceEnginesPanel(_SettingsPanel):
             flag=wx.LEFT | wx.RIGHT, border=2,
         )
         c_sizer.Add(ref_grid, 0, wx.EXPAND | wx.ALL, 4)
+
+        # 4) create button (last) ------------------------------------------
+        self.clone_create_btn = wx.Button(self.clone_panel, label="Create voice")
+        self.clone_create_btn.SetName("Create clone voice")
+        c_sizer.Add(self.clone_create_btn, 0, wx.ALL, 4)
         self.clone_status = wx.StaticText(self.clone_panel, label="")
         self.clone_status.SetName("Clone voice status")
         c_sizer.Add(self.clone_status, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 4)

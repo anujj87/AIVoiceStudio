@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 import wx
 
 from .. import __version__, project
@@ -132,6 +133,62 @@ class MainFrame(wx.Frame):
             (wx.ACCEL_CTRL | wx.ACCEL_SHIFT, ord("R"), ID_RECORD),
             (wx.ACCEL_CTRL, ord(","), ID_SETTINGS),
         ]))
+
+        # Belt-and-braces: a char hook catches the same shortcuts even when
+        # the accelerator table / menu accelerator parsing misses them
+        # (observed on wx 3.3.3 msw for Ctrl+Shift+letter).  Only fires when
+        # no modal dialog is open, so it never duplicates the dialog's own
+        # handling and never swallows ordinary typing.
+        self.Bind(wx.EVT_CHAR_HOOK, self._on_global_char_hook)
+
+    def _on_global_char_hook(self, evt: wx.KeyEvent) -> None:
+        """Global keyboard hook for the three main shortcuts.
+
+        wx's menu accelerators proved unreliable for Ctrl+Shift+letter on
+        this wx build, so the hook routes the keys itself.  It only acts
+        when the frame itself is active (no modal dialog owns the keys) and
+        passes every other key through untouched.
+        """
+        key = evt.GetKeyCode()
+        mods = evt.GetModifiers()
+        ctrl = bool(mods & wx.MOD_CONTROL)
+        shift = bool(mods & wx.MOD_SHIFT)
+        if wx.IsBusy():
+            evt.Skip()
+            return
+        # wx 3.3.3 msw translates letter+Ctrl+Shift to keycode 0 (raw 255),
+        # which is why neither the menu accelerators nor the accelerator
+        # table can match Ctrl+Shift+N / Ctrl+Shift+R on this build.  For
+        # those untranslated events, identify the held letter via the event
+        # scan code first, then Win32 GetKeyState as a fallback.
+        if sys.platform == "win32" and ctrl and shift and key in (0, ord("N"), ord("n"), ord("R"), ord("r")):
+            scan = 0
+            try:
+                scan = (evt.GetRawKeyFlags() >> 16) & 0xFF
+            except Exception:  # noqa: BLE001
+                pass
+            import ctypes  # noqa: PLC0415
+            user32 = ctypes.windll.user32
+            def _held(vk: int) -> bool:
+                return bool(user32.GetKeyState(vk) & 0x8000)
+            is_n = key in (ord("N"), ord("n")) or scan == 0x31 or _held(0x4E)
+            is_r = key in (ord("R"), ord("r")) or scan == 0x13 or _held(0x52)
+            if is_n:
+                self._new_project()
+                return
+            if is_r:
+                self._record()
+                return
+        if ctrl and shift and key in (ord("N"), ord("n")):
+            self._new_project()
+            return
+        if ctrl and shift and key in (ord("R"), ord("r")):
+            self._record()
+            return
+        if ctrl and key in (ord(","),):
+            self._settings()
+            return
+        evt.Skip()
 
     def _build_welcome(self):
         panel = wx.Panel(self)

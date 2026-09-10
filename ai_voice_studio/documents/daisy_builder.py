@@ -41,6 +41,7 @@ Conformance notes (DAISY 2.02 specification, Feb 2001):
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 import shutil
@@ -58,6 +59,8 @@ from ..constants import (
     DAISY_MASTER_SMIL_FILE,
 )
 from ..util import sanitize_filename
+
+log = logging.getLogger(__name__)
 
 _AUDIO_MIME = {
     "wav": "audio/wav",
@@ -149,10 +152,13 @@ def build_daisy_book(
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     multimedia = "audioFullText" if include_text else "audioNcc"
 
-    # 1. Copy recorded audio into DAISY/ under digit-only names and measure
+    # 1. Stage recorded audio into DAISY/ under digit-only names and measure
     #    durations.  Digit-only names are required so players can order audio
     #    correctly (and because names with spaces break SMIL/NCC URI
-    #    resolution in several players).
+    #    resolution in several players).  MP3 segments are re-encoded to
+    #    44.1 kHz MPEG-1 Layer III when needed: DAISY players decode that
+    #    profile reliably, while the engines' native low-rate MPEG-2 LSF
+    #    MP3s cut out in strict players (WAV/FLAC are copied as they are).
     entries: List[Dict[str, Any]] = []
     for i, seg in enumerate(ready, start=1):
         src = os.path.join(output_dir, os.path.basename(seg["saved"]))
@@ -160,10 +166,7 @@ def build_daisy_book(
                "." + (audio_format or "wav")).lstrip(".").lower()
         audio_name = f"aud{i:04d}.{ext}"
         dst = os.path.join(daisy_dir, audio_name)
-        if os.path.isfile(src) and os.path.abspath(src) != os.path.abspath(dst):
-            shutil.copy2(src, dst)
-        elif not os.path.isfile(dst) and os.path.isfile(src):
-            shutil.copy2(src, dst)
+        _stage_audio(src, dst, ext)
         dur = _audio_duration(dst, ext)
         entries.append({
             "index": seg.get("index", i),
@@ -448,6 +451,10 @@ def _write_smil(
     plus each paragraph); the single segment audio is divided between them
     proportionally by character count, exactly the mechanism the official
     samples use to slice one audio file across several ``<par>``s.
+
+    Every clip stays inside the real audio file: the final clip ends exactly
+    at the measured duration, never past it (clip-end beyond end-of-file is
+    invalid and makes strict players cut the audio out).
     """
     smil_name = _smil_name(entry)
     dur = max(0.001, entry["duration"])
@@ -458,12 +465,12 @@ def _write_smil(
     elapsed = 0.0
     for idx, block in enumerate(blocks):
         if idx == len(blocks) - 1:
-            # Give the final clip a small tail beyond the measured duration:
-            # MP3 encoder delay means decodable audio usually runs slightly
-            # LONGER than the container duration.  A clip-end exactly at the
-            # measured value makes strict players stop just before the real
-            # end of the narration.
-            clip_end = dur + 0.25
+            # The final clip ends exactly at the measured duration.  ``dur``
+            # is the real decodable length of the audio file (measured with
+            # the wave module or FFmpeg), so a clip-end beyond it would be
+            # an invalid clip: strict DAISY 2.02 players detect that the
+            # clip extends past end-of-file and cut the audio out there.
+            clip_end = dur
         else:
             clip_end = min(dur, elapsed + dur * block["chars"] / total_chars)
         pars.append(
@@ -496,7 +503,7 @@ def _write_smil(
         + _SMIL_LAYOUT +
         '  </head>\n'
         '  <body>\n'
-        f'    <seq dur="{dur + 0.25:.3f}s">\n'
+        f'    <seq dur="{dur:.3f}s">\n'
         + "\n".join(pars) + "\n"
         '    </seq>\n'
         '  </body>\n'
@@ -701,6 +708,30 @@ def _text_id(entry: Dict[str, Any]) -> str:
     if blocks:
         return blocks[0]["text_id"]
     return f"txt_{entry['number']:04d}"
+
+
+def _stage_audio(src: str, dst: str, ext: str) -> None:
+    """Copy (or normalize) one recorded segment into the book folder.
+
+    MP3 segments that are not player friendly (sample rate below 44.1 kHz,
+    i.e. MPEG-2 LSF encodes from the TTS engines) are re-encoded in place to
+    MPEG-1 Layer III 44.1 kHz mono, the audio profile DAISY 2.02 and DAISY 3
+    players decode reliably.  Every other file is copied unchanged.
+    """
+    if os.path.isfile(src) and os.path.abspath(src) != os.path.abspath(dst):
+        shutil.copy2(src, dst)
+    elif not os.path.isfile(dst) and os.path.isfile(src):
+        shutil.copy2(src, dst)
+    if ext == "mp3" and os.path.isfile(dst):
+        try:
+            from ..audio.ffmpeg import needs_mp3_normalization, normalize_mp3_for_daisy  # noqa: PLC0415
+
+            if needs_mp3_normalization(dst):
+                normalize_mp3_for_daisy(dst, dst)
+        except Exception:  # noqa: BLE001  # keep building with the original file
+            log.warning(
+                "DAISY staging: could not normalize %s (player-incompatible "
+                "MP3 left as is)", dst, exc_info=True)
 
 
 def _audio_duration(path: str, ext: str) -> float:

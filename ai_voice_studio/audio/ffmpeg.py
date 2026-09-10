@@ -110,3 +110,68 @@ def convert_wav(src_wav: str, dest_path: str, fmt: str, ffmpeg_exe: str) -> None
     )
     if result.returncode != 0:
         raise RuntimeError(f"FFmpeg conversion to {fmt} failed: {result.stderr[-400:]}")
+
+
+def needs_mp3_normalization(path: str) -> bool:
+    """True when an MP3 file is not DAISY-player friendly.
+
+    DAISY 2.02/3 players reliably decode MPEG-1 Layer III; the TTS engines
+    emit MPEG-2 LSF MP3s at the engine's native sample rate (e.g. 24 kHz),
+    which several DAISY players truncate or refuse ("audio cuts out" while
+    VLC plays the same file fine).  Probing via FFmpeg is cheap and safe.
+    """
+    exe = find_ffmpeg()
+    if not exe:
+        return False
+    try:
+        result = subprocess.run(
+            [exe, "-i", path],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+        import re  # noqa: PLC0415
+
+        stream = re.search(
+            r"Stream #\d+:\d+.*?: Audio: mp3.*?, (\d+) Hz", result.stderr or "")
+        if not stream:
+            return False
+        return int(stream.group(1)) < 44100
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def normalize_mp3_for_daisy(src: str, dst: str, ffmpeg_exe: Optional[str] = None) -> None:
+    """Transcode an MP3 to DAISY-friendly MPEG-1 Layer III 44.1 kHz mono.
+
+    Used by the DAISY builders when staging recorded audio: a segment saved
+    as a low-rate MPEG-2 LSF MP3 is re-encoded so DAISY players decode it
+    fully.  ``dst`` must already point inside the book folder (same folder
+    as ``src`` is fine: the source is read first, then the output replaces
+    it).
+    """
+    exe = ffmpeg_exe or find_ffmpeg()
+    if not exe:
+        raise RuntimeError("FFmpeg is required to normalize DAISY audio")
+    tmp_out = dst + ".norm.tmp.mp3"
+    args = [
+        exe, "-y", "-hide_banner", "-loglevel", "error", "-i", src,
+        "-codec:a", "libmp3lame", "-ar", "44100", "-ac", "1",
+        "-q:a", "2", tmp_out,
+    ]
+    result = subprocess.run(
+        args,
+        capture_output=True,
+        text=True,
+        timeout=600,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
+    if result.returncode != 0 or not os.path.isfile(tmp_out):
+        try:
+            os.remove(tmp_out)
+        except OSError:
+            pass
+        raise RuntimeError(
+            f"FFmpeg normalization failed for {src}: {result.stderr[-400:]}")
+    os.replace(tmp_out, dst)

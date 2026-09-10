@@ -1,8 +1,10 @@
 """Tests for the DAISY 2.02 book builder and ZIP export."""
 
 import os
+import re
 import shutil
 import struct
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -11,8 +13,42 @@ import zipfile
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+from ai_voice_studio.audio import ffmpeg as ffmpeg_mod
 from ai_voice_studio.constants import DAISY_OUTPUT_DIR_NAME
-from ai_voice_studio.documents.daisy_builder import build_daisy_book, export_daisy_zip
+from ai_voice_studio.documents.daisy_builder import (
+    _audio_duration,
+    build_daisy_book,
+    export_daisy_zip,
+)
+
+
+def _ffmpeg_available() -> bool:
+    return bool(ffmpeg_mod.find_ffmpeg())
+
+
+def _write_low_rate_mp3(path: str, seconds: float = 1.0, rate: int = 24000) -> None:
+    """Create a low-sample-rate MP3 like the TTS engines emit (MPEG-2 LSF)."""
+    exe = ffmpeg_mod.find_ffmpeg()
+    wav = path + ".tmp.wav"
+    _write_wav(wav, seconds=seconds, rate=rate)
+    try:
+        subprocess.run(
+            [exe, "-y", "-hide_banner", "-loglevel", "error", "-i", wav,
+             "-codec:a", "libmp3lame", "-ar", str(rate), "-ac", "1",
+             "-q:a", "2", path],
+            check=True, capture_output=True, text=True, timeout=60,
+        )
+    finally:
+        os.remove(wav)
+
+
+def _mp3_sample_rate(path: str) -> int:
+    """Parse the MP3 sample rate from FFmpeg's stream info."""
+    exe = ffmpeg_mod.find_ffmpeg()
+    result = subprocess.run(
+        [exe, "-i", path], capture_output=True, text=True, timeout=30)
+    m = re.search(r"Audio: mp3.*?, (\d+) Hz", result.stderr or "")
+    return int(m.group(1)) if m else -1
 
 
 def _write_wav(path: str, seconds: float = 1.0, rate: int = 8000) -> None:
@@ -85,7 +121,7 @@ class TestDaisyBuilder(unittest.TestCase):
         # official samples
         self.assertIn(
             '<audio src="aud0001.wav" clip-begin="npt=0.000s" '
-            'clip-end="npt=1.250s" id="aud_0001" />',
+            'clip-end="npt=1.000s" id="aud_0001" />',
             smil,
         )
         self.assertIn("<seq>\n          <audio", smil)
@@ -153,7 +189,10 @@ class TestDaisyBuilder(unittest.TestCase):
         self.assertIn('<text src="0001.html#seg_0001" id="txt_0001" />', smil)
         self.assertIn('<text src="0001.html#p_0001_001" id="txt_0002" />', smil)
         self.assertIn('clip-begin="npt=0.000s"', smil)
-        self.assertIn('clip-end="npt=1.250s"', smil)
+        self.assertIn('clip-end="npt=1.000s"', smil)
+        # The final clip never runs past the real audio: clip-end beyond
+        # end-of-file is invalid and strict players cut the audio out.
+        self.assertNotIn('clip-end="npt=1.250s"', smil)
 
         # OPF lists the text documents (flat hrefs)
         with open(os.path.join(daisy_dir, "package.opf"), encoding="utf-8") as fh:
@@ -172,6 +211,44 @@ class TestDaisyBuilder(unittest.TestCase):
         self.assertEqual(result, "")
         self.assertFalse(os.path.isdir(
             os.path.join(self.tmpdir, DAISY_OUTPUT_DIR_NAME)))
+
+    @unittest.skipUnless(
+        _ffmpeg_available(), "FFmpeg not available for MP3 normalization test")
+    def test_build_normalizes_low_rate_mp3(self):
+        """MP3 segments below 44.1 kHz are re-encoded to MPEG-1 44.1 kHz.
+
+        DAISY players decode MPEG-1 Layer III reliably; the engines' native
+        MPEG-2 LSF MP3s (e.g. 24 kHz) cut out in strict players.  The staged
+        audio must therefore end up at 44.1 kHz with valid clips.
+        """
+        saved = "chapter01.mp3"
+        _write_low_rate_mp3(os.path.join(self.tmpdir, saved))
+        segments = [{
+            "index": 1,
+            "title": "Chapter 1",
+            "text": "Some narration text.",
+            "saved": saved,
+            "status": "done",
+        }]
+        build_daisy_book(
+            output_dir=self.tmpdir,
+            project_name="MP3 Book",
+            segments=segments,
+            audio_format="mp3",
+        )
+        staged = os.path.join(self.tmpdir, DAISY_OUTPUT_DIR_NAME, "aud0001.mp3")
+        self.assertTrue(os.path.isfile(staged))
+        rate = _mp3_sample_rate(staged)
+        self.assertEqual(rate, 44100)
+        # And the SMIL clip must end within the re-encoded file's duration.
+        with open(os.path.join(self.tmpdir, DAISY_OUTPUT_DIR_NAME,
+                               "0001.smil"), encoding="utf-8") as fh:
+            smil = fh.read()
+        clip_end = float(re.search(
+            r'clip-end="npt=([\d.]+)s"', smil).group(1))
+        duration = _audio_duration(staged, "mp3")
+        self.assertGreater(duration, 0)
+        self.assertLessEqual(clip_end, duration + 0.05)
 
 
 class TestExportDaisyZip(unittest.TestCase):
