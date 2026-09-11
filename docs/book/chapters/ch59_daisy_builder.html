@@ -10,6 +10,7 @@
 <div class="book-container">
 <nav class="sidebar"><h2>📖 Contents</h2>
 <div class="part-header">Part VI</div><ul class="chapters"><li><a href="ch43_architecture.html">Ch 43</a></li><li><a href="ch44_paths_settings.html">Ch 44</a></li><li><a href="ch45_project_model.html">Ch 45</a></li><li><a href="ch46_document_parsing.html">Ch 46</a></li><li><a href="ch47_tts_catalog.html">Ch 47</a></li><li><a href="ch48_tts_engine.html">Ch 48</a></li><li><a href="ch49_downloader.html">Ch 49</a></li><li><a href="ch50_compute_detection.html">Ch 50</a></li><li><a href="ch51_main_frame.html">Ch 51</a></li><li><a href="ch52_settings_dialog.html">Ch 52</a></li><li><a href="ch53_model_panels.html">Ch 53</a></li><li><a href="ch54_new_project_wizard.html">Ch 54</a></li><li><a href="ch55_recording.html">Ch 55</a></li><li><a href="ch56_synthesis_worker.html">Ch 56</a></li><li><a href="ch57_clone_engine.html">Ch 57</a></li><li><a href="ch58_omnivoice.html">Ch 58</a></li><li><a href="ch59_daisy_builder.html" class="active">Ch 59: DAISY</a></li><li><a href="ch60_addons.html">Ch 60</a></li></ul>
+<div class="part-header">Part IX — Additions</div><ul class="chapters"><li><a href="ch73_playlist_builder.html">Ch 73: Playlist Builder</a></li><li><a href="ch74_daisy3_builder.html">Ch 74: DAISY 3 Builder</a></li><li><a href="ch75_dialogs_progress.html">Ch 75: Dialogs &amp; Progress</a></li></ul>
 </nav>
 <div class="main-content">
 
@@ -285,13 +286,85 @@
 
 <hr>
 
-<h2>59.4 Key Takeaways</h2>
+<h2>59.4 What Changed Since the First Edition</h2>
+
+<p>The DAISY 2.02 builder received three significant upgrades. The most
+important one fixes the classic "audio cuts out" complaint.</p>
+
+<h3>1. MP3 normalization on staging</h3>
+<p>Two new functions in <code>audio/ffmpeg.py</code> give the builder control
+over problem MP3s. DAISY players reliably decode MPEG-1 Layer III; the TTS
+engines, however, emit MPEG-2 LSF MP3s at their native sample rate
+(22&ndash;24&nbsp;kHz), which several players truncate or refuse while VLC plays
+the same file fine.</p>
+
+<pre><code>def needs_mp3_normalization(path: str) -> bool:
+    exe = find_ffmpeg()
+    if not exe:
+        return False
+    try:
+        result = subprocess.run(
+            [exe, "-i", path],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+        import re
+        stream = re.search(
+            r"Stream #\d+:\d+.*?: Audio: mp3.*?, (\d+) Hz", result.stderr or "")
+        if not stream:
+            return False
+        return int(stream.group(1)) < 44100
+    except Exception:
+        return False</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 6)</h4>
+  <ol>
+    <li><strong>Line 1:</strong> <code>def needs_mp3_normalization(path):</code><br>
+    <span class="desc">Answers one question: is this MP3 file one that DAISY players will mishandle? The probe costs one FFmpeg invocation, so it is cheap enough to run per segment.</span></li>
+    <li><strong>Lines 2–3:</strong> <code>exe = find_ffmpeg()</code> / <code>if not exe: return False</code><br>
+    <span class="desc">Locates FFmpeg (bundled folder or PATH). When it is not installed the probe returns <code>False</code> &mdash; meaning "assume the file is fine" &mdash; because without FFmpeg there is also no way to re-encode, and skipping is the only graceful choice.</span></li>
+    <li><strong>Lines 4–11:</strong> the <code>subprocess.run</code> probe<br>
+    <span class="desc">Runs <code>ffmpeg -i path</code> <em>without</em> an output file, which makes FFmpeg print stream information to <code>stderr</code> and exit. <code>capture_output=True, text=True</code> collects that text; <code>timeout=30</code> bounds a hung probe; <code>creationflags=CREATE_NO_WINDOW</code> (guarded with <code>getattr</code> so non-Windows platforms stay compatible) stops a console window from flashing on screen.</span></li>
+    <li><strong>Lines 12–14:</strong> the regex<br>
+    <span class="desc">Searches FFmpeg's stream report for a line like <code>Stream #0:0: Audio: mp3, 24000 Hz, ...</code>. The pattern anchors on <code>Audio: mp3</code> and captures the sample-rate digits before <code>Hz</code>. When nothing matches (corrupt file, unexpected layout) the probe again answers <code>False</code>.</span></li>
+    <li><strong>Line 15:</strong> <code>return int(stream.group(1)) &lt; 44100</code><br>
+    <span class="desc">The decision rule: anything below 44.1&nbsp;kHz is MPEG-2 LSF territory and gets normalized. 44.1&nbsp;kHz and above pass untouched.</span></li>
+    <li><strong>Lines 16–17:</strong> the blanket <code>except</code><br>
+    <span class="desc">Any failure (missing exe mid-run, timeout, decode error) degrades to <code>False</code>. A broken probe must never abort a book build &mdash; worst case the user gets an unnormalized MP3, which is exactly the pre-fix behaviour.</span></li>
+  </ol>
+</div>
+
+<p>The companion <code>normalize_mp3_for_daisy(src, dst)</code> re-encodes such a
+file to <strong>MPEG-1 Layer III, 44.1&nbsp;kHz, mono</strong> via
+<code>libmp3lame -q:a 2</code>, writing to a temp file and
+<code>os.replace</code>-ing it into place so a failed transcode never destroys
+the original. The DAISY 2.02 and DAISY 3 builders both call this pair while
+staging recorded audio into the book.</p>
+
+<h3>2. Book information from the wizard</h3>
+<p>The New Project wizard's DAISY page now collects title, creator, narrator,
+publisher, subject and date. These flow through the recording dialog into
+<code>build_daisy_book(..., meta=...)</code>; empty fields fall back to the
+global defaults in Settings or to sensible built-ins, and the running time is
+always measured from the actual audio &mdash; never trusted from metadata.</p>
+
+<h3>3. Cleaned metadata</h3>
+<p>Generator strings and build metadata were cleaned up so players show the
+book's own title rather than tooling artefacts, and the master SMIL/NCC
+cross-references were made strictly sibling-relative (same portability rule as
+the playlist builder in Chapter 73).</p>
+
+<h2>59.5 Key Takeaways</h2>
 <ul>
   <li><strong>DAISY 2.02</strong> is an accessible book format with audio-text synchronization</li>
   <li>Three key files: <strong>ncc.html</strong> (TOC), <strong>package.opf</strong> (manifest), <strong>SMIL</strong> (sync)</li>
-  <li>AIVS supports both <strong>audio-only</strong> and <strong>audio+text</strong> DAISY modes</li>
+  <li>AIVS supports both <strong>audio-only</strong> and <strong>audio+text</strong> DAISY modes (the legacy type stays loadable; new projects pick DAISY 3 for text+images &mdash; Chapter 74)</li>
   <li>The builder is called <strong>automatically after recording completes</strong></li>
   <li><strong>ZIP export</strong> packages everything into a single distributable file</li>
+  <li>Low-rate MP3s are <strong>re-encoded to 44.1&nbsp;kHz MPEG-1</strong> during staging so every DAISY player decodes the full audio</li>
 </ul>
 
 <hr>

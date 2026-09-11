@@ -47,6 +47,15 @@ log = logging.getLogger(__name__)
 
 _SAMPLE_RATE = 24000  # OmniVoice output sample rate
 
+# The omnivoice-server HTTP API validates ``input`` (JSON) and ``text``
+# (multipart) with ``max_length=10_000`` — a longer text is rejected before
+# inference even starts with a bare "HTTP 422: Request validation failed".
+# A whole book chapter easily exceeds that, so long texts are split into
+# server-sized chunks at sentence/paragraph boundaries, synthesized one by
+# one and concatenated; the audio the caller receives is identical to what
+# one giant request would produce (if the server accepted it).
+_TEXT_CHUNK_TARGET = 9_500
+
 
 def _read_server_config() -> dict:
     """Read OmniVoice Server settings from the app's settings.json.
@@ -72,6 +81,72 @@ DEFAULT_CORS_ORIGINS = (
     "http://localhost:5001,http://127.0.0.1:5001,"
     "http://localhost:5173,http://127.0.0.1:5173"
 )
+
+
+# ---------------------------------------------------------------------------
+# Long-text splitting (server rejects > 10,000 characters with HTTP 422)
+# ---------------------------------------------------------------------------
+_SENTENCE_END = ".!?\u0964\u0965\u3002\uff01\uff1f\u2026\"\u201d\u2019\u00bb"
+
+
+def split_text_for_server(text: str, limit: int = _TEXT_CHUNK_TARGET) -> list:
+    """Split ``text`` into chunks the omnivoice-server API accepts.
+
+    The server's pydantic schema caps ``input``/``text`` at 10,000 characters
+    and answers anything longer with HTTP 422 "Request validation failed"
+    before synthesis starts.  Book chapters are routinely longer, so this
+    splits at paragraph breaks first, then sentence ends (including Devanagari
+    danda and CJK full stops), then hard-cuts as a last resort.  Chunks are
+    kept in order and none exceeds ``limit`` characters (unless a single
+    "sentence" alone is longer, which the hard cut then splits).
+    """
+    text = text or ""
+    if len(text) <= limit:
+        return [text] if text else []
+
+    chunks: list = []
+    for paragraph in text.split("\n"):
+        paragraph = paragraph.strip()
+        if not paragraph:
+            continue
+        if len(paragraph) <= limit:
+            chunks.append(paragraph)
+            continue
+        # Paragraph itself too long: split at sentence boundaries.
+        sentences: list = []
+        start = 0
+        for i, ch in enumerate(paragraph):
+            if ch in _SENTENCE_END:
+                # Include trailing quotes/brackets after the terminator.
+                sentences.append(paragraph[start:i + 1])
+                start = i + 1
+        if start < len(paragraph):
+            sentences.append(paragraph[start:])
+        buf: list = []
+        buf_len = 0
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if not sentence:
+                continue
+            if len(sentence) > limit:
+                # A single "sentence" longer than the cap (no punctuation at
+                # all): hard-cut so the request still validates.
+                if buf:
+                    chunks.append(" ".join(buf))
+                    buf, buf_len = [], 0
+                for j in range(0, len(sentence), limit):
+                    piece = sentence[j:j + limit].strip()
+                    if piece:
+                        chunks.append(piece)
+                continue
+            if buf_len + len(sentence) + 1 > limit and buf:
+                chunks.append(" ".join(buf))
+                buf, buf_len = [], 0
+            buf.append(sentence)
+            buf_len += len(sentence) + 1
+        if buf:
+            chunks.append(" ".join(buf))
+    return chunks if chunks else [text[:limit]]
 
 
 # ---------------------------------------------------------------------------
@@ -392,16 +467,6 @@ class OmniVoiceServerManager:
             raise ValueError("Nothing to synthesize")
 
         url = f"{self.base_url}/v1/audio/speech"
-        payload: Dict[str, Any] = {
-            "model": "omnivoice",
-            "input": text,
-            "voice": voice,
-            "response_format": response_format or "wav",
-            "speed": speed,
-            "stream": bool(stream),
-        }
-        # Explicit values win; None means "use the server default" for that
-        # parameter, so each optional field is only included when set.
         optional = {
             "num_step": num_step,
             "guidance_scale": guidance_scale,
@@ -419,37 +484,55 @@ class OmniVoiceServerManager:
             "request_timeout_s": request_timeout_s,
             "seed": seed,
         }
-        for name, value in optional.items():
-            if value is not None:
-                payload[name] = value
-        # Voice design instructions are the strongest control and are only
-        # sent when the caller provided a real description.
-        if instructions:
-            payload["instructions"] = instructions
+        # The server caps ``input`` at 10,000 characters (HTTP 422 above
+        # that), so long texts are synthesized chunk by chunk and joined.
+        # Chunks inherit the same voice/instructions/parameters; the audio is
+        # concatenated in order, which is exactly what one giant request would
+        # have produced if the API accepted it.
+        samples = None
+        for chunk in split_text_for_server(text):
+            payload: Dict[str, Any] = {
+                "model": "omnivoice",
+                "input": chunk,
+                "voice": voice,
+                "response_format": response_format or "wav",
+                "speed": speed,
+                "stream": bool(stream),
+            }
+            for name, value in optional.items():
+                if value is not None:
+                    payload[name] = value
+            # Voice design instructions are the strongest control and are
+            # only sent when the caller provided a real description.
+            if instructions:
+                payload["instructions"] = instructions
 
-        data = json.dumps(payload).encode("utf-8")
-        req = urllib.request.Request(
-            url,
-            data=data,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        if self._api_key:
-            req.add_header("Authorization", f"Bearer {self._api_key}")
+            data = json.dumps(payload).encode("utf-8")
+            req = urllib.request.Request(
+                url,
+                data=data,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            if self._api_key:
+                req.add_header("Authorization", f"Bearer {self._api_key}")
 
-        # Long texts legitimately take minutes on CPU; the socket timeout
-        # must scale with the text or long recordings die mid-flight with
-        # "Synthesis failed: timed out".
-        request_timeout = self._request_timeout(request_timeout_s, text)
-        try:
-            with urllib.request.urlopen(req, timeout=request_timeout) as resp:
-                wav_bytes = resp.read()
-        except Exception as exc:
-            raise OmniVoiceServerError(
-                f"Synthesis failed: {self._http_error_detail(exc)}"
-            ) from exc
+            # Long texts legitimately take minutes on CPU; the socket timeout
+            # must scale with the text or long recordings die mid-flight with
+            # "Synthesis failed: timed out".
+            request_timeout = self._request_timeout(request_timeout_s, chunk)
+            try:
+                with urllib.request.urlopen(req, timeout=request_timeout) as resp:
+                    wav_bytes = resp.read()
+            except Exception as exc:
+                raise OmniVoiceServerError(
+                    f"Synthesis failed: {self._http_error_detail(exc)}"
+                ) from exc
 
-        return self._wav_bytes_to_samples(wav_bytes)
+            part = self._wav_bytes_to_samples(wav_bytes)
+            samples = part if samples is None else np.concatenate([samples, part])
+
+        return samples
 
     def synthesize_clone(
         self,
@@ -483,7 +566,87 @@ class OmniVoiceServerManager:
             raise ValueError("Nothing to synthesize")
 
         url = f"{self.base_url}/v1/audio/speech/clone"
+        # The server caps ``text`` at 10,000 characters (HTTP 422 above
+        # that), so long texts are synthesized chunk by chunk against the
+        # same uploaded reference sample and joined in order.
+        chunks = split_text_for_server(text)
+        samples = None
+        for chunk in chunks:
+            body = self._clone_multipart_body(
+                chunk,
+                ref_audio_path=ref_audio_path,
+                ref_text=ref_text,
+                speed=speed,
+                response_format=response_format,
+                num_step=num_step,
+                guidance_scale=guidance_scale,
+                denoise=denoise,
+                t_shift=t_shift,
+                position_temperature=position_temperature,
+                class_temperature=class_temperature,
+                duration=duration,
+                language=language,
+                layer_penalty_factor=layer_penalty_factor,
+                preprocess_prompt=preprocess_prompt,
+                postprocess_output=postprocess_output,
+                audio_chunk_duration=audio_chunk_duration,
+                audio_chunk_threshold=audio_chunk_threshold,
+                request_timeout_s=request_timeout_s,
+                seed=seed,
+            )
 
+            req = urllib.request.Request(
+                url,
+                data=body,
+                headers={
+                    "Content-Type": "multipart/form-data; boundary=----AIVoiceStudioBoundary",
+                },
+                method="POST",
+            )
+            if self._api_key:
+                req.add_header("Authorization", f"Bearer {self._api_key}")
+
+            # Cloning adds reference-audio preprocessing on top of generation,
+            # so its timeout gets the same text-aware scale plus headroom.
+            request_timeout = self._request_timeout(request_timeout_s, chunk)
+            try:
+                with urllib.request.urlopen(req, timeout=request_timeout) as resp:
+                    wav_bytes = resp.read()
+            except Exception as exc:
+                raise OmniVoiceServerError(
+                    f"Clone synthesis failed: {self._http_error_detail(exc)}"
+                ) from exc
+
+            part = self._wav_bytes_to_samples(wav_bytes)
+            samples = part if samples is None else np.concatenate([samples, part])
+
+        return samples
+
+    @staticmethod
+    def _clone_multipart_body(
+        text: str,
+        *,
+        ref_audio_path: str,
+        ref_text: str,
+        speed: float,
+        response_format: str,
+        num_step: int | None,
+        guidance_scale: float | None,
+        denoise: bool | None,
+        t_shift: float | None,
+        position_temperature: float | None,
+        class_temperature: float | None,
+        duration: float | None,
+        language: str | None,
+        layer_penalty_factor: float | None,
+        preprocess_prompt: bool | None,
+        postprocess_output: bool | None,
+        audio_chunk_duration: float | None,
+        audio_chunk_threshold: float | None,
+        request_timeout_s: int | None,
+        seed: int | None,
+    ) -> bytes:
+        """Multipart body for one ``/v1/audio/speech/clone`` request."""
         # Build multipart form data
         boundary = "----AIVoiceStudioBoundary"
         body = b""
@@ -530,30 +693,7 @@ class OmniVoiceServerManager:
             body += fh.read()
         body += b"\r\n"
         body += f"--{boundary}--\r\n".encode()
-
-        req = urllib.request.Request(
-            url,
-            data=body,
-            headers={
-                "Content-Type": f"multipart/form-data; boundary={boundary}",
-            },
-            method="POST",
-        )
-        if self._api_key:
-            req.add_header("Authorization", f"Bearer {self._api_key}")
-
-        # Cloning adds reference-audio preprocessing on top of generation, so
-        # its timeout gets the same text-aware scale plus headroom.
-        request_timeout = self._request_timeout(request_timeout_s, text)
-        try:
-            with urllib.request.urlopen(req, timeout=request_timeout) as resp:
-                wav_bytes = resp.read()
-        except Exception as exc:
-            raise OmniVoiceServerError(
-                f"Clone synthesis failed: {self._http_error_detail(exc)}"
-            ) from exc
-
-        return self._wav_bytes_to_samples(wav_bytes)
+        return body
 
     @staticmethod
     def _http_error_detail(exc: Exception) -> str:

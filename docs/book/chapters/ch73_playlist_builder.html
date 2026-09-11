@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 73: Playlist Builder - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part IX — Additions</div><ul class="chapters"><li><a href="ch73_playlist_builder.html" class="active">Ch 73: Playlist Builder</a></li><li><a href="ch74_daisy3_builder.html">Ch 74: DAISY 3 Builder</a></li><li><a href="ch75_dialogs_progress.html">Ch 75: Dialogs &amp; Progress</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 73</div>
+<h1>Playlist Builder</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Generate standard playlist files that modern players understand (M3U8, PLS, WPL)</li>
+  <li>Keep playlists portable by referencing audio through sibling-relative file names only</li>
+  <li>Escape XML attributes correctly with <code>xml.sax.saxutils.escape</code> so WPL files never break</li>
+  <li>Wire playlist generation into the recording lifecycle without touching the audio pipeline</li>
+</ul>
+
+<hr>
+
+<h2>73.1 Why a Playlist Builder?</h2>
+
+<p>An <em>Audio files with playlist</em> project records each segment of a document
+into its own audio file. After a long recording session you may have fifty files
+named <code>01 page 1.wav</code>, <code>02 page 2.wav</code> and so on. Every
+modern player can open a folder of audio files, but none of them know the
+<em>order</em> in which the pages should be played. The
+<code>documents/playlist_builder.py</code> module solves exactly this problem:
+after recording completes it writes three standard playlist files next to the
+audio, and every player (VLC, PotPlayer, GOM, Windows Media Player, Winamp,
+mpv) understands at least one of them:</p>
+
+<table>
+  <thead><tr><th>File</th><th>Format</th><th>Players</th></tr></thead>
+  <tbody>
+    <tr><td><code>&lt;project&gt;.m3u8</code></td><td>Extended M3U, UTF-8</td><td>VLC, PotPlayer, GOM, mpv</td></tr>
+    <tr><td><code>&lt;project&gt;.pls</code></td><td>Winamp playlist (INI style)</td><td>VLC, GOM, PotPlayer, Winamp</td></tr>
+    <tr><td><code>&lt;project&gt;.wpl</code></td><td>Windows Media Playlist (SMIL/XML)</td><td>Windows Media Player, PotPlayer, GOM</td></tr>
+  </tbody>
+</table>
+
+<div class="info"><strong>Portability rule:</strong> every entry references the
+audio by <em>file name only</em> — never an absolute path. The playlists keep
+working when the project folder is copied, moved or zipped, because the player
+resolves a bare name against the folder the playlist itself lives in.</div>
+
+<h2>73.2 Module Header and Imports</h2>
+
+<pre><code>"""Playlist file generation for the ``audio_playlist`` project type.
+
+After recording completes, three standard playlist files are written next to
+the audio files in the project folder, so the narration opens in modern
+media players (VLC, PotPlayer, GOM, Windows Media Player, Winamp, ...).
+"""</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+    <li><strong>Line 1:</strong> <code>"""Playlist file generation ..."""</code><br>
+    <span class="desc">The module docstring. It documents which project type this module serves (<code>audio_playlist</code>) and names the three playlist formats it writes. Because this is a plain-text string at the top of the file, Python stores it in the module's <code>__doc__</code> attribute, and tools like <code>help()</code> display it automatically.</span></li>
+  </ol>
+</div>
+
+<pre><code>from __future__ import annotations
+
+import os
+from typing import Any, Dict, List
+from xml.sax.saxutils import escape as _xml_escape</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+    <li><strong>Line 1:</strong> <code>from __future__ import annotations</code><br>
+    <span class="desc">Postpones evaluation of type annotations (PEP 563). Annotations such as <code>List[Dict[str, Any]]</code> are then stored as plain strings instead of being evaluated at import time, which slightly speeds up module import and lets newer annotation syntax run on older interpreters.</span></li>
+    <li><strong>Line 3:</strong> <code>import os</code><br>
+    <span class="desc">Imports the operating-system module, used here for <code>os.path.basename</code> (strip the folder from a path, keep the file name) and <code>os.path.join</code> (build a portable path from a folder and a file name).</span></li>
+    <li><strong>Line 4:</strong> <code>from typing import Any, Dict, List</code><br>
+    <span class="desc">Imports the generic typing helpers used in the function signatures. <code>Any</code> means "any type at all", <code>Dict[str, Any]</code> describes the segment dictionaries loaded from <code>project.json</code>, and <code>List</code> wraps them into sequence types.</span></li>
+    <li><strong>Line 5:</strong> <code>from xml.sax.saxutils import escape as _xml_escape</code><br>
+    <span class="desc">Imports the standard-library XML escaper and renames it with a leading underscore (<code>_xml_escape</code>). The escape function turns the five XML-sensitive characters (<code>&amp; &lt; &gt;</code> and quotes) into entities such as <code>&amp;amp;</code>. The alias keeps the rest of the file readable and marks the helper as module-private.</span></li>
+  </ol>
+</div>
+
+<h2>73.3 The XML Attribute Helper</h2>
+
+<pre><code>def _quoted(value: str) -> str:
+    """XML attribute value, always wrapped in double quotes."""
+    return '"%s"' % _xml_escape(value).replace('"', "&quot;")</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+    <li><strong>Line 1:</strong> <code>def _quoted(value: str) -> str:</code><br>
+    <span class="desc">Defines a private helper that returns <code>value</code> as a safely quoted XML attribute value. The WPL writer uses it for every <code>src</code> and <code>title</code> attribute it emits.</span></li>
+    <li><strong>Line 2:</strong> <code>"""XML attribute value, always wrapped in double quotes."""</code><br>
+    <span class="desc">The docstring records the contract: the result is always wrapped in <em>double</em> quotes, which is what the Windows Media Player playlist parser expects.</span></li>
+    <li><strong>Line 3:</strong> <code>return '"%s"' % _xml_escape(value).replace('"', "&quot;")</code><br>
+    <span class="desc">Three steps in one expression. First <code>_xml_escape(value)</code> replaces <code>&amp;</code>, <code>&lt;</code> and <code>&gt;</code> with entities. Then <code>.replace('"', "&quot;")</code> escapes double quotes — necessary because <code>escape()</code> deliberately leaves quotes alone (it escapes text nodes, not attributes). Finally the <code>%</code> operator wraps the result in literal double quotes. Without the quote escaping, a segment titled <code>He said "hello"</code> would produce a WPL file that Windows Media Player refuses to open.</span></li>
+  </ol>
+</div>
+
+<div class="warning"><strong>Common pitfall:</strong> <code>xml.sax.saxutils.escape()</code>
+only escapes the characters that are illegal in <em>text</em>. Attributes are
+delimited by quotes, so a quote inside an attribute value must also be escaped
+(<code>&amp;quot;</code>). This one-line helper is the difference between a WPL
+file that opens everywhere and one that only works for titles without quotes.</div>
+
+<h2>73.4 Selecting and Ordering Entries</h2>
+
+<pre><code>def _ready_entries(segments: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Recorded segments (``status == "done"`` with a saved file), in order."""
+    entries = [
+        s for s in segments
+        if s.get("status") == "done" and s.get("saved")
+    ]
+    entries.sort(key=lambda s: s.get("index", 0))
+    return entries</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 4)</h4>
+  <ol>
+    <li><strong>Line 1:</strong> <code>def _ready_entries(segments):</code><br>
+    <span class="desc">Defines the filter that decides which segments appear in the playlists. The function takes the raw <code>segments</code> list loaded from <code>project.json</code> and returns only the ones that were actually recorded.</span></li>
+    <li><strong>Line 2:</strong> <code>"""Recorded segments ... in order."""</code><br>
+    <span class="desc">The docstring states both the filter condition and the guarantee: results come back sorted by segment index, i.e. in the same order the audio was recorded.</span></li>
+    <li><strong>Lines 3–5:</strong> <code>entries = [s for s in segments if s.get("status") == "done" and s.get("saved")]</code><br>
+    <span class="desc">A list comprehension that keeps a segment only when both conditions hold. <code>status == "done"</code> means the TTS engine finished that segment, and a truthy <code>s.get("saved")</code> means an audio file name was recorded for it. Segments that are still <code>pending</code> (or done but somehow without a saved file) are excluded, so a half-finished recording produces a playlist covering only the audio that really exists. <code>s.get(...)</code> is used instead of <code>s["status"]</code> so a malformed segment dict cannot raise <code>KeyError</code> — it simply fails both checks and is skipped.</span></li>
+    <li><strong>Line 6:</strong> <code>entries.sort(key=lambda s: s.get("index", 0))</code><br>
+    <span class="desc">Sorts the filtered list in place by the segment's <code>index</code> field. <code>sort(key=...)</code> calls the lambda once per element and orders by the returned number. The sort is stable, so segments with equal indices keep their original relative order. This matters because <code>project.json</code> may list segments in any order after edits and re-recording.</span></li>
+    <li><strong>Line 7:</strong> <code>return entries</code><br>
+    <span class="desc">Returns the ordered list to the caller.</span></li>
+  </ol>
+</div>
+
+<pre><code>def _titles(entries: List[Dict[str, Any]]) -> List[str]:
+    return [str(s.get("title") or os.path.basename(s["saved"])) for s in entries]
+
+
+def _files(entries: List[Dict[str, Any]]) -> List[str]:
+    return [os.path.basename(str(s["saved"])) for s in entries]</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 5)</h4>
+  <ol>
+    <li><strong>Line 1:</strong> <code>def _titles(entries):</code><br>
+    <span class="desc">Defines the helper that extracts the display title for every playlist entry.</span></li>
+    <li><strong>Line 2:</strong> <code>return [str(s.get("title") or os.path.basename(s["saved"])) for s in entries]</code><br>
+    <span class="desc">A comprehension with a fallback chain. <code>s.get("title")</code> returns the segment title, or <code>None</code> if the project file has none. The <code>or</code> operator then falls back to <code>os.path.basename(s["saved"])</code> — the audio file's own name such as <code>01 page 1.wav</code>. <code>str(...)</code> guarantees the final value is a string even if the title field held a number. Players display these titles next to each track.</span></li>
+    <li><strong>Line 4:</strong> <code>def _files(entries):</code><br>
+    <span class="desc">Defines the helper that extracts the audio file names.</span></li>
+    <li><strong>Line 5:</strong> <code>return [os.path.basename(str(s["saved"])) for s in entries]</code><br>
+    <span class="desc">For every entry, takes the saved path and strips everything up to the last separator with <code>os.path.basename</code>. <code>str(...)</code> is defensive: even if a project file stored the path as something else, the playlist receives a plain string. The result is a bare file name like <code>02 page 2.wav</code>, which is exactly the portable reference the module promises.</span></li>
+  </ol>
+</div>
+
+<h2>73.5 The Three Writers</h2>
+
+<h3>M3U8 (extended M3U, UTF-8)</h3>
+
+<pre><code>def _write_m3u8(path: str, title: str, names: List[str], titles: List[str]) -> None:
+    lines = ["#EXTM3U", f"#PLAYLIST:{title}"]
+    for name, entry_title in zip(names, titles):
+        lines.append(f"#EXTINF:-1,{entry_title}")
+        lines.append(name)
+    with open(path, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write("\n".join(lines) + "\n")</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 6)</h4>
+  <ol>
+    <li><strong>Line 1:</strong> <code>def _write_m3u8(path, title, names, titles):</code><br>
+    <span class="desc">Defines the writer for the extended M3U format. <code>path</code> is the output file, <code>title</code> the playlist name shown by players, <code>names</code> the audio file names and <code>titles</code> the matching display titles (same order).</span></li>
+    <li><strong>Line 2:</strong> <code>lines = ["#EXTM3U", f"#PLAYLIST:{title}"]</code><br>
+    <span class="desc">Starts the file with the two mandatory header lines. <code>#EXTM3U</code> tells the player "this is the extended M3U format, not a plain one". <code>#PLAYLIST:{title}</code> is an f-string that names the whole playlist; VLC shows this name in its title bar, PotPlayer in its playlist header.</span></li>
+    <li><strong>Line 3:</strong> <code>for name, entry_title in zip(names, titles):</code><br>
+    <span class="desc">Iterates over both lists in parallel: <code>zip(names, titles)</code> yields <code>(name, title)</code> pairs, one per track, stopping at the shorter list.</span></li>
+    <li><strong>Line 4:</strong> <code>lines.append(f"#EXTINF:-1,{entry_title}")</code><br>
+    <span class="desc">Appends the extended-info line for one track. The format is <code>#EXTINF:&lt;duration in seconds&gt;,&lt;artist&gt;-&lt;title&gt;</code>. The value <code>-1</code> means "duration unknown" — the player reads the real length from the audio file itself when it loads the track. Everything after the comma is the display title.</span></li>
+    <li><strong>Line 5:</strong> <code>lines.append(name)</code><br>
+    <span class="desc">Appends the track reference itself — a bare file name such as <code>01 page 1.wav</code>. Non-comment lines in M3U are always the media locations, resolved relative to the playlist file's folder.</span></li>
+    <li><strong>Line 6:</strong> <code>with open(path, "w", encoding="utf-8", newline="\n") as fh:</code><br>
+    <span class="desc">Opens the output file for writing. <code>encoding="utf-8"</code> is what makes this an <em>M3U8</em> file (the "8" stands for UTF-8) and lets non-ASCII segment titles survive. <code>newline="\n"</code> overrides the Windows default so the file ends every line with a bare LF — the line ending players expect — regardless of the host platform.</span></li>
+    <li><strong>Line 7:</strong> <code>fh.write("\n".join(lines) + "\n")</code><br>
+    <span class="desc">Joins all collected lines with newlines into one string and writes it, adding one final newline so the file is well-formed. A single <code>write</code> call is also faster than hundreds of small writes.</span></li>
+  </ol>
+</div>
+
+<h3>PLS (Winamp style)</h3>
+
+<pre><code>def _write_pls(path: str, title: str, names: List[str], titles: List[str]) -> None:
+    lines = ["[playlist]"]
+    for i, (name, entry_title) in enumerate(zip(names, titles), start=1):
+        lines.append(f"File{i}={name}")
+        lines.append(f"Title{i}={entry_title}")
+        lines.append(f"Length{i}=-1")
+    lines.append(f"NumberOfEntries={len(names)}")
+    lines.append("Version=2")
+    with open(path, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write("\n".join(lines) + "\n")</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 7)</h4>
+  <ol>
+    <li><strong>Line 1:</strong> <code>def _write_pls(path, title, names, titles):</code><br>
+    <span class="desc">Defines the writer for the PLS (Winamp) playlist format, an INI-style key=value text format.</span></li>
+    <li><strong>Line 2:</strong> <code>lines = ["[playlist]"]</code><br>
+    <span class="desc">Starts the file with the mandatory <code>[playlist]</code> section header. Every PLS key must live inside this section.</span></li>
+    <li><strong>Line 3:</strong> <code>for i, (name, entry_title) in enumerate(zip(names, titles), start=1):</code><br>
+    <span class="desc">Loops over the parallel name/title pairs with a counter. <code>enumerate(..., start=1)</code> numbers the entries from 1, because the PLS format requires 1-based keys (<code>File1</code>, <code>File2</code>, …) and a missing <code>File1</code> makes some parsers reject the whole file.</span></li>
+    <li><strong>Line 4:</strong> <code>lines.append(f"File{i}={name}")</code><br>
+    <span class="desc">Writes the track reference key. <code>File1=01 page 1.wav</code> means "the first track is this file". As in M3U, a bare name is resolved relative to the playlist's folder.</span></li>
+    <li><strong>Line 5:</strong> <code>lines.append(f"Title{i}={entry_title}")</code><br>
+    <span class="desc">Writes the display title for the same entry number. The number must match the <code>File</code> key exactly or players will pair the wrong title with the wrong file.</span></li>
+    <li><strong>Line 6:</strong> <code>lines.append(f"Length{i}=-1")</code><br>
+    <span class="desc">Writes the track length in seconds; <code>-1</code> again means "unknown, read it from the file".</span></li>
+    <li><strong>Lines 7–8:</strong> <code>lines.append(f"NumberOfEntries={len(names)}")</code> and <code>lines.append("Version=2")</code><br>
+    <span class="desc">Closes the section with the two mandatory footer keys. <code>NumberOfEntries</code> tells parsers how many tracks to expect (so a truncated file is detected), and <code>Version=2</code> identifies the PLS format revision every current player expects.</span></li>
+    <li><strong>Lines 9–10:</strong> <code>with open(...) as fh: fh.write(...)</code><br>
+    <span class="desc">Writes the joined lines with UTF-8 encoding and LF line endings — identical I/O pattern to the M3U8 writer, for the same reasons.</span></li>
+  </ol>
+</div>
+
+<h3>WPL (Windows Media Player, SMIL)</h3>
+
+<pre><code>def _write_wpl(path: str, title: str, names: List[str]) -> None:
+    body = "".join(
+        f'      <media src={_quoted(name)}/>\n' for name in names
+    )
+    wpl = (
+        '<?wpl version="1.0"?>\n'
+        '<smil>\n'
+        '  <head>\n'
+        '    <meta name="Generator" content="AI Voice Studio"/>\n'
+        f'    <title>{_quoted(title)}</title>\n'
+        '  </head>\n'
+        '  <body>\n'
+        '    <seq>\n'
+        + body +
+        '    </seq>\n'
+        '  </body>\n'
+        '</smil>\n'
+    )
+    with open(path, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(wpl)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 8)</h4>
+  <ol>
+    <li><strong>Line 1:</strong> <code>def _write_wpl(path, title, names):</code><br>
+    <span class="desc">Defines the writer for the Windows Media Playlist format. Note it does not take the <code>titles</code> list: WPL has no per-track title attribute — Windows Media Player reads the media's own metadata instead.</span></li>
+    <li><strong>Lines 2–3:</strong> <code>body = "".join(f'      <media src={_quoted(name)}/>\n' for name in names)</code><br>
+    <span class="desc">Builds the XML body with a generator expression joined into one string. For every audio file it emits one <code>&lt;media src="..."/&gt;</code> element — the SMIL way of saying "play this file in sequence". The <code>src</code> value passes through <code>_quoted()</code>, so quotes and XML-special characters inside a file name can never break the document. The six leading spaces indent each element to match the surrounding structure.</span></li>
+    <li><strong>Lines 4–16:</strong> <code>wpl = ('<?wpl version="1.0"?>' ... )</code><br>
+    <span class="desc">Assembles the full SMIL document as one concatenated string. <code>&lt;?wpl version="1.0"?&gt;</code> is the processing instruction Windows Media Player uses to recognise the file type. The <code>&lt;meta name="Generator"&gt;</code> element records which application produced the playlist. The <code>&lt;seq&gt;</code> (sequence) element means its children play one after another in document order — exactly the reading order of the recorded document.</span></li>
+    <li><strong>Lines 17–18:</strong> <code>with open(...) as fh: fh.write(wpl)</code><br>
+    <span class="desc">Writes the finished XML with UTF-8 encoding and LF line endings. The file is now a valid WPL playlist that Windows Media Player, PotPlayer and GOM all open.</span></li>
+  </ol>
+</div>
+
+<h2>73.6 The Public Entry Point</h2>
+
+<pre><code>def build_playlists(
+    project_dir: str,
+    project_name: str,
+    segments: List[Dict[str, Any]],
+) -> List[str]:
+    """Write the M3U8/PLS/WPL playlists into ``project_dir``.
+
+    Returns the list of written file paths; empty when no segment has been
+    recorded yet.  Existing playlist files are overwritten so they stay in
+    sync with the project's segments (e.g. after re-recording).
+    """
+    entries = _ready_entries(segments)
+    if not entries:
+        return []
+    safe = "".join(
+        c if c not in '\\/:*?"<>|' else "_" for c in project_name
+    ).strip() or "playlist"
+    names = _files(entries)
+    titles = _titles(entries)
+
+    written: List[str] = []
+    m3u8_path = os.path.join(project_dir, safe + ".m3u8")
+    _write_m3u8(m3u8_path, project_name, names, titles)
+    written.append(m3u8_path)
+
+    pls_path = os.path.join(project_dir, safe + ".pls")
+    _write_pls(pls_path, project_name, names, titles)
+    written.append(pls_path)
+
+    wpl_path = os.path.join(project_dir, safe + ".wpl")
+    _write_wpl(wpl_path, project_name, names)
+    written.append(wpl_path)
+    return written</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 9)</h4>
+  <ol>
+    <li><strong>Lines 1–4:</strong> <code>def build_playlists(project_dir, project_name, segments):</code><br>
+    <span class="desc">The one public function of the module, called by the Recording window after recording finishes. It takes the project folder (where the audio already lives), the human project name (which becomes the playlist file base name), and the full segment list from <code>project.json</code>. It returns the list of files it wrote — the caller turns this into the "playlists were generated" note in the completion dialog.</span></li>
+    <li><strong>Lines 5–6:</strong> <code>entries = _ready_entries(segments)</code> / <code>if not entries: return []</code><br>
+    <span class="desc">Filters and orders the recorded segments. If nothing was recorded the function returns an empty list immediately and no playlist files are created — there is nothing to list.</span></li>
+    <li><strong>Lines 7–9:</strong> <code>safe = "".join(c if c not in '\\/:*?"<>|' else "_" for c in project_name).strip() or "playlist"</code><br>
+    <span class="desc">Turns the project name into a safe file-name base. The comprehension keeps every character except the nine characters Windows forbids in file names (<code>\ / : * ? " &lt; &gt; |</code>); each forbidden one becomes an underscore. <code>.strip()</code> removes leading/trailing spaces, and the <code>or "playlist"</code> fallback covers a name that was entirely punctuation — a project named <code>???</code> must not produce a file literally named <code>playlist.m3u8</code>'s base as an empty string.</span></li>
+    <li><strong>Lines 10–11:</strong> <code>names = _files(entries)</code> / <code>titles = _titles(entries)</code><br>
+    <span class="desc">Extracts the two parallel lists the writers need: bare audio file names and their display titles, both in segment order.</span></li>
+    <li><strong>Lines 13–21:</strong> the three <code>os.path.join(project_dir, safe + ".ext")</code> blocks<br>
+    <span class="desc">Writes each playlist into the project folder next to the audio. Each writer call is followed by <code>written.append(...)</code>, so by the end the list holds the three absolute paths (<code>.m3u8</code>, <code>.pls</code>, <code>.wpl</code>) in that order. Opening a writer with <code>"w"</code> truncates any existing file, which is exactly the desired "regenerate on every recording" behaviour: after re-recording one segment, the playlists are rebuilt with the new content in the correct order.</span></li>
+  </ol>
+</div>
+
+<h2>73.7 How the Recording Window Uses It</h2>
+
+<p>The wiring lives in <code>gui/recording_dialog.py</code>. When the synthesis
+worker reports that all segments are done, the dialog runs:</p>
+
+<pre><code>def _build_playlists_if_needed(self):
+    self._playlist_files = []
+    ptype = self.data.get("project_type", "audio_playlist")
+    if ptype != "audio_playlist":
+        return
+    try:
+        fresh = project.load_project(self.project_dir)
+        from ..documents.playlist_builder import build_playlists
+        self._playlist_files = build_playlists(
+            self.project_dir,
+            fresh.get("name", "playlist"),
+            fresh.get("segments", []),
+        )
+    except Exception as exc:
+        log.warning("Playlist generation failed: %s", exc)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 10)</h4>
+  <ol>
+    <li><strong>Line 2:</strong> <code>self._playlist_files = []</code><br>
+    <span class="desc">Resets the result list on every call, so a DAISY project (which returns early) never leaves a stale value behind.</span></li>
+    <li><strong>Line 3:</strong> <code>ptype = self.data.get("project_type", "audio_playlist")</code><br>
+    <span class="desc">Reads the project type with a default, then the guard on the next line makes playlist generation exclusive to <em>Audio files with playlist</em> projects — DAISY books get their own structure instead.</span></li>
+    <li><strong>Line 5:</strong> <code>fresh = project.load_project(self.project_dir)</code><br>
+    <span class="desc">Reloads <code>project.json</code> from disk instead of trusting the copy the dialog loaded when it opened. This is essential: the synthesis worker runs in a background thread and has been marking segments <code>done</code> in the file while the dialog sat idle — the in-memory copy still shows them as pending, which would produce an empty playlist.</span></li>
+    <li><strong>Line 6:</strong> <code>from ..documents.playlist_builder import build_playlists</code><br>
+    <span class="desc">A local (function-level) import. Importing lazily keeps the recording window's startup fast and avoids a hard module dependency at import time.</span></li>
+    <li><strong>Lines 7–10:</strong> <code>self._playlist_files = build_playlists(...)</code><br>
+    <span class="desc">Calls the builder with the freshly loaded name and segments and stores the three written paths for the completion summary.</span></li>
+    <li><strong>Lines 11–12:</strong> <code>except Exception as exc: log.warning(...)</code><br>
+    <span class="desc">Catches any failure (a read-only folder, a full disk) and logs a warning instead of crashing. Playlist generation is a convenience on top of a finished recording — the recording itself is already safely on disk, so the user must not lose the completion message because a playlist could not be written.</span></li>
+  </ol>
+</div>
+
+<h2>73.8 The Test Suite</h2>
+
+<p><code>tests/test_playlist_builder.py</code> pins the format details that
+players rely on. Two representative assertions:</p>
+
+<pre><code>def test_wpl_escapes_xml(self):
+    ...
+    self.assertIn('<media src="A &quot;x&quot;&amp;y.wav"/>', text)
+
+
+def test_returns_empty_when_nothing_recorded(self):
+    with tempfile.TemporaryDirectory() as tmp:
+        self.assertEqual(
+            build_playlists(tmp, "Book", [{"index": 1, "title": "A",
+                                           "status": "pending", "saved": None}]),
+            [],
+        )
+        self.assertEqual(os.listdir(tmp), [])</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 11)</h4>
+  <ol>
+    <li><strong>Lines 1–4:</strong> <code>def test_wpl_escapes_xml(self): ... assertIn('<media src="A &quot;x&quot;&amp;y.wav"/>', text)</code><br>
+    <span class="desc">Guards the exact escaping contract found in section 73.3: a saved file name containing a double quote and an ampersand must come out as <code>&amp;quot;</code> and <code>&amp;amp;</code> inside the WPL <code>src</code> attribute. This test exists because the original implementation escaped <code>&amp;</code> but not quotes — a regression this test now prevents forever.</span></li>
+    <li><strong>Lines 6–12:</strong> <code>def test_returns_empty_when_nothing_recorded(self): ...</code><br>
+    <span class="desc">Verifies the empty-recording contract from section 73.6: when every segment is still <code>pending</code>, <code>build_playlists</code> returns <code>[]</code> <em>and</em> the temporary project directory stays completely empty — no half-written playlist files, no stray <code>.m3u8</code> with zero entries.</span></li>
+  </ol>
+</div>
+
+<h2>73.9 Key Takeaways</h2>
+<ul>
+  <li>Three playlist formats cover all modern players: <strong>M3U8</strong> (VLC/PotPlayer/GOM), <strong>PLS</strong> (Winamp family), <strong>WPL</strong> (Windows Media Player)</li>
+  <li>Entries are <strong>file names only</strong> — playlists survive moving, copying or zipping the project folder</li>
+  <li><code>duration = -1</code>/<code>#EXTINF:-1</code> tells players to read the real length from each audio file</li>
+  <li>XML attributes need <code>&amp;quot;</code> escaping too — <code>escape()</code> alone is not enough for WPL</li>
+  <li>Generation runs <strong>after</strong> recording and reads <strong>fresh</strong> project state from disk, so it is a pure post-processing step that never touches the audio pipeline</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch72_roadmap.html">← Ch 72</a> &nbsp;|&nbsp; <a href="ch74_daisy3_builder.html">Ch 74 — DAISY 3 Builder →</a></p>
+</div></div></body>
+</html>

@@ -10,6 +10,7 @@
 <div class="book-container">
 <nav class="sidebar"><h2>📖 Contents</h2>
 <div class="part-header">Part IV</div><ul class="chapters"><li><a href="ch27_wxpython_intro.html">Ch 27</a></li><li><a href="ch28_sizers_layout.html">Ch 28</a></li><li><a href="ch29_controls.html">Ch 29</a></li><li><a href="ch30_events.html">Ch 30</a></li><li><a href="ch31_dialogs.html">Ch 31</a></li><li><a href="ch32_custom_drawing.html">Ch 32</a></li><li><a href="ch33_threading_gui.html">Ch 33</a></li><li><a href="ch34_accessibility.html" class="active">Ch 34: Accessibility</a></li><li><a href="ch35_themes.html">Ch 35</a></li><li><a href="ch36_wx_adv.html">Ch 36</a></li></ul>
+<div class="part-header">Part IX — Additions</div><ul class="chapters"><li><a href="ch73_playlist_builder.html">Ch 73: Playlist Builder</a></li><li><a href="ch74_daisy3_builder.html">Ch 74: DAISY 3 Builder</a></li><li><a href="ch75_dialogs_progress.html">Ch 75: Dialogs &amp; Progress</a></li></ul>
 </nav>
 <div class="main-content">
 
@@ -341,12 +342,80 @@ wx.CallAfter(self.text_preview.SetFocus)</code></pre>
 
 <hr>
 
-<h2>34.5 Key Takeaways</h2>
+<h2>34.5 What Changed Since the First Edition: Real MSAA Names</h2>
+
+<p>The first edition relied on <code>wx.Control.SetName()</code> and labels.
+Testing with real screen readers showed that <code>SetName</code> alone does
+not produce an MSAA <code>accName</code> for every control class — some
+controls (gauges, read-only text, static labels in sizers) still announced as
+"pane" or their class name. The helper module now attaches a real
+<strong><code>wx.Accessible</code></strong> implementation:</p>
+
+<pre><code>class _NameAccessible(wx.Accessible):
+    def __init__(self, win: wx.Window):
+        super().__init__(win)
+        self._win = win
+
+    def GetName(self, childId):
+        name = self._win.GetName()
+        if childId == 0 and name:
+            return (wx.ACC_OK, name, 0)
+        return (wx.ACC_FAIL, "", 0)
+
+    def GetChildCount(self):
+        return 0
+
+
+def set_accessible_name(control: wx.Window, name: str) -> None:
+    control.SetName(name)
+    if not control.GetAccessible():
+        control.SetAccessible(_NameAccessible(control))
+
+
+def update_accessible_name(control: wx.Window, name: str) -> None:
+    control.SetName(name)
+    acc = control.GetAccessible()
+    if acc is not None:
+        acc.NotifyEvent(wx.OBJ_CHANGE, 0)
+
+
+def finalize_accessibility(container: wx.Window) -> None:
+    def walk(win: wx.Window) -> None:
+        if win.GetName():
+            set_accessible_name(win, win.GetName())
+        for child in win.GetChildren():
+            walk(child)
+    walk(container)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 5)</h4>
+  <ol>
+    <li><strong>Lines 1–4:</strong> <code>class _NameAccessible(wx.Accessible):</code><br>
+    <span class="desc">A minimal MSAA provider. Subclassing <code>wx.Accessible</code> and attaching it to a window is the official wxPython way to answer the screen reader's <code>IAccessible::get_accName</code> call with a real string — no more reliance on heuristics that differ per control class.</span></li>
+    <li><strong>Lines 6–9:</strong> <code>def GetName(self, childId):</code><br>
+    <span class="desc">The one method screen readers call constantly. It returns a tuple: (<code>wx.ACC_OK</code>, the window's name, child id 0). When the reader hovers or focuses the control, this is the name it announces. Returning <code>wx.ACC_FAIL</code> for the object-without-name case lets wx fall back to its own behaviour instead of announcing an empty string.</span></li>
+    <li><strong>Lines 11–12:</strong> <code>def GetChildCount(self): return 0</code><br>
+    <span class="desc">Declares the control atomic — no MSAA children to enumerate. This keeps NVDA from descending into leaf controls looking for child elements that do not exist.</span></li>
+    <li><strong>Lines 15–18:</strong> <code>def set_accessible_name(control, name):</code><br>
+    <span class="desc">The single entry point every widget builder calls. It does both halves: <code>SetName(name)</code> (used by wx itself and by tests) <em>and</em> attaches the MSAA provider exactly once — <code>GetAccessible()</code> is checked so repeated calls never stack duplicate providers.</span></li>
+    <li><strong>Lines 21–25:</strong> <code>def update_accessible_name(control, name):</code><br>
+    <span class="desc">For controls whose label changes at runtime (the Rate/Pitch/Volume sliders announce "Rate: 1.35"). After updating the name it fires <code>acc.NotifyEvent(wx.OBJ_CHANGE, 0)</code>, which pushes an MSAA event so a focused screen reader re-announces the new value as the slider moves — without the event, NVDA would keep reading the stale label.</span></li>
+    <li><strong>Lines 28–33:</strong> <code>def finalize_accessibility(container):</code><br>
+    <span class="desc">A depth-first walk over the widget tree at dialog-construction time: every window that carries a name gets the MSAA provider attached. One call in each dialog's <code>__init__</code> guarantees full coverage, so individual builders cannot forget a control.</span></li>
+  </ol>
+</div>
+
+<div class="info"><strong>Audit tooling:</strong> <code>tools/probe_msaa.py</code>
+and <code>tools/a11y_audit.py</code> launch the real dialogs and dump the MSAA
+tree, so every accName is verified against what NVDA actually sees — not what
+the source code hopes it sees.</div>
+
+<h2>34.6 Key Takeaways</h2>
 <ul>
-  <li><strong>SetName()</strong> is the most important accessibility method — it provides the screen reader label</li>
-  <li>Every interactive control needs a <strong>descriptive name</strong></li>
-  <li><strong>Tab order</strong> should be logical (content first, then controls)</li>
-  <li>AIVS has a dedicated <strong>a11y.py</strong> module with helpers for accessible controls</li>
+  <li><strong>SetName()</strong> alone is not enough for every control class — a real <code>wx.Accessible</code> guarantees the MSAA <code>accName</code></li>
+  <li>Runtime label changes need <code>NotifyEvent(wx.OBJ_CHANGE)</code> to be re-announced</li>
+  <li><code>finalize_accessibility()</code> walks the whole tree so no control is missed</li>
+  <li>Verify with tools (<code>probe_msaa.py</code>), not assumptions</li>
   <li>The AIVS project was designed with accessibility as a <strong>core requirement</strong></li>
 </ul>
 

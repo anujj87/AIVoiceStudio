@@ -10,6 +10,7 @@
 <div class="book-container">
 <nav class="sidebar"><h2>📖 Contents</h2>
 <div class="part-header">Part VI</div><ul class="chapters"><li><a href="ch43_architecture.html">Ch 43</a></li><li><a href="ch44_paths_settings.html">Ch 44</a></li><li><a href="ch45_project_model.html">Ch 45</a></li><li><a href="ch46_document_parsing.html">Ch 46</a></li><li><a href="ch47_tts_catalog.html">Ch 47</a></li><li><a href="ch48_tts_engine.html">Ch 48</a></li><li><a href="ch49_downloader.html">Ch 49</a></li><li><a href="ch50_compute_detection.html">Ch 50</a></li><li><a href="ch51_main_frame.html">Ch 51</a></li><li><a href="ch52_settings_dialog.html">Ch 52</a></li><li><a href="ch53_model_panels.html">Ch 53</a></li><li><a href="ch54_new_project_wizard.html">Ch 54</a></li><li><a href="ch55_recording.html" class="active">Ch 55: Recording</a></li><li><a href="ch56_synthesis_worker.html">Ch 56</a></li><li><a href="ch57_clone_engine.html">Ch 57</a></li><li><a href="ch58_omnivoice.html">Ch 58</a></li><li><a href="ch59_daisy_builder.html">Ch 59</a></li><li><a href="ch60_addons.html">Ch 60</a></li></ul>
+<div class="part-header">Part IX — Additions</div><ul class="chapters"><li><a href="ch73_playlist_builder.html">Ch 73: Playlist Builder</a></li><li><a href="ch74_daisy3_builder.html">Ch 74: DAISY 3 Builder</a></li><li><a href="ch75_dialogs_progress.html">Ch 75: Dialogs &amp; Progress</a></li></ul>
 </nav>
 <div class="main-content">
 
@@ -373,13 +374,74 @@
 
 <hr>
 
-<h2>55.4 Key Takeaways</h2>
+<h2>55.4 What Changed Since the First Edition</h2>
+
+<p>The Recording window grew four features after the book's first edition. All
+of them are post-recording or pre-recording conveniences; the synthesis
+pipeline itself (Chapter 56) is unchanged.</p>
+
+<h3>1. Non-modal task progress dialog</h3>
+<p>Recording now shows a <code>TaskProgressDialog</code> (Chapter 75) instead of
+relying on the status line alone. The dialog pulses while segments synthesize,
+carries a real <strong>Stop recording</strong> button wired to the worker's
+cancel event, and closes itself when the worker finishes. Because it is
+non-modal, the Recording window stays usable.</p>
+
+<h3>2. OmniVoice options per project</h3>
+<p>When an OmniVoice engine is selected, an <strong>OmniVoice voice
+options&hellip;</strong> button appears. It stores clone/design options in the
+project's <code>tts.omni</code> dictionary; a summary line beside the button
+announces the current setting. Voice-library voices (created in Settings)
+carry their own identity, so for them the button hides and the summary
+describes the library voice instead.</p>
+
+<h3>3. Playlist generation on completion</h3>
+<p>For <em>Audio files with playlist</em> projects, the moment recording
+completes the dialog reloads <code>project.json</code> from disk (the worker
+thread has been updating segment status while the dialog sat idle) and calls
+<code>build_playlists()</code> &mdash; see Chapter 73 for the module itself and
+its line-by-line walkthrough. The completion message then names the three
+written files:</p>
+
+<pre><code>def _playlist_summary(self) -> str:
+    ptype = self.data.get("project_type", "audio_playlist")
+    if ptype != "audio_playlist" or not self._playlist_files:
+        return ""
+    names = ", ".join(os.path.basename(p) for p in self._playlist_files)
+    return ("\n\nPlaylists were generated in the project folder "
+            f"({names}) - open them in VLC, Windows Media Player, "
+            "PotPlayer or any modern player to play the whole "
+            "recording in order.")</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 5)</h4>
+  <ol>
+    <li><strong>Line 1:</strong> <code>def _playlist_summary(self) -&gt; str:</code><br>
+    <span class="desc">Builds the extra paragraph appended to the "Recording complete" message when playlists were written. Returning an empty string for other project types keeps the message clean for DAISY projects.</span></li>
+    <li><strong>Line 2:</strong> <code>ptype = self.data.get("project_type", "audio_playlist")</code><br>
+    <span class="desc">Reads the project type with a default. The guard on the next line returns <code>""</code> unless this really is an audio-playlist project <em>and</em> playlist files exist &mdash; <code>not self._playlist_files</code> covers the "nothing was recorded" case where <code>build_playlists</code> returned an empty list.</span></li>
+    <li><strong>Line 4:</strong> <code>names = ", ".join(os.path.basename(p) for p in self._playlist_files)</code><br>
+    <span class="desc">Compresses each written path to its bare file name with <code>os.path.basename</code> and joins them with commas, producing e.g. <code>My Book.m3u8, My Book.pls, My Book.wpl</code> &mdash; the user does not need the absolute paths, just the names to look for.</span></li>
+    <li><strong>Lines 5–9:</strong> <code>return (...)</code><br>
+    <span class="desc">Returns a two-sentence note: which files were generated and that they open in VLC, Windows Media Player, PotPlayer "or any modern player". The leading <code>\n\n</code> separates it from the DAISY summary that may precede it.</span></li>
+  </ol>
+</div>
+
+<h3>4. MP3/FLAC warning in DAISY projects</h3>
+<p>Choosing MP3 or FLAC while a DAISY project is open shows a warning every
+time (no "don't ask again"): DAISY players are much more reliable with WAV,
+and although the builders now re-encode low-rate MP3s (Chapter 59), WAV
+remains the recommended output. The Recording window's output-format combo
+stays enabled &mdash; the warning is informational, not a block.</p>
+
+<h2>55.5 Key Takeaways</h2>
 <ul>
   <li>The Recording Dialog is the <strong>most complex GUI component</strong> in AIVS</li>
   <li><strong>Compute mode</strong> filters which TTS engines are available</li>
   <li>Segments resume from <strong>first_pending_index</strong> — previously recorded segments are skipped</li>
   <li><strong>Pause/Resume/Stop</strong> control the background synthesis thread</li>
   <li>TTS settings are saved to <strong>project.json</strong> on every start and close</li>
+  <li>Post-recording steps read <strong>fresh</strong> project state from disk: DAISY books and playlists are built from what the worker actually saved</li>
 </ul>
 
 <hr>

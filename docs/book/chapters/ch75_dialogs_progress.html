@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 75: Dialogs &amp; Progress - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part IX — Additions</div><ul class="chapters"><li><a href="ch73_playlist_builder.html">Ch 73: Playlist Builder</a></li><li><a href="ch74_daisy3_builder.html">Ch 74: DAISY 3 Builder</a></li><li><a href="ch75_dialogs_progress.html" class="active">Ch 75: Dialogs &amp; Progress</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 75</div>
+<h1>Reusable Dialogs &amp; Progress</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Build labelled-button dialogs that screen readers announce properly (vs. <code>wx.MessageBox</code>)</li>
+  <li>Route engine errors through pattern matching to offer a server restart</li>
+  <li>Write one progress dialog that serves both background threads and synchronous work</li>
+  <li>Understand pulse animation with <code>wx.Timer</code> and forced repaints with <code>wx.Window.Update</code></li>
+</ul>
+
+<hr>
+
+<h2>75.1 Why Not <code>wx.MessageBox</code>?</h2>
+
+<p>The stock message box only offers standard buttons ("OK", "Yes", "No"). Two
+places in AIVS need <em>two meaningful buttons</em> instead:</p>
+<ul>
+  <li>recording finished → <strong>Open project folder</strong> / <strong>OK</strong></li>
+  <li>an OmniVoice Server failure → <strong>Restart OmniVoice server now</strong> / <strong>I will restart later</strong></li>
+</ul>
+<p>The module <code>gui/dialogs.py</code> provides one small dialog class plus
+helpers, so both flows stay consistent — and every button is a real
+<code>wx.Button</code> with a real accessible name, which NVDA and JAWS announce
+reliably (unlike owner-drawn or generic message-box buttons).</p>
+
+<h2>75.2 The Action Dialog</h2>
+
+<pre><code>def run_action_dialog(
+    parent: wx.Window,
+    title: str,
+    message: str,
+    actions: list[tuple[str, str]],
+    default_key: str | None = None,
+) -> str | None:
+    dlg = _ActionDialog(parent, title, message, actions, default_key)
+    try:
+        if dlg.ShowModal() == wx.ID_OK:
+            return dlg.selected_key
+        return None
+    finally:
+        dlg.Destroy()</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+    <li><strong>Lines 1–6:</strong> the signature<br>
+    <span class="desc">The public helper wraps the private dialog class. <code>actions</code> is a list of <code>(key, label)</code> pairs — <code>key</code> is what the caller receives, <code>label</code> is what the user sees and the screen reader announces. <code>default_key</code> names the button that receives initial focus (Enter activates it), so the <em>safe</em> choice is always the Enter choice. The return value is the chosen key, or <code>None</code> when the dialog was dismissed with Escape or the close box.</span></li>
+    <li><strong>Line 7:</strong> <code>dlg = _ActionDialog(parent, title, message, actions, default_key)</code><br>
+    <span class="desc">Creates (but does not yet show) the modal dialog. Construction builds all controls and sizers; showing happens in <code>ShowModal()</code>.</span></li>
+    <li><strong>Lines 8–11:</strong> <code>try: ... finally: dlg.Destroy()</code><br>
+    <span class="desc">Shows the dialog modally and translates the result: <code>wx.ID_OK</code> means a button was pressed and the chosen key is returned; anything else (Escape, close box) maps to <code>None</code>. The <code>finally</code> block is essential wx hygiene — <code>Destroy()</code> releases the native window resources on <em>every</em> path, including exceptions, preventing window-handle leaks.</span></li>
+  </ol>
+</div>
+
+<pre><code>class _ActionDialog(wx.Dialog):
+    def __init__(self, parent, title, message, actions, default_key=None):
+        super().__init__(parent, title=title)
+        self.selected_key: str | None = None
+        self._keys: dict[int, str] = {}
+
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        text = wx.StaticText(self, label=message)
+        text.SetName(title)
+        text.Wrap(520)
+        sizer.Add(text, 0, wx.EXPAND | wx.ALL, 12)
+
+        btn_row = wx.BoxSizer(wx.HORIZONTAL)
+        btn_row.AddStretchSpacer(1)
+        default_btn = None
+        for key, label in actions:
+            btn = wx.Button(self, label=label)
+            btn.SetName(label)
+            btn.SetToolTip(label)
+            self._keys[btn.GetId()] = key
+            if default_key is not None and key == default_key:
+                default_btn = btn
+            btn_row.Add(btn, 0, wx.ALL, 6)
+            btn.Bind(wx.EVT_BUTTON, self._on_action)
+        sizer.Add(btn_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 6)
+
+        self.SetSizer(sizer)
+        self.Fit()
+        self.SetMinSize(self.GetSize())
+        if parent is not None and parent.IsShown():
+            self.CentreOnParent()
+        else:
+            self.Centre()
+        target = default_btn or (btn_row.GetChildren()[0].GetWindow()
+                                 if btn_row.GetChildren() else None)
+        if target is not None:
+            wx.CallAfter(target.SetFocus)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+    <li><strong>Lines 1–4:</strong> class header and initial state<br>
+    <span class="desc">The dialog keeps two pieces of state: <code>selected_key</code> (which button the user chose; <code>None</code> until one is pressed) and <code>_keys</code>, a dictionary mapping wx control ids to the caller's action keys. When a button event arrives, the id is looked up in this dictionary — this is how one event handler serves any number of buttons.</span></li>
+    <li><strong>Lines 6–10:</strong> the message text<br>
+    <span class="desc">A vertical sizer holds a <code>StaticText</code> with the message. <code>text.SetName(title)</code> gives the label a real MSAA accessible name, and <code>text.Wrap(520)</code> breaks long messages at word boundaries around 520 pixels so the dialog never grows wider than the screen. <code>sizer.Add(text, 0, wx.EXPAND | wx.ALL, 12)</code> adds it with a 12-pixel border on all sides.</span></li>
+    <li><strong>Lines 12–21:</strong> the button row<br>
+    <span class="desc">A horizontal sizer holds the action buttons, right-aligned after a stretch spacer. For every <code>(key, label)</code> pair a real <code>wx.Button</code> is created; <code>SetName(label)</code> makes its accessible name equal to its visible label (screen readers announce exactly the label), and <code>self._keys[btn.GetId()] = key</code> registers the mapping the event handler needs. When the pair matches <code>default_key</code>, that button is remembered as the default focus target.</span></li>
+    <li><strong>Lines 23–28:</strong> layout and centering<br>
+    <span class="desc"><code>Fit()</code> sizes the dialog to its contents and <code>SetMinSize(self.GetSize())</code> stops the user shrinking it below that. Centering prefers the parent window (<code>CentreOnParent</code>) so the dialog appears near where the user is looking, falling back to screen center when the parent is hidden.</span></li>
+    <li><strong>Lines 29–31:</strong> <code>target = default_btn or ...</code> / <code>wx.CallAfter(target.SetFocus)</code><br>
+    <span class="desc">Chooses the button to focus: the default action if one was named, otherwise the first button. <code>wx.CallAfter</code> defers the focus call until after the dialog finishes its modal show cycle — setting focus during <code>__init__</code> would be overwritten by wx's own focus handling, so the call is queued for the next event-loop pass. Focus on the safe default means Enter triggers the conservative action ("I will restart later", "OK").</span></li>
+  </ol>
+</div>
+
+<h2>75.3 The "Open project folder" and Server-Restart Helpers</h2>
+
+<pre><code>def show_recording_complete(parent, message, project_folder):
+    key = run_action_dialog(
+        parent, "Recording complete", message,
+        [("open", "Open project folder"), ("ok", "OK")],
+        default_key="ok",
+    )
+    if key == "open":
+        open_folder(project_folder)
+
+
+_SERVER_HINTS = (
+    "omnivoice server",
+    "server is not responding",
+    "server exited prematurely",
+    ...
+)
+
+
+def looks_like_server_error(message: str) -> bool:
+    low = (message or "").lower()
+    if any(hint in low for hint in _REQUEST_LEVEL_HINTS):
+        return False
+    return any(hint in low for hint in _SERVER_HINTS)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+    <li><strong>Lines 1–9:</strong> <code>show_recording_complete(...)</code><br>
+    <span class="desc">The recording-finished dialog. Two buttons are offered with <code>"ok"</code> as the default; when the user picks <code>"open"</code>, <code>open_folder(project_folder)</code> launches the OS file manager (via <code>os.startfile</code> on Windows, a <code>file://</code> URL as fallback). Any other outcome (OK, Escape) simply closes.</span></li>
+    <li><strong>Lines 11–17:</strong> <code>_SERVER_HINTS = (...)</code><br>
+    <span class="desc">A tuple of lowercase substrings that indicate the OmniVoice HTTP server itself failed (connection refused, exited prematurely, "try restarting it from settings", …). Pattern matching on error text is deliberately simple: the engine layer raises many exception types, but the user-facing decision only needs "is this a server problem or not".</span></li>
+    <li><strong>Lines 19–23:</strong> <code>def looks_like_server_error(message): ...</code><br>
+    <span class="desc">The classifier. First the message is lowercased so matching is case-insensitive. Then the subtle part: <code>_REQUEST_LEVEL_HINTS</code> (messages like "server returned HTTP 500: …") are checked first and <em>veto</em> the classification — if the server answered with its own HTTP error, it is demonstrably alive and offering a restart would only confuse. Only when no veto matched do the <code>_SERVER_HINTS</code> decide. This two-tier check is why the restart dialog appears for dead-server errors but not for synthesis failures the server already reported.</span></li>
+  </ol>
+</div>
+
+<h2>75.4 One Progress Dialog, Two Usage Patterns</h2>
+
+<p><code>gui/progress.py</code> serves two callers with opposite needs:</p>
+<ul>
+  <li><strong>Background threads</strong> (recording, server restart): the worker
+  pushes updates through <code>wx.CallAfter</code>; the normal event loop repaints.</li>
+  <li><strong>Synchronous work</strong> (document parsing in the wizard): the UI
+  thread is busy inside a long call, so the dialog must repaint itself with
+  <code>wx.Window.Update()</code>.</li>
+</ul>
+
+<pre><code>class TaskProgressDialog(wx.Dialog):
+    def __init__(self, parent, title="Working", message="Working...",
+                 cancel_label=None, on_cancel=None, style=None):
+        if style is None:
+            style = wx.CAPTION | wx.RESIZE_BORDER
+        super().__init__(parent, title=title, style=style)
+        self._on_cancel = on_cancel
+
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        self._message = wx.StaticText(self, label=message)
+        self._message.SetName("Progress message")
+        self._message.Wrap(430)
+        sizer.Add(self._message, 0, wx.ALL, 10)
+
+        self.gauge = wx.Gauge(self, range=100, size=(420, 22))
+        self.gauge.SetName("Progress")
+        self.gauge.SetToolTip("Shows how much of the work has finished")
+        sizer.Add(self.gauge, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 4)</h4>
+  <ol>
+    <li><strong>Lines 1–5:</strong> the signature and style fallback<br>
+    <span class="desc">The constructor accepts the dialog texts, an optional cancel button (label + callback) and an optional style. When no style is given it uses <code>wx.CAPTION | wx.RESIZE_BORDER</code> — deliberately <em>without</em> <code>wx.CLOSE_BOX</code>: the dialog's lifetime is controlled by the calling code (via <code>finish()</code>), not by the user clicking a close box mid-operation.</span></li>
+    <li><strong>Lines 6–10:</strong> the message label<br>
+    <span class="desc">A <code>StaticText</code> with a fixed accessible name ("Progress message") that later gains the current text (see <code>set_message</code> below), and <code>Wrap(430)</code> so long status lines break cleanly. Screen readers announce the label whenever it changes because the name changes with it.</span></li>
+    <li><strong>Lines 12–15:</strong> the gauge<br>
+    <span class="desc">A <code>wx.Gauge</code> with range 100 — values are always expressed as percentages. It gets its own accessible name and a tooltip. <code>range=100</code> also matches the pulse animation below, which walks the gauge between 0 and 95.</span></li>
+  </ol>
+</div>
+
+<pre><code>    def start_pulse(self, interval_ms: int = 150) -> None:
+        self._pulse_value = 0
+        self._pulse_timer = wx.Timer(self)
+        self.Bind(wx.EVT_TIMER, self._on_pulse_tick, self._pulse_timer)
+        self._pulse_timer.Start(interval_ms)
+
+    def _on_pulse_tick(self, _):
+        self._pulse_value = (self._pulse_value + 4) % 96
+        self.show_progress(self._pulse_value)
+
+    def show_progress(self, value: int) -> None:
+        self.gauge.SetValue(max(0, min(100, int(value))))
+        self.gauge.Update()
+
+    def finish(self) -> None:
+        self.stop_pulse()
+        try:
+            self.Destroy()
+        except Exception:
+            pass</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 5)</h4>
+    <ol>
+    <li><strong>Lines 1–5:</strong> <code>start_pulse(interval_ms=150)</code><br>
+    <span class="desc">Starts indeterminate ("busy") animation for work whose length is unknown — a server restart, a recording that depends on document size. A <code>wx.Timer</code> owned by the dialog fires every 150&nbsp;ms on the UI thread (timers are the only safe way for GUI state to change periodically without a second thread touching widgets).</span></li>
+    <li><strong>Lines 7–8:</strong> <code>_on_pulse_tick</code><br>
+    <span class="desc">Each tick advances the stored pulse value by 4 and wraps with modulo 96, so the gauge sweeps 0→95→0 forever without ever reaching 100 (which would falsely signal completion). It then routes through <code>show_progress</code>, gaining the forced repaint for free.</span></li>
+    <li><strong>Lines 10–12:</strong> <code>show_progress(value)</code><br>
+    <span class="desc">Sets the gauge, clamped into 0–100 by <code>max(0, min(100, ...))</code> so a misbehaving worker cannot crash the dialog. The crucial detail is <code>self.gauge.Update()</code> — unlike <code>Refresh</code>, <code>Update()</code> repaints <em>immediately</em>, synchronously. This is what makes the bar move even while the UI thread is blocked inside a long parsing call and no event-loop paint pass will ever run.</span></li>
+    <li><strong>Lines 14–18:</strong> <code>finish()</code><br>
+    <span class="desc">The single, safe way to close the dialog: stop the pulse timer (a timer firing after destroy would raise), then <code>Destroy()</code> wrapped in a guard because two callers (worker thread via <code>CallAfter</code> and the UI handler) may both call <code>finish</code> — the second call must be a harmless no-op.</span></li>
+  </ol>
+</div>
+
+<h2>75.5 Where These Are Used</h2>
+
+<table>
+  <thead><tr><th>Call site</th><th>Helper</th><th>Buttons</th></tr></thead>
+  <tbody>
+    <tr><td>Recording complete (Recording window)</td><td><code>show_recording_complete</code></td><td>Open project folder / OK</td></tr>
+    <tr><td>OmniVoice Server error (anywhere)</td><td><code>notify_engine_error</code></td><td>Restart server now / I will restart later</td></tr>
+    <tr><td>Recording progress (Recording window)</td><td><code>TaskProgressDialog</code> + cancel → Stop</td><td>Stop recording</td></tr>
+    <tr><td>Server restart (Settings / error dialog)</td><td><code>restart_omni_server</code> + <code>TaskProgressDialog</code></td><td>(none — pulsing)</td></tr>
+    <tr><td>Document parsing (wizard)</td><td><code>TaskProgressDialog.show_progress</code></td><td>(none — synchronous)</td></tr>
+  </tbody>
+</table>
+
+<h2>75.6 Key Takeaways</h2>
+<ul>
+  <li>Real <code>wx.Button</code>s with <code>SetName(label)</code> are what screen readers announce — prefer them over <code>wx.MessageBox</code> when buttons carry meaning</li>
+  <li>Map control ids → action keys in a dict so one handler serves any number of buttons</li>
+  <li>Classify errors in two tiers: request-level messages veto, then server hints decide</li>
+  <li><code>wx.Window.Update()</code> repaints synchronously — the only way a progress bar can move while the UI thread is busy</li>
+  <li>Guard <code>Destroy()</code>; timers must stop before the window dies; <code>wx.CallAfter</code> sequences focus and cross-thread updates</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch74_daisy3_builder.html">← Ch 74</a> &nbsp;|&nbsp; <a href="appendix_a_reference.html">Appendix A — Python Reference →</a></p>
+</div></div></body>
+</html>

@@ -21,7 +21,11 @@ from unittest import mock
 import numpy as np
 
 from ai_voice_studio.omnivoice import build_synthesize_request, spec
-from ai_voice_studio.omnivoice_server import OmniVoiceServerManager, OmniVoiceServerError
+from ai_voice_studio.omnivoice_server import (
+    OmniVoiceServerManager,
+    OmniVoiceServerError,
+    split_text_for_server,
+)
 
 
 class CleanLanguageTest(unittest.TestCase):
@@ -370,7 +374,9 @@ class ServerRobustnessTest(unittest.TestCase):
         """A long text must get a longer socket timeout than the old fixed
         120s, and request_timeout_s still wins when given."""
         short = "hello"
-        long_text = "word " * 2000  # 10000 chars
+        # Keep this text under the server's 10k-char request cap so it is
+        # still ONE request; long-text splitting has its own test below.
+        long_text = "word " * 1200  # 6000 chars
         self.mgr.synthesize(short)
         short_timeout = self.captured["timeout"]
         self.mgr.synthesize(long_text)
@@ -388,8 +394,91 @@ class ServerRobustnessTest(unittest.TestCase):
             with open(ref, "wb") as fh:
                 fh.write(_wav_bytes())
             self.mgr.synthesize_clone(
-                "word " * 2000, ref_audio_path=ref)
+                "word " * 1200, ref_audio_path=ref)  # 6000 chars, one request
         self.assertGreater(self.captured["timeout"], 120.0)
+
+
+class ServerLongTextChunkingTest(unittest.TestCase):
+    """The omnivoice-server API caps ``input``/``text`` at 10,000 characters
+    and answers anything longer with HTTP 422 "Request validation failed" —
+    the exact error long book chapters hit on their very first segment.
+    The client must split long texts into server-sized chunks at sentence
+    boundaries, send one request per chunk and join the audio in order."""
+
+    def setUp(self):
+        self.requests = []
+        self._patch = mock.patch.object(urllib.request, "urlopen", self._fake_urlopen)
+        self._patch.start()
+        self.mgr = OmniVoiceServerManager(host="127.0.0.1", port=8880)
+
+    def tearDown(self):
+        self._patch.stop()
+
+    def _fake_urlopen(self, req, timeout=None):
+        self.requests.append(req)
+        return _FakeResponse(_wav_bytes())
+
+    def test_split_respects_limit(self):
+        text = (". ".join(f"Sentence number {i} here" for i in range(400)))
+        chunks = split_text_for_server(text)
+        self.assertGreater(len(chunks), 1)
+        for chunk in chunks:
+            self.assertLessEqual(len(chunk), 9500)
+        self.assertEqual("".join(chunks).replace(" ", ""),
+                         text.replace(" ", ""))
+
+    def test_split_short_text_is_one_chunk(self):
+        self.assertEqual(split_text_for_server("hello world"), ["hello world"])
+
+    def test_split_handles_devanagari_danda(self):
+        sentence = "यह एक वाक्य है। "
+        text = sentence * 600  # ~10,800 chars of danda-terminated Hindi
+        chunks = split_text_for_server(text)
+        self.assertGreater(len(chunks), 1)
+        for chunk in chunks:
+            self.assertLessEqual(len(chunk), 9500)
+
+    def test_long_text_sent_as_multiple_requests_in_order(self):
+        text = ("This is a test sentence for chunking. " * 400)  # ~16k chars
+        samples = self.mgr.synthesize(text, voice="alloy", instructions="male")
+        self.assertGreaterEqual(len(self.requests), 2)
+        sent = [json.loads(r.data.decode("utf-8"))["input"] for r in self.requests]
+        self.assertEqual("".join(s.replace(" ", "") for s in sent),
+                         text.replace(" ", ""))
+        # Every parameter rides along on every chunk.
+        for r in self.requests:
+            payload = json.loads(r.data.decode("utf-8"))
+            self.assertEqual(payload["voice"], "alloy")
+            self.assertEqual(payload["instructions"], "male")
+        self.assertEqual(len(samples), 200 * len(self.requests))  # one _wav_bytes() per chunk
+
+    def test_long_clone_text_sent_as_multiple_requests(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ref = os.path.join(tmp, "ref.wav")
+            with open(ref, "wb") as fh:
+                fh.write(_wav_bytes())
+            text = ("यह किताब का एक लंबा अध्याय है। " * 400)  # ~12.4k chars
+            samples = self.mgr.synthesize_clone(
+                text, ref_audio_path=ref, ref_text="sample transcript")
+        self.assertGreater(len(self.requests), 1)
+        for r in self.requests:
+            body = r.data.decode("utf-8", errors="replace")
+            self.assertIn('name="text"', body)
+            self.assertIn('name="ref_audio"', body)
+            self.assertIn('name="ref_text"', body)
+        self.assertEqual(len(samples), 200 * len(self.requests))
+
+    def test_no_chunk_exceeds_server_limit(self):
+        """Even a punctuation-less wall of text must be hard-cut below 10k."""
+        text = "अ" * 25000
+        chunks = split_text_for_server(text)
+        for chunk in chunks:
+            self.assertLessEqual(len(chunk), 9500)
+        with mock.patch.object(urllib.request, "urlopen", self._fake_urlopen):
+            self.mgr.synthesize(text)
+        for r in self.requests:
+            payload = json.loads(r.data.decode("utf-8"))
+            self.assertLessEqual(len(payload["input"]), 10000)
 
 
 class ServerHttpErrorDetailTest(unittest.TestCase):

@@ -10,6 +10,7 @@
 <div class="book-container">
 <nav class="sidebar"><h2>📖 Contents</h2>
 <div class="part-header">Part VI</div><ul class="chapters"><li><a href="ch43_architecture.html">Ch 43</a></li><li><a href="ch44_paths_settings.html" class="active">Ch 44: Paths/Settings</a></li><li><a href="ch45_project_model.html">Ch 45</a></li><li><a href="ch46_document_parsing.html">Ch 46</a></li><li><a href="ch47_tts_catalog.html">Ch 47</a></li><li><a href="ch48_tts_engine.html">Ch 48</a></li><li><a href="ch49_downloader.html">Ch 49</a></li><li><a href="ch50_compute_detection.html">Ch 50</a></li><li><a href="ch51_main_frame.html">Ch 51</a></li><li><a href="ch52_settings_dialog.html">Ch 52</a></li><li><a href="ch53_model_panels.html">Ch 53</a></li><li><a href="ch54_new_project_wizard.html">Ch 54</a></li><li><a href="ch55_recording.html">Ch 55</a></li><li><a href="ch56_synthesis_worker.html">Ch 56</a></li><li><a href="ch57_clone_engine.html">Ch 57</a></li><li><a href="ch58_omnivoice.html">Ch 58</a></li><li><a href="ch59_daisy_builder.html">Ch 59</a></li><li><a href="ch60_addons.html">Ch 60</a></li></ul>
+<div class="part-header">Part IX — Additions</div><ul class="chapters"><li><a href="ch73_playlist_builder.html">Ch 73: Playlist Builder</a></li><li><a href="ch74_daisy3_builder.html">Ch 74: DAISY 3 Builder</a></li><li><a href="ch75_dialogs_progress.html">Ch 75: Dialogs &amp; Progress</a></li></ul>
 </nav>
 <div class="main-content">
 
@@ -387,9 +388,28 @@ THEME_LIGHT, THEME_DARK, THEME_SYSTEM = <span class="str">"light"</span>, <span 
 
 <span class="cm"># Project types</span>
 PROJECT_TYPE_AUDIO_PLAYLIST = <span class="str">"audio_playlist"</span>
-PROJECT_TYPE_DAISY_AUDIO = <span class="str">"daisy_audio"</span>
-PROJECT_TYPE_DAISY_AUDIO_TEXT = <span class="str">"daisy_audio_text"</span>
 PROJECT_TYPE_CLIPBOARD = <span class="str">"clipboard"</span>
+PROJECT_TYPE_DAISY_AUDIO = <span class="str">"daisy_audio"</span>
+<span class="cm"># Legacy alias kept for reading older projects (no longer in the wizard)</span>
+PROJECT_TYPE_DAISY_AUDIO_TEXT = <span class="str">"daisy_audio_text"</span>
+PROJECT_TYPE_DAISY3_AUDIO_TEXT = <span class="str">"daisy3_audio_text"</span>
+
+<span class="cm"># DAISY 3 constants</span>
+DAISY3_OUTPUT_DIR_NAME = <span class="str">"DAISY3"</span>
+DAISY3_DTBOOK_FILE = <span class="str">"book.xml"</span>
+DAISY3_NCX_FILE = <span class="str">"ncx.xml"</span>
+
+<span class="cm"># DAISY chapter splitting</span>
+DAISY_SPLIT_H1 = <span class="str">"h1"</span>
+DAISY_SPLIT_ALL_HEADINGS = <span class="str">"all"</span>
+
+<span class="cm"># Audio file creation modes</span>
+MODE_PAGE_WITH_H1 = <span class="str">"page_with_h1"</span>
+MODE_PAGE_ONLY = <span class="str">"page_only"</span>
+MODE_H1_ONLY = <span class="str">"h1_only"</span>
+MODE_ALL_HEADINGS = <span class="str">"all_headings"</span>
+MODE_ONE_FILE = <span class="str">"one_file"</span>
+PAGES_PER_FILE_MIN, PAGES_PER_FILE_MAX = <span class="num">1</span>, <span class="num">50</span>
 
 <span class="cm"># DAISY constants</span>
 DAISY_NCC_FILE = <span class="str">"ncc.html"</span>
@@ -473,23 +493,31 @@ DAISY_AUDIO_DIR_NAME = <span class="str">"audio"</span></code></pre>
       </li>
       <li>
         <strong>Line 19:</strong> <code>PROJECT_TYPE_AUDIO_PLAYLIST = &quot;audio_playlist&quot;</code>
-        <br><span class="desc">Assigns <code>&quot;audio_playlist&quot;</code> to <code>PROJECT_TYPE_AUDIO_PLAYLIST</code>.</span>
+        <br><span class="desc">Assigns <code>&quot;audio_playlist&quot;</code> to <code>PROJECT_TYPE_AUDIO_PLAYLIST</code>. This is the default project type: per-segment audio files plus generated M3U8/PLS/WPL playlists (Chapter 73).</span>
       </li>
       <li>
-        <strong>Line 20:</strong> <code>PROJECT_TYPE_DAISY_AUDIO = &quot;daisy_audio&quot;</code>
-        <br><span class="desc">Assigns <code>&quot;daisy_audio&quot;</code> to <code>PROJECT_TYPE_DAISY_AUDIO</code>.</span>
+        <strong>Line 20:</strong> <code>PROJECT_TYPE_CLIPBOARD = &quot;clipboard&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;clipboard&quot;</code> to <code>PROJECT_TYPE_CLIPBOARD</code>. Clipboard projects record pasted text directly, with no source document.</span>
       </li>
       <li>
-        <strong>Line 21:</strong> <code>PROJECT_TYPE_DAISY_AUDIO_TEXT = &quot;daisy_audio_text&quot;</code>
-        <br><span class="desc">Assigns <code>&quot;daisy_audio_text&quot;</code> to <code>PROJECT_TYPE_DAISY_AUDIO_TEXT</code>.</span>
+        <strong>Line 21:</strong> <code>PROJECT_TYPE_DAISY_AUDIO = &quot;daisy_audio&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;daisy_audio&quot;</code> to <code>PROJECT_TYPE_DAISY_AUDIO</code>. DAISY 2.02 audio-only books.</span>
       </li>
       <li>
-        <strong>Line 22:</strong> <code>PROJECT_TYPE_CLIPBOARD = &quot;clipboard&quot;</code>
-        <br><span class="desc">Assigns <code>&quot;clipboard&quot;</code> to <code>PROJECT_TYPE_CLIPBOARD</code>.</span>
+        <strong>Line 22:</strong> <code># Legacy alias kept for reading older projects (no longer in the wizard)</code>
+        <br><span class="desc">A comment documenting that the next constant is a compatibility alias: older projects with this type keep loading and building books, but new projects cannot select it.</span>
       </li>
       <li>
-        <strong>Line 23:</strong> <code># DAISY constants</code>
-        <br><span class="desc">A comment: <em>DAISY constants</em>. Comments are ignored by the Python interpreter and serve as documentation.</span>
+        <strong>Line 23:</strong> <code>PROJECT_TYPE_DAISY_AUDIO_TEXT = &quot;daisy_audio_text&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;daisy_audio_text&quot;</code> to <code>PROJECT_TYPE_DAISY_AUDIO_TEXT</code>. The legacy DAISY 2.02 audio+text type &mdash; still honoured on load.</span>
+      </li>
+      <li>
+        <strong>Line 24:</strong> <code>PROJECT_TYPE_DAISY3_AUDIO_TEXT = &quot;daisy3_audio_text&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;daisy3_audio_text&quot;</code> to <code>PROJECT_TYPE_DAISY3_AUDIO_TEXT</code>. The DAISY 3 (Z39.86-2005) audio+text-with-images type, the only project type that embeds images (Chapter 74).</span>
+      </li>
+      <li>
+        <strong>Line 25:</strong> <code># DAISY 3 constants</code>
+        <br><span class="desc">A comment introducing the DAISY 3 output names: the builder writes a flat fileset (book.xml + ncx.xml + package.opf + SMILs + audio) inside the <code>DAISY3</code> folder.</span>
       </li>
       <li>
         <strong>Line 24:</strong> <code>DAISY_NCC_FILE = &quot;ncc.html&quot;</code>
@@ -502,6 +530,58 @@ DAISY_AUDIO_DIR_NAME = <span class="str">"audio"</span></code></pre>
       <li>
         <strong>Line 26:</strong> <code>DAISY_AUDIO_DIR_NAME = &quot;audio&quot;</code>
         <br><span class="desc">Assigns <code>&quot;audio&quot;</code> to <code>DAISY_AUDIO_DIR_NAME</code>.</span>
+      </li>
+      <li>
+        <strong>Line 27:</strong> <code>DAISY3_OUTPUT_DIR_NAME = &quot;DAISY3&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;DAISY3&quot;</code> to <code>DAISY3_OUTPUT_DIR_NAME</code>. Every DAISY 3 book is built inside this subfolder of the project.</span>
+      </li>
+      <li>
+        <strong>Line 28:</strong> <code>DAISY3_DTBOOK_FILE = &quot;book.xml&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;book.xml&quot;</code> to <code>DAISY3_DTBOOK_FILE</code> &mdash; the DTBook text document of a DAISY 3 book.</span>
+      </li>
+      <li>
+        <strong>Line 29:</strong> <code>DAISY3_NCX_FILE = &quot;ncx.xml&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;ncx.xml&quot;</code> to <code>DAISY3_NCX_FILE</code> &mdash; the NCX navigation file players use to move between chapters.</span>
+      </li>
+      <li>
+        <strong>Line 30:</strong> <code># DAISY chapter splitting</code>
+        <br><span class="desc">A comment introducing the two chapter-splitting modes offered on the wizard's DAISY page: heading style 1 only, or break on every heading (styles 1&ndash;6).</span>
+      </li>
+      <li>
+        <strong>Line 31:</strong> <code>DAISY_SPLIT_H1 = &quot;h1&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;h1&quot;</code> to <code>DAISY_SPLIT_H1</code>. Each heading style 1 starts a new DAISY chapter.</span>
+      </li>
+      <li>
+        <strong>Line 32:</strong> <code>DAISY_SPLIT_ALL_HEADINGS = &quot;all&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;all&quot;</code> to <code>DAISY_SPLIT_ALL_HEADINGS</code>. Any heading starts a new chapter.</span>
+      </li>
+      <li>
+        <strong>Line 33:</strong> <code># Audio file creation modes</code>
+        <br><span class="desc">A comment introducing the five modes that decide how a document is divided into audio files. The wizard and Settings both read these.</span>
+      </li>
+      <li>
+        <strong>Line 34:</strong> <code>MODE_PAGE_WITH_H1 = &quot;page_with_h1&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;page_with_h1&quot;</code> to <code>MODE_PAGE_WITH_H1</code>. Page-by-page recording with heading style 1 starting its own file.</span>
+      </li>
+      <li>
+        <strong>Line 35:</strong> <code>MODE_PAGE_ONLY = &quot;page_only&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;page_only&quot;</code> to <code>MODE_PAGE_ONLY</code>. One file per page &mdash; optionally grouping 1&ndash;50 pages into one file via <code>PAGES_PER_FILE_MIN/MAX</code>.</span>
+      </li>
+      <li>
+        <strong>Line 36:</strong> <code>MODE_H1_ONLY = &quot;h1_only&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;h1_only&quot;</code> to <code>MODE_H1_ONLY</code>. One file per heading style 1 and its following text.</span>
+      </li>
+      <li>
+        <strong>Line 37:</strong> <code>MODE_ALL_HEADINGS = &quot;all_headings&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;all_headings&quot;</code> to <code>MODE_ALL_HEADINGS</code>. Same pattern, but breaking on every heading level.</span>
+      </li>
+      <li>
+        <strong>Line 38:</strong> <code>MODE_ONE_FILE = &quot;one_file&quot;</code>
+        <br><span class="desc">Assigns <code>&quot;one_file&quot;</code> to <code>MODE_ONE_FILE</code>. The whole document becomes one audio file; a recording stopped midway restarts from the beginning, so the Recording window warns about it.</span>
+      </li>
+      <li>
+        <strong>Line 39:</strong> <code>PAGES_PER_FILE_MIN, PAGES_PER_FILE_MAX = 1, 50</code>
+        <br><span class="desc">Assigns the grouping bounds <code>1</code> and <code>50</code>. The wizard's spin control is built from these, so the GUI and validation share one source of truth.</span>
       </li>
   </ol>
 </div>

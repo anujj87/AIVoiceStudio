@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 74: DAISY 3 Builder - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part IX — Additions</div><ul class="chapters"><li><a href="ch73_playlist_builder.html">Ch 73: Playlist Builder</a></li><li><a href="ch74_daisy3_builder.html" class="active">Ch 74: DAISY 3 Builder</a></li><li><a href="ch75_dialogs_progress.html">Ch 75: Dialogs &amp; Progress</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 74</div>
+<h1>DAISY 3 Builder (Z39.86-2005)</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand the DAISY 3 fileset: DTBook text, NCX navigation, SMIL synchronization</li>
+  <li>Generate a conforming DTBook 2005-3 document with frontmatter and images</li>
+  <li>Synchronize audio to text at phrase level using proportional time slicing</li>
+  <li>Embed source-document images as <code>imggroup</code> elements and OPF manifest entries</li>
+</ul>
+
+<hr>
+
+<h2>74.1 What DAISY 3 Adds Over DAISY 2.02</h2>
+
+<p>DAISY 2.02 stores its text in small HTML files; DAISY 3 (the Z39.86-2005
+standard) replaces that with one <strong>DTBook</strong> XML document for the
+whole book, an <strong>NCX</strong> navigation file, and SMIL 2.0 documents
+that bind every paragraph to its place in the audio. The builder in
+<code>documents/daisy3_builder.py</code> (added after this book's first
+edition) produces a complete fileset in <code>&lt;project&gt;/DAISY3/</code>:</p>
+
+<pre><code>book.xml       -- DTBook 2005-3 text content (frontmatter, body, rearmatter)
+ncx.xml        -- NCX navigation (navMap built from the heading hierarchy)
+package.opf    -- OPF package manifest tying everything together
+0001.smil ...  -- one SMIL 2.0 document per recorded segment
+aud0001.wav .. -- recorded audio renamed to digit-only names</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+    <li><strong>Line 1:</strong> <code>book.xml -- DTBook 2005-3 text content</code><br>
+    <span class="desc">The whole book's text in a single DTBook document: mandatory <code>frontmatter</code> (title, author), the <code>bodymatter</code> with all chapters, and a <code>rearmatter</code>. DAISY 3 players open this file's companion package and render the text while highlighting the spoken paragraph.</span></li>
+    <li><strong>Line 2:</strong> <code>ncx.xml -- NCX navigation</code><br>
+    <span class="desc">The navigation control file. Its <code>navMap</code> mirrors the document's heading hierarchy, so a reader can jump chapter by chapter (or heading by heading) exactly as in the printed book's table of contents.</span></li>
+    <li><strong>Line 3:</strong> <code>package.opf -- OPF package manifest</code><br>
+    <span class="desc">The entry point a DAISY 3 player opens first. It lists every file in the book with its MIME type and links the DTBook, NCX, SMILs and audio together.</span></li>
+    <li><strong>Line 4:</strong> <code>0001.smil ... -- one SMIL per segment</code><br>
+    <span class="desc">Each recorded segment gets one SMIL 2.0 document containing a <code>&lt;par&gt;</code> per paragraph: the text reference and the <code>&lt;audio&gt;</code> element with exact clip begin/end times.</span></li>
+    <li><strong>Line 5:</strong> <code>aud0001.wav -- digit-only names</code><br>
+    <span class="desc">Recorded audio is copied under zero-padded digit-only names. Segment titles can contain any characters; players only ever see <code>aud0001.wav</code>, <code>aud0002.mp3</code>, which keeps every URI in the book trivially safe.</span></li>
+  </ol>
+</div>
+
+<h2>74.2 The Entry Point: <code>build_daisy3_book()</code></h2>
+
+<pre><code>def build_daisy3_book(
+    output_dir: str,
+    project_name: str,
+    segments: List[Dict[str, Any]],
+    audio_format: str = "wav",
+    language: str = "en",
+    publisher: str = "",
+    source_file: str = "",
+    author: str = "",
+    meta: Optional[Dict[str, str]] = None,
+) -> str:
+    ready = [s for s in segments if s.get("status") == "done" and s.get("saved")]
+    if not ready:
+        return ""
+
+    daisy_dir = os.path.join(output_dir, DAISY3_OUTPUT_DIR_NAME)
+    os.makedirs(daisy_dir, exist_ok=True)
+
+    book_uid = "urn:uuid:" + str(uuid.uuid4())
+    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+    <li><strong>Lines 1–10:</strong> the signature<br>
+    <span class="desc">The parameters deliberately mirror <code>build_daisy_book()</code> from the DAISY 2.02 builder, so the recording dialog can call either one with the same argument list. <code>output_dir</code> is the project folder, <code>segments</code> the fresh segment list from <code>project.json</code>, and <code>meta</code> the book information entered in the wizard (title, creator, date, subject, narrator, producer). The return value is the path of the generated <code>package.opf</code> — the file players open — or an empty string when there was nothing to build.</span></li>
+    <li><strong>Line 11:</strong> <code>ready = [s for s in segments if s.get("status") == "done" and s.get("saved")]</code><br>
+    <span class="desc">The same filter the playlist builder uses: only segments that were fully recorded (status <code>done</code> with a saved file) become part of the book. A partially recorded project produces a book covering exactly the audio that exists.</span></li>
+    <li><strong>Line 12:</strong> <code>if not ready: return ""</code><br>
+    <span class="desc">No recorded audio means no book: the function returns an empty string and the caller skips its "book generated" message.</span></li>
+    <li><strong>Lines 14–15:</strong> <code>daisy_dir = os.path.join(output_dir, DAISY3_OUTPUT_DIR_NAME)</code> / <code>os.makedirs(daisy_dir, exist_ok=True)</code><br>
+    <span class="desc">Creates the <code>DAISY3</code> folder inside the project folder. <code>exist_ok=True</code> makes the call idempotent — rebuilding the book after re-recording a segment simply reuses the existing folder.</span></li>
+    <li><strong>Line 17:</strong> <code>book_uid = "urn:uuid:" + str(uuid.uuid4())</code><br>
+    <span class="desc">Generates a fresh unique identifier for the book. DAISY metadata requires a <code>dc:Identifier</code> in URN form; a random UUID guarantees two exports of different books never collide in a player's library.</span></li>
+    <li><strong>Line 18:</strong> <code>now_iso = datetime.now(timezone.utc).strftime(...)</code><br>
+    <span class="desc">Timestamps the build in UTC with the ISO-8601 format (<code>%Y-%m-%dT%H:%M:%SZ</code>) that DAISY metadata fields demand. UTC avoids ambiguous local-time offsets in the book metadata.</span></li>
+  </ol>
+</div>
+
+<div class="info"><strong>MP3 normalization on staging:</strong> while copying each
+recorded segment into the book as <code>aud0001.wav</code> and friends, the
+builder calls the same <code>_stage_audio</code> helper as the DAISY 2.02
+builder. An MP3 saved by a TTS engine is often MPEG-2 LSF at 22–24&nbsp;kHz,
+which several DAISY players truncate ("audio cuts out"). If
+<code>ffmpeg.needs_mp3_normalization()</code> detects a rate below 44.1&nbsp;kHz,
+the file is re-encoded to MPEG-1 Layer III, 44.1&nbsp;kHz mono before entering
+the book. See Chapter 59.</div>
+
+<h2>74.3 Building the DTBook</h2>
+
+<p>The DTBook writer emits the official public identifier and required
+structure:</p>
+
+<pre><code>_DTBOOK_DOCTYPE = (
+    '<!DOCTYPE dtbook PUBLIC "-//NISO//DTD dtbook 2005-3//EN" '
+    '"http://www.daisy.org/z3986/2005/dtbook-2005-3.dtd">'
+)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+    <li><strong>Lines 1–3:</strong> <code>_DTBOOK_DOCTYPE = ('&lt;!DOCTYPE dtbook PUBLIC ...')</code><br>
+    <span class="desc">The official Document Type Declaration for DTBook 2005-3. Strict DAISY 3 players (FSReader, EasyReader, AMIS) validate the document against this DTD; writing the exact formal public identifier and system URL means the book conforms rather than merely parses. The string is split across two literals that Python concatenates, keeping the source line short.</span></li>
+  </ol>
+</div>
+
+<p>Every segment's text becomes a chapter with one phrase per paragraph:</p>
+
+<pre><code>def _entry_blocks(entry: Dict[str, Any], id_counter: List[int]) -> List[Dict[str, Any]]:
+    blocks: List[Dict[str, Any]] = []
+
+    def add(dtbook_id: str, text: str) -> None:
+        id_counter[0] += 1
+        blocks.append({"id": dtbook_id, "text": text})
+
+    for para in entry["paragraphs"]:
+        add(f"dtb{para['index']}", para["text"])
+    return blocks</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 4)</h4>
+  <ol>
+    <li><strong>Line 1:</strong> <code>def _entry_blocks(entry, id_counter):</code><br>
+    <span class="desc">Converts one recorded segment into the DTBook paragraph records. <code>entry</code> holds the segment's text broken into paragraphs, and <code>id_counter</code> is a one-element list used as a mutable counter (a closure cannot rebind a plain <code>int</code> of the enclosing scope, but it can mutate a list).</span></li>
+    <li><strong>Lines 3–5:</strong> <code>def add(dtbook_id, text): ... blocks.append(...)</code><br>
+    <span class="desc">A local helper closing over <code>blocks</code> and <code>id_counter</code>. Each call bumps the shared counter and appends one record with a DTBook element id (<code>dtb1</code>, <code>dtb2</code>, …). These ids are what the SMIL files reference later, so they must be unique across the whole book.</span></li>
+    <li><strong>Lines 7–8:</strong> <code>for para in entry["paragraphs"]: add(f"dtb{para['index']}", para["text"])</code><br>
+    <span class="desc">One paragraph of the segment becomes one DTBook block, and one block later becomes one SMIL <code>&lt;par&gt;</code> — this 1:1 mapping is what gives the book phrase-level synchronization: while a paragraph is spoken, the player highlights exactly that paragraph's text.</span></li>
+  </ol>
+</div>
+
+<h2>74.4 Embedding Images</h2>
+
+<p>DAISY 3 is the first project type in AIVS that carries images. The builder
+extracts images from the source document and appends them as
+<code>imggroup</code> elements:</p>
+
+<pre><code>_IMAGE_EXT_MIME = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".svg": "image/svg+xml",
+    ".webp": "image/webp",
+    ".bmp": "image/bmp",
+    ".tif": "image/tiff",
+    ".tiff": "image/tiff",
+}
+
+_IMG_TAG_RE = re.compile(
+    r"<img\b[^>]*?\bsrc\s*=\s*[\"']([^\"']+)[\"']", re.IGNORECASE
+)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 5)</h4>
+  <ol>
+    <li><strong>Lines 1–11:</strong> <code>_IMAGE_EXT_MIME = {...}</code><br>
+    <span class="desc">Maps the image file extensions the builder understands to their official MIME types. The OPF manifest requires the correct MIME type for every resource, and the <code>imggroup</code> writer uses the same table when choosing the file extension for extracted media.</span></li>
+    <li><strong>Lines 13–14:</strong> <code>_IMG_TAG_RE = re.compile(r"&lt;img\b[^&gt;]*?\bsrc\s*=\s*[\"']([^\"']+)[\"']", re.IGNORECASE)</code><br>
+    <span class="desc">The regular expression that pulls image references out of HTML/EPUB content. Reading it piece by piece: <code>&lt;img\b</code> matches the tag opening (<code>\b</code> prevents matching <code>&lt;imginput</code>-style words); <code>[^&gt;]*?</code> lazily skips any attributes before <code>src</code>; <code>\bsrc\s*=\s*</code> matches the src attribute with optional spaces around the equals sign; <code>[\"']([^\"']+)[\"']</code> captures the value in either single or double quotes; and <code>re.IGNORECASE</code> accepts <code>&lt;IMG SRC=...&gt;</code> as produced by some exporters. Everything the parser finds here is downloaded/extracted into the book and referenced from the DTBook.</span></li>
+  </ol>
+</div>
+
+<h2>74.5 NCX Navigation and SMIL Synchronization</h2>
+
+<p>The NCX nests navPoints by heading level, and each SMIL binds text to audio
+with <code>dtb:</code> attributes that players require:</p>
+
+<pre><code>_SMIL_DOCTYPE = (
+    '<!DOCTYPE smil PUBLIC "-//NISO//DTD xml-smil 2005-1//EN" '
+    '"http://www.daisy.org/z3986/2005/xml-smil-2005-1.dtd">'
+)
+
+_SMIL_DTB_NS = "http://www.daisy.org/z3986/2005/dtbook/"</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 6)</h4>
+  <ol>
+    <li><strong>Lines 1–3:</strong> <code>_SMIL_DOCTYPE = ('&lt;!DOCTYPE smil PUBLIC ...')</code><br>
+    <span class="desc">The official SMIL 2.0 DTD declaration for DAISY 3 content documents. Like the DTBook doctype it makes the fileset conformant, not just well-formed.</span></li>
+    <li><strong>Line 5:</strong> <code>_SMIL_DTB_NS = "http://www.daisy.org/z3986/2005/dtbook/"</code><br>
+    <span class="desc">The namespace URI bound to the <code>dtb:</code> prefix. DAISY 3 SMIL files carry required custom attributes in this namespace — <code>dtb:requiredNamespace</code> on the root, <code>dtb:totalElapsed</code>/<code>dtb:timeInThisSmil</code> for timings, and <code>customTest</code> on each <code>&lt;par&gt;</code> — without which strict players refuse to play the book.</span></li>
+  </ol>
+</div>
+
+<div class="warning"><strong>Conformance detail learned the hard way:</strong> the
+<code>&lt;audio&gt;</code> element must sit <em>directly inside</em> each
+<code>&lt;par&gt;</code> — wrapping it in a <code>&lt;seq&gt;</code> (which SMIL
+itself allows) makes several real DAISY 3 players skip the audio entirely. The
+builder therefore writes <code>&lt;par&gt;&lt;text .../&gt;&lt;audio .../&gt;&lt;/par&gt;</code>
+and nothing between them.</div>
+
+<p>Audio timing is phrase-level and proportional. For a segment whose audio
+lasts 60 seconds and whose three paragraphs have 100, 200 and 300 characters,
+the SMIL assigns 10 s, 20 s and 30 s clip windows respectively. The helper
+converting stored values:</p>
+
+<pre><code>def _total_ms(total_ms_value: Any) -> int:
+    try:
+        return max(0, int(float(total_ms_value)))
+    except (TypeError, ValueError):
+        return 0</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 7)</h4>
+  <ol>
+    <li><strong>Line 1:</strong> <code>def _total_ms(total_ms_value):</code><br>
+    <span class="desc">Coerces a duration value of unknown type (JSON may hand back an <code>int</code>, <code>float</code>, <code>str</code> or <code>None</code>) into a non-negative millisecond integer for the SMIL clock calculations.</span></li>
+    <li><strong>Line 2:</strong> <code>try:</code><br>
+    <span class="desc">Begins the guarded conversion — <code>float("abc")</code> or <code>float(None)</code> would raise, and a bad stored value must never abort a whole book build.</span></li>
+    <li><strong>Line 3:</strong> <code>return max(0, int(float(total_ms_value)))</code><br>
+    <span class="desc">Two-step conversion: <code>float(...)</code> accepts strings like <code>"1234.5"</code>, then <code>int(...)</code> truncates to whole milliseconds; <code>max(0, ...)</code> clamps negative junk to zero so a clock value can never go backwards.</span></li>
+    <li><strong>Lines 4–5:</strong> <code>except (TypeError, ValueError): return 0</code><br>
+    <span class="desc">Both realistic failure modes are caught and mapped to 0 ms: <code>TypeError</code> for <code>None</code>/objects, <code>ValueError</code> for non-numeric strings. Zero keeps the SMIL timeline valid even when one paragraph's duration is missing.</span></li>
+  </ol>
+</div>
+
+<h2>74.6 The OPF Package and ZIP Export</h2>
+
+<p><code>_write_opf()</code> emits the manifest that ties the book together, and
+<code>export_daisy3_zip()</code> packages the whole <code>DAISY3</code> folder
+into a single ZIP for distribution (same UI as the DAISY 2.02 export button in
+the Recording window).</p>
+
+<pre><code>def export_daisy3_zip(project_dir: str, zip_path: str,
+                      callback: Optional[Callable[[str], None]] = None) -> None:
+    src = os.path.join(project_dir, DAISY3_OUTPUT_DIR_NAME)
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for root, _dirs, files in os.walk(src):
+            for name in files:
+                full = os.path.join(root, name)
+                rel = os.path.relpath(full, src)
+                zf.write(full, rel)
+                if callback:
+                    callback(rel)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 8)</h4>
+  <ol>
+    <li><strong>Lines 1–2:</strong> <code>def export_daisy3_zip(project_dir, zip_path, callback=None):</code><br>
+    <span class="desc">Packages the finished <code>DAISY3</code> folder into one ZIP file. The optional <code>callback</code> receives each archived file name, which lets the GUI show progress while a large book is being zipped.</span></li>
+    <li><strong>Line 3:</strong> <code>src = os.path.join(project_dir, DAISY3_OUTPUT_DIR_NAME)</code><br>
+    <span class="desc">Locates the book folder inside the project — the same constant (<code>DAISY3</code>) the builder used when creating it.</span></li>
+    <li><strong>Line 4:</strong> <code>with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:</code><br>
+    <span class="desc">Opens the target ZIP for writing with DEFLATE compression. The <code>with</code> block guarantees the archive's central directory is finalized (properly closed) even if an error occurs mid-zip.</span></li>
+    <li><strong>Lines 5–9:</strong> the <code>os.walk</code> loop<br>
+    <span class="desc">Visits every file under the book folder. <code>os.path.relpath(full, src)</code> converts each absolute path into a path relative to the book root, so the ZIP unpacks as a clean DAISY 3 fileset with no drive letters or parent folders — exactly what a player expects to find. The callback fires after each file so a progress dialog can tick.</span></li>
+  </ol>
+</div>
+
+<h2>74.7 Choosing DAISY 3 in the Wizard</h2>
+
+<p>The New Project wizard offers <strong>DAISY audio and text with images book
+(3)</strong> as a project type. Choosing it adds a DAISY page where the book
+information (title, author, narrator, publisher…) and the chapter-splitting
+mode (heading style 1 only / break on every heading) are collected; the
+Recording window then builds the DAISY 3 fileset automatically when recording
+completes, and the <strong>Export DAISY as ZIP</strong> button appears.</p>
+
+<h2>74.8 Key Takeaways</h2>
+<ul>
+  <li>DAISY 3 = <strong>DTBook</strong> (one XML text document) + <strong>NCX</strong> (navigation) + <strong>SMIL 2.0</strong> (sync) + audio</li>
+  <li>Official DTDs and <code>dtb:</code> attributes are mandatory for strict players</li>
+  <li><code>&lt;audio&gt;</code> goes <strong>directly inside</strong> <code>&lt;par&gt;</code> — no wrapping <code>&lt;seq&gt;</code></li>
+  <li>Phrase-level sync: paragraphs get proportional clip windows of the segment audio</li>
+  <li>Images from DOCX/EPUB/HTML are embedded as <code>imggroup</code> and listed in the OPF manifest</li>
+  <li>MP3s below 44.1&nbsp;kHz are normalized on staging so DAISY players decode the full audio</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch73_playlist_builder.html">← Ch 73</a> &nbsp;|&nbsp; <a href="ch75_dialogs_progress.html">Ch 75 — Dialogs &amp; Progress →</a></p>
+</div></div></body>
+</html>

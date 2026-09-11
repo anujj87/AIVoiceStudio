@@ -31,8 +31,10 @@ screen readers such as NVDA, JAWS and Narrator.</p>
   <li><strong>Voice cloning</strong> &mdash; clone a voice from a 4&ndash;5 second WAV sample with Coqui XTTS v2, in 17 languages (optional ~2.5&nbsp;GB engine download).</li>
   <li><strong>Punctuation control</strong> &mdash; four modes, including &ldquo;All&rdquo;, which speaks every punctuation mark as a word (quote, dot, left paren, tic&hellip;) for voices that cannot pronounce punctuation.</li>
   <li><strong>Project-based recording</strong> &mdash; each document becomes a project; every segment is saved to disk immediately as WAV, MP3 or FLAC, and recording resumes where it stopped after a crash or close.</li>
+  <li><strong>Standard playlists</strong> &mdash; &ldquo;Audio files with playlist&rdquo; projects automatically get <code>.m3u8</code>, <code>.pls</code> and <code>.wpl</code> files next to the audio, so the whole recording plays in order in VLC, PotPlayer, GOM, Windows Media Player, Winamp and other modern players.</li>
+  <li><strong>DAISY books</strong> &mdash; DAISY 2.02 audio books and DAISY 3 (Z39.86-2005) audio + text books with images, built automatically when recording completes and exportable as one ZIP file.</li>
   <li><strong>GPU acceleration</strong> &mdash; optional CUDA runtime (about 1.8&nbsp;GB) downloaded from Settings &rarr; Compute; only an NVIDIA driver is required.</li>
-  <li><strong>Screen-reader friendly</strong> &mdash; labelled controls, NVDA-style settings dialog, keyboard shortcuts throughout.</li>
+  <li><strong>Screen-reader friendly</strong> &mdash; real MSAA accessible names on every control, NVDA-style settings dialog, keyboard shortcuts throughout.</li>
 </ul>
 
 <h2>Quick start</h2>
@@ -85,6 +87,29 @@ licensed under the <strong>Coqui Public Model Licence (non-commercial)</strong>.
 <p>The mode is chosen per project in the New Project window; the default for
 new projects is set in Settings &rarr; Punctuation, where you can also preview
 any mode through a selected voice.</p>
+
+<h2>Project types</h2>
+<ul>
+  <li><strong>Audio files with playlist</strong> (default) &mdash; the document is split into segments; each segment becomes an audio file, and three playlist files (<code>.m3u8</code>, <code>.pls</code>, <code>.wpl</code>) are generated when recording completes. Playlists reference the audio by file name only, so they keep working when the project folder is copied or zipped.</li>
+  <li><strong>Clipboard</strong> &mdash; paste text and record it directly, no document file needed.</li>
+  <li><strong>DAISY audio and text with images book (3)</strong> &mdash; a DAISY 3 (Z39.86-2005) book: full DTBook text, NCX navigation, paragraph-level audio synchronization, and images from the source document embedded. Book information (title, author, narrator&hellip;) is entered in the wizard.</li>
+  <li><strong>DAISY audio book (2.02)</strong> &mdash; a DAISY 2.02 audio-only book with SMIL navigation and NCC metadata. MP3 segments are automatically re-encoded to 44.1&nbsp;kHz MPEG-1 when needed so every DAISY player decodes them fully.</li>
+</ul>
+<p>All DAISY project types get an <strong>Export DAISY as ZIP</strong> button in the Recording window once recording is complete.</p>
+
+<h2>Playlists for your recordings</h2>
+<p>When an <em>Audio files with playlist</em> project finishes recording, three
+playlist files appear in the project folder next to the audio:</p>
+<table>
+  <tr><th>File</th><th>Plays in</th></tr>
+  <tr><td><code>&lt;project&gt;.m3u8</code></td><td>VLC, PotPlayer, GOM, mpv</td></tr>
+  <tr><td><code>&lt;project&gt;.pls</code></td><td>Winamp, VLC, GOM, PotPlayer</td></tr>
+  <tr><td><code>&lt;project&gt;.wpl</code></td><td>Windows Media Player, PotPlayer, GOM</td></tr>
+</table>
+<p>Open any of them in your player to hear the whole recording from the first
+segment to the last, in reading order. To add playlists to a project you
+already recorded: open it and press <strong>Start recording</strong> &mdash; nothing
+pending means the playlists are written immediately.</p>
 
 <h2>Project lifecycle</h2>
 <ul>
