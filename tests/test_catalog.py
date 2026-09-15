@@ -41,6 +41,10 @@ class CatalogStructureTest(unittest.TestCase):
                     # pip-installed variants (e.g. omnivoice-triton) have no artifact.
                     if tts.get("requires_package"):
                         continue
+                    # Windows system voices (SAPI5 / Windows Core) ship with
+                    # the operating system: there is nothing to download.
+                    if tts.get("builtin"):
+                        continue
                     artifacts = []
                     if variant.get("artifact"):
                         artifacts.append(variant["artifact"])
@@ -145,14 +149,49 @@ class CatalogStructureTest(unittest.TestCase):
         }
         variants = kitten["languages"][0]["variants"]
         self.assertEqual({v["id"]: v["artifact"] for v in variants}, expected)
-        # The official KittenTTS voice order (Bella, Jasper, Luna, Bruno,
-        # Rosie, Hugo, Kiki, Leo) maps to sids 0..7.
-        first = variants[0]
-        self.assertEqual(
-            [v["id"] for v in first["voices"]],
-            ["bella", "jasper", "luna", "bruno", "rosie", "hugo", "kiki", "leo"],
-        )
-        self.assertEqual([v["sid"] for v in first["voices"]], list(range(8)))
+        # KittenTTS names its voices Bella, Jasper, Luna, Bruno, Rosie, Hugo,
+        # Kiki and Leo, but the speaker ids inside the model alternate
+        # male/female (expr-voice-2-m is sid 0, expr-voice-2-f is sid 1, ...).
+        # Listing them in name order with sids 0..7 made every voice speak the
+        # neighbouring speaker of the opposite gender.
+        alias_to_sid = {
+            "bella": 1,    # expr-voice-2-f
+            "jasper": 0,   # expr-voice-2-m
+            "luna": 3,     # expr-voice-3-f
+            "bruno": 2,    # expr-voice-3-m
+            "rosie": 5,    # expr-voice-4-f
+            "hugo": 4,     # expr-voice-4-m
+            "kiki": 7,     # expr-voice-5-f
+            "leo": 6,      # expr-voice-5-m
+        }
+        for variant in variants:
+            self.assertEqual(
+                [v["id"] for v in variant["voices"]], list(alias_to_sid),
+                variant["id"],
+            )
+            self.assertEqual(
+                {v["id"]: v["sid"] for v in variant["voices"]}, alias_to_sid,
+                variant["id"],
+            )
+
+    def test_builtin_windows_engines_need_no_download(self):
+        """SAPI5 / Windows Core voices ship with Windows: no artifact, no
+        package, and one variant shared by every installed locale."""
+        for engine_id in ("sapi5", "windows_core"):
+            tts = catalog.find_tts(engine_id)
+            self.assertIsNotNone(tts, engine_id)
+            self.assertTrue(tts.get("builtin"), engine_id)
+            self.assertFalse(tts.get("requires_package"), engine_id)
+            self.assertEqual(tts["engine"], engine_id)
+            # The dynamic voice entries carry a locale (en-US, hi-IN, ...) that
+            # is not a catalog language, so the variant is found by id.
+            variant = catalog.find_variant(tts, "en-US", "installed")
+            self.assertIsNotNone(variant, engine_id)
+            self.assertTrue(variant["name"], engine_id)
+
+    def test_only_the_windows_engines_are_builtin(self):
+        builtin = {t["id"] for t in catalog.get_tts_list() if t.get("builtin")}
+        self.assertEqual(builtin, {"sapi5", "windows_core"})
 
     def test_piper_voices_have_artifacts(self):
         piper = catalog.find_tts("piper")
@@ -300,6 +339,21 @@ class ResolveVoiceFilesTest(unittest.TestCase):
         self.assertTrue(files["model"].endswith("model.int8.onnx"))
         self.assertTrue(files["voices_file"].endswith("voices.bin"))
         self.assertTrue(files["data_dir"].endswith("espeak-ng-data"))
+
+    def test_kitten_fp32_model_file_is_found(self):
+        """Regression: the nano fp32 artwork ships ``model.fp32.onnx``.
+
+        Only model.onnx/model.int8.onnx were looked for, so a successfully
+        downloaded fp32 voice reported "Model files are incomplete (missing
+        model)" as soon as it was previewed.
+        """
+        vdir = self._voice_dir("kitten/nano_fp32")
+        for name in ("model.fp32.onnx", "tokens.txt", "voices.bin"):
+            open(os.path.join(vdir, name), "w").close()
+        os.makedirs(os.path.join(vdir, "espeak-ng-data"), exist_ok=True)
+        files = resolve_voice_files({"dir": vdir, "engine": "kitten", "sid": 1})
+        self.assertTrue(files["model"].endswith("model.fp32.onnx"))
+        self.assertTrue(files["tokens"].endswith("tokens.txt"))
 
     def test_piper_char_frontend_ignores_shared_espeak(self):
         """Character-frontend voices must not receive the

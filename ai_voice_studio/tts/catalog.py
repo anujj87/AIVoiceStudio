@@ -43,6 +43,14 @@ def find_variant(
 ) -> Optional[Dict[str, Any]]:
     lang = find_language(tts, lang_code)
     if not lang:
+        # Built-in engines (the Windows system voices) have one variant whose
+        # id is shared by every installed locale, so the language code never
+        # matches a catalog language and the variant is looked up by id.
+        if tts and tts.get("builtin"):
+            for candidate in tts.get("languages", []):
+                for variant in candidate.get("variants", []):
+                    if variant["id"] == variant_id:
+                        return variant
         return None
     for variant in lang.get("variants", []):
         if variant["id"] == variant_id:
@@ -63,7 +71,7 @@ def find_voice(
 
 
 def cloning_capable_tts() -> List[Dict[str, Any]]:
-    """TTS engines that support the Voice clone workflow (SPEC: voice clone tab)."""
+    """TTS engines that support the voice-cloning workflow."""
     return [tts for tts in get_tts_list() if tts.get("voice_cloning")]
 
 

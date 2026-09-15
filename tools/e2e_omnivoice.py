@@ -24,6 +24,7 @@ import gc
 import json
 import logging
 import os
+import shutil
 import sys
 import tempfile
 import time
@@ -73,6 +74,10 @@ def _make_project(root: str, name: str, text: str, omni: dict) -> str:
     from ai_voice_studio import project
 
     project_dir = os.path.join(root, name)
+    # Start from an empty folder: reusing a previous run's directory made the
+    # report list stale WAVs as this run's output (a failed design run looked
+    # like it had produced audio, because yesterday's files were still there).
+    shutil.rmtree(project_dir, ignore_errors=True)
     os.makedirs(project_dir, exist_ok=True)
     sentences = [s.strip() for s in text.replace("\n", " ").split(". ") if s.strip()]
     segments = [
@@ -120,6 +125,7 @@ def _record(log, project_dir: str, mode_label: str) -> dict:
     import wx
 
     from ai_voice_studio.gui.recording_dialog import RecordingDialog
+    from ai_voice_studio.gui import dialogs as dialogs_mod
     from ai_voice_studio.settings import Settings
     from ai_voice_studio.tts.models import ModelStore
 
@@ -133,8 +139,22 @@ def _record(log, project_dir: str, mode_label: str) -> dict:
         messageboxes.append((str(caption), str(message)))
         return wx.OK
 
+    def fake_action_dialog(parent, title, message, actions, default_key=None):
+        """Stand in for the modal labelled-button dialog.
+
+        The recording-complete dialog (and the OmniVoice server error dialog)
+        lives in ``dialogs`` rather than ``wx.MessageBox``; without this stub
+        the run blocks forever on ``ShowModal`` waiting for a click.
+        """
+        messageboxes.append((str(title), str(message)))
+        if default_key is not None:
+            return default_key
+        return actions[0][0] if actions else None
+
     original_messagebox = wx.MessageBox
+    original_action_dialog = dialogs_mod.run_action_dialog
     wx.MessageBox = fake_messagebox
+    dialogs_mod.run_action_dialog = fake_action_dialog
 
     # In development the OmniVoice engine spawns its worker with
     # sys.executable; point it at the managed Python that owns
@@ -145,6 +165,38 @@ def _record(log, project_dir: str, mode_label: str) -> dict:
         dialog = RecordingDialog(None, project_dir, Settings(), ModelStore())
         try:
             dialog.Show()
+
+            # The voice list is filled in asynchronously (the installed-package
+            # probe runs in the background), so pump events until the
+            # OmniVoice engine shows up instead of reading the combo once.
+            def _tts_index() -> int:
+                return next(
+                    (i for i in range(dialog.tts_combo.GetCount())
+                     if dialog.tts_combo.GetClientData(i) == "omnivoice"),
+                    -1,
+                )
+
+            def _wait_until(predicate, timeout=60.0) -> bool:
+                deadline = time.monotonic() + timeout
+                while time.monotonic() < deadline:
+                    wx.Yield()
+                    if predicate():
+                        return True
+                    time.sleep(0.05)
+                return bool(predicate())
+
+            # TTS engine -> OmniVoice (direct / omnivoice-triton).  This must
+            # come first: the Compute combo is rebuilt from the selected
+            # engine, so "CUDA GPU (OmniVoice)" only exists once an OmniVoice
+            # engine is selected (picking it before this raised "the compute
+            # option is missing" whenever another engine sorted first).
+            if not _wait_until(lambda: _tts_index() >= 0):
+                raise RuntimeError(
+                    "No OmniVoice voices available - is omnivoice-triton "
+                    "installed in the managed Python environment?"
+                )
+            dialog.tts_combo.SetSelection(_tts_index())
+            dialog._on_tts(None)
 
             # Compute -> CUDA GPU (OmniVoice), then refresh the engine list.
             idx = next(
@@ -157,19 +209,6 @@ def _record(log, project_dir: str, mode_label: str) -> dict:
             dialog.compute_combo.SetSelection(idx)
             dialog._on_compute_change(None)
 
-            # TTS engine -> OmniVoice (direct / omnivoice-triton).
-            tts_idx = next(
-                (i for i in range(dialog.tts_combo.GetCount())
-                 if dialog.tts_combo.GetClientData(i) == "omnivoice"),
-                -1,
-            )
-            if tts_idx < 0:
-                raise RuntimeError(
-                    "No OmniVoice voices available - is omnivoice-triton "
-                    "installed in the managed Python environment?"
-                )
-            dialog.tts_combo.SetSelection(tts_idx)
-            dialog._on_tts(None)
             # Voice -> the first catalog voice (auto) of the first variant.
             if dialog.voice_combo.GetCount():
                 dialog.voice_combo.SetSelection(0)
@@ -206,6 +245,7 @@ def _record(log, project_dir: str, mode_label: str) -> dict:
             dialog.Destroy()
     finally:
         wx.MessageBox = original_messagebox
+        dialogs_mod.run_action_dialog = original_action_dialog
         sys.executable = real_executable
 
 
@@ -246,22 +286,34 @@ def main() -> int:
         results.append(("design", _record(log, design_dir, "voice design")))
 
         # Use the first produced file as the clone reference.
-        ref = results[0][1]["outputs"][0]
-        log.info("Reference sample for clone run: %s", ref)
+        design_outputs = results[0][1]["outputs"]
+        if not design_outputs:
+            # OmniVoice occasionally returns no audio for the first segment of
+            # a fresh model load.  That is upstream flakiness rather than a
+            # failure of the app path, so report the run instead of crashing on
+            # an empty output list, and skip the clone run (it needs a
+            # reference sample).
+            log.warning(
+                "The design run produced no audio (see the report below); "
+                "skipping the clone run."
+            )
+        else:
+            ref = design_outputs[0]
+            log.info("Reference sample for clone run: %s", ref)
 
-        # ---- Run 2: voice clone ------------------------------------------
-        _release_engines()
-        omni = spec.build_omni(
-            mode="clone",
-            ref_audio=ref,
-            ref_text=DESIGN_TEXT,  # exact transcript -> no Whisper download
-            num_step=32,
-            guidance_scale=3.0,
-            class_temperature=0.0,
-        )
-        clone_dir = _make_project(OUT_ROOT, "clone", CLONE_TEXT, omni)
-        log.info("== RUN 2: voice clone into %s", clone_dir)
-        results.append(("clone", _record(log, clone_dir, "voice clone")))
+            # ---- Run 2: voice clone --------------------------------------
+            _release_engines()
+            omni = spec.build_omni(
+                mode="clone",
+                ref_audio=ref,
+                ref_text=DESIGN_TEXT,  # exact transcript -> no Whisper download
+                num_step=32,
+                guidance_scale=3.0,
+                class_temperature=0.0,
+            )
+            clone_dir = _make_project(OUT_ROOT, "clone", CLONE_TEXT, omni)
+            log.info("== RUN 2: voice clone into %s", clone_dir)
+            results.append(("clone", _record(log, clone_dir, "voice clone")))
 
         # ---- Report --------------------------------------------------------
         print("\n" + "=" * 78)

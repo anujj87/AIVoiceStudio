@@ -13,7 +13,8 @@ import shutil
 import threading
 import wx
 
-from ..tts import catalog
+from .. import venv_packages
+from ..tts import catalog, windows_tts
 from ..tts.downloader import (
     DownloadCancelled,
     DownloadError,
@@ -167,11 +168,12 @@ class DownloadPanel(_ManagerPanel):
         self.Bind(EVT_DOWNLOAD_PROGRESS, self._on_progress)
         self.Bind(EVT_DOWNLOAD_FINISHED, self._on_finished)
 
-        # Exclude TTS engines that are installed via pip (e.g. omnivoice-triton)
-        # and don't use the artifact download system.
+        # Exclude TTS engines installed via pip (e.g. omnivoice-triton) and the
+        # built-in Windows voices (SAPI5 / Windows Core): neither uses the
+        # artifact download system.
         downloadable = [
             tts for tts in catalog.get_tts_list()
-            if not tts.get("requires_package")
+            if not tts.get("requires_package") and not tts.get("builtin")
         ]
         populate_tts(self.tts_combo, downloadable)
         self._on_tts(None)
@@ -423,27 +425,8 @@ class AvailablePanel(_ManagerPanel):
         # installed, even though the model file is only downloaded on first
         # synthesis.
         self._inject_pip_installed_voices()
-        custom = self.store.custom_voices()
-        for voice in custom:
-            self._voices.append(
-                {
-                    "tts": voice["tts"],
-                    "tts_name": voice["tts"],
-                    "language": "custom",
-                    "variant": "custom",
-                    "voice": voice["name"],
-                    "voice_name": f"Cloned voice: {voice['name']}",
-                    "sid": 0,
-                    "engine": voice.get("engine", "vits"),
-                    "dir": voice["dir"],
-                    "custom": True,
-                    "sample": voice.get("sample", ""),
-                    "reference": voice.get("reference", ""),
-                    "xtts_lang": voice.get("language", "en"),
-                    "ref_text": voice.get("ref_text", ""),
-                    "model_dir": voice.get("model_dir", ""),
-                }
-            )
+        # Built-in Windows voices (SAPI5 / Windows Core) are always ready.
+        windows_tts.add_installed_voices(self._voices, self._on_builtin_voices)
         # Universal OmniVoice voice library: created voices are engine
         # agnostic, so register them under every installed OmniVoice engine.
         try:
@@ -480,25 +463,25 @@ class AvailablePanel(_ManagerPanel):
         """Inject voices for TTS engines installed via pip (e.g. OmniVoice).
 
         These engines don't use the artifact download system, so their
-        voices never appear in ``store.installed_voices()``.  We check if
-        the package is installed in the *managed venv* (not the main
-        process) and, if so, create voice entries from the catalog.
+        voices never appear in ``store.installed_voices()``.  We ask the
+        shared package cache (background probe of the *managed venv*, not the
+        main process) and add the catalog voices when the package is there.
         """
         try:
-            from ..python_runtime import get_runtime  # noqa: PLC0415
-            rt = get_runtime()
-            if not rt.is_created:
-                return
-            for tts_entry in catalog.get_tts_list():
+            from ..tts import catalog as catalog_mod  # noqa: PLC0415
+
+            for tts_entry in catalog_mod.get_tts_list():
                 pkg = tts_entry.get("requires_package")
                 if not pkg:
                     continue
-                # Check in the managed venv, not the main process.
-                result = rt.run_in_env(
-                    f"import importlib.metadata; "
-                    f"print(importlib.metadata.version('{pkg}'))"
-                )
-                if result.returncode != 0 or not result.stdout.strip():
+                if not venv_packages.installed(pkg):
+                    # Not installed yet (or the background probe is still
+                    # running): ask to be told when the answer arrives.
+                    if not venv_packages.is_known(pkg):
+                        venv_packages.request(
+                            pkg,
+                            lambda _v, p=pkg: wx.CallAfter(self._on_pip_probe, p),
+                        )
                     continue
                 # Package is installed — add all catalog voices for this
                 # TTS engine so the user can see and select them.
@@ -520,6 +503,41 @@ class AvailablePanel(_ManagerPanel):
                                     "requires_package": pkg,
                                 }
                             )
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _reload_keeping_selection(self):
+        """Re-read the voice lists without moving the user's selection.
+
+        Safe to call from a deferred (``wx.CallAfter``) rebuild: the panel may
+        have been destroyed while the background probe was in flight, and
+        touching the widgets then raises.
+        """
+        try:
+            prev = self._snapshot_selection()
+            self.refresh()
+            self._restore_selection(prev)
+        except Exception:  # noqa: BLE001
+            log.debug("Could not rebuild the Available TTS list", exc_info=True)
+
+    def _on_pip_probe(self, pkg: str):
+        """A background venv probe finished; show the engine if it is there."""
+        try:
+            if venv_packages.version(pkg):
+                self._reload_keeping_selection()
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _on_builtin_voices(self, _voices=None):
+        """The background enumeration of the Windows voices finished.
+
+        Runs on the enumeration worker thread (one per Windows engine), so the
+        panel is rebuilt through ``wx.CallAfter``: touching the combo boxes from
+        those threads corrupted the heap (SAPI5 and Windows Core finish at the
+        same time and raced on the same widgets).
+        """
+        try:
+            wx.CallAfter(self._reload_keeping_selection)
         except Exception:  # noqa: BLE001
             pass
 

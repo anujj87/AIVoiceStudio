@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
+import threading
 
 
 def _run_frozen_worker() -> bool:
@@ -92,6 +93,24 @@ def _init_python_runtime() -> None:
         logging.getLogger("main").warning("Python runtime init failed: %s", exc)
 
 
+def _warm_package_cache() -> None:
+    """Probe the managed venv in the background.
+
+    The Settings dialog and the Recording window ask whether the OmniVoice
+    packages are installed; answering from a warm cache keeps both windows
+    opening instantly (the probe itself starts a Python interpreter, which is
+    why it must never run on the UI thread).
+    """
+    try:
+        from ai_voice_studio.venv_packages import warm
+
+        threading.Thread(
+            target=warm, daemon=True, name="aivs-warm-packages"
+        ).start()
+    except Exception as exc:  # noqa: BLE001
+        logging.getLogger("main").debug("Package warm-up failed: %s", exc)
+
+
 def main() -> int:
     # First, do basic startup logging to determine developer mode
     settings = Settings()
@@ -107,6 +126,7 @@ def main() -> int:
     # Initialize subsystems
     _init_python_runtime()
     _init_addons()
+    _warm_package_cache()
 
     # If heavy logging was enabled, log system info
     if developer_mode:

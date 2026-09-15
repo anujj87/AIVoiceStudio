@@ -234,10 +234,15 @@ class OmniVoiceServerManager:
         return f"http://{self._host}:{self._port}"
 
     @property
+    def process_alive(self) -> bool:
+        """True when the subprocess this manager started is still running."""
+        return self._proc is not None and self._proc.poll() is None
+
+    @property
     def is_running(self) -> bool:
         """True when we started a subprocess that is still alive,
         OR when a server is reachable via health check (started externally)."""
-        if self._proc is not None and self._proc.poll() is None:
+        if self.process_alive:
             return True
         # Another manager instance may have started the server, or it
         # was started externally.  Verify with a health check.

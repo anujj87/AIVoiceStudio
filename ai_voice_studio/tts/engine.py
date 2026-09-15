@@ -238,13 +238,13 @@ def get_engine(
     provider: str = "cpu",
     num_threads: int = 2,
 ):
-    # Cloned voices (XTTS v2) run in a separate worker process through the
-    # coqui-tts runtime; they do not use sherpa-onnx at all.
-    if voice_entry.get("engine") == "xtts":
-        from ..clone import XtTsCloneEngine  # noqa: PLC0415
+    # Windows system voices (SAPI5 / Windows Core) are synthesised by the
+    # operating system through PowerShell, not by sherpa-onnx.
+    if voice_entry.get("engine") in ("sapi5", "windows_core"):
+        from ..tts.windows_tts import WindowsVoiceEngine  # noqa: PLC0415
 
         try:
-            return XtTsCloneEngine(voice_entry)
+            return WindowsVoiceEngine(voice_entry)
         except Exception as exc:  # noqa: BLE001
             raise EngineUnavailableError(str(exc)) from exc
     # OmniVoice runs in a separate worker process through the

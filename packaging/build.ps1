@@ -14,11 +14,35 @@
 
 param(
     [ValidateSet("x64", "x86", "both")]
-    [string]$Arch = "x64"
+    [string]$Arch = "x64",
+    # Optional explicit compiler path, e.g.
+    #   -IsccPath 'C:\Program Files\Inno Setup 7\ISCC.exe'
+    [string]$IsccPath = ""
 )
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
+
+# Locate the Inno Setup compiler (ISCC.exe): PATH first, then an explicit
+# -IsccPath, then the standard Inno Setup 6/7 install locations for both
+# Program Files flavours.  (A bare string literal here would be emitted to the
+# output stream and get captured by the caller, hence real comments.)
+function Find-Iscc {
+    $candidates = @()
+    $onPath = Get-Command iscc -ErrorAction SilentlyContinue
+    if ($onPath) { $candidates += $onPath.Source }
+    if ($IsccPath) { $candidates += $IsccPath }
+    foreach ($base in @($env:ProgramFiles, ${env:ProgramFiles(x86)})) {
+        if (-not $base) { continue }
+        foreach ($version in @("Inno Setup 7", "Inno Setup 6")) {
+            $candidates += (Join-Path $base "$version\ISCC.exe")
+        }
+    }
+    foreach ($candidate in $candidates) {
+        if ($candidate -and (Test-Path $candidate)) { return $candidate }
+    }
+    return $null
+}
 
 function Build-Arch {
     param([string]$a, [string]$venv, [string]$iss)
@@ -36,12 +60,12 @@ function Build-Arch {
         if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed for $a" }
 
         Write-Host "== Compiling $a installer ==" -ForegroundColor Cyan
-        $iscc = (Get-Command iscc -ErrorAction SilentlyContinue).Source
+        $iscc = Find-Iscc
         if (-not $iscc) {
-            $knownPath = "C:\Program Files\Inno Setup 7\ISCC.exe"
-            if (Test-Path $knownPath) { $iscc = $knownPath }
+            throw ("Inno Setup ISCC.exe was not found. Install Inno Setup 6 or 7, " +
+                   "put iscc on PATH, or pass -IsccPath 'C:\Program Files\Inno Setup 7\ISCC.exe'.")
         }
-        if (-not $iscc) { throw "Inno Setup ISCC.exe was not found." }
+        Write-Host "   using $iscc" -ForegroundColor DarkGray
         & $iscc $iss
         if ($LASTEXITCODE -ne 0) { throw "ISCC failed for $a" }
     } finally {

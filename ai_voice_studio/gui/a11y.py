@@ -41,11 +41,21 @@ class _NameAccessible(wx.Accessible):
     def GetName(self, childId):
         if childId > 0:
             win = self.win
+            index = childId - 1
+            # MSAA may ask for any child id, including ones past the end (a
+            # screen reader probing the list, or a stale id after the rows
+            # changed).  GetString/GetItemText assert on an invalid index, so
+            # the range is checked here: asking for a row that is not there
+            # returns "not implemented" instead of raising.
             if isinstance(win, wx.ListBox):
-                text = win.GetString(childId - 1)
+                if not 0 <= index < win.GetCount():
+                    return (wx.ACC_NOT_IMPLEMENTED, "")
+                text = win.GetString(index)
                 return (wx.ACC_OK, text or "")
             if isinstance(win, wx.ListCtrl):
-                text = win.GetItemText(childId - 1)
+                if not 0 <= index < win.GetItemCount():
+                    return (wx.ACC_NOT_IMPLEMENTED, "")
+                text = win.GetItemText(index)
                 return (wx.ACC_OK, text or "")
             return (wx.ACC_NOT_IMPLEMENTED, "")
         return (wx.ACC_OK, getattr(self.win, "_acc_name", "") or "")

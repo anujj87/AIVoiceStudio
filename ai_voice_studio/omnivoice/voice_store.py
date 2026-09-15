@@ -84,34 +84,14 @@ def find_voice(store, name: str) -> Dict[str, Any] | None:
 def engine_ids_installed() -> List[str]:
     """Return the OmniVoice engine ids whose pip package is installed.
 
-    Runs one probe inside the managed runtime; ``[]`` when the runtime is
-    missing or the probe fails (callers treat that as \"nothing installed\").
+    Answers from the shared package cache (``venv_packages``), which probes
+    the managed runtime in the background, so this never blocks the GUI while
+    the settings dialog is being built.  ``[]`` means "nothing installed or
+    not known yet".
     """
-    installed: List[str] = []
-    try:
-        from ..python_runtime import get_runtime  # noqa: PLC0415
+    from ..venv_packages import version  # noqa: PLC0415
 
-        rt = get_runtime()
-        if not rt.is_created:
-            return installed
-        packages = [pkg for _, (_, pkg) in ENGINE_INFO.items()]
-        script = (
-            "import importlib.metadata as m\n"
-            + "\n".join(
-                f"try:\n print(m.version({pkg!r}))\nexcept Exception:\n print('')"
-                for pkg in packages
-            )
-        )
-        result = rt.run_in_env(script)
-        if result.returncode != 0:
-            return installed
-        lines = (result.stdout or "").splitlines()
-        for index, engine_id in enumerate(ENGINE_INFO):
-            if index < len(lines) and lines[index].strip():
-                installed.append(engine_id)
-    except Exception:  # noqa: BLE001
-        log.debug("Could not probe installed OmniVoice engines", exc_info=True)
-    return installed
+    return [engine_id for engine_id, (_, pkg) in ENGINE_INFO.items() if version(pkg)]
 
 
 # ---------------------------------------------------------------------------

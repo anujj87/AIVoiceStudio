@@ -34,8 +34,9 @@ from ..constants import (
 )
 from ..documents.splitter import Segment
 from ..jobs.synthesizer import SynthesisWorker
+from .. import venv_packages
 from ..settings import Settings
-from ..tts import catalog
+from ..tts import catalog, windows_tts
 from ..util import sanitize_filename
 from ..tts.models import ModelStore
 from . import dialogs
@@ -96,9 +97,13 @@ _COMPUTE_LABELS = {
 }
 
 # TTS engines available for each compute mode.
-# ONNX engines (Piper, Kokoro, Kitten, etc.) work with CPU/GPU compute.
-# OmniVoice engines (Server, Triton, Hybrid) require CUDA GPU.
-_ONNX_TTS_ENGINES = {"piper", "kokoro", "kitten", "matcha", "pocket"}
+# Local engines (Piper, Kokoro, Kitten, the built-in Windows system voices,
+# etc.) work with CPU/GPU compute.  OmniVoice engines (Server, Triton,
+# Hybrid) require CUDA GPU.
+_ONNX_TTS_ENGINES = {
+    "piper", "kokoro", "kitten", "matcha", "pocket",
+    "sapi5", "windows_core",
+}
 _OMNIVOICE_ENGINES = {"omnivoice", "omnivoice_server"}
 
 
@@ -347,27 +352,8 @@ class RecordingDialog(wx.Dialog):
     def _populate_voices(self):
         """Load voices and group by TTS engine, filtering by compute mode."""
         self._all_voices = self.store.installed_voices()
-        for voice in self.store.custom_voices():
-            self._all_voices.append(
-                {
-                    "tts": voice["tts"],
-                    "tts_name": voice["tts"],
-                    "language": "custom",
-                    "variant": "custom",
-                    "voice": voice["name"],
-                    "voice_name": f"Cloned voice: {voice['name']}",
-                    "sid": 0,
-                    "engine": voice.get("engine", "vits"),
-                    "dir": voice["dir"],
-                    "custom": True,
-                    "sample": voice.get("sample", ""),
-                    "reference": voice.get("reference", ""),
-                    "xtts_lang": voice.get("language", "en"),
-                    "ref_text": voice.get("ref_text", ""),
-                    "model_dir": voice.get("model_dir", ""),
-                    "instruct": voice.get("instruct", ""),
-                }
-            )
+        # Built-in Windows voices (SAPI5 / Windows Core): always available.
+        windows_tts.add_installed_voices(self._all_voices, self._on_builtin_voices)
         # Universal OmniVoice voice library: created voices are engine
         # agnostic, so register them under every installed OmniVoice engine
         # and they appear no matter which TTS version is selected.
@@ -382,26 +368,30 @@ class RecordingDialog(wx.Dialog):
             pass
         # Inject pip-installed OmniVoice voices (not in artifact system)
         self._inject_omnivoice_voices()
-        # Bind compute combo change to refresh the voice cascade
-        self.compute_combo.Bind(wx.EVT_COMBOBOX, self._on_compute_change)
+        # Bind compute combo change to refresh the voice cascade (only once:
+        # this method runs again when background voice discovery finishes).
+        if not getattr(self, "_compute_change_bound", False):
+            self._compute_change_bound = True
+            self.compute_combo.Bind(wx.EVT_COMBOBOX, self._on_compute_change)
         self._populate_tts_engines()
 
     def _inject_omnivoice_voices(self):
         """Add OmniVoice voices from catalog if pip package is installed."""
         try:
-            from ..python_runtime import get_runtime  # noqa: PLC0415
-            rt = get_runtime()
-            if not rt.is_created:
-                return
             for tts_entry in catalog.get_tts_list():
                 pkg = tts_entry.get("requires_package")
                 if not pkg:
                     continue
-                result = rt.run_in_env(
-                    f"import importlib.metadata; "
-                    f"print(importlib.metadata.version('{pkg}'))"
-                )
-                if result.returncode != 0 or not result.stdout.strip():
+                if not venv_packages.installed(pkg):
+                    # Not installed yet (or the background probe is still
+                    # running): ask to be told when the answer arrives.
+                    if not venv_packages.is_known(pkg):
+                        venv_packages.request(
+                            pkg,
+                            lambda _v, p=pkg: wx.CallAfter(
+                                self._on_package_probe, p
+                            ),
+                        )
                     continue
                 for lang in tts_entry.get("languages", []):
                     for variant in lang.get("variants", []):
@@ -427,6 +417,55 @@ class RecordingDialog(wx.Dialog):
     def _on_compute_change(self, _):
         """Refresh the voice cascade when the compute back-end changes."""
         self._refresh_voices_for_selection()
+
+    # -- background voice discovery -----------------------------------------
+    def _on_builtin_voices(self, _voices=None):
+        """The Windows voice enumeration finished (worker thread)."""
+        try:
+            wx.CallAfter(self._rebuild_voice_choices)
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _on_package_probe(self, package: str):
+        """A managed-venv probe finished; re-list the engines when present."""
+        try:
+            if venv_packages.version(package):
+                wx.CallAfter(self._rebuild_voice_choices)
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _remember_tts_selection(self) -> dict:
+        voice = self._selected_voice()
+        return {
+            "tts": self._selected_tts_id(),
+            "language": voice.get("language") if voice else None,
+            "variant": voice.get("variant") if voice else None,
+            "voice": voice.get("voice") if voice else None,
+            "compute": self._selected_compute(),
+        }
+
+    def _rebuild_voice_choices(self):
+        """Re-run voice discovery without losing the current selection."""
+        try:
+            saved = self._remember_tts_selection()
+            self._populate_voices()
+            tts_id = saved.get("tts")
+            if tts_id:
+                for index in range(self.tts_combo.GetCount()):
+                    if self.tts_combo.GetClientData(index) == tts_id:
+                        self.tts_combo.SetSelection(index)
+                        self._on_tts(None)
+                        break
+            self._select_project_cascade(saved)
+            compute_choice = saved.get("compute")
+            if compute_choice:
+                for index in range(self.compute_combo.GetCount()):
+                    if self.compute_combo.GetClientData(index) == compute_choice:
+                        self.compute_combo.SetSelection(index)
+                        break
+            self._update_omni_ui()
+        except Exception:  # noqa: BLE001
+            log.debug("Could not rebuild the voice list", exc_info=True)
 
     def _populate_tts_engines(self):
         """List every downloaded/ready TTS engine (compute-agnostic)."""

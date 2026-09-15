@@ -2550,42 +2550,42 @@
                 {
                   "id": "bella",
                   "name": "Bella (female)",
-                  "sid": 0
+                  "sid": 1
                 },
                 {
                   "id": "jasper",
                   "name": "Jasper (male)",
-                  "sid": 1
+                  "sid": 0
                 },
                 {
                   "id": "luna",
                   "name": "Luna (female)",
-                  "sid": 2
+                  "sid": 3
                 },
                 {
                   "id": "bruno",
                   "name": "Bruno (male)",
-                  "sid": 3
+                  "sid": 2
                 },
                 {
                   "id": "rosie",
                   "name": "Rosie (female)",
-                  "sid": 4
+                  "sid": 5
                 },
                 {
                   "id": "hugo",
                   "name": "Hugo (male)",
-                  "sid": 5
+                  "sid": 4
                 },
                 {
                   "id": "kiki",
                   "name": "Kiki (female)",
-                  "sid": 6
+                  "sid": 7
                 },
                 {
                   "id": "leo",
                   "name": "Leo (male)",
-                  "sid": 7
+                  "sid": 6
                 }
               ]
             },
@@ -2597,42 +2597,42 @@
                 {
                   "id": "bella",
                   "name": "Bella (female)",
-                  "sid": 0
+                  "sid": 1
                 },
                 {
                   "id": "jasper",
                   "name": "Jasper (male)",
-                  "sid": 1
+                  "sid": 0
                 },
                 {
                   "id": "luna",
                   "name": "Luna (female)",
-                  "sid": 2
+                  "sid": 3
                 },
                 {
                   "id": "bruno",
                   "name": "Bruno (male)",
-                  "sid": 3
+                  "sid": 2
                 },
                 {
                   "id": "rosie",
                   "name": "Rosie (female)",
-                  "sid": 4
+                  "sid": 5
                 },
                 {
                   "id": "hugo",
                   "name": "Hugo (male)",
-                  "sid": 5
+                  "sid": 4
                 },
                 {
                   "id": "kiki",
                   "name": "Kiki (female)",
-                  "sid": 6
+                  "sid": 7
                 },
                 {
                   "id": "leo",
                   "name": "Leo (male)",
-                  "sid": 7
+                  "sid": 6
                 }
               ]
             },
@@ -2644,42 +2644,42 @@
                 {
                   "id": "bella",
                   "name": "Bella (female)",
-                  "sid": 0
+                  "sid": 1
                 },
                 {
                   "id": "jasper",
                   "name": "Jasper (male)",
-                  "sid": 1
+                  "sid": 0
                 },
                 {
                   "id": "luna",
                   "name": "Luna (female)",
-                  "sid": 2
+                  "sid": 3
                 },
                 {
                   "id": "bruno",
                   "name": "Bruno (male)",
-                  "sid": 3
+                  "sid": 2
                 },
                 {
                   "id": "rosie",
                   "name": "Rosie (female)",
-                  "sid": 4
+                  "sid": 5
                 },
                 {
                   "id": "hugo",
                   "name": "Hugo (male)",
-                  "sid": 5
+                  "sid": 4
                 },
                 {
                   "id": "kiki",
                   "name": "Kiki (female)",
-                  "sid": 6
+                  "sid": 7
                 },
                 {
                   "id": "leo",
                   "name": "Leo (male)",
-                  "sid": 7
+                  "sid": 6
                 }
               ]
             },
@@ -2691,42 +2691,42 @@
                 {
                   "id": "bella",
                   "name": "Bella (female)",
-                  "sid": 0
+                  "sid": 1
                 },
                 {
                   "id": "jasper",
                   "name": "Jasper (male)",
-                  "sid": 1
+                  "sid": 0
                 },
                 {
                   "id": "luna",
                   "name": "Luna (female)",
-                  "sid": 2
+                  "sid": 3
                 },
                 {
                   "id": "bruno",
                   "name": "Bruno (male)",
-                  "sid": 3
+                  "sid": 2
                 },
                 {
                   "id": "rosie",
                   "name": "Rosie (female)",
-                  "sid": 4
+                  "sid": 5
                 },
                 {
                   "id": "hugo",
                   "name": "Hugo (male)",
-                  "sid": 5
+                  "sid": 4
                 },
                 {
                   "id": "kiki",
                   "name": "Kiki (female)",
-                  "sid": 6
+                  "sid": 7
                 },
                 {
                   "id": "leo",
                   "name": "Leo (male)",
-                  "sid": 7
+                  "sid": 6
                 }
               ]
             }
@@ -3037,6 +3037,52 @@
                   "sid": 0
                 }
               ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sapi5",
+      "name": "SAPI5 (Windows voices)",
+      "engine": "sapi5",
+      "license": "Windows (built in)",
+      "homepage": "https://learn.microsoft.com/windows/win32/msapi/sapi-voices",
+      "builtin": true,
+      "voice_cloning": false,
+      "note": "The Microsoft Speech API 5 'Desktop' voices that ship with Windows (Microsoft David Desktop, Zira Desktop, Hazel Desktop, ...). Nothing is downloaded and no package is needed: the voices installed on this PC are listed automatically and synthesized by Windows itself.",
+      "languages": [
+        {
+          "code": "installed",
+          "name": "Voices installed on this PC",
+          "variants": [
+            {
+              "id": "installed",
+              "name": "SAPI5 voice",
+              "voices": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "windows_core",
+      "name": "Windows Core voices",
+      "engine": "windows_core",
+      "license": "Windows (built in)",
+      "homepage": "https://learn.microsoft.com/windows/apps/design/input/speech-interactions",
+      "builtin": true,
+      "voice_cloning": false,
+      "note": "The modern Windows voices Narrator uses (Microsoft David, Mark, Zira, Hazel, Heera, Kalpana, ...). They ship with Windows, need no download and no package, and are synthesized through the Windows Runtime speech engine.",
+      "languages": [
+        {
+          "code": "installed",
+          "name": "Voices installed on this PC",
+          "variants": [
+            {
+              "id": "installed",
+              "name": "Windows Core voice",
+              "voices": []
             }
           ]
         }

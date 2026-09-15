@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import atexit
 import os
 import re
 import shutil
+import subprocess
 import sys
+import threading
+import time
 
 _ILLEGAL_FILENAME = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 _MULTI_SPACE = re.compile(r"[ \t]+")
@@ -80,3 +84,73 @@ def worker_command(module: str, *args: str) -> list[str]:
     if getattr(sys, "frozen", False):
         return [sys.executable, "--aivs-worker", module, *args]
     return [sys.executable, "-m", module, *args]
+
+
+# ---------------------------------------------------------------------------
+# Child processes started from background threads
+# ---------------------------------------------------------------------------
+#: Children still running, so the exit hook below can reach them.
+_children: "set[subprocess.Popen]" = set()
+_children_lock = threading.Lock()
+_drain_registered = False
+
+
+def run_tracked(cmd, *, timeout=None, **kwargs) -> subprocess.CompletedProcess:
+    """Run ``cmd`` and keep the child process reachable at interpreter exit.
+
+    Voice discovery and the managed-venv package probes run child processes
+    from daemon threads.  A daemon thread caught inside ``subprocess`` while
+    Python finalises can crash the process on exit (a segmentation fault when
+    the app was closed during voice discovery), so such children are
+    registered here and drained by :func:`drain_children` before shutdown.
+
+    Same contract as ``subprocess.run`` with ``capture_output=True, text=True``.
+    """
+    global _drain_registered
+    if not _drain_registered:
+        _drain_registered = True
+        atexit.register(drain_children)
+    proc = subprocess.Popen(
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, **kwargs
+    )
+    with _children_lock:
+        _children.add(proc)
+    try:
+        try:
+            out, err = proc.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.communicate()
+            raise
+    finally:
+        with _children_lock:
+            _children.discard(proc)
+    return subprocess.CompletedProcess(cmd, proc.returncode, out, err)
+
+
+def drain_children(timeout: float = 3.0) -> None:
+    """Let tracked children finish, then kill whatever is still running.
+
+    Called at interpreter shutdown: waiting a moment lets a quick probe finish
+    on its own (the clean path), and killing the rest stops a hung child from
+    leaving its worker thread mid-``subprocess`` during finalisation.
+    """
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        with _children_lock:
+            if not _children:
+                return
+        time.sleep(0.05)
+    with _children_lock:
+        procs = list(_children)
+    for proc in procs:
+        try:
+            proc.kill()
+        except Exception:  # noqa: BLE001
+            pass
+    end = time.monotonic() + 1.0
+    while time.monotonic() < end:
+        with _children_lock:
+            if not _children:
+                break
+        time.sleep(0.05)

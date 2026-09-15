@@ -60,8 +60,9 @@ from ..constants import (
     VOLUME_MAX,
     VOLUME_MIN,
 )
+from .. import venv_packages
 from ..settings import Settings
-from ..tts import catalog
+from ..tts import catalog, windows_tts
 from ..tts.downloader import ModelDownloader
 from ..tts.models import ModelStore
 from .a11y import (
@@ -87,6 +88,10 @@ _THEME_CHOICES = [
     (THEME_LIGHT, "Light"),
     (THEME_DARK, "Dark"),
 ]
+
+# Managed-environment status line, keyed by env dir: probing it runs a
+# subprocess, so the answer is reused until an install changes it.
+_PIP_STATUS_CACHE: dict = {}
 
 
 class _SettingsPanel(wx.Panel):
@@ -122,6 +127,30 @@ class _SettingsPanel(wx.Panel):
         Return False to block saving.
         """
         return True
+
+    # -- background voice discovery ---------------------------------------
+    def _on_voices_ready(self, _voices=None):
+        """A background voice probe finished: refresh this panel's cascade.
+
+        Used by the managed-venv package probe and the Windows voice
+        enumeration so that building the panel never waits for a subprocess
+        (that wait is what made opening Settings feel slow).
+        """
+        populate = getattr(self, "_populate_voices", None)
+        if populate is None:
+            return
+        try:
+            wx.CallAfter(populate)
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _on_package_probe(self, package: str):
+        """A managed-venv probe finished; re-add voices when it is installed."""
+        try:
+            if venv_packages.version(package):
+                self._on_voices_ready()
+        except Exception:  # noqa: BLE001
+            pass
 
 
 class _SettingsPanelAccessible(wx.Accessible):
@@ -478,7 +507,13 @@ class SettingsDialog(wx.Dialog):
         return self._panels[2]
 
     @property
-    def voice_clone_panel(self):
+    def omnivoice_engines_panel(self):
+        """The 'OmniVoice engines' category (voice library + engine cards).
+
+        This used to be a separate 'Voice clone' category; the clone/design
+        studio now lives inside the OmniVoice engines category, so the old
+        ``voice_clone_panel`` alias was renamed to match what it returns.
+        """
         return self._panels[3]
 
     @property
@@ -654,6 +689,32 @@ class _RecordingSettingsPanel(_SettingsPanel):
                     flag=wx.LEFT | wx.RIGHT, border=2)
         sizer.Add(grid, 0, wx.EXPAND | wx.ALL, 6)
 
+        # -- TTS and voice preview ------------------------------------------
+        # The same idea as the Punctuation category: every voice the selected
+        # TTS engine can speak with is listed here, so a long list (Kokoro's
+        # multilingual speakers, the built-in Windows voices, ...) stays easy
+        # to browse.  Choosing a row fills the Variant/Voice boxes above; the
+        # Preview button then speaks it with the current Speed/Pitch/Volume.
+        voices_box = wx.StaticBox(self, label="TTS and voice preview")
+        voices_sizer = wx.StaticBoxSizer(voices_box, wx.VERTICAL)
+        voices_sizer.Add(
+            wx.StaticText(
+                voices_box,
+                label="Voices available for the selected TTS engine:",
+            ),
+            0, wx.LEFT | wx.RIGHT | wx.TOP, 4,
+        )
+        self.voices_list = wx.ListBox(
+            voices_box, size=(-1, 110),
+            name="Voices for the selected TTS engine",
+        )
+        voices_sizer.Add(self.voices_list, 1, wx.EXPAND | wx.ALL, 4)
+        self.voice_count = wx.StaticText(voices_box, label="")
+        self.voice_count.SetName("Voice count")
+        voices_sizer.Add(self.voice_count, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 4)
+        sizer.Add(voices_sizer, 1, wx.EXPAND | wx.ALL, 6)
+        self._voice_list_entries: list = []
+
         self.rate = self._slider_row(sizer, "Speed", 1.0, RATE_MIN, RATE_MAX)
         self.pitch = self._slider_row(sizer, "Pitch", 1.0, PITCH_MIN, PITCH_MAX)
         self.volume = self._slider_row(sizer, "Volume", 1.0, VOLUME_MIN, VOLUME_MAX)
@@ -680,6 +741,7 @@ class _RecordingSettingsPanel(_SettingsPanel):
         self.tts_combo.Bind(wx.EVT_COMBOBOX, self._on_tts)
         self.variant_combo.Bind(wx.EVT_COMBOBOX, self._on_variant)
         self.preview_btn.Bind(wx.EVT_BUTTON, self._on_preview)
+        self.voices_list.Bind(wx.EVT_LISTBOX, self._on_voice_list_select)
         self._populate_voices()
 
     def on_activated(self):
@@ -693,18 +755,9 @@ class _RecordingSettingsPanel(_SettingsPanel):
     def _populate_voices(self):
         self._voices = self.store.installed_voices()
         self._inject_pip_installed_voices()
-        for voice in self.store.custom_voices():
-            self._voices.append({
-                "tts": voice["tts"], "tts_name": voice["tts"],
-                "language": "custom", "variant": "custom",
-                "voice": voice["name"],
-                "voice_name": f"Cloned voice: {voice['name']}",
-                "sid": 0, "engine": voice.get("engine", "vits"),
-                "dir": voice["dir"], "custom": True,
-                "sample": voice.get("sample", ""),
-                "reference": voice.get("reference", ""),
-                "xtts_lang": voice.get("language", "en"),
-            })
+        # Built-in Windows voices (SAPI5 / Windows Core): always available,
+        # no download and no package needed.
+        windows_tts.add_installed_voices(self._voices, self._on_voices_ready)
         # Universal OmniVoice voice library: created voices are engine
         # agnostic, so register them under every installed OmniVoice engine.
         try:
@@ -732,23 +785,22 @@ class _RecordingSettingsPanel(_SettingsPanel):
                 "No voices downloaded. Use the 'Download and remove' tab first."
             )
             self._load_defaults_for_tts(None)
+        self._refresh_voice_list()
 
     def _inject_pip_installed_voices(self):
         """Inject voices for TTS engines installed via pip (e.g. OmniVoice)."""
         try:
-            from ..python_runtime import get_runtime  # noqa: PLC0415
-            rt = get_runtime()
-            if not rt.is_created:
-                return
             for tts_entry in catalog.get_tts_list():
                 pkg = tts_entry.get("requires_package")
                 if not pkg:
                     continue
-                result = rt.run_in_env(
-                    f"import importlib.metadata; "
-                    f"print(importlib.metadata.version('{pkg}'))"
-                )
-                if result.returncode != 0 or not result.stdout.strip():
+                if not venv_packages.installed(pkg):
+                    # Not installed yet (or the background probe is still
+                    # running): ask to be told when the answer arrives.
+                    if not venv_packages.is_known(pkg):
+                        venv_packages.request(
+                            pkg, lambda _v, p=pkg: self._on_package_probe(p)
+                        )
                     continue
                 for lang in tts_entry.get("languages", []):
                     for variant in lang.get("variants", []):
@@ -792,6 +844,7 @@ class _RecordingSettingsPanel(_SettingsPanel):
             self.variant_combo.SetSelection(0)
         self._on_variant(None)
         self._load_defaults_for_tts(tts_id)
+        self._refresh_voice_list()
 
     def _on_variant(self, _):
         key = self.variant_combo.GetClientData(self.variant_combo.GetSelection()) \
@@ -816,6 +869,64 @@ class _RecordingSettingsPanel(_SettingsPanel):
     def _selected_tts_id(self):
         sel = self.tts_combo.GetSelection()
         return self.tts_combo.GetClientData(sel) if sel >= 0 else None
+
+    # -- TTS and voice preview list -----------------------------------------
+    def _refresh_voice_list(self):
+        """List every voice of the selected TTS engine (all variants)."""
+        tts_id = self._selected_tts_id()
+        tts = catalog.find_tts(tts_id) if tts_id else None
+        self.voices_list.Clear()
+        self._voice_list_entries = []
+        for voice in self._voices:
+            if voice["tts"] != tts_id:
+                continue
+            variant = (
+                catalog.find_variant(tts, voice["language"], voice["variant"])
+                if tts else None
+            )
+            variant_label = variant["name"] if variant else voice["variant"]
+            self._voice_list_entries.append(voice)
+            self.voices_list.Append(
+                f"{voice.get('voice_name', voice['voice'])} - {variant_label}"
+            )
+        if self._voice_list_entries:
+            self.voices_list.SetSelection(0)
+        count = len(self._voice_list_entries)
+        if not tts_id:
+            self.voice_count.SetLabel("No TTS engine available.")
+        elif count:
+            self.voice_count.SetLabel(
+                f"{count} voice{'s' if count != 1 else ''} available for this "
+                "TTS engine."
+            )
+        else:
+            self.voice_count.SetLabel(
+                "No voices available for this TTS engine."
+            )
+
+    def _on_voice_list_select(self, _evt=None):
+        """Choosing a row in the list moves the Variant/Voice boxes above."""
+        sel = self.voices_list.GetSelection()
+        if sel < 0 or sel >= len(self._voice_list_entries):
+            return
+        voice = self._voice_list_entries[sel]
+        for index in range(self.variant_combo.GetCount()):
+            if self.variant_combo.GetClientData(index) != (
+                voice["language"], voice["variant"]
+            ):
+                continue
+            if self.variant_combo.GetSelection() != index:
+                self.variant_combo.SetSelection(index)
+                self._on_variant(None)
+            break
+        for index in range(self.voice_combo.GetCount()):
+            entry = self.voice_combo.GetClientData(index)
+            if entry and entry.get("voice") == voice.get("voice"):
+                self.voice_combo.SetSelection(index)
+                break
+        self.preview_status.SetLabel(
+            f"Selected: {voice.get('voice_name', voice['voice'])}."
+        )
 
     # -- per-TTS defaults ---------------------------------------------------
     def _per_tts(self) -> dict:
@@ -1085,18 +1196,9 @@ class _PunctuationPanel(_SettingsPanel):
         self._voices = self.store.installed_voices()
         # Inject pip-installed OmniVoice voices (not in artifact system)
         self._inject_pip_installed_voices()
-        for voice in self.store.custom_voices():
-            self._voices.append({
-                "tts": voice["tts"], "tts_name": voice["tts"],
-                "language": "custom", "variant": "custom",
-                "voice": voice["name"],
-                "voice_name": f"Cloned voice: {voice['name']}",
-                "sid": 0, "engine": voice.get("engine", "vits"),
-                "dir": voice["dir"], "custom": True,
-                "sample": voice.get("sample", ""),
-                "reference": voice.get("reference", ""),
-                "xtts_lang": voice.get("language", "en"),
-            })
+        # Built-in Windows voices (SAPI5 / Windows Core): always available,
+        # no download and no package needed.
+        windows_tts.add_installed_voices(self._voices, self._on_voices_ready)
         # Universal OmniVoice voice library: created voices are engine
         # agnostic, so register them under every installed OmniVoice engine.
         try:
@@ -1131,19 +1233,17 @@ class _PunctuationPanel(_SettingsPanel):
         process) and, if so, create voice entries from the catalog.
         """
         try:
-            from ..python_runtime import get_runtime  # noqa: PLC0415
-            rt = get_runtime()
-            if not rt.is_created:
-                return
             for tts_entry in catalog.get_tts_list():
                 pkg = tts_entry.get("requires_package")
                 if not pkg:
                     continue
-                result = rt.run_in_env(
-                    f"import importlib.metadata; "
-                    f"print(importlib.metadata.version('{pkg}'))"
-                )
-                if result.returncode != 0 or not result.stdout.strip():
+                if not venv_packages.installed(pkg):
+                    # Not installed yet (or the background probe is still
+                    # running): ask to be told when the answer arrives.
+                    if not venv_packages.is_known(pkg):
+                        venv_packages.request(
+                            pkg, lambda _v, p=pkg: self._on_package_probe(p)
+                        )
                     continue
                 for lang in tts_entry.get("languages", []):
                     for variant in lang.get("variants", []):
@@ -1488,14 +1588,21 @@ class _OmniVoiceEnginesPanel(_SettingsPanel):
         self._installed: list = []  # engine ids with packages installed
 
         sizer = wx.BoxSizer(wx.VERTICAL)
+        self._engines: list = []  # list of dicts for each engine variant
+
+        # -- Dependency shortcut -------------------------------------------
+        # OmniVoice is not downloadable from this category (it is installed
+        # from Compute), so a missing dependency gets one button that takes
+        # the user straight there.
+        self._build_dependency_hint(sizer)
 
         # -- Voice library (universal, both engines) -----------------------
         self._build_voice_library(sizer)
 
         # -- Engine cards -------------------------------------------------
         sizer.Add(wx.StaticLine(self), 0, wx.EXPAND | wx.ALL, 6)
-        self._engines = []  # list of dicts for each engine variant
         self._build_engine_cards(sizer)
+        self._refresh_engine_status()
 
         # -- Features overview --------------------------------------------
         sizer.Add(wx.StaticLine(self), 0, wx.EXPAND | wx.ALL, 6)
@@ -1976,12 +2083,120 @@ class _OmniVoiceEnginesPanel(_SettingsPanel):
                 pass
             self._preview_sound = None
 
+    # -- dependency (OmniVoice package) -------------------------------------
+    def _build_dependency_hint(self, sizer):
+        """Where to get OmniVoice when its dependency is missing.
+
+        Neither the direct engine (``omnivoice-triton``) nor the server
+        (``omnivoice-server``) can be downloaded from this category - the
+        Compute category installs them - so the missing case gets one button
+        that moves the user to Compute.
+        """
+        box = wx.StaticBox(self, label="OmniVoice dependency")
+        inner = wx.StaticBoxSizer(box, wx.VERTICAL)
+        self.dependency_status = wx.StaticText(box, label="Checking...")
+        self.dependency_status.SetName("OmniVoice dependency status")
+        self.dependency_status.Wrap(640)
+        inner.Add(self.dependency_status, 0, wx.LEFT | wx.RIGHT | wx.TOP, 4)
+
+        self.goto_compute_btn = wx.Button(
+            box, label="Download OmniVoice — move to Compute"
+        )
+        self.goto_compute_btn.SetName(
+            "Download OmniVoice dependency from the Compute category"
+        )
+        self.goto_compute_btn.SetToolTip(
+            "OmniVoice is not installed. The Compute category downloads and "
+            "installs the omnivoice-triton and omnivoice-server packages."
+        )
+        inner.Add(self.goto_compute_btn, 0, wx.ALL, 4)
+        sizer.Add(inner, 0, wx.EXPAND | wx.ALL, 6)
+
+        self.goto_compute_btn.Bind(wx.EVT_BUTTON, self._on_goto_compute)
+        self._refresh_dependency_hint()
+
+    def _refresh_dependency_hint(self):
+        """Show/hide the Compute shortcut from the cached package status."""
+        from ..omnivoice import voice_store  # noqa: PLC0415
+
+        ready: list[str] = []
+        missing: list[str] = []
+        for _engine_id, (label, package) in voice_store.ENGINE_INFO.items():
+            version = venv_packages.version(package)
+            if version:
+                ready.append(f"{label} (v{version})")
+            else:
+                missing.append(package)
+                if not venv_packages.is_known(package):
+                    venv_packages.request(package, self._on_dependency_probe)
+        if ready and not missing:
+            self.dependency_status.SetLabel("Installed: " + ", ".join(ready) + ".")
+            self.goto_compute_btn.Hide()
+        else:
+            detail = ", ".join(missing) if missing else "the OmniVoice package"
+            self.dependency_status.SetLabel(
+                f"OmniVoice TTS is not installed (needs {detail}). It cannot be "
+                "downloaded from this category - use the Compute category to "
+                "download it."
+            )
+            self.goto_compute_btn.Show()
+        self.Layout()
+
+    def _refresh_engine_status(self):
+        """Update every engine card's status from the shared package cache."""
+        for eng in self._engines:
+            package = eng["package"]
+            version = venv_packages.version(package)
+            if version:
+                eng["status_label"].SetLabel(
+                    f"Installed (v{version}) — ready to use"
+                )
+                eng["installed"] = True
+            else:
+                eng["status_label"].SetLabel(
+                    "Not installed — install from Compute tab"
+                )
+                eng["installed"] = False
+                if not venv_packages.is_known(package):
+                    venv_packages.request(package, self._on_dependency_probe)
+        self._installed = [eng["id"] for eng in self._engines if eng["installed"]]
+
+    def _refresh_dependency_state(self):
+        """Refresh the dependency hint, the engine cards and the library."""
+        self._refresh_dependency_hint()
+        self._refresh_engine_status()
+        self._refresh_library()
+
+    def _on_dependency_probe(self, _version=None):
+        """A background package probe finished (worker thread)."""
+        try:
+            wx.CallAfter(self._refresh_dependency_state)
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _on_goto_compute(self, _evt=None):
+        """Move to the Compute category, where OmniVoice is installed from."""
+        dialog = wx.GetTopLevelParent(self)
+        show = getattr(dialog, "_show_category", None)
+        categories = getattr(dialog, "CATEGORIES", None)
+        if not show or not categories or _ComputePanel not in categories:
+            wx.MessageBox(
+                "Open Settings > Compute to download and install the "
+                "OmniVoice dependency (omnivoice-triton or omnivoice-server).",
+                "Download OmniVoice", style=wx.OK | wx.ICON_INFORMATION,
+            )
+            return
+        index = categories.index(_ComputePanel)
+        try:
+            if dialog.cat_list.GetItemCount() > index:
+                dialog.cat_list.Select(index)
+                dialog.cat_list.Focus(index)
+            show(index, focus_panel=True)
+        except Exception:  # noqa: BLE001
+            pass
+
     def _build_engine_cards(self, sizer):
         """Build status cards for each OmniVoice engine variant."""
-        from ..python_runtime import get_runtime  # noqa: PLC0415
-
-        rt = get_runtime()
-
         engines = [
             {
                 "id": "omnivoice_server",
@@ -2026,25 +2241,9 @@ class _OmniVoiceEnginesPanel(_SettingsPanel):
             add_labeled(card_box, status_grid, "Status", status_label,
                         flag=wx.LEFT | wx.RIGHT, border=2)
 
-            # Package check
-            pkg_installed = False
-            if rt.is_created:
-                try:
-                    result = rt.run_in_env(
-                        f"import importlib.metadata; "
-                        f"print(importlib.metadata.version('{eng['package']}'))"
-                    )
-                    pkg_installed = result.returncode == 0 and bool(result.stdout.strip())
-                    if pkg_installed:
-                        version = result.stdout.strip()
-                        status_label.SetLabel(f"Installed (v{version}) — ready to use")
-                    else:
-                        status_label.SetLabel("Not installed — install from Compute tab")
-                except Exception:  # noqa: BLE001
-                    status_label.SetLabel("Not installed — install from Compute tab")
-            else:
-                status_label.SetLabel("Not installed — install from Compute tab")
-
+            # Install status is filled in by _refresh_engine_status() from the
+            # shared package cache, so building this panel never waits for a
+            # managed-venv probe (those waits made Settings open slowly).
             card_sizer.Add(status_grid, 0, wx.EXPAND | wx.ALL, 4)
 
             # Features
@@ -2068,41 +2267,15 @@ class _OmniVoiceEnginesPanel(_SettingsPanel):
                 "id": eng["id"],
                 "package": eng["package"],
                 "status_label": status_label,
-                "installed": pkg_installed,
+                "installed": False,
             })
 
     def on_activated(self):
         super().on_activated()
-        from ..omnivoice import voice_store  # noqa: PLC0415
-
-        # Cache which OmniVoice engines are installed and refresh the voice
-        # library (voices can also be created by other panels/windows).
-        self._installed = voice_store.engine_ids_installed()
-        self._refresh_library()
+        # Status, library and engine cards all answer from the shared caches
+        # (venv package probe), so opening this category never waits.
+        self._refresh_dependency_state()
         self._on_engine_change(None)
-        # Refresh install status
-        from ..python_runtime import get_runtime  # noqa: PLC0415
-        rt = get_runtime()
-        for eng in self._engines:
-            if rt.is_created:
-                try:
-                    result = rt.run_in_env(
-                        f"import importlib.metadata; "
-                        f"print(importlib.metadata.version('{eng['package']}'))"
-                    )
-                    installed = result.returncode == 0 and bool(result.stdout.strip())
-                    if installed:
-                        version = result.stdout.strip()
-                        eng["status_label"].SetLabel(f"Installed (v{version}) — ready to use")
-                    else:
-                        eng["status_label"].SetLabel("Not installed — install from Compute tab")
-                    eng["installed"] = installed
-                except Exception:  # noqa: BLE001
-                    eng["status_label"].SetLabel("Not installed — install from Compute tab")
-                    eng["installed"] = False
-            else:
-                eng["status_label"].SetLabel("Not installed — install from Compute tab")
-                eng["installed"] = False
 
     def apply_to_settings(self):
         pass  # No settings to save for this panel
@@ -2129,6 +2302,9 @@ class _OmniVoiceServerPanel(_SettingsPanel):
         super().__init__(parent)
         self.settings = settings
         self._thread: threading.Thread | None = None
+        self._status_thread: threading.Thread | None = None
+        self._status_probe_running = False
+        self._status_epoch = 0
 
         sizer = wx.BoxSizer(wx.VERTICAL)
 
@@ -2325,29 +2501,70 @@ class _OmniVoiceServerPanel(_SettingsPanel):
 
     def _refresh_status(self):
         """Check if the server is running and update the status label and the
-        voice-profile controls."""
+        voice-profile controls.
+
+        The check is a network round trip (an unreachable host can take
+        seconds to time out), so it runs on a worker thread: opening this
+        category stays instant and the labels are filled in when the answer
+        arrives.  A check already in flight is not restarted.
+        """
+        if self._status_probe_running:
+            return
+        host = self.host_ctrl.GetValue().strip() or "127.0.0.1"
+        port = self.port_ctrl.GetValue()
+        self.status_label.SetLabel("Server status: Checking...")
+        self._status_probe_running = True
+        self._status_epoch += 1
+        self._status_thread = threading.Thread(
+            target=self._probe_status,
+            args=(host, port, self._status_epoch),
+            daemon=True,
+        )
+        self._status_thread.start()
+
+    def _probe_status(self, host: str, port: int, epoch: int):
+        """Worker thread: is a server reachable on host:port?"""
         running = False
         try:
             from ..omnivoice_server import get_server_manager  # noqa: PLC0415
-            host = self.host_ctrl.GetValue().strip() or "127.0.0.1"
-            port = self.port_ctrl.GetValue()
             mgr = get_server_manager(host=host, port=port)
-            running = bool(mgr.is_running)
+            # A subprocess we started ourselves answers without a round
+            # trip; anything else gets one short health probe.
+            running = bool(mgr.process_alive) or mgr.health_check(
+                retries=1, delay=0.0, timeout=2.0
+            )
         except Exception:  # noqa: BLE001
             running = False
-        if running:
-            host = self.host_ctrl.GetValue().strip() or "127.0.0.1"
-            port = self.port_ctrl.GetValue()
-            self.status_label.SetLabel(f"Server status: Running at http://{host}:{port}")
-            self.start_btn.Disable()
-            self.stop_btn.Enable()
-        else:
-            self.status_label.SetLabel("Server status: Not running")
-            self.start_btn.Enable()
-            self.stop_btn.Disable()
-        self._set_profiles_enabled(running)
-        if running:
-            self._on_refresh_profiles(None)
+        try:
+            wx.CallAfter(self._status_ready, running, host, port, epoch)
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _status_ready(self, running: bool, host: str, port: int, epoch: int):
+        """Main thread: apply the result of a background status probe."""
+        if epoch != self._status_epoch:
+            # A start/stop happened while this probe was in flight: its
+            # answer is about the old state, so drop it.
+            return
+        try:
+            self._status_probe_running = False
+            if running:
+                self.status_label.SetLabel(
+                    f"Server status: Running at http://{host}:{port}"
+                )
+                self.start_btn.Disable()
+                self.stop_btn.Enable()
+            else:
+                self.status_label.SetLabel("Server status: Not running")
+                self.start_btn.Enable()
+                self.stop_btn.Disable()
+            self._set_profiles_enabled(running)
+            if running:
+                self._on_refresh_profiles(None)
+            self.Layout()
+        except Exception:  # noqa: BLE001
+            # The dialog (and this panel) may already be gone; nothing to do.
+            pass
 
     def _on_start(self, _):
         """Start the OmniVoice server in a background thread."""
@@ -2378,6 +2595,10 @@ class _OmniVoiceServerPanel(_SettingsPanel):
 
     def _start_done(self, success, message):
         self._thread = None
+        # Starting/stopping changes the truth the status probe was asking
+        # about, so any probe still in flight is discarded.
+        self._status_epoch += 1
+        self._status_probe_running = False
         self.status_label.SetLabel(f"Server status: {message}")
         self.start_btn.Enable(not success)
         self.stop_btn.Enable(success)
@@ -2395,6 +2616,8 @@ class _OmniVoiceServerPanel(_SettingsPanel):
             from ..omnivoice_server import get_server_manager  # noqa: PLC0415
             mgr = get_server_manager()
             mgr.stop()
+            self._status_epoch += 1
+            self._status_probe_running = False
             self.status_label.SetLabel("Server status: Stopped")
             self.start_btn.Enable()
             self.stop_btn.Disable()
@@ -2849,33 +3072,25 @@ class _ComputePanel(_SettingsPanel):
         self._refresh_omnivoice_server()
 
     def _refresh_omnivoice(self):
-        """Check if omnivoice-triton is installed in the managed venv."""
-        from ..python_runtime import get_runtime  # noqa: PLC0415
-        rt = get_runtime()
-        if not rt.is_created:
-            self.omnivoice_status.SetLabel("Not installed. OmniVoice TTS is unavailable.")
-            self.omnivoice_install_btn.Enable()
-            self.omnivoice_remove_btn.Disable()
-            return
-        try:
-            result = rt.run_in_env(
-                "import importlib.metadata; print(importlib.metadata.version('omnivoice-triton'))"
+        """Show the omnivoice-triton status from the shared package cache."""
+        package = "omnivoice-triton"
+        version = venv_packages.version(package)
+        if version:
+            self.omnivoice_status.SetLabel(
+                f"Installed (v{version}). OmniVoice TTS is available."
             )
-            version = result.stdout.strip()
-            if result.returncode == 0 and version:
-                self.omnivoice_status.SetLabel(
-                    f"Installed (v{version}). OmniVoice TTS is available."
-                )
-                self.omnivoice_install_btn.Disable()
-                self.omnivoice_remove_btn.Enable()
-            else:
-                self.omnivoice_status.SetLabel("Not installed. OmniVoice TTS is unavailable.")
-                self.omnivoice_install_btn.Enable()
-                self.omnivoice_remove_btn.Disable()
-        except Exception:  # noqa: BLE001
-            self.omnivoice_status.SetLabel("Not installed. OmniVoice TTS is unavailable.")
+            self.omnivoice_install_btn.Disable()
+            self.omnivoice_remove_btn.Enable()
+        else:
+            self.omnivoice_status.SetLabel(
+                "Not installed. OmniVoice TTS is unavailable."
+            )
             self.omnivoice_install_btn.Enable()
             self.omnivoice_remove_btn.Disable()
+            if not venv_packages.is_known(package):
+                venv_packages.request(
+                    package, lambda _v: wx.CallAfter(self._refresh_omnivoice)
+                )
 
     def _on_omnivoice_install(self, _):
         """Install omnivoice-triton via pip with a progress dialog."""
@@ -3049,6 +3264,7 @@ class _ComputePanel(_SettingsPanel):
                 self._ov_install_dlg = None
         except Exception:  # noqa: BLE001
             pass
+        venv_packages.invalidate("omnivoice-triton")
         self._refresh_omnivoice()
         wx.MessageBox(
             message,
@@ -3127,6 +3343,7 @@ class _ComputePanel(_SettingsPanel):
                 self._ov_install_dlg = None
         except Exception:  # noqa: BLE001
             pass
+        venv_packages.invalidate("omnivoice-triton")
         self._refresh_omnivoice()
         wx.MessageBox(
             message,
@@ -3179,34 +3396,26 @@ class _ComputePanel(_SettingsPanel):
         self.server_remove_btn.Bind(wx.EVT_BUTTON, self._on_server_remove)
 
     def _refresh_omnivoice_server(self):
-        """Check if omnivoice-server is installed in the managed venv."""
-        from ..python_runtime import get_runtime  # noqa: PLC0415
-        rt = get_runtime()
-        if not rt.is_created:
-            self.server_status.SetLabel("Not installed. OmniVoice Server is unavailable.")
-            self.server_install_btn.Enable()
-            self.server_remove_btn.Disable()
-            return
-        try:
-            result = rt.run_in_env(
-                "import importlib.metadata; "
-                "print(importlib.metadata.version('omnivoice-server'))"
+        """Show the omnivoice-server status from the shared package cache."""
+        package = "omnivoice-server"
+        version = venv_packages.version(package)
+        if version:
+            self.server_status.SetLabel(
+                f"Installed (v{version}). OmniVoice Server is available."
             )
-            version = result.stdout.strip()
-            if result.returncode == 0 and version:
-                self.server_status.SetLabel(
-                    f"Installed (v{version}). OmniVoice Server is available."
-                )
-                self.server_install_btn.Disable()
-                self.server_remove_btn.Enable()
-            else:
-                self.server_status.SetLabel("Not installed. OmniVoice Server is unavailable.")
-                self.server_install_btn.Enable()
-                self.server_remove_btn.Disable()
-        except Exception:  # noqa: BLE001
-            self.server_status.SetLabel("Not installed. OmniVoice Server is unavailable.")
+            self.server_install_btn.Disable()
+            self.server_remove_btn.Enable()
+        else:
+            self.server_status.SetLabel(
+                "Not installed. OmniVoice Server is unavailable."
+            )
             self.server_install_btn.Enable()
             self.server_remove_btn.Disable()
+            if not venv_packages.is_known(package):
+                venv_packages.request(
+                    package,
+                    lambda _v: wx.CallAfter(self._refresh_omnivoice_server),
+                )
 
     def _on_server_install(self, _):
         """Install omnivoice-server via pip with a progress dialog."""
@@ -3320,6 +3529,7 @@ class _ComputePanel(_SettingsPanel):
                 self._srv_install_dlg = None
         except Exception:  # noqa: BLE001
             pass
+        venv_packages.invalidate("omnivoice-server")
         self._refresh_omnivoice_server()
         wx.MessageBox(
             message,
@@ -3390,6 +3600,7 @@ class _ComputePanel(_SettingsPanel):
                 self._srv_install_dlg = None
         except Exception:  # noqa: BLE001
             pass
+        venv_packages.invalidate("omnivoice-server")
         self._refresh_omnivoice_server()
         wx.MessageBox(
             message,
@@ -3492,6 +3703,8 @@ class _DeveloperPanel(_SettingsPanel):
         super().__init__(parent)
         self.settings = settings
         self._thread = None
+        self._pip_thread: threading.Thread | None = None
+        self._pip_probe_running = False
         sizer = wx.BoxSizer(wx.VERTICAL)
 
         self._dev_warning = wx.StaticText(
@@ -3650,19 +3863,61 @@ class _DeveloperPanel(_SettingsPanel):
             status = "[Enabled]" if addon.enabled else "[Disabled]"
             self.addon_list.Append(f"{status} {addon.name} v{addon.version}", addon.name)
 
-    def _refresh_pip(self):
+    def _refresh_pip(self, force: bool = False):
+        """Show the managed-environment status without blocking the UI.
+
+        Counting the packages runs the environment's own Python (a
+        subprocess), which is too slow to do while the category opens, so
+        the answer is cached and the first probe runs on a worker thread.
+        """
         from ..python_runtime import get_runtime
         rt = get_runtime()
-        if rt.is_created:
-            pkgs = rt.pip_list()
-            self.pip_status.SetLabel(
-                f"Environment ready: {len(pkgs)} packages installed "
-                f"at {rt.env_dir}"
-            )
-        else:
+        if not rt.is_created:
             self.pip_status.SetLabel(
                 f"Environment not yet created. Will be created at: {rt.env_dir}"
             )
+            return
+        if not force:
+            cached = _PIP_STATUS_CACHE.get(rt.env_dir)
+            if cached is not None:
+                self.pip_status.SetLabel(cached)
+                return
+        if self._pip_probe_running:
+            return
+        self._pip_probe_running = True
+        self.pip_status.SetLabel("Checking the Python environment...")
+        self._pip_thread = threading.Thread(
+            target=self._probe_pip, args=(rt,), daemon=True
+        )
+        self._pip_thread.start()
+
+    def _probe_pip(self, rt):
+        """Worker thread: count the packages in the managed environment."""
+        label = None
+        try:
+            pkgs = rt.pip_list()
+            label = (
+                f"Environment ready: {len(pkgs)} packages installed "
+                f"at {rt.env_dir}"
+            )
+        except Exception:  # noqa: BLE001
+            label = None
+        try:
+            wx.CallAfter(self._pip_ready, rt.env_dir, label)
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _pip_ready(self, env_dir: str, label):
+        """Main thread: apply the result of a background environment probe."""
+        self._pip_probe_running = False
+        if label:
+            _PIP_STATUS_CACHE[env_dir] = label
+        try:
+            self.pip_status.SetLabel(
+                label if label else "Could not read the Python environment."
+            )
+        except Exception:  # noqa: BLE001
+            pass
 
     def _on_addon_select(self, _):
         pass  # selection update
@@ -3752,7 +4007,7 @@ class _DeveloperPanel(_SettingsPanel):
 
     def _pip_install_done(self, result):
         self._thread = None
-        self._refresh_pip()
+        self._refresh_pip(force=True)
         if result["ok"]:
             wx.MessageBox("Packages installed successfully.", "pip install",
                           style=wx.OK | wx.ICON_INFORMATION)

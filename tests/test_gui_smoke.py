@@ -11,7 +11,10 @@ import os
 import shutil
 import sys
 import tempfile
+import threading
+import time
 import unittest
+from unittest import mock
 
 import wx
 
@@ -160,6 +163,54 @@ class SettingsDialogTest(_AppMixin):
             dlg._show_category(3)
             self.assertFalse(dlg._panels[0].IsShown())
             self.assertTrue(dlg._panels[3].IsShown())
+
+            # Recording settings exposes the TTS/voice preview list.
+            self.assertTrue(hasattr(recording, "voices_list"))
+            self.assertEqual(recording.voices_list.GetName(),
+                             "Voices for the selected TTS engine")
+            self.assertTrue(hasattr(recording, "voice_count"))
+            self.assertEqual(recording.voice_count.GetName(), "Voice count")
+
+            # The OmniVoice engines category offers the one-click move to the
+            # Compute category when the OmniVoice dependency is missing.
+            engines = dlg._panels[3]
+            self.assertTrue(hasattr(engines, "goto_compute_btn"))
+            self.assertIn("Compute", engines.goto_compute_btn.GetLabel())
+            self.assertTrue(hasattr(engines, "dependency_status"))
+        finally:
+            dlg.Destroy()
+
+    def test_server_category_opens_without_waiting_for_the_probe(self):
+        """Opening a category must never block on a network round trip.
+
+        The server status probe used to run inline on activation, which made
+        the Settings dialog freeze for seconds on an unreachable host.
+        """
+        settings = Settings()
+        dlg = SettingsDialog(self.frame, settings, self._empty_store())
+        try:
+            index = [i for i, cls in enumerate(dlg.CATEGORIES)
+                     if cls.title == "OmniVoice Server"][0]
+            panel = dlg._panels[index]
+            probed = threading.Event()
+            probed_args = []
+
+            def slow_probe(host, port, epoch):
+                probed_args.append((host, port, epoch))
+                probed.set()
+                time.sleep(1.5)  # stand in for a slow health check
+
+            with mock.patch.object(panel, "_probe_status", slow_probe):
+                start = time.perf_counter()
+                dlg._show_category(index)
+                elapsed = time.perf_counter() - start
+
+            self.assertLess(elapsed, 0.5,
+                            f"switching category blocked for {elapsed:.2f}s")
+            self.assertEqual(panel.status_label.GetLabel(),
+                             "Server status: Checking...")
+            self.assertTrue(probed.wait(2.0), "status probe never started")
+            self.assertTrue(probed_args[0][0] or probed_args[0][1])
         finally:
             dlg.Destroy()
 
@@ -299,6 +350,87 @@ class RecordingDialogTest(_AppMixin):
                 dlg.Destroy()
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
+
+
+class AvailablePanelThreadTest(_AppMixin):
+    """Background voice discovery must never touch widgets off-thread.
+
+    The Windows voices are enumerated on one worker thread per engine, and
+    both finish at roughly the same time.  A callback that rebuilt the panel
+    inline ran on those threads and raced on the combo boxes, corrupting the
+    heap (a hard crash a second or two after the settings dialog opened).
+    """
+
+    def _panel(self):
+        from ai_voice_studio.gui.model_panels import AvailablePanel
+
+        return AvailablePanel(self.frame, self._empty_store())
+
+    def test_builtin_voice_callback_is_deferred_to_the_main_thread(self):
+        panel = self._panel()
+        try:
+            seen: list = []
+            with mock.patch.object(
+                panel, "_reload_keeping_selection",
+                lambda: seen.append(threading.current_thread()),
+            ):
+                # Called from the enumeration worker thread.
+                panel._on_builtin_voices([])
+                self.assertEqual(
+                    seen, [],
+                    "the panel was rebuilt synchronously on the enumeration "
+                    "thread (wx widgets must only be touched on the main one)",
+                )
+                # The event loop then runs it on the main thread.
+                for _ in range(50):
+                    wx.Yield()
+                    if seen:
+                        break
+                    time.sleep(0.02)
+            self.assertTrue(seen, "the deferred rebuild never ran")
+            self.assertIs(seen[0], threading.main_thread())
+        finally:
+            panel.Destroy()
+
+
+class AccessibleListTest(_AppMixin):
+    """MSAA may ask a list for any child id, including out-of-range ones.
+
+    ``_NameAccessible.GetName`` used to call ``GetString``/``GetItemText``
+    without checking the range, so a screen reader probing the recent-projects
+    list raised ``wxAssertionError: ... invalid index in wxListBox::GetString``
+    (caught by the crash handler and written to crash.log at every start).
+    """
+
+    def _list(self, choices):
+        from ai_voice_studio.gui.a11y import set_accessible_name
+
+        lb = wx.ListBox(self.frame, choices=choices)
+        self.addCleanup(lb.Destroy)
+        set_accessible_name(lb, "Recent projects")
+        return lb
+
+    def test_rows_report_their_own_text(self):
+        lb = self._list(["one", "two", "three"])
+        acc = lb.GetAccessible()
+        self.assertEqual(acc.GetName(0), (wx.ACC_OK, "Recent projects"))
+        for child, text in ((1, "one"), (2, "two"), (3, "three")):
+            self.assertEqual(acc.GetName(child), (wx.ACC_OK, text))
+        self.assertEqual(acc.GetChildCount(), (wx.ACC_OK, 3))
+
+    def test_out_of_range_child_id_does_not_raise(self):
+        lb = self._list(["one", "two"])
+        acc = lb.GetAccessible()
+        for child in (3, 4, 99):
+            status, text = acc.GetName(child)
+            self.assertEqual(status, wx.ACC_NOT_IMPLEMENTED, child)
+            self.assertEqual(text, "")
+
+    def test_empty_list_does_not_raise(self):
+        lb = self._list([])
+        acc = lb.GetAccessible()
+        self.assertEqual(acc.GetChildCount(), (wx.ACC_OK, 0))
+        self.assertEqual(acc.GetName(1)[0], wx.ACC_NOT_IMPLEMENTED)
 
 
 if __name__ == "__main__":

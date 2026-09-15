@@ -11,8 +11,8 @@ Layout::
       },
       "custom_voices": [
         {"name": "my_voice", "tts": "piper", "dir": "...", "kind": "tarball"},
-        {"name": "mum", "tts": "xtts", "dir": "...", "kind": "xtts",
-         "engine": "xtts", "sample": ".../sample.wav", "language": "en"}
+        {"name": "narrator", "tts": "omnivoice", "dir": "...",
+         "kind": "omni_design", "engine": "omnivoice", "instruct": "male"}
       ]
     }
 """
@@ -239,25 +239,22 @@ class ModelStore:
                     )
         return voices
 
-    # -- custom (cloned) voices --------------------------------------------
+    # -- custom (user-created) voices ---------------------------------------
     def add_custom_voice(self, name: str, tts_id: str, directory: str, kind: str,
                          extra: Dict[str, Any] | None = None) -> None:
-        """Register a custom (cloned) voice.
+        """Register a custom (user-created) voice.
 
-        ``kind`` is either a sherpa voice kind (``tarball``/``onnx``) or
-        ``"xtts"`` for voices cloned from a short sample; the engine used to
-        synthesise a clone is ``"xtts"``.
+        ``kind`` is a sherpa voice kind (``tarball``/``onnx``) for standalone
+        model folders, or an OmniVoice voice-library kind
+        (``omni_clone``/``omni_design``) whose engine, reference sample and
+        design instructions travel in ``extra``.
         """
-        # Determine engine from kind
-        engine_map = {
-            "xtts": "xtts",
-        }
         entry: Dict[str, Any] = {
             "name": name,
             "tts": tts_id,
             "dir": directory,
             "kind": kind,
-            "engine": engine_map.get(kind, "vits"),
+            "engine": "vits",
         }
         if extra:
             entry.update(extra)
@@ -369,7 +366,19 @@ def resolve_voice_files(voice_entry: Dict[str, Any]) -> Dict[str, Any]:
             }
         )
     elif engine in ("kokoro", "kitten"):
-        model = find("model.onnx", "model.int8.onnx")
+        if engine == "kitten":
+            # The three Kitten v0.8 sizes use different file names in the
+            # sherpa-onnx release: micro is ``model.onnx``, nano-int8 is
+            # ``model.int8.onnx`` and nano-fp32 is ``model.fp32.onnx``.
+            # Looking only for model.onnx/model.int8.onnx made the fp32
+            # voice report "Model files are incomplete (missing model)"
+            # right after a successful download.
+            model = (
+                find("model.onnx", "model.fp32.onnx", "model.int8.onnx")
+                or _find_onnx(directory)
+            )
+        else:
+            model = find("model.onnx", "model.int8.onnx")
         tokens = find("tokens.txt")
         voices = find("voices.bin", "voices.txt")
         # Kokoro multi-lang (v1.0+) bundles espeak-ng-data and a set of
