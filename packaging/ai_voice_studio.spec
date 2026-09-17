@@ -47,6 +47,8 @@ hiddenimports = [
     "ai_voice_studio.gui.voicelab_options_dialog",
     # Per-category Compute combo shown next to every Preview button.
     "ai_voice_studio.gui.compute_choice",
+    # First-launch terms acceptance dialog (imported by main.py).
+    "ai_voice_studio.gui.accept_dialog",
 ]
 
 datas = [
@@ -62,6 +64,7 @@ datas = [
     ("../docs/UserGuide.html", "docs"),
     ("../docs/AddonDevelopmentGuide.html", "docs"),
     ("../docs/AccessibilityGuide.html", "docs"),
+    ("../docs/THIRD-PARTY-LICENSES.html", "docs"),
     # Python & wxPython book (HTML, opened from Help menu via F1).
     ("../docs/book/index.html", "docs/book"),
     ("../docs/book/css/style.css", "docs/book/css"),

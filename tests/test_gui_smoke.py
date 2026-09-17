@@ -22,7 +22,12 @@ import wx
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from ai_voice_studio import project  # noqa: E402
-from ai_voice_studio.constants import AUDIO_MODE_CHOICES, MODE_PAGE_WITH_H1  # noqa: E402
+from ai_voice_studio.constants import AUDIO_MODE_CHOICES, MODE_PAGE_WITH_H1, TERMS_VERSION  # noqa: E402
+from ai_voice_studio.gui.accept_dialog import (  # noqa: E402
+    AcceptanceDialog,
+    record_acceptance,
+    terms_current,
+)
 from ai_voice_studio.gui.main_frame import MainFrame  # noqa: E402
 from ai_voice_studio.gui.new_project_wizard import NewProjectWizard  # noqa: E402
 from ai_voice_studio.gui.recording_dialog import RecordingDialog  # noqa: E402
@@ -52,6 +57,108 @@ class _AppMixin(unittest.TestCase):
         os.close(fd)
         self.addCleanup(lambda: os.path.exists(path) and os.remove(path))
         return ModelStore(state_file=path)
+
+
+class AcceptanceDialogTest(_AppMixin):
+    """First-launch terms dialog: all boxes required, disagree blocks the app."""
+
+    def _dialog(self) -> AcceptanceDialog:
+        dlg = AcceptanceDialog(self.frame)
+        self.addCleanup(dlg.Destroy)
+        return dlg
+
+    def test_buttons_disabled_until_every_box_checked(self):
+        dlg = self._dialog()
+        boxes = dlg._checkboxes
+        self.assertGreaterEqual(len(boxes), 7)  # 6 terms + "agree with all"
+        self.assertFalse(dlg._agree_btn.IsEnabled())
+        self.assertFalse(dlg._disagree_btn.IsEnabled())
+        for box in boxes:
+            box.SetValue(True)
+        dlg._on_toggle(None)
+        self.assertTrue(dlg._agree_btn.IsEnabled())
+        self.assertTrue(dlg._disagree_btn.IsEnabled())
+        # Unchecking any single box disables both buttons again.
+        boxes[0].SetValue(False)
+        dlg._on_toggle(None)
+        self.assertFalse(dlg._agree_btn.IsEnabled())
+        self.assertFalse(dlg._disagree_btn.IsEnabled())
+
+    def test_last_checkbox_checks_all_terms_automatically(self):
+        dlg = self._dialog()
+        terms = dlg._term_checkboxes
+        self.assertEqual(len(terms), 6)
+        # Ticking the final box ticks every term checkbox.
+        dlg._agree_all.SetValue(True)
+        dlg._on_agree_all(None)
+        self.assertTrue(all(b.GetValue() for b in terms))
+        self.assertTrue(dlg._agree_btn.IsEnabled())
+        self.assertTrue(dlg._disagree_btn.IsEnabled())
+        # Un-ticking it un-ticks them all again.
+        dlg._agree_all.SetValue(False)
+        dlg._on_agree_all(None)
+        self.assertFalse(any(b.GetValue() for b in terms))
+        self.assertFalse(dlg._agree_btn.IsEnabled())
+
+    def test_term_two_mentions_full_responsibility(self):
+        dlg = self._dialog()
+        self.assertIn("fully responsible", dlg._term_checkboxes[1].GetLabel())
+
+    def test_terms_alone_are_not_enough_without_the_all_box(self):
+        dlg = self._dialog()
+        for box in dlg._term_checkboxes:
+            box.SetValue(True)
+        dlg._on_toggle(None)
+        # The "agree with all" box itself is still required to proceed.
+        self.assertFalse(dlg._agree_btn.IsEnabled())
+        dlg._agree_all.SetValue(True)
+        dlg._on_agree_all(None)
+        self.assertTrue(dlg._agree_btn.IsEnabled())
+
+    def test_agree_records_acceptance(self):
+        settings = Settings(path=os.path.join(
+            tempfile.mkdtemp(prefix="aivs_terms_"), "settings.json"))
+        self.assertFalse(terms_current(settings))
+        dlg = self._dialog()
+        for box in dlg._checkboxes:
+            box.SetValue(True)
+        dlg._on_agree(None)
+        self.assertTrue(dlg.accepted)
+        record_acceptance(settings)
+        self.assertTrue(terms_current(settings))
+
+    def test_disagree_does_not_record_acceptance(self):
+        settings = Settings(path=os.path.join(
+            tempfile.mkdtemp(prefix="aivs_terms_"), "settings.json"))
+        dlg = self._dialog()
+        for box in dlg._checkboxes:
+            box.SetValue(True)
+        dlg._on_disagree(None)
+        self.assertFalse(dlg.accepted)
+        record_acceptance(settings)  # only called on agreement in main.py
+        dlg2 = self._dialog()
+        for box in dlg2._checkboxes:
+            box.SetValue(True)
+        dlg2._on_disagree(None)
+        self.assertFalse(dlg2.accepted)
+
+    def test_version_bump_reprompts(self):
+        settings = Settings(path=os.path.join(
+            tempfile.mkdtemp(prefix="aivs_terms_"), "settings.json"))
+        record_acceptance(settings)
+        self.assertTrue(terms_current(settings))
+        # Simulate an update: a newer TERMS_VERSION no longer matches.
+        with mock.patch("ai_voice_studio.gui.accept_dialog.TERMS_VERSION", "9999.0.0"):
+            self.assertFalse(terms_current(settings))
+
+    def test_escape_is_swallowed(self):
+        dlg = self._dialog()
+        for box in dlg._checkboxes:
+            box.SetValue(True)
+        event = mock.Mock()
+        event.GetKeyCode.return_value = wx.WXK_ESCAPE
+        dlg._on_char_hook(event)
+        event.Skip.assert_not_called()  # Escape cannot dismiss the dialog
 
 
 class NewProjectWizardTest(_AppMixin):
@@ -612,7 +719,8 @@ class MainFrameTest(_AppMixin):
             self.assertGreaterEqual(help_index, 0, "Help menu missing")
             help_labels = [item.GetItemLabelText()
                            for item in menubar.GetMenu(help_index).GetMenuItems()]
-            for expected in ("Read Me", "User Guide", "About AI Voice Studio"):
+            for expected in ("Read Me", "User Guide", "Third-Party Licences",
+                             "About AI Voice Studio"):
                 self.assertIn(expected, help_labels)
             # Shortcuts live in the menu labels (single registration; no
             # duplicate frame-level accelerator table that could double-fire

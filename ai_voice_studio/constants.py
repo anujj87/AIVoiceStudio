@@ -2,7 +2,12 @@
 
 APP_NAME = "AI Voice Studio"
 APP_ID = "AIVoiceStudio"
-APP_VERSION = "0.1.0"
+APP_VERSION = "2026.3.1"
+
+# Version of the first-launch terms/acceptance dialog. Bump this on every
+# release so the dialog shows again after an update (SPEC: user must re-accept
+# the terms once per program version; it never repeats within one version).
+TERMS_VERSION = "2026.3.1"
 
 # ---------------------------------------------------------------------------
 # User data layout (%APPDATA%/AIVoiceStudio by default)

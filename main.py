@@ -36,6 +36,7 @@ if _run_frozen_worker():
 import wx
 
 from ai_voice_studio import paths
+from ai_voice_studio.gui.accept_dialog import AcceptanceDialog, record_acceptance, terms_current
 from ai_voice_studio.gui.main_frame import MainFrame
 from ai_voice_studio.gui.theme import apply_theme
 from ai_voice_studio.settings import Settings
@@ -111,6 +112,33 @@ def _warm_package_cache() -> None:
         logging.getLogger("main").debug("Package warm-up failed: %s", exc)
 
 
+def _require_terms_acceptance(settings: Settings) -> bool:
+    """Show the first-launch terms dialog until the user accepts.
+
+    Returns True when the application may continue to start. Every exit
+    path of the dialog except the "I Agree" button (Disagree, Escape,
+    closing the window) returns False so the application never launches
+    without acceptance. Acceptance is remembered per TERMS_VERSION, so
+    the dialog shows again only after an update or a fresh install.
+    """
+    if terms_current(settings):
+        return True
+    log = logging.getLogger("main")
+    log.info("Showing first-launch terms acceptance dialog")
+    app = wx.App(False)
+    dialog = AcceptanceDialog(None)
+    try:
+        accepted = dialog.ShowModal() == wx.ID_OK and dialog.accepted
+    finally:
+        dialog.Destroy()
+    if accepted:
+        record_acceptance(settings)
+        log.info("Terms accepted (version %s)", settings.get("terms_version"))
+    else:
+        log.info("Terms not accepted - application will not start")
+    return accepted
+
+
 def main() -> int:
     # First, do basic startup logging to determine developer mode
     settings = Settings()
@@ -122,6 +150,11 @@ def main() -> int:
     log = logging.getLogger("main")
     log.info("AI Voice Studio starting (Python %s)", sys.version.split()[0])
     log.info("Developer mode: %s", developer_mode)
+
+    # First launch (or first launch after an update): the application only
+    # continues when the user accepts the terms of use.
+    if not _require_terms_acceptance(settings):
+        return 0
 
     # Initialize subsystems
     _init_python_runtime()

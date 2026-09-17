@@ -7,6 +7,6 @@ neural TTS models (Piper, Kokoro-82M, ...).
 """
 
 __app_name__ = "AI Voice Studio"
-__version__ = "2026.2.1"
+__version__ = "2026.3.1"
 __author__ = "Anuj Sharma"
 __license__ = "GPL-3.0-or-later"

@@ -16,12 +16,57 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 ----------------------------------------------------------------------------
 
 Third-party components bundled or downloaded by the application keep their own
-licences:
+licences. By using a component you accept its licence; check each one before
+commercial use.
 
+Bundled libraries
+-----------------
+* Python .............. PSF License (bundled with the frozen executable)
+* wxPython ............ wxWindows Library Licence (LGPL-compatible)
 * sherpa-onnx ......... Apache-2.0
-* ONNX Runtime ....... MIT
-* wxPython ........... wxWindows Library Licence (LGPL-compatible)
-* Piper voices ....... MIT
-* Kokoro-82M ......... Apache-2.0
-* MMS TTS ............ CC-BY-NC-4.0 (non-commercial)
-* FFmpeg (optional) .. LGPL/GPL (downloaded on demand by the user)
+* ONNX Runtime ........ MIT
+* numpy ............... BSD-3-Clause
+* FFmpeg (optional) ... LGPL-2.1/GPL (downloaded on demand by the user)
+
+TTS engines shipped in the catalog (sherpa-onnx ONNX family)
+-----------------------------------------------------------
+* Piper ............... MIT (code); voices under their own licences
+  (mostly MIT or Apache-2.0; check each voice on its model page)
+* Kokoro-82M .......... Apache-2.0
+* Kitten TTS .......... Apache-2.0
+* VITS (zh-AISHELL3) .. Apache-2.0 (code); AISHELL3 data for non-commercial use
+* Matcha-TTS .......... Apache-2.0 (code); model checkpoints CC-BY-4.0 unless
+  the model page states otherwise
+* MMS TTS (Meta) ...... CC-BY-NC-4.0 (non-commercial)
+* SAPI5 voices ........ Provided by Windows/the voice vendor; each voice keeps
+  its own EULA. Use only voices you are licensed to use.
+* Windows Core voices . Provided by Windows; governed by the Microsoft Windows
+  licence terms of your installation.
+
+OmniVoice engines (k2-fsa)
+--------------------------
+* OmniVoice ........... Apache-2.0
+  (https://github.com/k2-fsa/OmniVoice)
+* OmniVoice Server .... Apache-2.0
+  (https://github.com/maemreyo/omnivoice-server; uses the k2-fsa OmniVoice
+  model under Apache-2.0)
+
+Voice Lab clone engines (installed per engine into their own environments)
+--------------------------------------------------------------------------
+* Pocket TTS (Kyutai) . Apache-2.0 (code); the pre-made voices carry their own
+  licences, and cloned voices remain the responsibility of the user
+  (https://github.com/kyutai-labs/pocket-tts)
+* Bark (Suno AI) ...... MIT (code and model); generated audio is subject to
+  Suno's acceptable-use policy (https://github.com/suno-ai/bark)
+* F5-TTS .............. MIT (code); CC-BY-NC-4.0 (model weights) -
+  NON-COMMERCIAL unless you have a separate permission for the weights
+  (https://github.com/SWivid/F5-TTS)
+
+Other Python packages pulled in by the engines (torch, torchaudio, soundfile,
+scipy, transformers and friends) keep their own licences - BSD/MIT/Apache-2.0
+family for all of them; the exact list is visible with "pip license" inside
+each engine environment.
+
+The AI Voice Studio application itself does not grant any licence over the
+voices, models or audio produced with them; the user is responsible for
+respecting each component's licence and for lawful use of generated audio.
