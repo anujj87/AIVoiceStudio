@@ -147,6 +147,16 @@ def main():
     audit("OmniVoice options dialog", od, None)
     od.Destroy()
 
+    from ai_voice_studio.gui.voicelab_options_dialog import VoiceLabOptionsDialog
+    from ai_voice_studio.voicelab import engines as voice_lab
+
+    for engine_id in voice_lab.engine_ids():
+        vd = VoiceLabOptionsDialog(None, engine_id, values={}, project_name="demo")
+        vd.SetSize((760, 800))
+        vd.Show()
+        audit(f"Voice Lab options dialog ({engine_id})", vd, None)
+        vd.Destroy()
+
     from ai_voice_studio.gui.new_project_wizard import NewProjectWizard
 
     nw = NewProjectWizard(None, settings, store, initial_name="demo")

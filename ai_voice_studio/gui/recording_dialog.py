@@ -99,12 +99,15 @@ _COMPUTE_LABELS = {
 # TTS engines available for each compute mode.
 # Local engines (Piper, Kokoro, Kitten, the built-in Windows system voices,
 # etc.) work with CPU/GPU compute.  OmniVoice engines (Server, Triton,
-# Hybrid) require CUDA GPU.
+# Hybrid) require CUDA GPU.  The Voice Lab engines (Pocket TTS, Bark, F5-TTS)
+# run on the CPU and on the GPU, so their compute combo offers the CPU and -
+# when a GPU is detected - the GPU as well.
 _ONNX_TTS_ENGINES = {
     "piper", "kokoro", "kitten", "matcha", "pocket",
     "sapi5", "windows_core",
 }
 _OMNIVOICE_ENGINES = {"omnivoice", "omnivoice_server"}
+_VOICE_LAB_ENGINES = {"pocket_tts", "bark", "f5tts"}
 
 
 class RecordingDialog(wx.Dialog):
@@ -229,6 +232,23 @@ class RecordingDialog(wx.Dialog):
         self.omni_summary.Hide()
         sizer.Add(omni_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 6)
 
+        # -- Voice Lab tuning (per engine, per project) ----------------------
+        tune_row = wx.BoxSizer(wx.HORIZONTAL)
+        self.engine_options_btn = wx.Button(self, label="Engine tuning...")
+        self.engine_options_btn.SetName("Voice engine tuning")
+        self.engine_options_btn.SetToolTip(
+            "Diffusion steps, sampling temperatures, quantization and the "
+            "other generation settings of the selected Voice Lab engine."
+        )
+        tune_row.Add(self.engine_options_btn, 0, wx.ALL, 4)
+        self.engine_options_summary = wx.StaticText(self, label="")
+        self.engine_options_summary.SetName("Voice engine tuning summary")
+        tune_row.Add(self.engine_options_summary, 1,
+                     wx.ALL | wx.ALIGN_CENTER_VERTICAL, 4)
+        self.engine_options_btn.Hide()
+        self.engine_options_summary.Hide()
+        sizer.Add(tune_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 6)
+
         # -- controls --------------------------------------------------------
         btns = wx.BoxSizer(wx.HORIZONTAL)
         self.start_btn = wx.Button(self, label="Start recording")
@@ -295,6 +315,7 @@ class RecordingDialog(wx.Dialog):
         self.lang_combo.Bind(wx.EVT_COMBOBOX, self._on_lang)
         self.variant_combo.Bind(wx.EVT_COMBOBOX, self._on_variant)
         self.omni_btn.Bind(wx.EVT_BUTTON, self._on_omni_options)
+        self.engine_options_btn.Bind(wx.EVT_BUTTON, self._on_engine_options)
         self.Bind(wx.EVT_CLOSE, self._on_close)
         self.Bind(EVT_SYNTH_STATUS, self._on_synth_status)
         self.Bind(EVT_SYNTH_SEGMENT_DONE, self._on_segment_done)
@@ -302,9 +323,17 @@ class RecordingDialog(wx.Dialog):
         self.Bind(EVT_SYNTH_ERROR, self._on_error)
 
     def _selected_compute(self) -> str:
-        """Return the selected compute mode key (resolves auto)."""
+        """Return the selected compute mode key (with 'auto' resolved).
+
+        Voice Lab engines resolve 'auto' to the GPU when one is present, the
+        ONNX engines resolve it through the application's compute detection.
+        """
         sel = self.compute_combo.GetSelection()
         raw = self.compute_combo.GetClientData(sel) if sel >= 0 else "auto"
+        if self._selected_tts_id() in _VOICE_LAB_ENGINES:
+            from ..voicelab import resolve_device  # noqa: PLC0415
+
+            return resolve_device(raw)
         if raw == compute.COMPUTE_AUTO:
             return compute.resolve_compute(raw)
         return raw
@@ -376,21 +405,31 @@ class RecordingDialog(wx.Dialog):
         self._populate_tts_engines()
 
     def _inject_omnivoice_voices(self):
-        """Add OmniVoice voices from catalog if pip package is installed."""
+        """Add pip-installed engines' voices (OmniVoice, Voice Lab).
+
+        OmniVoice voices come from the catalog; the Voice Lab engines (Pocket
+        TTS, Bark, F5-TTS) bring their own pre-made voices, which are listed
+        from their installed package.
+        """
         try:
+            from ..voicelab import builtin_voice_entries  # noqa: PLC0415
+
+            self._all_voices.extend(builtin_voice_entries())
             for tts_entry in catalog.get_tts_list():
                 pkg = tts_entry.get("requires_package")
                 if not pkg:
                     continue
-                if not venv_packages.installed(pkg):
+                # Every pip-installed TTS engine lives in its *own* Python
+                # environment, so its catalog id names the environment.
+                engine = catalog.engine_env_id(tts_entry)
+                if not venv_packages.installed(pkg, engine=engine):
                     # Not installed yet (or the background probe is still
                     # running): ask to be told when the answer arrives.
-                    if not venv_packages.is_known(pkg):
+                    if not venv_packages.is_known(pkg, engine=engine):
                         venv_packages.request(
-                            pkg,
-                            lambda _v, p=pkg: wx.CallAfter(
-                                self._on_package_probe, p
-                            ),
+                            pkg, engine=engine,
+                            on_ready=lambda _v, p=pkg, e=engine:
+                                wx.CallAfter(self._on_package_probe, p, e),
                         )
                     continue
                 for lang in tts_entry.get("languages", []):
@@ -426,10 +465,10 @@ class RecordingDialog(wx.Dialog):
         except Exception:  # noqa: BLE001
             pass
 
-    def _on_package_probe(self, package: str):
+    def _on_package_probe(self, package: str, engine: str | None = None):
         """A managed-venv probe finished; re-list the engines when present."""
         try:
-            if venv_packages.version(package):
+            if venv_packages.version(package, engine=engine):
                 wx.CallAfter(self._rebuild_voice_choices)
         except Exception:  # noqa: BLE001
             pass
@@ -491,9 +530,25 @@ class RecordingDialog(wx.Dialog):
         """Fill the compute combo with the options the selected TTS supports.
 
         ONNX engines (Piper, Kokoro, Kitten, ...) run on Auto / CPU / GPU
-        (ONNX); OmniVoice engines run on CUDA GPU.
+        (ONNX); OmniVoice engines run on CUDA GPU; the Voice Lab engines run
+        on the CPU and on the GPU (CPU always, GPU plus Auto when detected).
         """
         self.compute_combo.Clear()
+        if tts_id in _VOICE_LAB_ENGINES:
+            from ..voicelab import device_options  # noqa: PLC0415
+
+            for value, label in device_options():
+                self.compute_combo.Append(label, value)
+            # CPU first (the option that works everywhere) unless the user
+            # already picked something else for this engine.
+            preferred = self.settings.get("clone_engines.device", "cpu")
+            for index in range(self.compute_combo.GetCount()):
+                if self.compute_combo.GetClientData(index) == preferred:
+                    self.compute_combo.SetSelection(index)
+                    break
+            else:
+                self.compute_combo.SetSelection(0)
+            return
         if tts_id in _OMNIVOICE_ENGINES:
             self.compute_combo.Append(_COMPUTE_LABELS["cuda_gpu"], "cuda_gpu")
         else:
@@ -517,7 +572,7 @@ class RecordingDialog(wx.Dialog):
                 if engine in _OMNIVOICE_ENGINES or v.get("custom_omni"):
                     self._voices.append(v)
             else:
-                if engine in _ONNX_TTS_ENGINES:
+                if engine in _ONNX_TTS_ENGINES or engine in _VOICE_LAB_ENGINES:
                     self._voices.append(v)
         if not self._voices:
             for combo in (self.lang_combo, self.variant_combo, self.voice_combo):
@@ -663,6 +718,7 @@ class RecordingDialog(wx.Dialog):
                         else "No OmniVoice options set - auto voice will be used.")
             self.omni_summary.SetLabel(text)
             self.omni_summary.SetName("OmniVoice voice options summary: " + text)
+        self._update_engine_options_ui()
         self.Layout()
 
     def _on_omni_options(self, _):
@@ -685,6 +741,97 @@ class RecordingDialog(wx.Dialog):
         self._update_omni_ui()
         self.status.SetLabel(
             "OmniVoice options saved for this project. Press Start recording."
+        )
+
+    # -- Voice Lab tuning options (per project, per engine) ------------------
+    def _is_voicelab_selected(self) -> bool:
+        return self._selected_tts_id() in _VOICE_LAB_ENGINES
+
+    def _engine_options_for_engine(self) -> dict:
+        """The tuning overrides this project stores for the selected engine."""
+        stored = self.data.get("tts", {}).get("engine_options") or {}
+        tts_id = self._selected_tts_id()
+        if stored.get("engine") == tts_id:
+            values = stored.get("values") or {}
+            return values if isinstance(values, dict) else {}
+        return {}
+
+    def _engine_options_defaults(self) -> dict:
+        """The tuning defaults saved in Settings > Voice Clone for the engine."""
+        from ..voicelab import options as tuning  # noqa: PLC0415
+
+        tts_id = self._selected_tts_id()
+        if tts_id not in _VOICE_LAB_ENGINES:
+            return {}
+        saved = self.settings.get(tuning.settings_key(tts_id), {})
+        return saved if isinstance(saved, dict) else {}
+
+    def _effective_engine_options(self) -> dict:
+        """Project overrides, else the saved defaults, else nothing."""
+        from ..voicelab import options as tuning  # noqa: PLC0415
+
+        tts_id = self._selected_tts_id()
+        if tts_id not in _VOICE_LAB_ENGINES:
+            return {}
+        return tuning.resolve(
+            tts_id, self._engine_options_for_engine(),
+            self._engine_options_defaults(),
+        )
+
+    def _update_engine_options_ui(self):
+        """Show the tuning button for Voice Lab engines and describe the
+        values this project will actually use."""
+        visible = self._is_voicelab_selected()
+        self.engine_options_btn.Show(visible)
+        self.engine_options_summary.Show(visible)
+        if not visible:
+            return
+        from ..voicelab import options as tuning  # noqa: PLC0415
+
+        tts_id = self._selected_tts_id()
+        values = self._effective_engine_options()
+        text = tuning.describe_overrides(tts_id, values)
+        if text:
+            source = "" if self._engine_options_for_engine() else " (Settings default)"
+            summary = f"Tuning: {text}{source}."
+        else:
+            summary = "Tuning: engine defaults."
+        notes = tuning.problems(tts_id, values, self._selected_compute())
+        if notes:
+            summary += " " + " ".join(notes)
+        self.engine_options_summary.SetLabel(summary)
+        self.engine_options_summary.SetName(
+            "Voice engine tuning summary: " + summary
+        )
+
+    def _on_engine_options(self, _):
+        """Open the per-engine tuning dialog for this project."""
+        from .voicelab_options_dialog import VoiceLabOptionsDialog  # noqa: PLC0415
+
+        tts_id = self._selected_tts_id()
+        if tts_id not in _VOICE_LAB_ENGINES:
+            return
+        dlg = VoiceLabOptionsDialog(
+            self,
+            engine_id=tts_id,
+            values=self._engine_options_for_engine(),
+            project_name=self.data.get("name", ""),
+            scope="project",
+        )
+        try:
+            if dlg.ShowModal() != wx.ID_OK:
+                return
+            values = dlg.get_options()
+        finally:
+            dlg.Destroy()
+        tts = self.data.setdefault("tts", {})
+        if values:
+            tts["engine_options"] = {"engine": tts_id, "values": values}
+        else:
+            tts.pop("engine_options", None)
+        self._update_engine_options_ui()
+        self.status.SetLabel(
+            "Engine tuning saved for this project. Press Start recording."
         )
 
     def _selected_voice(self):
@@ -813,6 +960,13 @@ class RecordingDialog(wx.Dialog):
         }
         if omni:
             tts_data["omni"] = omni
+        if self._is_voicelab_selected():
+            tuning = self._engine_options_for_engine()
+            if tuning:
+                tts_data["engine_options"] = {
+                    "engine": self._selected_tts_id(),
+                    "values": tuning,
+                }
         # Merge into the freshest on-disk state instead of saving the stale
         # in-memory copy: the recording worker marks segments done in
         # project.json while the dialog runs, and a wholesale save here would
@@ -893,6 +1047,17 @@ class RecordingDialog(wx.Dialog):
                 self.omni_summary.SetLabel(
                     f"Cloning the voice from: {os.path.basename(ref)}."
                 )
+        # Voice Lab engines: hand this project's tuning overrides (or the
+        # Settings defaults for the engine) to the synthesis worker.
+        if voice.get("engine") in _VOICE_LAB_ENGINES:
+            from ..voicelab import options as tuning  # noqa: PLC0415
+
+            values = self._effective_engine_options()
+            voice = tuning.apply_to_voice(voice, values)
+            for note in tuning.problems(voice.get("engine"), values,
+                                        self._selected_compute()):
+                self.status.SetLabel(note)
+
         params = self._current_params()
         fmt = params["output_format"]
         ffmpeg_exe = None

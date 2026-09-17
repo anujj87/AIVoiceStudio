@@ -67,7 +67,7 @@ def main() -> int:
         frame = wx.Frame(None)
         store = ModelStore(state_file=state)
         dlg = SettingsDialog(frame, Settings(), store)
-        panel = dlg._panels[3]
+        panel = dlg.omnivoice_engines_panel
         assert panel.title == "OmniVoice engines", panel.title
 
         # --- clone voice ------------------------------------------------
@@ -109,8 +109,9 @@ def main() -> int:
         assert shown == {"Renamed Voice", "Narrator"}, shown
         print("OK Available TTS lists library voices:", sorted(shown))
 
-        dlg._panels[6].on_activated()  # Punctuation panel
-        shown_p = {v["voice"] for v in dlg._panels[6]._voices
+        punct_panel = dlg.punctuation_panel
+        punct_panel.on_activated()  # Punctuation panel
+        shown_p = {v["voice"] for v in punct_panel._voices
                    if v.get("custom_omni")}
         assert shown_p == {"Renamed Voice", "Narrator"}, shown_p
         print("OK Punctuation panel lists library voices:", sorted(shown_p))

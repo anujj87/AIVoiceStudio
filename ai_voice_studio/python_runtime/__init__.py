@@ -17,6 +17,7 @@ Usage::
 
 from __future__ import annotations
 
+import glob
 import json
 import logging
 import os
@@ -33,7 +34,20 @@ from .. import paths
 log = logging.getLogger(__name__)
 
 _ADDON_ENV_DIR = "addon_env"
+#: Per-TTS environments live in a sibling folder: one virtualenv per engine,
+#: so engines with conflicting dependencies (different torch or transformers
+#: releases) never fight over the same site-packages.
+_TTS_ENVS_DIR = "tts_envs"
 _MANIFEST_NAME = "installed_packages.json"
+
+#: Engines that share one environment.  The two OmniVoice engines are the same
+#: model behind two front-ends (the direct Triton runner and the HTTP server):
+#: both want the same ``omnivoice`` base package and the same CUDA PyTorch, so
+#: a second environment would only duplicate several gigabytes of wheels.
+#: Every other TTS engine gets an environment of its own.
+SHARED_ENVIRONMENTS: Dict[str, str] = {
+    "omnivoice_server": "omnivoice",
+}
 
 
 def _python_exe_for_env(env_dir: str) -> str:
@@ -113,6 +127,20 @@ class PythonRuntime:
     def is_created(self) -> bool:
         return os.path.isfile(self.python_exe)
 
+    @property
+    def site_packages_dirs(self) -> List[str]:
+        """The environment's ``site-packages`` folder(s), when they exist.
+
+        Used for *synchronous* "is this package installed here?" checks: a
+        background probe answers that question for the GUI, but the decision
+        which interpreter to start an engine's worker with must not depend on
+        a probe that may not have answered yet (see ``venv_packages``).
+        """
+        found: List[str] = []
+        for pattern in ("Lib/site-packages", "lib/python*/site-packages"):
+            found.extend(sorted(glob.glob(os.path.join(self._env_dir, pattern))))
+        return [path for path in found if os.path.isdir(path)]
+
     # -- system python ------------------------------------------------------
 
     @property
@@ -177,6 +205,7 @@ class PythonRuntime:
         packages: List[str] | str,
         progress: Callable[[str, int, int], None] | None = None,
         cancel_event: threading.Event | None = None,
+        index_url: str | None = None,
     ) -> Dict[str, str]:
         """Install packages into the addon virtualenv.
 
@@ -189,6 +218,9 @@ class PythonRuntime:
             Optional callback ``(message, done, total)`` for progress updates.
         cancel_event:
             Optional event to cancel the installation.
+        index_url:
+            Optional alternative package index (``--index-url``), used to pull
+            the CUDA build of PyTorch from the official PyTorch wheels.
 
         Returns
         -------
@@ -210,7 +242,10 @@ class PythonRuntime:
                 cleaned.append(token)
         packages = cleaned or []
         pip = self.ensure_pip()
-        cmd = [pip, "install", "--no-warn-script-location"] + packages
+        cmd = [pip, "install", "--no-warn-script-location"]
+        if index_url:
+            cmd += ["--index-url", index_url]
+        cmd += packages
         log.info("Running pip install: %s", " ".join(cmd))
 
         if progress:
@@ -342,14 +377,80 @@ class PythonRuntime:
 # Singleton accessor
 # ---------------------------------------------------------------------------
 _default_runtime: PythonRuntime | None = None
+#: One environment per pip-installed TTS engine ("pocket_tts", "bark", ...).
+_engine_runtimes: Dict[str, PythonRuntime] = {}
 _runtime_lock = threading.Lock()
 
 
-def get_runtime() -> PythonRuntime:
-    """Return the default PythonRuntime instance (lazy singleton)."""
+def _safe_env_name(engine_id: str | None) -> str:
+    """Folder name for an engine's environment (path-safe, lower-case)."""
+    name = "".join(
+        char if char.isalnum() or char in "_-" else "_"
+        for char in (engine_id or "").strip().lower()
+    )
+    return name or "default"
+
+
+def environment_id(engine_id: str | None) -> str:
+    """Folder id of the virtualenv that holds ``engine_id``'s packages.
+
+    Usually the engine's own id; the OmniVoice engines are the one exception
+    (see ``SHARED_ENVIRONMENTS``) and map onto their shared environment.
+    """
+    name = _safe_env_name(engine_id)
+    return SHARED_ENVIRONMENTS.get(name, name)
+
+
+def engine_env_dir(engine_id: str) -> str:
+    """The folder of the virtualenv that holds one TTS engine."""
+    return os.path.join(
+        paths.user_data_dir(), _TTS_ENVS_DIR, environment_id(engine_id)
+    )
+
+
+def get_runtime(engine_id: str | None = None) -> PythonRuntime:
+    """Return the PythonRuntime instance (lazy singleton per environment).
+
+    Without ``engine_id`` this is the shared addon environment used by addons
+    and the Developer tab.  With an engine id it is that TTS engine's *own*
+    environment (``%APPDATA%/AIVoiceStudio/tts_envs/<engine>``), so engines
+    whose pip dependencies conflict never share site-packages.  Engines listed
+    in ``SHARED_ENVIRONMENTS`` (the two OmniVoice ones) resolve to the same
+    runtime object.
+    """
     global _default_runtime
-    if _default_runtime is None:
-        with _runtime_lock:
-            if _default_runtime is None:
-                _default_runtime = PythonRuntime()
-    return _default_runtime
+    if not engine_id:
+        if _default_runtime is None:
+            with _runtime_lock:
+                if _default_runtime is None:
+                    _default_runtime = PythonRuntime()
+        return _default_runtime
+    key = environment_id(engine_id)
+    with _runtime_lock:
+        runtime = _engine_runtimes.get(key)
+        if runtime is None:
+            runtime = PythonRuntime(engine_env_dir(engine_id))
+            _engine_runtimes[key] = runtime
+        return runtime
+
+
+def engine_runtime(engine_id: str) -> PythonRuntime:
+    """The environment that actually holds one TTS engine's packages.
+
+    Every pip-installed TTS engine gets its *own* virtualenv
+    (``%APPDATA%/AIVoiceStudio/tts_envs/<engine>``, shared by the two
+    OmniVoice engines) so engines with conflicting dependencies never share
+    site-packages.  An engine that was installed before those per-TTS
+    environments existed still lives in the shared addon environment, so that
+    one is used as the fallback until the engine is (re)installed into its
+    own environment.
+    """
+    runtime = get_runtime(engine_id)
+    if runtime.is_created:
+        return runtime
+    return get_runtime()
+
+
+def engine_env_exists(engine_id: str) -> bool:
+    """True when ``engine_id`` has its own (created) virtualenv."""
+    return get_runtime(engine_id).is_created

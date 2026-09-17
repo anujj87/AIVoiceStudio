@@ -69,6 +69,25 @@ Detection rules:
 - If more than one compute option is available, an **Auto** entry is added (preference order:
   GPU → NPU → CPU).
 
+**How much compute is used** (whatever back-end is selected):
+
+- **GPU** uses the whole available NVIDIA card. Any CUDA-capable card the driver exposes is
+  accepted - there is no model, VRAM or compute-capability requirement - and the run is tuned for
+  maximum throughput: the first (usually only) CUDA device, cuDNN's autotuner, the TensorFloat-32
+  fast paths, `high` float32 matmul precision and the autograd engine switched off.
+- **CPU** uses between **80% and 95%** of the machine's logical CPUs (`compute.cpu_threads()`),
+  so a long recording is fast while the desktop, the Recording window and the audio writer stay
+  responsive. Machines with fewer than four logical CPUs keep one core free instead; a
+  single-core machine uses its one core. The value is passed to every back-end - sherpa-onnx's
+  `num_threads` and `torch.set_num_threads` in the pip-installed engines' worker - so the same
+  budget applies everywhere.
+
+**A Compute combo with every Preview button**: *Available TTS*, *Recording settings*,
+*Punctuation* and *OmniVoice engines* each show a small **Compute** combo (CPU, GPU when an
+NVIDIA GPU is detected, Auto when there is a choice) next to their Preview button. The choice is
+remembered per category in Settings (`preview_compute.<category>`) and is resolved to the
+provider the preview passes to `get_engine`.
+
 ## 3. Functional requirements
 
 ### 3.1 Settings dialog (File → Settings / `Ctrl+,`)
@@ -86,21 +105,42 @@ A tabbed dialog with **OK / Cancel / Apply** buttons. Tabs:
    - Combo 1: TTS, Combo 2: Language, Combo 3: Variant, Combo 4: Voice.
    - Lists only **downloaded** voices so the user can preview/use them.
    - Voice-clone uploads appear here too (voice name = file name of the uploaded sample).
-4. **Voice clone**:
+4. **Voice Clone** (Pocket TTS by Kyutai, Suno Bark, F5-TTS) — the CPU-first clone
+   engines:
+   - 1. **Engine** combo + **Install engine... / Remove engine** (pip into the engine's *own*
+     virtualenv, `%APPDATA%\AIVoiceStudio\tts_envs\<engine>`) with the install status
+     underneath.
+   - 2. **Device** combo: **CPU always**; **GPU (CUDA)** and **Auto** are added when an
+     NVIDIA GPU is detected (the CPU is never removed).
+   - 3. **Voice**: *Use a built-in voice* (the engine's pre-made voices) or *Clone a voice
+     from a sample* (reference recording + optional transcript + voice name → **Create
+     cloned voice**; Bark takes a `.npz` speaker embedding).
+   - 4. **Voices ready to use**: every built-in and cloned voice, with **Preview selected
+     voice** and **Delete cloned voice**.
+   - **Engine tuning...** edits the generation defaults of the selected engine (diffusion
+     steps, CFG strength, sampling temperatures, int8 quantization, seed, ...) and saves
+     them in Settings (`clone_engines.options.<engine>`); each project can override them.
+     A control starts at the engine's own default and only values that differ from it are
+     stored, so an untouched engine keeps its documented behaviour.
+   - Cloned voices are stored in the model store (`kind=clone_reference`) and appear in
+     **Available TTS**, the Preview cascades and the Recording window.
+   - Built-in voices of installed engines are injected into those panels too, so they can
+     be used everywhere without extra configuration.
+5. **Voice clone (uploaded model)**:
    - Combo 1: TTS, Combo 2: Language, Combo 3: Variant (only entries of cloning-capable TTS).
    - **Upload voice** button → file dialog for audio sample (`.wav/.mp3/.flac/.onnx`).
    - For Piper: a `.onnx` + `.onnx.json` pair is copied into the user model folder and registered
      under the uploaded file name. For XTTS: a reference audio path is recorded.
    - Registered clone names appear in **Available TTS → Voice combo** and are usable everywhere.
-5. **Recording settings**:
+6. **Recording settings**:
    - Punctuation combo: `Default (TTS default)`, `None`, `Math`, `All`.
    - Speed slider, Pitch slider, Volume slider (with value labels).
    - Edit box prefilled with sample text + **Preview** button (plays a short synthesis).
-6. **Audio file creation**:
+7. **Audio file creation**:
    - Radio group (single choice): **Page by page with heading style 1**,
      **Page by page only**, **Heading style 1 only**, **Break on every heading**.
    - Description text for each mode (see §3.4).
-7. **Reset** — **Reset to default** button; shows confirmation "All settings will go back to
+8. **Reset** — **Reset to default** button; shows confirmation "All settings will go back to
    their default values." and clears models cache info.
 
 ### 3.2 Accessibility guidelines (must-follow)
@@ -120,6 +160,71 @@ A tabbed dialog with **OK / Cancel / Apply** buttons. Tabs:
 As described in §2.3. The **Recording** window and **Settings** show a "Compute" combo with only
 the available options (plus `Auto` when >1). Changing compute back-end at runtime re-creates the
 TTS engine (cache by `(provider, model fingerprint)`).
+
+### 3.3.1 Python environments (one per TTS engine)
+
+Every TTS engine that is installed with pip runs from its **own** Python virtualenv
+(`%APPDATA%\AIVoiceStudio\tts_envs\<engine>`, created and managed by
+`python_runtime.PythonRuntime`), so conflicting dependency versions (torch, torchaudio,
+transformers, triton) can never break another engine:
+
+| Environment | Holds |
+|---|---|
+| `tts_envs\pocket_tts` | Pocket TTS (Kyutai) |
+| `tts_envs\bark` | Suno Bark (`transformers` + `torch`) |
+| `tts_envs\f5tts` | F5-TTS |
+| `tts_envs\omnivoice` | **both** OmniVoice engines (direct + HTTP server) |
+| `addon_env` | addons, the Developer tab and the sherpa-onnx GPU runtime |
+
+Rules:
+
+- The engine's id names the environment (`python_runtime.environment_id`);
+  `SHARED_ENVIRONMENTS` maps the one deliberate exception - `omnivoice_server` onto
+  `omnivoice` - because the two OmniVoice engines are the same model behind two front-ends and
+  want the same base package and the same CUDA PyTorch.
+- The engine's packages are installed into that environment only; each engine is driven by
+  `voicelab.worker` (or the OmniVoice worker) running on that environment's interpreter, so
+  PyTorch/CUDA never enters the GUI process.
+- `venv_packages` probes are cached per *environment*, so the two OmniVoice engines share one
+  answer and installing either refreshes both. Because the probe answers only once its background
+  check has finished, the cached probe is for the **GUI** (labels, enabled buttons) and never for
+  a decision that must be right immediately: `venv_packages.version`/`installed` fall back to a
+  direct listing of the environment's `site-packages` (`venv_packages.package_present`), and
+  `voicelab.CloneWorker._runtime` uses that same listing to choose which interpreter an engine's
+  worker is started with. Without it the first preview after an install started the worker in the
+  shared environment and Bark failed with `ModuleNotFoundError: No module named 'torch'` although
+  its own environment had PyTorch. When neither environment holds the engine the error says so in
+  the engine's own words instead of naming a missing module.
+- The sherpa-onnx ONNX engines (Piper, Kokoro, Kitten, Matcha, VITS, the Windows system voices)
+  ship with the application and are deliberately unchanged: they keep using the bundled runtime.
+- Engines installed before the per-TTS environments existed are still found in the shared addon
+  environment (`python_runtime.engine_runtime` prefers the engine's own environment and falls
+  back to the shared one).
+- **GPU support for every engine**: each Voice Clone engine takes the CUDA build of PyTorch from
+  the official PyTorch wheel index `voicelab.engines.PYTORCH_CUDA_INDEX` when an NVIDIA GPU is
+  detected (PyPI's plain `torch` wheel is CPU-only on Windows); the OmniVoice installers use the
+  same constant, so every CUDA wheel comes from one index. The index must carry wheels for the
+  Python the app runs on - `cu121` stops at Python 3.12 and made pip fail with "No matching
+  distribution found for torch" on Python 3.13, which is why the index is `cu128`.
+- If the CUDA wheel index cannot satisfy an install (no build for this interpreter, or the mirror
+  is unreachable) the engine installer falls back to the plain PyPI packages, so the engine is
+  still installed and usable on the CPU, with the GPU limitation reported to the user.
+- **Install verification**: after the pip steps succeed the app imports the engine's module(s)
+  (`voicelab.verify_engine_import`, using `engines.import_modules`) in the engine's own environment
+  and reports a failure in the install dialog. pip succeeding is not the same as a working engine;
+  this is what turns a dependency-resolution mistake into an immediate, explained message. The same
+  `engines.import_modules` list decides which environment the worker is started with, so it is the
+  single description of "what this engine needs". Package names are plain names only: the same list
+  feeds "Remove engine", and a version specifier there would make `pip uninstall` fail.
+- **Audio decoding without FFmpeg**: from TorchAudio 2.9 on `torchaudio.load`/`save` decode through
+  TorchCodec (its `backend` argument is accepted and ignored), which on Windows needs FFmpeg's
+  shared libraries - not something the app installs. The Voice Lab worker probes TorchCodec with a
+  real file (`_torchcodec_works`) and only when it is broken replaces `torchaudio.load`/`save` with
+  soundfile-backed equivalents (`_install_audio_io_shim`, opt-out via
+  `AIVS_VOICELAB_NO_AUDIO_SHIM=0`); soundfile ships libsndfile in its wheel, so WAV/FLAC/OGG/MP3
+  decode with nothing installed, and a machine with FFmpeg keeps TorchCodec's wider format support.
+  F5-TTS additionally cleans its reference clip with pydub, which shells out to FFmpeg for non-WAV
+  input, so a non-WAV reference is converted to a WAV once with soundfile before the engine runs.
 
 ### 3.4 Audio file creation modes & naming
 
@@ -155,6 +260,10 @@ and open the **Recording** window for this project. Projects are listed in **Fil
 
 - Selectors: TTS, Language, Variant, Voice, plus **Rate, Pitch, Volume** sliders and
   **Punctuation** combo — these settings apply **only to this project** (stored in the project file).
+- **Engine tuning...** (shown for the Voice Clone engines) stores this project's generation
+  overrides under `tts.engine_options` (`{"engine": id, "values": {...}}`); a project without
+  its own overrides uses the Settings defaults for that engine. The summary next to the button
+  names the active values and where they come from, and unsupported ones are reported.
 - **Start / Pause / Resume** recording.
 - Instant persistence: every synthesized segment is **saved to disk immediately** after synthesis.
   If the app is closed/crashes, the next launch finds the last saved segment and offers to
@@ -200,12 +309,19 @@ AI-voice-studio/
 │   ├── paths.py               # user data dirs (%APPDATA%\AIVoiceStudio)
 │   ├── settings.py            # persisted settings (JSON)
 │   ├── constants.py           # app constants + theme enum
-│   ├── compute.py             # CPU/GPU/NPU/Auto detection
+│   ├── compute.py             # CPU/GPU/NPU/Auto detection, CPU thread budget
+│   ├── python_runtime/        # managed virtualenvs (one per TTS engine + addon_env)
+│   ├── venv_packages.py       # cached per-environment package probes
 │   ├── tts/
 │   │   ├── catalog.py         # model catalog (embedded JSON) + helpers
 │   │   ├── downloader.py      # resumable downloads (requests, Range)
 │   │   ├── engine.py          # sherpa-onnx wrapper, engine cache
 │   │   └── models.py          # installed-model state (downloads.json)
+│   ├── voicelab/
+│   │   ├── engines.py         # CPU/GPU clone engines + their built-in voices
+│   │   ├── options.py         # per-engine tuning vocabulary (defaults, ranges)
+│   │   ├── worker.py          # standalone worker subprocess (PyTorch lives here)
+│   │   └── __init__.py        # device choice, worker client, VoicelabEngine, clones
 │   ├── documents/
 │   │   ├── parsers.py         # pdf/txt/docx/html/md/clipboard → plain text
 │   │   └── splitter.py        # §3.4 splitting + naming
@@ -216,7 +332,9 @@ AI-voice-studio/
 │   │   └── synthesizer.py     # background synthesis worker + resume logic
 │   ├── gui/
 │   │   ├── main_frame.py      # main window, menu, status bar
-│   │   ├── settings_dialog.py # all 7 tabs
+│   │   ├── settings_dialog.py # all settings categories
+│   │   ├── clone_engines_panel.py # Voice Clone category (CPU/GPU clone engines)
+│   │   ├── voicelab_options_dialog.py # per-engine tuning dialog (project/defaults)
 │   │   ├── model_panels.py    # Download/Remove, Available TTS, Voice clone panels
 │   │   ├── new_project_wizard.py
 │   │   ├── recording_dialog.py

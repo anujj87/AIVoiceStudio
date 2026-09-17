@@ -237,7 +237,45 @@ class ModelStore:
                             "frontend": tts.get("frontend", ""),
                         }
                     )
+        # Voices cloned with a Voice Lab engine (Pocket TTS, Bark, F5-TTS)
+        # live in ``custom_voices``; listing them here means every panel that
+        # shows installed voices shows the clones too.
+        voices.extend(self._voice_lab_clones())
         return voices
+
+    def _voice_lab_clones(self) -> List[Dict[str, Any]]:
+        """Voice entries for voices cloned from a user recording."""
+        try:
+            from ..voicelab import CLONE_KIND  # noqa: PLC0415
+            from ..voicelab import engines as voicelab_engines  # noqa: PLC0415
+        except Exception:  # noqa: BLE001
+            return []
+        entries: List[Dict[str, Any]] = []
+        for voice in self.custom_voices():
+            if voice.get("kind") != CLONE_KIND:
+                continue
+            engine_id = voice.get("tts") or voice.get("engine")
+            if not voicelab_engines.is_engine(engine_id):
+                continue
+            entries.append(
+                {
+                    "tts": engine_id,
+                    "tts_name": voicelab_engines.engine_name(engine_id),
+                    "language": voice.get("language", "en"),
+                    "variant": voice.get("variant") or "default",
+                    "voice": voice.get("voice") or voicelab_engines.CLONE_VOICE_ID,
+                    "voice_name": voice.get("name", "Cloned voice"),
+                    "sid": 0,
+                    "engine": engine_id,
+                    "dir": voice.get("dir", ""),
+                    "ref_audio": voice.get("ref_audio") or voice.get("sample") or "",
+                    "ref_text": voice.get("ref_text", ""),
+                    "custom": True,
+                    "cloned": True,
+                    "builtin_voice": False,
+                }
+            )
+        return entries
 
     # -- custom (user-created) voices ---------------------------------------
     def add_custom_voice(self, name: str, tts_id: str, directory: str, kind: str,
@@ -341,6 +379,22 @@ def resolve_voice_files(voice_entry: Dict[str, Any]) -> Dict[str, Any]:
             "sid": voice_entry.get("sid", 0),
         })
         return files
+
+    # Voice Lab engines (Pocket TTS / Bark / F5-TTS) run from an installed
+    # package and keep their model in the HuggingFace cache: there are no local
+    # model files for the engine to load.
+    try:
+        from ..voicelab import engines as voicelab_engines  # noqa: PLC0415
+
+        if voicelab_engines.is_engine(engine):
+            files.update({
+                "model": None,
+                "tokens": None,
+                "sid": voice_entry.get("sid", 0),
+            })
+            return files
+    except Exception:  # noqa: BLE001
+        pass
 
     def find(*names: str) -> Optional[str]:
         for name in names:

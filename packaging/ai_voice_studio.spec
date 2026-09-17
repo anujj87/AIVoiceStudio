@@ -39,12 +39,23 @@ hiddenimports = [
     "ai_voice_studio.addons",
     "ai_voice_studio.python_runtime",
     "ai_voice_studio.heavy_logging",
+    # Voice Lab: the clone-engine registry, its tuning vocabulary and its GUI
+    # category and options dialog.
+    "ai_voice_studio.voicelab",
+    "ai_voice_studio.voicelab.engines",
+    "ai_voice_studio.voicelab.options",
+    "ai_voice_studio.gui.voicelab_options_dialog",
+    # Per-category Compute combo shown next to every Preview button.
+    "ai_voice_studio.gui.compute_choice",
 ]
 
 datas = [
     # embedded model catalog (TTS -> language -> variant -> voice -> URLs)
     # paths are relative to this spec file (packaging/), so go up to the root
     ("../ai_voice_studio/tts/models_catalog.json", "ai_voice_studio/tts"),
+    # Voice Lab worker: a standalone script run by the *managed virtualenv*
+    # interpreter as a subprocess, which cannot import from the PYZ archive.
+    ("../ai_voice_studio/voicelab/worker.py", "ai_voice_studio/voicelab"),
     ("../README.md", "."),
     # HTML documentation opened from the Help menu.
     ("../docs/README.html", "docs"),

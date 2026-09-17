@@ -7,6 +7,7 @@ which made pages render blank.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import shutil
 import sys
@@ -28,6 +29,11 @@ from ai_voice_studio.gui.recording_dialog import RecordingDialog  # noqa: E402
 from ai_voice_studio.gui.settings_dialog import SettingsDialog  # noqa: E402
 from ai_voice_studio.settings import Settings  # noqa: E402
 from ai_voice_studio.tts.models import ModelStore  # noqa: E402
+from ai_voice_studio import compute  # noqa: E402
+from ai_voice_studio import voicelab  # noqa: E402
+from ai_voice_studio.gui import compute_choice  # noqa: E402
+from ai_voice_studio.voicelab import engines as voice_lab  # noqa: E402
+from ai_voice_studio.voicelab import options as tuning  # noqa: E402
 
 
 class _AppMixin(unittest.TestCase):
@@ -106,8 +112,8 @@ class SettingsDialogTest(_AppMixin):
         try:
             # NVDA-style: a category list on the left, one panel per category.
             self.assertIsNotNone(dlg.cat_list)
-            self.assertEqual(dlg.cat_list.GetItemCount(), 12)
-            self.assertEqual(len(dlg._panels), 12)
+            self.assertEqual(dlg.cat_list.GetItemCount(), 13)
+            self.assertEqual(len(dlg._panels), 13)
             self.assertTrue(hasattr(dlg, "container"))
             # Every panel must have at least one child control.
             for panel in dlg._panels:
@@ -115,8 +121,30 @@ class SettingsDialogTest(_AppMixin):
             # Only the first category is visible.
             self.assertTrue(dlg._panels[0].IsShown())
             self.assertFalse(dlg._panels[1].IsShown())
-            # Category 3 is OmniVoice Engines (was Voice Clone).
-            self.assertEqual(dlg._panels[3].title, "OmniVoice engines")
+            # Category 3 is the Voice Clone category (the CPU/GPU clone
+            # engines); OmniVoice engines follows it.
+            self.assertEqual(dlg._panels[3].title, "Voice Clone")
+            self.assertEqual(dlg._panels[4].title, "OmniVoice engines")
+            clone = dlg.voice_clone_panel
+            for attribute in ("engine_combo", "install_btn", "remove_btn",
+                              "engine_status", "device_combo", "source_combo",
+                              "builtin_combo", "sample_ctrl", "name_ctrl",
+                              "ref_text_ctrl", "create_btn", "voices_list",
+                              "preview_btn", "preview_status", "delete_btn"):
+                self.assertTrue(hasattr(clone, attribute), attribute)
+            # Every Voice Lab engine is selectable, and the CPU is always the
+            # first device (the GPU is only ever offered *in addition*).
+            self.assertEqual(
+                clone.engine_combo.GetCount(), len(voice_lab.engine_ids())
+            )
+            self.assertGreaterEqual(clone.device_combo.GetCount(), 1)
+            self.assertEqual(clone.device_combo.GetClientData(0), "cpu")
+            self.assertIn(clone.device_combo.GetClientData(0),
+                          [d[0] for d in voicelab.device_options()])
+            # The built-in voices of the four engines are defined, even when
+            # the engines are not installed yet.
+            self.assertGreater(voice_lab.count_builtin_voices("bark"), 100)
+            self.assertEqual(voice_lab.count_builtin_voices("pocket_tts"), 26)
             # Recording-settings category exposes the preview controls
             # (punctuation moved out to its own category).
             recording = dlg.recording_panel
@@ -163,6 +191,9 @@ class SettingsDialogTest(_AppMixin):
             dlg._show_category(3)
             self.assertFalse(dlg._panels[0].IsShown())
             self.assertTrue(dlg._panels[3].IsShown())
+            dlg._show_category(4)
+            self.assertFalse(dlg._panels[3].IsShown())
+            self.assertTrue(dlg._panels[4].IsShown())
 
             # Recording settings exposes the TTS/voice preview list.
             self.assertTrue(hasattr(recording, "voices_list"))
@@ -173,7 +204,7 @@ class SettingsDialogTest(_AppMixin):
 
             # The OmniVoice engines category offers the one-click move to the
             # Compute category when the OmniVoice dependency is missing.
-            engines = dlg._panels[3]
+            engines = dlg.omnivoice_engines_panel
             self.assertTrue(hasattr(engines, "goto_compute_btn"))
             self.assertIn("Compute", engines.goto_compute_btn.GetLabel())
             self.assertTrue(hasattr(engines, "dependency_status"))
@@ -254,6 +285,304 @@ class SettingsDialogTest(_AppMixin):
             dlg.Destroy()
 
 
+class VoiceCloneCategoryTest(_AppMixin):
+    """The Voice Clone category end to end: create a clone, then use it."""
+
+    def setUp(self):
+        # Cloned voices are copied into the user models folder: keep that in a
+        # temporary directory so the real one is never touched.
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        patcher = mock.patch("ai_voice_studio.paths.user_data_dir",
+                             return_value=self.tmp.name)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _dialog(self):
+        settings = Settings(path=os.path.join(self.tmp.name, "settings.json"))
+        dlg = SettingsDialog(self.frame, settings, self._empty_store())
+        self.addCleanup(dlg.Destroy)
+        return dlg
+
+    @contextlib.contextmanager
+    def _without_builtin_voices(self, panel):
+        """Hide the engine's built-in voices, whatever this machine has.
+
+        A Voice Lab engine that happens to be installed here contributes its
+        own voices (F5-TTS ships two reference voices, Bark over a hundred),
+        which would drown out the clones these tests are about.  The probe
+        thread is silenced too, so the test never waits on a real engine.
+        """
+        with mock.patch.object(voice_lab, "builtin_voices", return_value=[]), \
+                mock.patch.object(panel, "_probe_builtin_availability"):
+            yield
+
+    def test_cpu_is_always_offered_and_gpu_is_added_when_present(self):
+        with mock.patch.object(voicelab, "has_cuda", return_value=False):
+            dlg = self._dialog()
+            values = [dlg.voice_clone_panel.device_combo.GetClientData(i)
+                      for i in range(dlg.voice_clone_panel.device_combo.GetCount())]
+            self.assertEqual(values, ["cpu"])
+        with mock.patch.object(voicelab, "has_cuda", return_value=True):
+            dlg = self._dialog()
+            values = [dlg.voice_clone_panel.device_combo.GetClientData(i)
+                      for i in range(dlg.voice_clone_panel.device_combo.GetCount())]
+            self.assertEqual(values, ["cpu", "cuda", "auto"])
+
+    def test_builtin_voices_are_offered_once_the_engine_is_installed(self):
+        dlg = self._dialog()
+        panel = dlg.voice_clone_panel
+        # Whether a package happens to be installed in the managed environment
+        # depends on the machine, so both states are driven explicitly here.
+        with mock.patch.object(voicelab, "is_installed", return_value=False):
+            self.assertTrue(panel.select_engine("bark"))
+            self.assertEqual(panel.builtin_combo.GetCount(), 0)
+            self.assertEqual(panel.voices_list.GetCount(), 0)
+            self.assertIn("Not installed", panel.engine_status.GetLabel())
+        with mock.patch.object(voicelab, "is_installed", return_value=True), \
+                mock.patch.object(voicelab, "installed_version", return_value="4.4.0"):
+            panel._refresh_engine_status()
+            panel._refresh_builtin_voices()
+            panel._refresh_voices()
+        self.assertEqual(panel.builtin_combo.GetCount(), 130)
+        self.assertEqual(panel.voices_list.GetCount(), 130)
+        self.assertIn("Installed (version 4.4.0)",
+                      panel.engine_status.GetLabel())
+        # ... and every voice row says which engine, variant and device.
+        self.assertIn("built-in", panel.voices_list.GetString(0))
+        self.assertIn("CPU", panel.voices_list.GetString(0))
+
+    def test_a_cloned_voice_reaches_available_tts(self):
+        sample = os.path.join(self.tmp.name, "reference.wav")
+        with open(sample, "wb") as fh:
+            fh.write(b"RIFFfake")
+        dlg = self._dialog()
+        panel = dlg.voice_clone_panel
+        self.assertTrue(panel.select_engine("f5tts"))
+        panel.name_ctrl.SetValue("My Clone")
+        panel.sample_ctrl.SetValue(sample)
+        panel.ref_text_ctrl.SetValue("some words")
+        # This test is about the clone: on a machine where F5-TTS really is
+        # installed its own built-in reference voices would be listed as well.
+        with self._without_builtin_voices(panel):
+            panel._on_create(None)
+            labels = [panel.voices_list.GetString(i)
+                      for i in range(panel.voices_list.GetCount())]
+            self.assertEqual(len(labels), 1, labels)
+        self.assertIn("My Clone", labels[0])
+        self.assertIn("cloned", labels[0])
+        # The other categories pick the clone up without knowing about the
+        # Voice Clone category at all.
+        dlg.available_panel.refresh()
+        cloned = [v for v in dlg.available_panel._voices if v.get("cloned")]
+        self.assertEqual([v["voice_name"] for v in cloned], ["My Clone"])
+        dlg.recording_panel.on_activated()
+        self.assertIn("f5tts", [dlg.recording_panel.tts_combo.GetClientData(i)
+                                for i in range(dlg.recording_panel.tts_combo.GetCount())])
+
+    def test_a_failed_cuda_install_falls_back_to_the_cpu_wheels(self):
+        """A CUDA wheel index that cannot satisfy the install must not block it.
+
+        ``cu121`` has no Python 3.13 wheels; without the fallback the engine
+        install failed outright with "No matching distribution found for
+        torch" and the engine could not be used at all.
+        """
+        dlg = self._dialog()
+        panel = dlg.voice_clone_panel
+        self.assertTrue(panel.select_engine("f5tts"))
+        calls = []
+
+        class FakeRuntime:
+            def ensure_pip(self):
+                pass
+
+            def pip_install(self, packages, progress=None, index_url=None):
+                calls.append((list(packages), index_url))
+                if index_url:
+                    return {"ok": False, "output": "",
+                            "error": "No matching distribution found for torch"}
+                return {"ok": True, "output": "", "error": ""}
+
+        done = {}
+        with mock.patch("ai_voice_studio.python_runtime.get_runtime",
+                        return_value=FakeRuntime()), \
+                mock.patch.object(voicelab, "has_cuda", return_value=True), \
+                mock.patch.object(panel, "_update_progress"), \
+                mock.patch.object(
+                    panel, "_install_done",
+                    side_effect=lambda *args: done.update(args=args),
+                ), \
+                mock.patch("wx.CallAfter",
+                           side_effect=lambda fn, *a, **k: fn(*a, **k)):
+            panel._install_job("f5tts")
+        # CUDA wheels first, then the same packages from PyPI.
+        self.assertEqual(calls[0][1], voice_lab.PYTORCH_CUDA_INDEX)
+        self.assertIsNone(calls[1][1])
+        # The install succeeds, with a note explaining the GPU limitation.
+        self.assertIsNone(done["args"][1])
+        self.assertTrue(done["args"][2])
+        self.assertIn("CPU", done["args"][2][0])
+
+    def test_engine_tuning_defaults_are_saved_in_settings(self):
+        dlg = self._dialog()
+        panel = dlg.voice_clone_panel
+        self.assertTrue(panel.select_engine("f5tts"))
+        self.assertTrue(hasattr(panel, "tuning_btn"))
+        self.assertIn("engine defaults", panel.tuning_note.GetLabel())
+        # The dialog writes into the panel's settings file.
+        with mock.patch(
+            "ai_voice_studio.gui.voicelab_options_dialog.VoiceLabOptionsDialog"
+        ) as fake:
+            fake.return_value.ShowModal.return_value = wx.ID_OK
+            fake.return_value.get_options.return_value = {"nfe_step": 16}
+            panel._on_tuning(None)
+        self.assertEqual(
+            dlg.settings.get(tuning.settings_key("f5tts")), {"nfe_step": 16}
+        )
+        panel._refresh_tuning_note()
+        self.assertIn("diffusion steps 16", panel.tuning_note.GetLabel().lower())
+        self.assertIn("diffusion steps 16", panel.engine_status.GetLabel().lower())
+
+    def test_preview_uses_the_saved_tuning_defaults(self):
+        dlg = self._dialog()
+        panel = dlg.voice_clone_panel
+        dlg.settings.set(tuning.settings_key("f5tts"), {"nfe_step": 8})
+        with mock.patch.object(voicelab, "is_installed", return_value=True), \
+                mock.patch.object(voicelab, "installed_version",
+                                  return_value="1.2.3"):
+            self.assertTrue(panel.select_engine("f5tts"))
+            panel._refresh_engine_status()
+            panel._refresh_builtin_voices()
+            panel._refresh_voices()
+            panel.voices_list.SetSelection(0)
+            panel._update_voice_buttons()
+            captured = {}
+
+            def fake_thread(target=None, args=None, daemon=None):
+                captured["args"] = args
+
+                class _Thread:
+                    def start(self):
+                        pass
+
+                return _Thread()
+
+            with mock.patch(
+                "ai_voice_studio.gui.clone_engines_panel.threading.Thread",
+                side_effect=fake_thread,
+            ):
+                panel._on_preview(None)
+        entry = captured["args"][0]
+        self.assertEqual(entry.get("options"), {"nfe_step": 8})
+        self.assertIn("diffusion steps 8",
+                      panel.preview_status.GetLabel().lower())
+
+    def test_the_engine_tuning_dialog_edits_the_overrides(self):
+        from ai_voice_studio.gui.voicelab_options_dialog import (
+            VoiceLabOptionsDialog,
+        )
+
+        dlg = VoiceLabOptionsDialog(
+            self.frame, "f5tts", values={"nfe_step": 16},
+            project_name="Smoke project",
+        )
+        try:
+            self.assertEqual(dlg._controls["nfe_step"].GetValue(), 16)
+            self.assertEqual(dlg.get_options(), {"nfe_step": 16})
+            self.assertIn("diffusion steps 16", dlg.summary.GetLabel().lower())
+            # A value equal to the engine default is not an override any more.
+            dlg._controls["nfe_step"].SetValue(32)
+            dlg._on_changed(None)
+            self.assertEqual(dlg.get_options(), {})
+            self.assertIn("none", dlg.summary.GetLabel())
+            # Reset restores every engine default.
+            dlg._controls["cfg_strength"].SetValue(3.5)
+            dlg._on_reset(None)
+            self.assertEqual(dlg.get_options(), {})
+            # The seed field accepts a number and refuses anything else.
+            dlg._controls["seed"].SetValue("7")
+            self.assertEqual(dlg.get_options(), {"seed": 7})
+            dlg._controls["seed"].SetValue("later")
+            with self.assertRaises(ValueError):
+                dlg.get_options()
+        finally:
+            dlg.Destroy()
+
+    def test_save_refuses_an_invalid_value_and_closes_otherwise(self):
+        """Clicking the real buttons: one validates, the other cancels."""
+        from ai_voice_studio.gui.voicelab_options_dialog import (
+            VoiceLabOptionsDialog,
+        )
+
+        # Another stock-button dialog first: wx must not re-create ours.
+        scratch = wx.Dialog(self.frame)
+        scratch.SetSizer(scratch.CreateSeparatedButtonSizer(wx.OK))
+        scratch.Destroy()
+
+        dlg = VoiceLabOptionsDialog(self.frame, "f5tts")
+        try:
+            self.assertEqual(dlg.save_btn.GetName(), "Save options")
+            self.assertEqual(dlg.cancel_btn.GetName(), "Cancel")
+
+            def click(button):
+                evt = wx.CommandEvent(wx.wxEVT_COMMAND_BUTTON_CLICKED,
+                                      button.GetId())
+                evt.SetEventObject(button)
+                button.GetEventHandler().ProcessEvent(evt)
+
+            with mock.patch.object(dlg, "EndModal") as end, \
+                    mock.patch.object(wx, "MessageBox") as box:
+                dlg._controls["seed"].SetValue("not a number")
+                click(dlg.save_btn)
+                self.assertTrue(box.called, "an invalid value must be reported")
+                self.assertFalse(end.called, "the dialog must stay open")
+                dlg._controls["seed"].SetValue("7")
+                click(dlg.save_btn)
+                end.assert_called_once_with(wx.ID_OK)
+                end.reset_mock()
+                click(dlg.cancel_btn)
+                end.assert_called_once_with(wx.ID_CANCEL)
+        finally:
+            dlg.Destroy()
+
+    def test_every_engine_has_a_tuning_dialog(self):
+        from ai_voice_studio.gui.voicelab_options_dialog import (
+            VoiceLabOptionsDialog,
+        )
+
+        for engine_id in voice_lab.engine_ids():
+            dlg = VoiceLabOptionsDialog(self.frame, engine_id)
+            try:
+                self.assertEqual(
+                    sorted(dlg._controls),
+                    sorted(tuning.option_keys(engine_id)),
+                    engine_id,
+                )
+                self.assertEqual(dlg.get_options(), {}, engine_id)
+            finally:
+                dlg.Destroy()
+
+    def test_deleting_a_clone_removes_it_from_the_other_categories(self):
+        sample = os.path.join(self.tmp.name, "reference.wav")
+        with open(sample, "wb") as fh:
+            fh.write(b"RIFFfake")
+        dlg = self._dialog()
+        panel = dlg.voice_clone_panel
+        self.assertTrue(panel.select_engine("pocket_tts"))
+        panel.name_ctrl.SetValue("Gone Soon")
+        panel.sample_ctrl.SetValue(sample)
+        with self._without_builtin_voices(panel):
+            panel._on_create(None)
+            panel.voices_list.SetSelection(0)
+            with mock.patch.object(wx, "MessageBox", return_value=wx.YES):
+                panel._on_delete(None)
+            self.assertEqual(panel.voices_list.GetCount(), 0)
+        dlg.available_panel.refresh()
+        self.assertEqual(
+            [v for v in dlg.available_panel._voices if v.get("cloned")], []
+        )
+
+
 class MainFrameTest(_AppMixin):
     def test_frame_builds_all_ui(self):
         frame = MainFrame(settings=Settings(), store=self._empty_store())
@@ -306,6 +635,91 @@ class MainFrameTest(_AppMixin):
             dlg.Destroy()
 
 
+class PreviewComputeChoiceTest(_AppMixin):
+    """Every category with a Preview button offers a Compute combo.
+
+    The combo lists CPU first, adds GPU (CUDA) when an NVIDIA GPU is detected
+    and Auto when there is a choice; the choice is remembered per category in
+    Settings, so the next preview uses the same back-end.
+    """
+
+    #: ``(panel accessor, category key)`` for every Preview category.  The
+    #: Voice Clone category has its own Device combo (same idea, older API)
+    #: and is checked separately.
+    _PANELS = (
+        ("available_panel", "available_tts"),
+        ("recording_panel", "recording_settings"),
+        ("punctuation_panel", "punctuation"),
+        ("omnivoice_engines_panel", "omnivoice_engines"),
+    )
+
+    def _dialog(self):
+        settings = Settings(path=os.path.join(tempfile.mkdtemp(), "settings.json"))
+        dlg = SettingsDialog(self.frame, settings, self._empty_store())
+        self.addCleanup(dlg.Destroy)
+        return dlg, settings
+
+    def test_every_preview_category_has_a_compute_combo(self):
+        with mock.patch.object(compute, "has_nvidia_gpu", return_value=False):
+            dlg, _settings = self._dialog()
+            for accessor, _category in self._PANELS:
+                panel = getattr(dlg, accessor)
+                self.assertTrue(hasattr(panel, "preview_btn"), accessor)
+                self.assertTrue(hasattr(panel, "compute_combo"), accessor)
+                values = [panel.compute_combo.GetClientData(i)
+                          for i in range(panel.compute_combo.GetCount())]
+                self.assertEqual(values, ["cpu"], accessor)
+                self.assertEqual(panel.compute_combo.GetSelection(), 0, accessor)
+
+    def test_the_gpu_is_added_when_a_card_is_present(self):
+        with mock.patch.object(compute, "has_nvidia_gpu", return_value=True):
+            dlg, _settings = self._dialog()
+            for accessor, _category in self._PANELS:
+                panel = getattr(dlg, accessor)
+                values = [panel.compute_combo.GetClientData(i)
+                          for i in range(panel.compute_combo.GetCount())]
+                self.assertEqual(values, ["cpu", "cuda", "auto"], accessor)
+            # OmniVoice itself needs CUDA, so its preview defaults to the GPU.
+            self.assertEqual(
+                dlg.omnivoice_engines_panel.compute_combo.GetClientData(
+                    dlg.omnivoice_engines_panel.compute_combo.GetSelection()
+                ),
+                "cuda",
+            )
+
+    def test_the_choice_is_remembered_per_category(self):
+        with mock.patch.object(compute, "has_nvidia_gpu", return_value=True):
+            dlg, settings = self._dialog()
+            combo = dlg.punctuation_panel.compute_combo
+            combo.SetSelection(1)  # GPU
+            evt = wx.CommandEvent(wx.wxEVT_COMMAND_COMBOBOX_SELECTED,
+                                  combo.GetId())
+            evt.SetEventObject(combo)
+            combo.GetEventHandler().ProcessEvent(evt)
+            self.assertEqual(
+                settings.get(compute_choice.settings_key("punctuation")), "cuda"
+            )
+        self.assertEqual(compute_choice.saved_choice(settings, "punctuation"),
+                         "cuda")
+        # ... and a category nobody touched keeps the CPU.
+        self.assertEqual(compute_choice.saved_choice(settings, "recording_settings"),
+                         "cpu")
+
+    def test_the_preview_provider_follows_the_choice(self):
+        with mock.patch.object(compute, "has_nvidia_gpu", return_value=True):
+            self.assertEqual(compute_choice.provider_for_preview("cpu"), "cpu")
+            self.assertEqual(compute_choice.provider_for_preview("cuda"), "cuda")
+            self.assertEqual(compute_choice.provider_for_preview("auto"), "cuda")
+            # A Voice Lab engine resolves its own device (it brings its own
+            # PyTorch), an ONNX engine goes through the CUDA runtime check.
+            self.assertEqual(
+                compute_choice.provider_for_preview("cuda", "pocket_tts"), "cuda"
+            )
+            self.assertEqual(
+                compute_choice.provider_for_preview("cpu", "pocket_tts"), "cpu"
+            )
+
+
 class RecordingDialogTest(_AppMixin):
     def test_dialog_builds_controls_from_a_project(self):
         tmp = tempfile.mkdtemp(prefix="aivs_smoke_")
@@ -350,6 +764,158 @@ class RecordingDialogTest(_AppMixin):
                 dlg.Destroy()
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
+
+
+class RecordingDialogTuningTest(_AppMixin):
+    """The per-project tuning overrides in the Recording window."""
+
+    def _dialog_with_engine(self, engine_id="f5tts", stored=None):
+        tmp = tempfile.mkdtemp(prefix="aivs_smoke_")
+        self.addCleanup(shutil.rmtree, tmp, True)
+        project.create_project(
+            tmp, "Tuning project", "doc.txt", MODE_PAGE_WITH_H1,
+            [{"index": 1, "title": "One", "text": "Hello."}],
+        )
+        data = project.load_project(tmp)
+        data.setdefault("tts", {})
+        data["tts"].update({
+            "tts": engine_id,
+            "language": "en",
+            "variant": "f5_v1_base",
+            "voice": "basic_ref_en",
+        })
+        if stored is not None:
+            data["tts"]["engine_options"] = {
+                "engine": engine_id, "values": stored,
+            }
+        project.save_project(tmp, data)
+        settings = Settings(path=os.path.join(tmp, "settings.json"))
+        dlg = RecordingDialog(self.frame, tmp, settings, self._empty_store())
+        self.addCleanup(dlg.Destroy)
+        # The Voice Lab engines only appear once their package is installed;
+        # hand the dialog their pre-made voices so the tuning row is exercised
+        # (rebuilding the choices re-reads the store, so the patch has to wrap
+        # the rebuild).
+        entries = voice_lab.builtin_voices(engine_id)
+        with mock.patch.object(voicelab, "builtin_voice_entries",
+                               lambda engine_id=None: list(entries)):
+            dlg._rebuild_voice_choices()
+        for index in range(dlg.tts_combo.GetCount()):
+            if dlg.tts_combo.GetClientData(index) == engine_id:
+                dlg.tts_combo.SetSelection(index)
+                dlg._on_tts(None)
+                break
+        return tmp, dlg, settings
+
+    def test_the_row_shows_only_for_voice_lab_engines(self):
+        _tmp, dlg, _settings = self._dialog_with_engine("f5tts")
+        self.assertTrue(dlg.engine_options_btn.IsShown())
+        self.assertIn("engine defaults",
+                      dlg.engine_options_summary.GetLabel().lower())
+        # Another engine hides the row again.
+        dlg.tts_combo.SetSelection(0)
+        dlg._on_tts(None)
+        if dlg._selected_tts_id() not in ("pocket_tts", "bark", "f5tts"):
+            self.assertFalse(dlg.engine_options_btn.IsShown())
+
+    def test_a_projects_tuning_is_summarised_and_saved(self):
+        tmp, dlg, _settings = self._dialog_with_engine(
+            "f5tts", stored={"nfe_step": 16}
+        )
+        self.assertIn("diffusion steps 16",
+                      dlg.engine_options_summary.GetLabel().lower())
+        self.assertEqual(dlg._effective_engine_options(), {"nfe_step": 16})
+        # Saving the project keeps the overrides untouched.
+        dlg._save_tts_to_project()
+        saved = project.load_project(tmp)["tts"]["engine_options"]
+        self.assertEqual(saved, {"engine": "f5tts", "values": {"nfe_step": 16}})
+
+    def test_the_settings_default_is_used_when_the_project_has_none(self):
+        _tmp, dlg, settings = self._dialog_with_engine("f5tts")
+        settings.set(tuning.settings_key("f5tts"), {"nfe_step": 8})
+        dlg._update_engine_options_ui()
+        self.assertEqual(dlg._effective_engine_options(), {"nfe_step": 8})
+        label = dlg.engine_options_summary.GetLabel()
+        self.assertIn("diffusion steps 8", label.lower())
+        self.assertIn("Settings default", label)
+        # A project override wins over the saved default.
+        dlg.data.setdefault("tts", {})["engine_options"] = {
+            "engine": "f5tts", "values": {"nfe_step": 16},
+        }
+        dlg._update_engine_options_ui()
+        self.assertEqual(dlg._effective_engine_options(), {"nfe_step": 16})
+        self.assertNotIn("Settings default",
+                         dlg.engine_options_summary.GetLabel())
+
+    def test_the_tuning_dialog_result_is_stored_in_the_project(self):
+        from ai_voice_studio.gui import recording_dialog as recording_module
+
+        _tmp, dlg, _settings = self._dialog_with_engine("f5tts")
+        with mock.patch(
+            "ai_voice_studio.gui.voicelab_options_dialog.VoiceLabOptionsDialog"
+        ) as fake:
+            fake.return_value.ShowModal.return_value = wx.ID_OK
+            fake.return_value.get_options.return_value = {"nfe_step": 16}
+            dlg._on_engine_options(None)
+        self.assertEqual(dlg.data["tts"]["engine_options"],
+                         {"engine": "f5tts", "values": {"nfe_step": 16}})
+        self.assertIn("diffusion steps 16",
+                      dlg.engine_options_summary.GetLabel().lower())
+        # Cancelling keeps the previous values.
+        with mock.patch(
+            "ai_voice_studio.gui.voicelab_options_dialog.VoiceLabOptionsDialog"
+        ) as fake:
+            fake.return_value.ShowModal.return_value = wx.ID_CANCEL
+            dlg._on_engine_options(None)
+        self.assertEqual(dlg.data["tts"]["engine_options"]["values"],
+                         {"nfe_step": 16})
+        # An empty result clears them again.
+        with mock.patch(
+            "ai_voice_studio.gui.voicelab_options_dialog.VoiceLabOptionsDialog"
+        ) as fake:
+            fake.return_value.ShowModal.return_value = wx.ID_OK
+            fake.return_value.get_options.return_value = {}
+            dlg._on_engine_options(None)
+        self.assertNotIn("engine_options", dlg.data["tts"])
+        self.assertIn("engine defaults",
+                      dlg.engine_options_summary.GetLabel().lower())
+        self.assertTrue(recording_module is not None)
+
+    def test_start_recording_hands_the_tuning_to_the_voice(self):
+        """The overrides ride on the voice entry the synthesis worker gets."""
+        _tmp, dlg, settings = self._dialog_with_engine(
+            "f5tts", stored={"nfe_step": 16}
+        )
+        voice = tuning.apply_to_voice(
+            dlg._selected_voice(), dlg._effective_engine_options()
+        )
+        self.assertEqual(voice["options"], {"nfe_step": 16})
+        # ... and the whole Start-recording path passes them on unchanged.
+        captured = {}
+
+        def fake_worker(**kwargs):
+            captured.update(kwargs)
+            return mock.MagicMock()
+
+        with mock.patch("ai_voice_studio.gui.recording_dialog.SynthesisWorker",
+                        side_effect=fake_worker), \
+                mock.patch.object(dlg, "_show_progress_dialog"):
+            dlg._cancel_event = threading.Event()
+            dlg._on_start(None)
+        self.assertEqual(captured["voice_entry"].get("options"),
+                         {"nfe_step": 16})
+        self.assertIn("engine_options", project.load_project(
+            _tmp)["tts"])
+        # A Settings default is applied when the project has none of its own.
+        _tmp2, dlg2, settings2 = self._dialog_with_engine("f5tts")
+        settings2.set(tuning.settings_key("f5tts"), {"cfg_strength": 3.0})
+        with mock.patch("ai_voice_studio.gui.recording_dialog.SynthesisWorker",
+                        side_effect=fake_worker), \
+                mock.patch.object(dlg2, "_show_progress_dialog"):
+            dlg2._on_start(None)
+        self.assertEqual(captured["voice_entry"].get("options"),
+                         {"cfg_strength": 3.0})
+        self.assertTrue(settings is not None)
 
 
 class AvailablePanelThreadTest(_AppMixin):

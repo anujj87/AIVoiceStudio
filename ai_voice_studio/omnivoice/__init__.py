@@ -54,6 +54,13 @@ log = logging.getLogger(__name__)
 
 _SAMPLE_RATE = 24000  # OmniVoice output sample rate
 
+#: This engine's id: it names the OmniVoice Python environment
+#: (``%APPDATA%/AIVoiceStudio/tts_envs/omnivoice``).  The direct engine and the
+#: HTTP server are the same model behind two front-ends and share this one
+#: environment; every other TTS engine gets an environment of its own, so a
+#: conflicting PyTorch/transformers release can never break it.
+ENGINE_ID = "omnivoice"
+
 
 # ---------------------------------------------------------------------------
 # Embedded worker source (standalone script, no ai_voice_studio imports).
@@ -306,11 +313,11 @@ def has_nvidia_gpu() -> bool:
 
 
 def is_available() -> bool:
-    """True when the ``omnivoice_triton`` package is importable from the
-    managed venv (checked by the worker subprocess, not in-process)."""
+    """True when the ``omnivoice_triton`` package is importable from this
+    engine's own virtualenv (checked by the worker subprocess)."""
     try:
-        from ..python_runtime import get_runtime  # noqa: PLC0415
-        rt = get_runtime()
+        from ..python_runtime import engine_runtime  # noqa: PLC0415
+        rt = engine_runtime(ENGINE_ID)
         if not rt.is_created:
             return False
         result = rt.run_in_env(
@@ -405,11 +412,11 @@ class OmniVoiceWorker:
     def _ensure_proc(self) -> None:
         if self._proc is not None and self._proc.poll() is None:
             return
-        # In a frozen app, sys.executable is the .exe -- use the managed
-        # venv's Python instead so it can find omnivoice-triton.
+        # In a frozen app, sys.executable is the .exe -- use the engine's
+        # own environment's Python instead so it can find omnivoice-triton.
         if getattr(sys, "frozen", False):
-            from ..python_runtime import get_runtime  # noqa: PLC0415
-            rt = get_runtime()
+            from ..python_runtime import engine_runtime  # noqa: PLC0415
+            rt = engine_runtime(ENGINE_ID)
             worker_python = rt.python_exe
             # The worker.py source is inside PyInstaller's PYZ archive
             # and invisible to the venv Python.  Write it as a standalone

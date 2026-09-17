@@ -47,6 +47,13 @@ log = logging.getLogger(__name__)
 
 _SAMPLE_RATE = 24000  # OmniVoice output sample rate
 
+#: This engine's id.  It resolves to the environment the *direct* OmniVoice
+#: engine uses (``%APPDATA%/AIVoiceStudio/tts_envs/omnivoice``): the two are
+#: the same model with two front-ends and want the same base package and the
+#: same CUDA PyTorch, so they deliberately share one environment.  Every other
+#: TTS engine has an environment of its own.
+ENGINE_ID = "omnivoice_server"
+
 # The omnivoice-server HTTP API validates ``input`` (JSON) and ``text``
 # (multipart) with ``max_length=10_000`` — a longer text is rejected before
 # inference even starts with a bare "HTTP 422: Request validation failed".
@@ -153,10 +160,10 @@ def split_text_for_server(text: str, limit: int = _TEXT_CHUNK_TARGET) -> list:
 # Package detection (managed venv)
 # ---------------------------------------------------------------------------
 def is_available() -> bool:
-    """True when ``omnivoice_server`` is importable from the managed venv."""
+    """True when ``omnivoice_server`` is importable from its own venv."""
     try:
-        from ..python_runtime import get_runtime  # noqa: PLC0415
-        rt = get_runtime()
+        from ..python_runtime import engine_runtime  # noqa: PLC0415
+        rt = engine_runtime(ENGINE_ID)
         if not rt.is_created:
             return False
         result = rt.run_in_env(
@@ -171,8 +178,8 @@ def is_available() -> bool:
 def installed_version() -> str | None:
     """Return the installed omnivoice-server version, or None."""
     try:
-        from ..python_runtime import get_runtime  # noqa: PLC0415
-        rt = get_runtime()
+        from ..python_runtime import engine_runtime  # noqa: PLC0415
+        rt = engine_runtime(ENGINE_ID)
         if not rt.is_created:
             return None
         result = rt.run_in_env(
@@ -271,8 +278,8 @@ class OmniVoiceServerManager:
             )
             return
 
-        from ..python_runtime import get_runtime  # noqa: PLC0415
-        rt = get_runtime()
+        from ..python_runtime import engine_runtime  # noqa: PLC0415
+        rt = engine_runtime(ENGINE_ID)
 
         if not rt.is_created:
             raise OmniVoiceServerError(

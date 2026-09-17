@@ -84,14 +84,20 @@ def find_voice(store, name: str) -> Dict[str, Any] | None:
 def engine_ids_installed() -> List[str]:
     """Return the OmniVoice engine ids whose pip package is installed.
 
-    Answers from the shared package cache (``venv_packages``), which probes
-    the managed runtime in the background, so this never blocks the GUI while
-    the settings dialog is being built.  ``[]`` means "nothing installed or
-    not known yet".
+    Each engine is probed in its *own* virtualenv first
+    (``tts_envs/omnivoice``, ``tts_envs/omnivoice_server``) and in the shared
+    addon environment afterwards (where engines installed before the per-TTS
+    environments existed still live).  Answers come from the cached
+    ``venv_packages`` probes, so this never blocks the GUI while the settings
+    dialog is being built.  ``[]`` means "nothing installed or not known yet".
     """
     from ..venv_packages import version  # noqa: PLC0415
 
-    return [engine_id for engine_id, (_, pkg) in ENGINE_INFO.items() if version(pkg)]
+    installed: List[str] = []
+    for engine_id, (_name, pkg) in ENGINE_INFO.items():
+        if version(pkg, engine=engine_id) or version(pkg):
+            installed.append(engine_id)
+    return installed
 
 
 # ---------------------------------------------------------------------------

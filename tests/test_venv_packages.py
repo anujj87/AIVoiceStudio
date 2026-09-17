@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import sys
+import tempfile
 import threading
 import time
 import unittest
@@ -16,7 +17,9 @@ from unittest import mock
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+from ai_voice_studio import python_runtime as pr  # noqa: E402
 from ai_voice_studio import venv_packages as vp  # noqa: E402
+from ai_voice_studio.tts import catalog  # noqa: E402
 
 
 class _Result:
@@ -58,15 +61,13 @@ def _wait_for(predicate, timeout: float = 5.0) -> bool:
 
 class _CacheMixin(unittest.TestCase):
     def setUp(self):
-        with vp._lock:
-            vp._cache.clear()
-            vp._listeners.clear()
-            vp._loading.clear()
+        self._clear()
         self.addCleanup(self._clear)
 
     def _clear(self):
         with vp._lock:
             vp._cache.clear()
+            vp._disk_cache.clear()
             vp._listeners.clear()
             vp._loading.clear()
 
@@ -151,17 +152,108 @@ class VersionTest(_CacheMixin):
             self.assertTrue(_wait_for(lambda: vp.version("omnivoice-triton")))
         self.assertEqual(len(runtime.calls), 1)
 
+class DiskProbeTest(_CacheMixin):
+    """The first answer comes from the environment on disk.
+
+    Regression: ``version()`` used to answer ``None`` until the background
+    probe had finished, so "is this engine installed?" was answered "no" on a
+    cold cache - and the worker was then started in the wrong environment.
+    """
+
+    def _runtime(self, env_dir, packages, created=True):
+        if created:
+            site = os.path.join(env_dir, "Lib", "site-packages")
+            os.makedirs(site)
+        for package in packages:
+            stem = package.replace("-", "_")
+            os.makedirs(os.path.join(site, stem))
+            os.makedirs(os.path.join(site, f"{stem}-1.0.dist-info"))
+        os.makedirs(os.path.join(env_dir, "Scripts"), exist_ok=True)
+        with open(os.path.join(env_dir, "Scripts", "python.exe"), "w") as fh:
+            fh.write("")
+        return pr.PythonRuntime(env_dir)
+
+    def setUp(self):
+        super().setUp()
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.runtime = self._runtime(
+            os.path.join(self.tmp.name, "engine_env"),
+            ["torch", "transformers", "f5-tts"],
+        )
+        patcher = mock.patch("ai_voice_studio.python_runtime.get_runtime",
+                             return_value=self.runtime)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_a_cold_cache_still_answers_from_the_disk(self):
+        self.assertFalse(vp.is_known("torch"))
+        self.assertEqual(vp.version("torch"), "1.0")
+        self.assertTrue(vp.installed("torch"))
+
+    def test_the_name_is_normalised_like_pip_does(self):
+        # The distribution is ``f5_tts-1.0.dist-info`` but the package the app
+        # asks about is ``f5-tts``.
+        self.assertTrue(vp.installed("f5-tts"))
+        self.assertTrue(vp.package_present("f5_tts"))
+        self.assertTrue(vp.package_present("F5.TTS"))
+
+    def test_package_present_is_synchronous_and_needs_no_probe(self):
+        self.assertTrue(vp.package_present("transformers"))
+        self.assertFalse(vp.package_present("numpy"))
+        self.assertFalse(vp.package_present(""))
+
+    def test_a_missing_environment_reports_nothing(self):
+        missing = pr.PythonRuntime(os.path.join(self.tmp.name, "nope"))
+        with mock.patch("ai_voice_studio.python_runtime.get_runtime",
+                        return_value=missing):
+            self.assertFalse(vp.package_present("torch"))
+            self.assertIsNone(vp.version("torch"))
+
+    def test_the_disk_answer_does_not_replace_a_probe_answer(self):
+        # The disk listing is only the *first* answer: once the probe has run,
+        # its answer (which also covers hand-patched environments) wins.
+        with vp._lock:
+            vp._cache[vp._key("torch", None)] = (time.time(), "9.9.9")
+        self.assertEqual(vp.version("torch"), "9.9.9")
+
+    def test_the_disk_answer_does_not_stop_the_probe(self):
+        self.assertTrue(vp.installed("torch"))
+        self.assertFalse(vp.is_known("torch"),
+                         "the panel must still refresh from the probe")
+
+    def test_invalidate_forgets_the_disk_listing_too(self):
+        self.assertTrue(vp.package_present("torch"))
+        vp._disk_cache["sentinel"] = (0.0, {})
+        vp.invalidate("torch")
+        self.assertEqual(vp._disk_cache, {})
+
+
+class WarmTest(_CacheMixin):
     def test_warm_probes_the_catalog_packages(self):
         runtime = _FakeRuntime({"omnivoice-triton": "0.1.0",
-                                "omnivoice-server": "0.2.5"})
+                                "omnivoice-server": "0.2.5",
+                                "pocket-tts": "1.0.0",
+                                "transformers": "4.44.0",
+                                "f5-tts": "1.1.0"})
         with mock.patch("ai_voice_studio.python_runtime.get_runtime",
                         return_value=runtime):
             vp.warm()
+            # Every engine whose package the catalog lists is probed once:
+            # the two OmniVoice engines plus the Voice Lab engines.
+            packages = {
+                tts["requires_package"]
+                for tts in catalog.get_tts_list()
+                if tts.get("requires_package")
+            }
             self.assertTrue(_wait_for(
-                lambda: vp.installed("omnivoice-triton")
-                and vp.installed("omnivoice-server")
-            ))
-        self.assertEqual(len(runtime.calls), 2)
+                lambda: all(vp.installed(pkg) for pkg in packages)
+            ), packages)
+        # One probe per package, and nothing else was run.
+        self.assertEqual(len(runtime.calls), len(packages))
+        probed = " ".join(runtime.calls)
+        for package in packages:
+            self.assertIn(repr(package), probed, package)
 
 
 if __name__ == "__main__":

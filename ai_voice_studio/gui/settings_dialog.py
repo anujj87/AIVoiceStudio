@@ -14,15 +14,16 @@ Categories:
 1. General                -- theme (System / Light / Dark)
 2. Download and remove    -- model manager (DownloadPanel)
 3. Available TTS          -- downloaded voices (AvailablePanel)
-4. OmniVoice engines      -- GPU TTS engine variants (Server, Triton, Hybrid)
-5. Recording settings     -- speed, pitch, volume, preview
-6. Punctuation            -- default punctuation mode (spoken-word expansion)
-7. Audio file creation    -- audio modes with descriptions + pages per file
-8. DAISY settings         -- DAISY 2.02 audio book defaults
-9. Compute                -- optional GPU (CUDA) runtime + OmniVoice
-10. Developer             -- addon management, pip, diagnostics
-11. OmniVoice Server      -- network TTS server configuration
-12. Reset                 -- restore defaults
+4. Voice Clone            -- CPU/GPU voice-clone engines (VoiceClonePanel)
+5. OmniVoice engines      -- GPU TTS engine variants (Server, Triton, Hybrid)
+6. Recording settings     -- speed, pitch, volume, preview
+7. Punctuation            -- default punctuation mode (spoken-word expansion)
+8. Audio file creation    -- audio modes with descriptions + pages per file
+9. DAISY settings         -- DAISY 2.02 audio book defaults
+10. Compute               -- optional GPU (CUDA) runtime + OmniVoice
+11. Developer             -- addon management, pip, diagnostics
+12. OmniVoice Server      -- network TTS server configuration
+13. Reset                 -- restore defaults
 """
 
 from __future__ import annotations
@@ -78,6 +79,7 @@ from .events import (
     EVT_DOWNLOAD_PROGRESS,
 )
 from . import dialogs
+from .clone_engines_panel import VoiceClonePanel
 from .model_panels import AvailablePanel, DownloadPanel
 from .theme import apply_theme
 
@@ -144,10 +146,10 @@ class _SettingsPanel(wx.Panel):
         except Exception:  # noqa: BLE001
             pass
 
-    def _on_package_probe(self, package: str):
+    def _on_package_probe(self, package: str, engine: str | None = None):
         """A managed-venv probe finished; re-add voices when it is installed."""
         try:
-            if venv_packages.version(package):
+            if venv_packages.version(package, engine=engine):
                 self._on_voices_ready()
         except Exception:  # noqa: BLE001
             pass
@@ -200,6 +202,7 @@ class SettingsDialog(wx.Dialog):
             _GeneralPanel,
             DownloadPanel,
             AvailablePanel,
+            VoiceClonePanel,
             _OmniVoiceEnginesPanel,
             _OmniVoiceServerPanel,
             _RecordingSettingsPanel,
@@ -296,8 +299,8 @@ class SettingsDialog(wx.Dialog):
         if cls in (DownloadPanel,):
             return (self.store, self.downloader)
         if cls in (AvailablePanel,):
-            return (self.store,)
-        if cls in (_OmniVoiceEnginesPanel,):
+            return (self.store, self.settings)
+        if cls in (_OmniVoiceEnginesPanel, VoiceClonePanel):
             return (self.settings, self.store)
         if cls in (_OmniVoiceServerPanel,):
             return (self.settings,)
@@ -494,6 +497,13 @@ class SettingsDialog(wx.Dialog):
         self.EndModal(wx.ID_CANCEL)
 
     # Convenience attributes kept for tests / external code.
+    def _panel_by_title(self, title: str):
+        """Look a category up by its title (keeps the accessors honest)."""
+        for panel in self._panels:
+            if panel.title == title:
+                return panel
+        raise KeyError(title)
+
     @property
     def general_panel(self):
         return self._panels[0]
@@ -507,6 +517,11 @@ class SettingsDialog(wx.Dialog):
         return self._panels[2]
 
     @property
+    def voice_clone_panel(self):
+        """The 'Voice Clone' category: Pocket TTS / Bark / F5-TTS."""
+        return self._panel_by_title("Voice Clone")
+
+    @property
     def omnivoice_engines_panel(self):
         """The 'OmniVoice engines' category (voice library + engine cards).
 
@@ -514,39 +529,39 @@ class SettingsDialog(wx.Dialog):
         studio now lives inside the OmniVoice engines category, so the old
         ``voice_clone_panel`` alias was renamed to match what it returns.
         """
-        return self._panels[3]
+        return self._panel_by_title("OmniVoice engines")
 
     @property
     def omnivoice_server_panel(self):
-        return self._panels[4]
+        return self._panel_by_title("OmniVoice Server")
 
     @property
     def recording_panel(self):
-        return self._panels[5]
+        return self._panel_by_title("Recording settings")
 
     @property
     def punctuation_panel(self):
-        return self._panels[6]
+        return self._panel_by_title("Punctuation")
 
     @property
     def audio_mode_panel(self):
-        return self._panels[7]
+        return self._panel_by_title("Audio file creation")
 
     @property
     def daisy_panel(self):
-        return self._panels[8]
+        return self._panel_by_title("DAISY settings")
 
     @property
     def compute_panel(self):
-        return self._panels[9]
+        return self._panel_by_title("Compute")
 
     @property
     def developer_panel(self):
-        return self._panels[10]
+        return self._panel_by_title("Developer")
 
     @property
     def reset_panel(self):
-        return self._panels[11]
+        return self._panel_by_title("Reset")
 
 
 # ---------------------------------------------------------------------------
@@ -733,7 +748,20 @@ class _RecordingSettingsPanel(_SettingsPanel):
 
         self.preview_btn = wx.Button(self, label="Preview")
         self.preview_btn.SetName("Preview")
-        sizer.Add(self.preview_btn, 0, wx.ALL, 4)
+        # Which back-end the Preview speaks with (CPU, GPU when detected,
+        # Auto); remembered per category in Settings.
+        from .compute_choice import make_compute_row  # noqa: PLC0415
+
+        preview_row = wx.BoxSizer(wx.HORIZONTAL)
+        compute_label, self.compute_combo = make_compute_row(
+            self, self.settings, "recording_settings"
+        )
+        preview_row.Add(compute_label, 0,
+                        wx.ALL | wx.ALIGN_CENTER_VERTICAL, 4)
+        preview_row.Add(self.compute_combo, 0,
+                        wx.ALL | wx.ALIGN_CENTER_VERTICAL, 4)
+        preview_row.Add(self.preview_btn, 0, wx.ALL, 4)
+        sizer.Add(preview_row, 0, wx.LEFT, 2)
         self.preview_status = wx.StaticText(self, label="")
         sizer.Add(self.preview_status, 0, wx.ALL, 4)
         self.SetSizer(sizer)
@@ -790,16 +818,27 @@ class _RecordingSettingsPanel(_SettingsPanel):
     def _inject_pip_installed_voices(self):
         """Inject voices for TTS engines installed via pip (e.g. OmniVoice)."""
         try:
+            # Voice Lab engines (Pocket TTS, Bark, F5-TTS): their pre-made
+            # voices are provided by the installed package rather than by a
+            # catalog variant.
+            from ..voicelab import builtin_voice_entries  # noqa: PLC0415
+
+            self._voices.extend(builtin_voice_entries())
             for tts_entry in catalog.get_tts_list():
                 pkg = tts_entry.get("requires_package")
                 if not pkg:
                     continue
-                if not venv_packages.installed(pkg):
+                # Every pip-installed TTS engine lives in its *own* Python
+                # environment, so its catalog id names the environment.
+                engine = catalog.engine_env_id(tts_entry)
+                if not venv_packages.installed(pkg, engine=engine):
                     # Not installed yet (or the background probe is still
                     # running): ask to be told when the answer arrives.
-                    if not venv_packages.is_known(pkg):
+                    if not venv_packages.is_known(pkg, engine=engine):
                         venv_packages.request(
-                            pkg, lambda _v, p=pkg: self._on_package_probe(p)
+                            pkg, engine=engine,
+                            on_ready=lambda _v, p=pkg, e=engine:
+                                self._on_package_probe(p, e),
                         )
                     continue
                 for lang in tts_entry.get("languages", []):
@@ -1024,20 +1063,24 @@ class _RecordingSettingsPanel(_SettingsPanel):
         volume = self.volume.GetValue() / 100.0
         self.preview_btn.Disable()
         self.preview_status.SetLabel("Synthesizing preview...")
+        # Snapshot the compute choice on the UI thread; the job runs on a worker.
+        from .compute_choice import _combo_value  # noqa: PLC0415
+
+        choice = _combo_value(self.compute_combo)
         threading.Thread(
             target=self._preview_job,
-            args=(voice, text, punct, rate, pitch, volume),
+            args=(voice, text, punct, rate, pitch, volume, choice),
             daemon=True,
         ).start()
 
-    def _preview_job(self, voice, text, punct, rate, pitch, volume):
-        from .. import compute as compute_mod
+    def _preview_job(self, voice, text, punct, rate, pitch, volume, choice="cpu"):
         from ..audio.output import write_wav
         from ..tts.engine import EngineUnavailableError, get_engine, process_punctuation
+        from .compute_choice import provider_for_preview
 
         try:
             engine = get_engine(
-                voice, provider=compute_mod.provider_for(compute_mod.resolve_compute("cpu"))
+                voice, provider=provider_for_preview(choice, voice.get("engine"))
             )
             text = process_punctuation(text, punct)
             samples = engine.synthesize(
@@ -1169,7 +1212,20 @@ class _PunctuationPanel(_SettingsPanel):
 
         self.preview_btn = wx.Button(self, label="Preview")
         self.preview_btn.SetName("Preview")
-        sizer.Add(self.preview_btn, 0, wx.ALL, 4)
+        # Which back-end the Preview speaks with (CPU, GPU when detected,
+        # Auto); remembered per category in Settings.
+        from .compute_choice import make_compute_row  # noqa: PLC0415
+
+        preview_row = wx.BoxSizer(wx.HORIZONTAL)
+        compute_label, self.compute_combo = make_compute_row(
+            self, settings, "punctuation"
+        )
+        preview_row.Add(compute_label, 0,
+                        wx.ALL | wx.ALIGN_CENTER_VERTICAL, 4)
+        preview_row.Add(self.compute_combo, 0,
+                        wx.ALL | wx.ALIGN_CENTER_VERTICAL, 4)
+        preview_row.Add(self.preview_btn, 0, wx.ALL, 4)
+        sizer.Add(preview_row, 0, wx.LEFT, 2)
         self.preview_status = wx.StaticText(self, label="")
         sizer.Add(self.preview_status, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 4)
 
@@ -1233,16 +1289,27 @@ class _PunctuationPanel(_SettingsPanel):
         process) and, if so, create voice entries from the catalog.
         """
         try:
+            # Voice Lab engines (Pocket TTS, Bark, F5-TTS): their pre-made
+            # voices are provided by the installed package rather than by a
+            # catalog variant.
+            from ..voicelab import builtin_voice_entries  # noqa: PLC0415
+
+            self._voices.extend(builtin_voice_entries())
             for tts_entry in catalog.get_tts_list():
                 pkg = tts_entry.get("requires_package")
                 if not pkg:
                     continue
-                if not venv_packages.installed(pkg):
+                # Every pip-installed TTS engine lives in its *own* Python
+                # environment, so its catalog id names the environment.
+                engine = catalog.engine_env_id(tts_entry)
+                if not venv_packages.installed(pkg, engine=engine):
                     # Not installed yet (or the background probe is still
                     # running): ask to be told when the answer arrives.
-                    if not venv_packages.is_known(pkg):
+                    if not venv_packages.is_known(pkg, engine=engine):
                         venv_packages.request(
-                            pkg, lambda _v, p=pkg: self._on_package_probe(p)
+                            pkg, engine=engine,
+                            on_ready=lambda _v, p=pkg, e=engine:
+                                self._on_package_probe(p, e),
                         )
                     continue
                 for lang in tts_entry.get("languages", []):
@@ -1333,19 +1400,22 @@ class _PunctuationPanel(_SettingsPanel):
         self.preview_status.SetLabel("Synthesizing preview...")
         mode = self.selected()
         text = self.example_text.GetValue() or "Hello."
+        # Snapshot the compute choice on the UI thread; the job runs on a worker.
+        from .compute_choice import _combo_value  # noqa: PLC0415
+
+        choice = _combo_value(self.compute_combo)
         threading.Thread(
-            target=self._preview_job, args=(voice, text, mode), daemon=True
+            target=self._preview_job, args=(voice, text, mode, choice), daemon=True
         ).start()
 
-    def _preview_job(self, voice, text, mode):
-        from .. import compute as compute_mod
+    def _preview_job(self, voice, text, mode, choice="cpu"):
         from ..audio.output import write_wav
         from ..tts.engine import EngineUnavailableError, get_engine, process_punctuation
+        from .compute_choice import provider_for_preview
 
         try:
             engine = get_engine(
-                voice,
-                provider=compute_mod.provider_for(compute_mod.resolve_compute("cpu")),
+                voice, provider=provider_for_preview(choice, voice.get("engine"))
             )
             text = process_punctuation(text, mode)
             samples = engine.synthesize(text, sid=voice.get("sid", 0), speed=1.0)
@@ -1788,6 +1858,16 @@ class _OmniVoiceEnginesPanel(_SettingsPanel):
         self.preview_btn = wx.Button(lib_box, label="Preview selected voice")
         self.preview_btn.SetName("Preview voice library voice")
         pv_grid.Add(self.preview_btn, 0, wx.ALL, 2)
+        # Which back-end the preview runs on.  OmniVoice itself needs CUDA, so
+        # GPU is the default here; the CPU entry is only offered for the sake
+        # of consistency (the engine still runs on the GPU).
+        from .compute_choice import make_compute_row  # noqa: PLC0415
+
+        compute_label, self.compute_combo = make_compute_row(
+            lib_box, self.settings, "omnivoice_engines", default="cuda"
+        )
+        lib.Add(compute_label, 0, wx.LEFT | wx.RIGHT | wx.TOP, 4)
+        lib.Add(self.compute_combo, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 4)
         lib.Add(pv_grid, 0, wx.EXPAND | wx.ALL, 4)
         self.lib_status = wx.StaticText(lib_box, label="")
         self.lib_status.SetName("Voice library status")
@@ -2022,13 +2102,17 @@ class _OmniVoiceEnginesPanel(_SettingsPanel):
             f"Synthesizing a preview with {label}... (first use loads the "
             "model and can take a minute or two.)"
         )
+        # Snapshot the compute choice on the UI thread; the job runs on a worker.
+        from .compute_choice import _combo_value, provider_for_preview  # noqa: PLC0415
+
+        choice = _combo_value(self.compute_combo)
+        provider = provider_for_preview(choice, entry.get("engine"))
         threading.Thread(
-            target=self._preview_job, args=(entry, text, label),
+            target=self._preview_job, args=(entry, text, label, provider),
             daemon=True,
         ).start()
 
-    def _preview_job(self, entry, text, engine_label):
-        from .. import compute  # noqa: PLC0415
+    def _preview_job(self, entry, text, engine_label, provider="cuda"):
         from ..audio.output import write_wav  # noqa: PLC0415
         from ..tts.engine import (  # noqa: PLC0415
             EngineUnavailableError,
@@ -2037,9 +2121,7 @@ class _OmniVoiceEnginesPanel(_SettingsPanel):
         )
 
         try:
-            engine = get_engine(
-                entry, provider=compute.provider_for("cuda")
-            )
+            engine = get_engine(entry, provider=provider)
             punct = self.settings.get("recording.punctuation", "default")
             samples = engine.synthesize(
                 process_punctuation(text, punct), sid=0, speed=1.0
@@ -2121,14 +2203,21 @@ class _OmniVoiceEnginesPanel(_SettingsPanel):
 
         ready: list[str] = []
         missing: list[str] = []
-        for _engine_id, (label, package) in voice_store.ENGINE_INFO.items():
-            version = venv_packages.version(package)
+        for engine_id, (label, package) in voice_store.ENGINE_INFO.items():
+            # Each OmniVoice engine is probed in its own virtualenv first, then
+            # in the shared addon environment (where pre-existing installs
+            # live), exactly like the Voice Lab engines.
+            version = venv_packages.version(package, engine=engine_id)
+            if version is None:
+                version = venv_packages.version(package)
             if version:
                 ready.append(f"{label} (v{version})")
             else:
                 missing.append(package)
-                if not venv_packages.is_known(package):
-                    venv_packages.request(package, self._on_dependency_probe)
+                if not venv_packages.is_known(package, engine=engine_id):
+                    venv_packages.request(
+                        package, self._on_dependency_probe, engine=engine_id
+                    )
         if ready and not missing:
             self.dependency_status.SetLabel("Installed: " + ", ".join(ready) + ".")
             self.goto_compute_btn.Hide()
@@ -2146,7 +2235,10 @@ class _OmniVoiceEnginesPanel(_SettingsPanel):
         """Update every engine card's status from the shared package cache."""
         for eng in self._engines:
             package = eng["package"]
-            version = venv_packages.version(package)
+            env_id = eng["env"]
+            version = venv_packages.version(package, engine=env_id)
+            if version is None:
+                version = venv_packages.version(package)
             if version:
                 eng["status_label"].SetLabel(
                     f"Installed (v{version}) — ready to use"
@@ -2157,8 +2249,10 @@ class _OmniVoiceEnginesPanel(_SettingsPanel):
                     "Not installed — install from Compute tab"
                 )
                 eng["installed"] = False
-                if not venv_packages.is_known(package):
-                    venv_packages.request(package, self._on_dependency_probe)
+                if not venv_packages.is_known(package, engine=env_id):
+                    venv_packages.request(
+                        package, self._on_dependency_probe, engine=env_id
+                    )
         self._installed = [eng["id"] for eng in self._engines if eng["installed"]]
 
     def _refresh_dependency_state(self):
@@ -2202,6 +2296,7 @@ class _OmniVoiceEnginesPanel(_SettingsPanel):
                 "id": "omnivoice_server",
                 "name": "OmniVoice Server",
                 "package": "omnivoice-server",
+                "env": "omnivoice_server",
                 "description": "OpenAI-compatible HTTP API. Other apps on the network can use it.",
                 "speed": "Fastest (persistent server, model stays hot)",
                 "quality": "High (32 inference steps default)",
@@ -2211,6 +2306,7 @@ class _OmniVoiceEnginesPanel(_SettingsPanel):
                 "id": "omnivoice_triton",
                 "name": "OmniVoice Triton",
                 "package": "omnivoice-triton",
+                "env": "omnivoice",
                 "description": "Stable GPU mode via Triton kernel fusion.",
                 "speed": "Good (~1.5x faster than hybrid)",
                 "quality": "High",
@@ -2220,6 +2316,7 @@ class _OmniVoiceEnginesPanel(_SettingsPanel):
                 "id": "omnivoice_hybrid",
                 "name": "OmniVoice Hybrid",
                 "package": "omnivoice-triton",
+                "env": "omnivoice",
                 "description": "Fast GPU mode combining ONNX and CUDA kernels.",
                 "speed": "Fastest per-request (~3.4x faster)",
                 "quality": "High",
@@ -2266,6 +2363,7 @@ class _OmniVoiceEnginesPanel(_SettingsPanel):
             self._engines.append({
                 "id": eng["id"],
                 "package": eng["package"],
+                "env": eng["env"],
                 "status_label": status_label,
                 "installed": False,
             })
@@ -3037,7 +3135,8 @@ class _ComputePanel(_SettingsPanel):
         self.omnivoice_install_btn = wx.Button(self, label="Install OmniVoice dependency")
         self.omnivoice_install_btn.SetName("Install OmniVoice dependency")
         self.omnivoice_install_btn.SetToolTip(
-            "Opens a command window to install omnivoice-triton (pip install). "
+            "Opens a command window to install omnivoice-triton (pip install) "
+            "into the OmniVoice environment (shared with OmniVoice Server). "
             "Requires NVIDIA GPU with CUDA."
         )
         self.omnivoice_remove_btn = wx.Button(self, label="Remove OmniVoice dependency")
@@ -3071,10 +3170,26 @@ class _ComputePanel(_SettingsPanel):
         self._refresh_omnivoice()
         self._refresh_omnivoice_server()
 
+    @staticmethod
+    def _omnivoice_torch_ready() -> bool:
+        """True when the shared OmniVoice environment already has PyTorch.
+
+        The direct OmniVoice engine and the HTTP server install into the *same*
+        environment (same model, same CUDA PyTorch), so whichever is installed
+        second finds PyTorch already there.
+        """
+        try:
+            return bool(venv_packages.installed("torch", engine="omnivoice"))
+        except Exception:  # noqa: BLE001
+            return False
+
     def _refresh_omnivoice(self):
-        """Show the omnivoice-triton status from the shared package cache."""
+        """Show the omnivoice-triton status (its own venv, then the shared one)."""
         package = "omnivoice-triton"
-        version = venv_packages.version(package)
+        env_id = "omnivoice"
+        version = venv_packages.version(package, engine=env_id)
+        if version is None:
+            version = venv_packages.version(package)
         if version:
             self.omnivoice_status.SetLabel(
                 f"Installed (v{version}). OmniVoice TTS is available."
@@ -3087,9 +3202,10 @@ class _ComputePanel(_SettingsPanel):
             )
             self.omnivoice_install_btn.Enable()
             self.omnivoice_remove_btn.Disable()
-            if not venv_packages.is_known(package):
+            if not venv_packages.is_known(package, engine=env_id):
                 venv_packages.request(
-                    package, lambda _v: wx.CallAfter(self._refresh_omnivoice)
+                    package, lambda _v: wx.CallAfter(self._refresh_omnivoice),
+                    engine=env_id,
                 )
 
     def _on_omnivoice_install(self, _):
@@ -3157,7 +3273,7 @@ class _ComputePanel(_SettingsPanel):
         return {"ok": True, "output": combined, "error": ""}
 
     def _omnivoice_install_job(self):
-        """Background thread: install OmniVoice into the managed venv.
+        """Background thread: install OmniVoice into the shared OmniVoice venv.
 
         On Windows the install order is:
         1. PyTorch with CUDA (from PyTorch index — ``--index-url``)
@@ -3172,8 +3288,11 @@ class _ComputePanel(_SettingsPanel):
         wheel index, and the runtime's arg-cleaning logic strips flags.
         """
         from ..python_runtime import get_runtime  # noqa: PLC0415
+        from ..voicelab import engines as voice_lab_engines  # noqa: PLC0415
         import sys as _sys  # noqa: PLC0415
-        rt = get_runtime()
+        # OmniVoice's *own* environment, so its CUDA PyTorch never shares
+        # site-packages with another TTS engine.
+        rt = get_runtime("omnivoice")
         try:
             def _progress(msg, _done, _total):
                 wx.CallAfter(self._ov_update_label, msg)
@@ -3185,20 +3304,27 @@ class _ComputePanel(_SettingsPanel):
                 rt.ensure_pip()
 
                 # -- Step 1: PyTorch with CUDA via PyTorch's own index ----
-                _progress(
-                    "Step 1/5: Installing PyTorch with CUDA (~2 GB)...",
-                    0, 0,
-                )
-                r = self._pip_install_raw(
-                    rt.pip_exe,
-                    ["torch", "torchaudio",
-                     "--index-url",
-                     "https://download.pytorch.org/whl/cu128"],
-                )
-                if not r["ok"]:
-                    wx.CallAfter(self._omnivoice_install_done, False,
-                                 f"Step 1 failed: {r.get('error', '')}")
-                    return
+                # Both OmniVoice engines share one environment, so a second
+                # install (Server first, say) must not fetch the CUDA wheels
+                # all over again.
+                if self._omnivoice_torch_ready():
+                    _progress("Step 1/5: PyTorch with CUDA is already installed.",
+                              0, 0)
+                else:
+                    _progress(
+                        "Step 1/5: Installing PyTorch with CUDA (~2 GB)...",
+                        0, 0,
+                    )
+                    r = self._pip_install_raw(
+                        rt.pip_exe,
+                        ["torch", "torchaudio",
+                         "--index-url",
+                         voice_lab_engines.PYTORCH_CUDA_INDEX],
+                    )
+                    if not r["ok"]:
+                        wx.CallAfter(self._omnivoice_install_done, False,
+                                     f"Step 1 failed: {r.get('error', '')}")
+                        return
 
                 # -- Steps 2-5: remaining packages via PyPI -----------------
                 remaining = [
@@ -3264,7 +3390,7 @@ class _ComputePanel(_SettingsPanel):
                 self._ov_install_dlg = None
         except Exception:  # noqa: BLE001
             pass
-        venv_packages.invalidate("omnivoice-triton")
+        venv_packages.invalidate("omnivoice-triton", engine="omnivoice")
         self._refresh_omnivoice()
         wx.MessageBox(
             message,
@@ -3276,7 +3402,9 @@ class _ComputePanel(_SettingsPanel):
         """Uninstall omnivoice-triton via pip with a progress dialog."""
         if wx.MessageBox(
             "Remove the OmniVoice dependency (omnivoice-triton)?\n\n"
-            "This will uninstall the omnivoice-triton package and its dependencies.\n"
+            "This will uninstall the omnivoice-triton package and its "
+            "dependencies.\n"
+            "OmniVoice Server shares this environment, so it is removed too.\n"
             "The OmniVoice TTS voices will no longer be available.",
             "Remove OmniVoice",
             style=wx.YES_NO | wx.ICON_QUESTION,
@@ -3314,12 +3442,14 @@ class _ComputePanel(_SettingsPanel):
     def _omnivoice_remove_job(self):
         """Background thread: uninstall all OmniVoice packages from the managed venv."""
         from ..python_runtime import get_runtime  # noqa: PLC0415
-        rt = get_runtime()
+        rt = get_runtime("omnivoice")
         try:
-            # Remove all OmniVoice-related packages (not PyTorch —
-            # other addons may still need it).
+            # Remove all OmniVoice-related packages (not PyTorch — other
+            # addons may still need it).  The HTTP server lives in the same
+            # environment, so it goes with them.
             packages = [
                 "omnivoice-triton",
+                "omnivoice-server",
                 "omnivoice",
                 "sageattention",
                 "triton-windows",
@@ -3343,7 +3473,7 @@ class _ComputePanel(_SettingsPanel):
                 self._ov_install_dlg = None
         except Exception:  # noqa: BLE001
             pass
-        venv_packages.invalidate("omnivoice-triton")
+        venv_packages.invalidate("omnivoice-triton", engine="omnivoice")
         self._refresh_omnivoice()
         wx.MessageBox(
             message,
@@ -3396,9 +3526,16 @@ class _ComputePanel(_SettingsPanel):
         self.server_remove_btn.Bind(wx.EVT_BUTTON, self._on_server_remove)
 
     def _refresh_omnivoice_server(self):
-        """Show the omnivoice-server status from the shared package cache."""
+        """Show the omnivoice-server status.
+
+        ``omnivoice_server`` resolves to the environment the direct OmniVoice
+        engine uses (the two share one), so this reports that status.
+        """
         package = "omnivoice-server"
-        version = venv_packages.version(package)
+        env_id = "omnivoice_server"
+        version = venv_packages.version(package, engine=env_id)
+        if version is None:
+            version = venv_packages.version(package)
         if version:
             self.server_status.SetLabel(
                 f"Installed (v{version}). OmniVoice Server is available."
@@ -3411,10 +3548,11 @@ class _ComputePanel(_SettingsPanel):
             )
             self.server_install_btn.Enable()
             self.server_remove_btn.Disable()
-            if not venv_packages.is_known(package):
+            if not venv_packages.is_known(package, engine=env_id):
                 venv_packages.request(
                     package,
                     lambda _v: wx.CallAfter(self._refresh_omnivoice_server),
+                    engine=env_id,
                 )
 
     def _on_server_install(self, _):
@@ -3448,10 +3586,12 @@ class _ComputePanel(_SettingsPanel):
         self._srv_install_thread.start()
 
     def _server_install_job(self):
-        """Background thread: install omnivoice-server into the managed venv."""
+        """Background thread: install omnivoice-server into the shared venv."""
         from ..python_runtime import get_runtime  # noqa: PLC0415
+        from ..voicelab import engines as voice_lab_engines  # noqa: PLC0415
         import sys as _sys  # noqa: PLC0415
-        rt = get_runtime()
+        # The HTTP server shares the OmniVoice environment.
+        rt = get_runtime("omnivoice_server")
         try:
             def _progress(msg, _done, _total):
                 wx.CallAfter(self._srv_update_label, msg)
@@ -3460,21 +3600,26 @@ class _ComputePanel(_SettingsPanel):
                 _progress("Preparing Python environment...", 0, 0)
                 rt.ensure_pip()
 
-                # Step 1: PyTorch with CUDA
-                _progress(
-                    "Step 1/3: Installing PyTorch with CUDA (~2 GB)...",
-                    0, 0,
-                )
-                r = self._pip_install_raw(
-                    rt.pip_exe,
-                    ["torch", "torchaudio",
-                     "--index-url",
-                     "https://download.pytorch.org/whl/cu128"],
-                )
-                if not r["ok"]:
-                    wx.CallAfter(self._server_install_done, False,
-                                 f"Step 1 failed: {r.get('error', '')}")
-                    return
+                # Step 1: PyTorch with CUDA (shared with the direct engine:
+                # both OmniVoice engines install into the same environment).
+                if self._omnivoice_torch_ready():
+                    _progress("Step 1/3: PyTorch with CUDA is already installed.",
+                              0, 0)
+                else:
+                    _progress(
+                        "Step 1/3: Installing PyTorch with CUDA (~2 GB)...",
+                        0, 0,
+                    )
+                    r = self._pip_install_raw(
+                        rt.pip_exe,
+                        ["torch", "torchaudio",
+                         "--index-url",
+                         voice_lab_engines.PYTORCH_CUDA_INDEX],
+                    )
+                    if not r["ok"]:
+                        wx.CallAfter(self._server_install_done, False,
+                                     f"Step 1 failed: {r.get('error', '')}")
+                        return
 
                 # Step 2: omnivoice (base)
                 _progress("Step 2/3: Installing omnivoice (base package)...", 0, 0)
@@ -3529,7 +3674,7 @@ class _ComputePanel(_SettingsPanel):
                 self._srv_install_dlg = None
         except Exception:  # noqa: BLE001
             pass
-        venv_packages.invalidate("omnivoice-server")
+        venv_packages.invalidate("omnivoice-server", engine="omnivoice_server")
         self._refresh_omnivoice_server()
         wx.MessageBox(
             message,
@@ -3576,9 +3721,9 @@ class _ComputePanel(_SettingsPanel):
         self._srv_install_thread.start()
 
     def _server_remove_job(self):
-        """Background thread: uninstall omnivoice-server from the managed venv."""
+        """Background thread: uninstall omnivoice-server from the shared venv."""
         from ..python_runtime import get_runtime  # noqa: PLC0415
-        rt = get_runtime()
+        rt = get_runtime("omnivoice_server")
         try:
             packages = ["omnivoice-server"]
             result = rt.pip_uninstall(packages)
@@ -3600,7 +3745,7 @@ class _ComputePanel(_SettingsPanel):
                 self._srv_install_dlg = None
         except Exception:  # noqa: BLE001
             pass
-        venv_packages.invalidate("omnivoice-server")
+        venv_packages.invalidate("omnivoice-server", engine="omnivoice_server")
         self._refresh_omnivoice_server()
         wx.MessageBox(
             message,

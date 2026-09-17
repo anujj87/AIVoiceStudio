@@ -84,8 +84,11 @@ class SynthesisWorker(threading.Thread):
         if self.on_status:
             self.on_status("Loading TTS engine...")
         try:
+            # CPU runs use the 80-95% band of the machine's logical CPUs
+            # (compute.cpu_threads); the GPU back-end ignores the value.
             self._engine = get_engine(
-                self.voice_entry, provider=provider, num_threads=2
+                self.voice_entry, provider=provider,
+                num_threads=compute.cpu_threads(),
             )
         except EngineUnavailableError as exc:
             if self.on_error:

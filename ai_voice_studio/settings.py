@@ -31,6 +31,10 @@ _DEFAULTS: Dict[str, Any] = {
     "theme": THEME_SYSTEM,
     # compute back-end: "auto" | "cpu" | "cuda" | "dml"
     "compute": COMPUTE_AUTO,
+    # per-category compute choice for the Preview buttons
+    # ({"punctuation": "cpu", "available_tts": "cuda", ...}); kept under its
+    # own key because "compute" above is a plain string, not a table.
+    "preview_compute": {},
     # developer mode: enables heavy logging, addon management, advanced options
     "developer_mode": False,
     # recording defaults used by the New Project wizard / Recording window
@@ -71,6 +75,12 @@ _DEFAULTS: Dict[str, Any] = {
     "recent_projects": [],
     # addon management
     "addons_enabled": {},
+    # Voice Clone (Voice Lab) engines: last engine and the device they run on
+    # ("cpu" always; "cuda" when an NVIDIA GPU is detected; "auto" = GPU first)
+    "clone_engines": {
+        "engine": "pocket_tts",
+        "device": "cpu",
+    },
     # OmniVoice Server settings
     "omnivoice_server": {
         "enabled": False,

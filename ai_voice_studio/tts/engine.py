@@ -47,6 +47,20 @@ class EngineUnavailableError(Exception):
     """Raised when sherpa_onnx / onnxruntime is missing or broken."""
 
 
+def default_num_threads() -> int:
+    """Threads a CPU back-end uses: 80-95% of the machine's logical CPUs.
+
+    Resolved through :mod:`ai_voice_studio.compute` (lazily, so this module
+    stays importable on a machine where the runtime is missing).
+    """
+    try:
+        from .. import compute  # noqa: PLC0415
+
+        return compute.cpu_threads()
+    except Exception:  # noqa: BLE001
+        return 2
+
+
 def _ensure_dll_search_path() -> None:
     """Make sherpa-onnx's bundled native DLLs findable on Windows.
 
@@ -236,8 +250,12 @@ def samples_to_int16(raw) -> "np.ndarray":
 def get_engine(
     voice_entry: Dict,
     provider: str = "cpu",
-    num_threads: int = 2,
+    num_threads: int = 0,
 ):
+    if not num_threads:
+        # CPU inference: use the 80-95% band of the machine (the GPU back-end
+        # ignores this - it is only there for the CPU-side pre/post work).
+        num_threads = default_num_threads()
     # Windows system voices (SAPI5 / Windows Core) are synthesised by the
     # operating system through PowerShell, not by sherpa-onnx.
     if voice_entry.get("engine") in ("sapi5", "windows_core"):
@@ -262,6 +280,25 @@ def get_engine(
 
         try:
             return OmniVoiceServerEngine(voice_entry)
+        except Exception as exc:  # noqa: BLE001
+            raise EngineUnavailableError(str(exc)) from exc
+    # Voice Lab engines (Pocket TTS, Bark, F5-TTS) run through the
+    # managed virtualenv. They work on the CPU and use the GPU when the user
+    # asked for it; ``provider`` carries that choice here.
+    try:
+        from ..voicelab import engines as voicelab_engines  # noqa: PLC0415
+
+        is_voice_lab = voicelab_engines.is_engine(voice_entry.get("engine"))
+    except Exception:  # noqa: BLE001
+        is_voice_lab = False
+    if is_voice_lab:
+        from ..voicelab import VoicelabEngine  # noqa: PLC0415
+
+        try:
+            return VoicelabEngine(
+                voice_entry,
+                device=voice_entry.get("device") or provider,
+            )
         except Exception as exc:  # noqa: BLE001
             raise EngineUnavailableError(str(exc)) from exc
     # sid is a per-call generate() argument, not part of the engine's

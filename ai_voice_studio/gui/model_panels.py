@@ -323,10 +323,11 @@ class AvailablePanel(_ManagerPanel):
     """Lists downloaded voices (incl. cloned ones) with a voice combo."""
     title = "Available TTS"
 
-    def __init__(self, parent, store: ModelStore):
+    def __init__(self, parent, store: ModelStore, settings=None):
         super().__init__(parent)
         self.store = store
         self._voices: list = []  # parallel list of voice entries
+        self.settings = settings
 
         sizer = wx.BoxSizer(wx.VERTICAL)
         grid = wx.FlexGridSizer(cols=2, vgap=6, hgap=8)
@@ -346,6 +347,14 @@ class AvailablePanel(_ManagerPanel):
         sizer.Add(grid, 0, wx.EXPAND | wx.ALL, 6)
 
         btns = wx.BoxSizer(wx.HORIZONTAL)
+        # Which back-end the Preview uses (CPU, GPU when detected, Auto).
+        from .compute_choice import make_compute_row  # noqa: PLC0415
+
+        compute_label, self.compute_combo = make_compute_row(
+            self, settings, "available_tts"
+        )
+        btns.Add(compute_label, 0, wx.LEFT | wx.RIGHT | wx.ALIGN_CENTER_VERTICAL, 4)
+        btns.Add(self.compute_combo, 0, wx.ALL | wx.ALIGN_CENTER_VERTICAL, 4)
         self.preview_btn = wx.Button(self, label="Preview selected voice")
         self.preview_btn.SetName("Preview selected voice")
         btns.Add(self.preview_btn, 0, wx.ALL, 4)
@@ -469,18 +478,28 @@ class AvailablePanel(_ManagerPanel):
         """
         try:
             from ..tts import catalog as catalog_mod  # noqa: PLC0415
+            from ..voicelab import builtin_voice_entries  # noqa: PLC0415
+
+            # Voice Lab engines (Pocket TTS, Bark, F5-TTS): their
+            # pre-made voices are provided by the installed package, so they
+            # are listed here rather than in a catalog variant.
+            self._voices.extend(builtin_voice_entries())
 
             for tts_entry in catalog_mod.get_tts_list():
                 pkg = tts_entry.get("requires_package")
                 if not pkg:
                     continue
-                if not venv_packages.installed(pkg):
+                # Every pip-installed TTS engine lives in its *own* Python
+                # environment, so its catalog id names the environment.
+                engine = catalog_mod.engine_env_id(tts_entry)
+                if not venv_packages.installed(pkg, engine=engine):
                     # Not installed yet (or the background probe is still
                     # running): ask to be told when the answer arrives.
-                    if not venv_packages.is_known(pkg):
+                    if not venv_packages.is_known(pkg, engine=engine):
                         venv_packages.request(
-                            pkg,
-                            lambda _v, p=pkg: wx.CallAfter(self._on_pip_probe, p),
+                            pkg, engine=engine,
+                            on_ready=lambda _v, p=pkg, e=engine:
+                                wx.CallAfter(self._on_pip_probe, p, e),
                         )
                     continue
                 # Package is installed — add all catalog voices for this
@@ -520,10 +539,10 @@ class AvailablePanel(_ManagerPanel):
         except Exception:  # noqa: BLE001
             log.debug("Could not rebuild the Available TTS list", exc_info=True)
 
-    def _on_pip_probe(self, pkg: str):
+    def _on_pip_probe(self, pkg: str, engine: str | None = None):
         """A background venv probe finished; show the engine if it is there."""
         try:
-            if venv_packages.version(pkg):
+            if venv_packages.version(pkg, engine=engine):
                 self._reload_keeping_selection()
         except Exception:  # noqa: BLE001
             pass
@@ -622,16 +641,24 @@ class AvailablePanel(_ManagerPanel):
             return
         self.preview_btn.Disable()
         self.detail.SetLabel("Synthesizing preview...")
-        # Lazy import to avoid GUI<->engine coupling at import time.
-        threading.Thread(target=self._preview_job, args=(voice,), daemon=True).start()
+        # Snapshot the compute choice on the UI thread; the job runs on a worker.
+        from .compute_choice import _combo_value  # noqa: PLC0415
 
-    def _preview_job(self, voice):
-        from .. import compute
+        choice = _combo_value(self.compute_combo)
+        # Lazy import to avoid GUI<->engine coupling at import time.
+        threading.Thread(
+            target=self._preview_job, args=(voice, choice), daemon=True
+        ).start()
+
+    def _preview_job(self, voice, choice="cpu"):
         from ..audio.output import write_wav
         from ..tts.engine import EngineUnavailableError, get_engine, process_punctuation
+        from .compute_choice import provider_for_preview
 
         try:
-            engine = get_engine(voice, provider=compute.provider_for(compute.resolve_compute("cpu")))
+            engine = get_engine(
+                voice, provider=provider_for_preview(choice, voice.get("engine"))
+            )
             text = process_punctuation(
                 "This is a preview of the selected voice. Hello, welcome to AI Voice Studio.",
                 "default",
