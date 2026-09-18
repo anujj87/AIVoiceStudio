@@ -111,7 +111,19 @@ _VOICE_LAB_ENGINES = {"pocket_tts", "bark", "f5tts"}
 
 
 class RecordingDialog(wx.Dialog):
-    def __init__(self, parent, project_dir: str, settings: Settings, store: ModelStore):
+    def __init__(
+        self,
+        parent,
+        project_dir: str,
+        settings: Settings,
+        store: ModelStore,
+        start_index: int | None = None,
+        single_segment: bool = False,
+    ):
+        """``start_index`` (0-based) starts the next recording at that segment
+        instead of the first segment that is still pending; ``single_segment``
+        stops the run after that one segment (Edit > Start Selected
+        Recording)."""
         data = project.load_project(project_dir)
         super().__init__(parent, title=f"Recording - {data.get('name', project_dir)}",
                          size=(720, 640))
@@ -126,12 +138,17 @@ class RecordingDialog(wx.Dialog):
         self._pause_event = threading.Event()
         self._progress_dlg: TaskProgressDialog | None = None
         self._warned_one_file = False
+        self._start_index = None if start_index is None else max(0, int(start_index))
+        self._single_segment = bool(single_segment)
 
         self._load_segments()
         self._build_ui()
         self._populate_voices()
         self._apply_project_tts()
         self._update_progress()
+        note = self._pending_note()
+        if note:
+            self.status.SetLabel(note)
         # Announce the project name and focus the text preview.
         self.SetName(f"Recording: {self.data.get('name', '')}")
         # Real MSAA accNames for every labelled control.
@@ -1084,7 +1101,13 @@ class RecordingDialog(wx.Dialog):
                 self.format_combo.SetSelection(idx)
 
         self._save_tts_to_project()
-        start_index = project.first_pending_index(self.project_dir)
+        if self._start_index is None:
+            start_index = project.first_pending_index(self.project_dir)
+        else:
+            start_index = min(self._start_index, len(self._segments))
+        # "Only record selected file" stops after that one segment; otherwise
+        # the run goes on to the end of the project as before.
+        end_index = start_index + 1 if self._single_segment else None
         self._cancel_event = threading.Event()
         self._pause_event = threading.Event()
         self._worker = SynthesisWorker(
@@ -1094,6 +1117,7 @@ class RecordingDialog(wx.Dialog):
             output_dir=self.project_dir,
             ffmpeg_exe=ffmpeg_exe,
             start_index=start_index,
+            end_index=end_index,
             on_segment_done=lambda idx, title, path: self._segment_done(idx, title, path),
             on_all_done=lambda: wx.PostEvent(self, SynthFinishedEvent()),
             on_error=lambda msg: wx.PostEvent(self, SynthErrorEvent(msg)),
@@ -1104,7 +1128,14 @@ class RecordingDialog(wx.Dialog):
         self._set_running(True)
         self._show_progress_dialog()
         self._worker.start()
-        self.status.SetLabel(f"Recording started (resuming from segment {start_index + 1}).")
+        if self._single_segment:
+            self.status.SetLabel(
+                f"Recording started (only segment {start_index + 1})."
+            )
+        else:
+            self.status.SetLabel(
+                f"Recording started (resuming from segment {start_index + 1})."
+            )
 
     def _download_ffmpeg_job(self):
         try:
@@ -1354,6 +1385,18 @@ class RecordingDialog(wx.Dialog):
         self.pause_btn.Enable(running and not self._pause_event.is_set())
         self.resume_btn.Enable(running and self._pause_event.is_set())
         self.stop_btn.Enable(running)
+
+    def _pending_note(self) -> str:
+        """'Ready' status line for a run started at a chosen segment."""
+        if self._start_index is None or self._start_index >= len(self._segments):
+            return ""
+        total = len(self._segments)
+        title = self._segments[self._start_index].title
+        if self._single_segment:
+            return (f"Ready: only segment {self._start_index + 1} of {total} "
+                    f"({title}) will be recorded.")
+        return (f"Ready: segment {self._start_index + 1} of {total} ({title}) "
+                "and every file after it will be recorded.")
 
     def _update_progress(self):
         total = len(self._segments)

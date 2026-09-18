@@ -75,7 +75,10 @@ list for the same actions as the Edit menu.</p>
   <tr><td>Resume Recording</td><td>Opens the selected project; recording continues from the first unsaved segment.</td></tr>
   <tr><td>Restart Project&hellip;</td><td>Deletes all recordings and settings, keeps only the project name, and opens the New Project window again so you can choose a document and options afresh.</td></tr>
   <tr><td>Restart All Recording</td><td>Deletes every recorded audio file; every segment is recorded again from the beginning.</td></tr>
-  <tr><td>Restart Selected Recording&hellip;</td><td>Shows a combo box with the recorded files actually present in the project folder; choose one to record it again.</td></tr>
+  <tr><td>Start Selected Recording&hellip;</td><td>Opens a picker with a sidebar that decides what the combo box lists:<ul>
+    <li><strong>Select an audio file</strong> (default) &mdash; the files already recorded in the project folder, so one of them is recorded again.</li>
+    <li><strong>Select by file break</strong> &mdash; every file break of the project, recorded or not, so recording can start at any break.</li>
+  </ul>A second pair of options decides how far recording goes: <strong>Only record selected file</strong> records just that file and stops, while <strong>Record all files from here</strong> records the chosen file and then every file after it to the end of the project. The chosen file is deleted first so it is recorded again. Recording itself still starts from the <strong>Start recording</strong> button of the Recording window.</td></tr>
   <tr><td>Remove Project&hellip;</td><td>Removes the project from the menu and deletes its folder from your hard disk. This cannot be undone.</td></tr>
 </table>
 

@@ -711,7 +711,7 @@ class MainFrameTest(_AppMixin):
             labels = [item.GetItemLabelText()
                       for item in menubar.GetMenu(edit_index).GetMenuItems()]
             for expected in ("Resume Recording", "Restart Project...",
-                             "Restart All Recording", "Restart Selected Recording...",
+                             "Restart All Recording", "Start Selected Recording...",
                              "Remove Project..."):
                 self.assertIn(expected, labels)
             # Help menu has Read Me + User Guide + About.
@@ -731,16 +731,191 @@ class MainFrameTest(_AppMixin):
         finally:
             frame.Destroy()
 
-    def test_recording_picker_dialog_builds(self):
-        from ai_voice_studio.gui.main_frame import _RecordingPickerDialog
 
-        dlg = _RecordingPickerDialog(self.frame, ["Chapter 1.wav", "Chapter 2.wav"])
-        try:
-            self.assertEqual(dlg.combo.GetCount(), 2)
-            self.assertEqual(dlg.combo.GetName(), "Recorded files")
-            self.assertEqual(dlg.combo.GetSelection(), 0)
-        finally:
-            dlg.Destroy()
+class StartSelectedRecordingDialogTest(_AppMixin):
+    """The Edit > Start Selected Recording picker (sidebar + combo).
+
+    Sidebar: "Select an audio file" lists what is already recorded, "Select
+    by file break" lists every file break of the project (recorded or not).
+    The second radio group decides whether the run stops after the chosen
+    file or goes on to the end of the project.
+    """
+
+    def _entries(self):
+        return [
+            {"position": 0, "title": "01 chapter 1", "file": "01 chapter 1.wav"},
+            {"position": 1, "title": "02 chapter 2", "file": None},
+            {"position": 2, "title": "03 chapter 3", "file": None},
+        ]
+
+    def _dialog(self, entries=None):
+        from ai_voice_studio.gui.main_frame import _StartRecordingDialog
+
+        dlg = _StartRecordingDialog(
+            self.frame, self._entries() if entries is None else entries)
+        self.addCleanup(dlg.Destroy)
+        return dlg
+
+    def test_the_defaults_are_recorded_files_and_only_that_file(self):
+        dlg = self._dialog()
+        self.assertTrue(dlg.file_radio.GetValue())
+        self.assertFalse(dlg.break_radio.GetValue())
+        self.assertTrue(dlg.only_radio.GetValue())
+        self.assertFalse(dlg.all_radio.GetValue())
+        self.assertIn("recorded file to record again",
+                      dlg.choice_label.GetLabel())
+        # Only the files that exist on disk are listed.
+        self.assertEqual([dlg.combo.GetString(i) for i in range(dlg.combo.GetCount())],
+                         ["01 chapter 1.wav"])
+        self.assertEqual(dlg.start_index(), 0)
+        self.assertTrue(dlg.only_selected())
+        self.assertEqual(dlg.chosen_file(), "01 chapter 1.wav")
+
+    def test_select_by_file_break_lists_every_break_of_the_project(self):
+        dlg = self._dialog()
+        dlg.break_radio.SetValue(True)
+        dlg._on_mode(None)
+        self.assertIn("record by file break", dlg.choice_label.GetLabel())
+        self.assertEqual([dlg.combo.GetString(i) for i in range(dlg.combo.GetCount())],
+                         ["01 chapter 1", "02 chapter 2", "03 chapter 3"])
+        # A break that has no file yet can still be recorded from.
+        dlg.combo.SetSelection(2)
+        self.assertEqual(dlg.start_index(), 2)
+        self.assertIsNone(dlg.chosen_file())
+        self.assertTrue(dlg.only_selected())
+        # "Record all files from here" goes on to the end of the project.
+        dlg.all_radio.SetValue(True)
+        self.assertFalse(dlg.only_selected())
+        # A break that is already recorded hands its file over for deletion.
+        dlg.combo.SetSelection(0)
+        self.assertEqual(dlg.chosen_file(), "01 chapter 1.wav")
+
+    def test_switching_back_to_audio_files_restores_that_list(self):
+        dlg = self._dialog()
+        dlg.break_radio.SetValue(True)
+        dlg._on_mode(None)
+        dlg.file_radio.SetValue(True)
+        dlg._on_mode(None)
+        self.assertEqual([dlg.combo.GetString(i) for i in range(dlg.combo.GetCount())],
+                         ["01 chapter 1.wav"])
+        self.assertEqual(dlg.start_index(), 0)
+
+    def test_with_nothing_recorded_the_dialog_starts_in_break_mode(self):
+        dlg = self._dialog(entries=[
+            {"position": 0, "title": "01 chapter 1", "file": None},
+            {"position": 1, "title": "02 chapter 2", "file": None},
+        ])
+        self.assertTrue(dlg.break_radio.GetValue())
+        self.assertEqual(dlg.combo.GetCount(), 2)
+
+    def test_the_edit_menu_action_starts_at_the_chosen_break(self):
+        """The picker's answers reach the recording window end to end."""
+        tmp = tempfile.mkdtemp(prefix="aivs_smoke_")
+        self.addCleanup(shutil.rmtree, tmp, True)
+        project.create_project(
+            tmp, "Selected project", "doc.txt", MODE_PAGE_WITH_H1,
+            [{"index": i + 1, "title": f"chapter {i + 1}",
+              "text": f"Text {i + 1}."} for i in range(4)],
+        )
+        data = project.load_project(tmp)
+        data["segments"][2].update({"status": "done", "saved": "chapter 3.wav"})
+        project.save_project(tmp, data)
+        with open(os.path.join(tmp, "chapter 3.wav"), "wb"):
+            pass
+        settings = Settings(path=os.path.join(tmp, "settings.json"))
+        settings.add_recent_project("Selected project", tmp)
+        frame = MainFrame(settings=settings, store=self._empty_store())
+        self.addCleanup(frame.Destroy)
+        frame.recent_list.SetSelection(0)
+
+        opened = {}
+        fake = mock.MagicMock()
+        fake.return_value.ShowModal.return_value = wx.ID_OK
+        fake.return_value.start_index.return_value = 2
+        fake.return_value.only_selected.return_value = True
+        fake.return_value.chosen_file.return_value = "chapter 3.wav"
+        with mock.patch.object(
+            frame, "_open_recording",
+            lambda *args, **kwargs: opened.update(args=args, kwargs=kwargs),
+        ), mock.patch("ai_voice_studio.gui.main_frame._StartRecordingDialog", fake):
+            frame._restart_selected()
+
+        self.assertEqual(opened["args"], (tmp,))
+        self.assertEqual(opened["kwargs"],
+                         {"start_index": 2, "single_segment": True})
+        # The chosen recording is deleted and its segment is pending again.
+        self.assertFalse(os.path.exists(os.path.join(tmp, "chapter 3.wav")))
+        self.assertEqual(project.load_project(tmp)["segments"][2]["status"],
+                         "pending")
+
+    def _project_frame(self, segments):
+        """A MainFrame whose one recent project has ``segments``."""
+        tmp = tempfile.mkdtemp(prefix="aivs_smoke_")
+        self.addCleanup(shutil.rmtree, tmp, True)
+        project.create_project(
+            tmp, "Selected project", "doc.txt", MODE_PAGE_WITH_H1, segments,
+        )
+        settings = Settings(path=os.path.join(tmp, "settings.json"))
+        settings.add_recent_project("Selected project", tmp)
+        frame = MainFrame(settings=settings, store=self._empty_store())
+        self.addCleanup(frame.Destroy)
+        frame.recent_list.SetSelection(0)
+        return frame, tmp
+
+    def test_the_picker_opens_even_when_nothing_is_recorded(self):
+        """A 100-chapter book may be recorded from chapter 75; no guard."""
+        frame, _tmp = self._project_frame([
+            {"index": i + 1, "title": f"chapter {i + 1}", "text": f"Text {i + 1}."}
+            for i in range(4)
+        ])
+        opened = {}
+        fake = mock.MagicMock()
+        fake.return_value.ShowModal.return_value = wx.ID_OK
+        fake.return_value.start_index.return_value = 2
+        fake.return_value.only_selected.return_value = True
+        fake.return_value.chosen_file.return_value = None
+        with mock.patch.object(
+            frame, "_open_recording",
+            lambda *args, **kwargs: opened.update(args=args, kwargs=kwargs),
+        ), mock.patch("ai_voice_studio.gui.main_frame._StartRecordingDialog", fake) \
+                as dlg, mock.patch.object(wx, "MessageBox") as box:
+            frame._restart_selected()
+        self.assertFalse(box.called, "nothing recorded must not block the picker")
+        self.assertTrue(dlg.called, "the picker must open")
+        # Every file break is offered and none of them has a file yet.
+        entries = dlg.call_args.args[1]
+        self.assertEqual([e["title"] for e in entries],
+                         [f"chapter {i + 1}" for i in range(4)])
+        self.assertEqual([e["file"] for e in entries], [None] * 4)
+        self.assertEqual(opened["kwargs"],
+                         {"start_index": 2, "single_segment": True})
+
+    def test_a_project_without_file_breaks_is_reported(self):
+        from ai_voice_studio.gui.main_frame import _StartRecordingDialog
+
+        frame, _tmp = self._project_frame([])
+        with mock.patch.object(wx, "MessageBox") as box, \
+                mock.patch.object(_StartRecordingDialog, "ShowModal") as modal:
+            frame._restart_selected()
+        self.assertTrue(box.called, "an unsplit project has nothing to record")
+        self.assertIn("file breaks", box.call_args.args[0])
+        self.assertFalse(modal.called)
+
+    def test_the_project_files_are_mapped_back_to_their_break(self):
+        from ai_voice_studio.gui.main_frame import _picker_entries
+
+        data = {"segments": [
+            {"index": 1, "title": "01 chapter 1", "saved": "01 chapter 1.wav"},
+            {"index": 2, "title": "02 chapter 2", "saved": None},
+            {"index": 3, "title": "03 chapter 3", "saved": None},
+        ]}
+        entries = _picker_entries(data, ["03 chapter 3.wav", "01 chapter 1.wav",
+                                         "stray file.wav"])
+        self.assertEqual([e["position"] for e in entries], [0, 1, 2])
+        self.assertEqual(entries[0]["file"], "01 chapter 1.wav")
+        self.assertIsNone(entries[1]["file"])
+        # Matched by file name even though project.json does not know it yet.
+        self.assertEqual(entries[2]["file"], "03 chapter 3.wav")
 
 
 class PreviewComputeChoiceTest(_AppMixin):
@@ -1024,6 +1199,88 @@ class RecordingDialogTuningTest(_AppMixin):
         self.assertEqual(captured["voice_entry"].get("options"),
                          {"cfg_strength": 3.0})
         self.assertTrue(settings is not None)
+
+
+class StartSelectedRecordingWiringTest(_AppMixin):
+    """Edit > Start Selected Recording reaches the synthesizer.
+
+    The picker's answers travel to the recording window: the chosen file
+    break is where the run starts, and "only record selected file" stops the
+    run after that one segment.
+    """
+
+    def _dialog(self, start_index=None, single_segment=False, segments=4):
+        tmp = tempfile.mkdtemp(prefix="aivs_smoke_")
+        self.addCleanup(shutil.rmtree, tmp, True)
+        project.create_project(
+            tmp, "Selected project", "doc.txt", MODE_PAGE_WITH_H1,
+            [{"index": i + 1, "title": f"chapter {i + 1}",
+              "text": f"Text {i + 1}."} for i in range(segments)],
+        )
+        data = project.load_project(tmp)
+        data.setdefault("tts", {})
+        data["tts"].update({
+            "tts": "f5tts", "language": "en",
+            "variant": "f5_v1_base", "voice": "basic_ref_en",
+        })
+        project.save_project(tmp, data)
+        settings = Settings(path=os.path.join(tmp, "settings.json"))
+        dlg = RecordingDialog(self.frame, tmp, settings, self._empty_store(),
+                              start_index=start_index,
+                              single_segment=single_segment)
+        self.addCleanup(dlg.Destroy)
+        entries = voice_lab.builtin_voices("f5tts")
+        with mock.patch.object(voicelab, "builtin_voice_entries",
+                               lambda engine_id=None: list(entries)):
+            dlg._rebuild_voice_choices()
+        for index in range(dlg.tts_combo.GetCount()):
+            if dlg.tts_combo.GetClientData(index) == "f5tts":
+                dlg.tts_combo.SetSelection(index)
+                dlg._on_tts(None)
+                break
+        return tmp, dlg
+
+    def _start(self, dlg):
+        captured = {}
+
+        def fake_worker(**kwargs):
+            captured.update(kwargs)
+            return mock.MagicMock()
+
+        with mock.patch("ai_voice_studio.gui.recording_dialog.SynthesisWorker",
+                        side_effect=fake_worker), \
+                mock.patch.object(dlg, "_show_progress_dialog"):
+            dlg._cancel_event = threading.Event()
+            dlg._on_start(None)
+        return captured
+
+    def test_the_ready_note_names_the_chosen_segment(self):
+        _tmp, dlg = self._dialog(start_index=1)
+        note = dlg.status.GetLabel()
+        self.assertIn("segment 2 of 4", note)
+        self.assertIn("chapter 2", note)
+        self.assertIn("every file after it", note)
+
+    def test_only_record_selected_file_stops_after_that_segment(self):
+        _tmp, dlg = self._dialog(start_index=2, single_segment=True)
+        self.assertIn("only segment 3", dlg.status.GetLabel())
+        captured = self._start(dlg)
+        self.assertEqual(captured["start_index"], 2)
+        self.assertEqual(captured["end_index"], 3)
+        self.assertIn("only segment 3", dlg.status.GetLabel())
+
+    def test_record_all_files_from_here_runs_to_the_end(self):
+        _tmp, dlg = self._dialog(start_index=2)
+        captured = self._start(dlg)
+        self.assertEqual(captured["start_index"], 2)
+        self.assertIsNone(captured["end_index"])
+        self.assertIn("resuming from segment 3", dlg.status.GetLabel())
+
+    def test_a_plain_start_still_uses_the_first_pending_segment(self):
+        _tmp, dlg = self._dialog()
+        captured = self._start(dlg)
+        self.assertEqual(captured["start_index"], 0)
+        self.assertIsNone(captured["end_index"])
 
 
 class AvailablePanelThreadTest(_AppMixin):

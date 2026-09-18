@@ -39,6 +39,7 @@ class SynthesisWorker(threading.Thread):
         output_dir: str,
         ffmpeg_exe: Optional[str] = None,
         start_index: int = 0,
+        end_index: Optional[int] = None,
         on_segment_done: Optional[Callable[[int, str, str], None]] = None,
         on_all_done: Optional[Callable[[], None]] = None,
         on_error: Optional[Callable[[str], None]] = None,
@@ -53,6 +54,10 @@ class SynthesisWorker(threading.Thread):
         self.output_dir = output_dir
         self.ffmpeg_exe = ffmpeg_exe
         self.start_index = max(0, start_index)
+        # Exclusive stop position.  None means "to the end of the project"
+        # (the plain Start recording behaviour); start_index + 1 records one
+        # single segment, which is what "only record selected file" needs.
+        self.end_index = end_index
         self.on_segment_done = on_segment_done
         self.on_all_done = on_all_done
         self.on_error = on_error
@@ -102,8 +107,11 @@ class SynthesisWorker(threading.Thread):
         if self.on_status:
             self.on_status("TTS engine ready. Starting synthesis...")
         total = len(self.segments)
+        stop = total
+        if self.end_index is not None:
+            stop = max(self.start_index, min(self.end_index, total))
         processed: Dict[int, Dict[str, str]] = {}
-        for idx in range(self.start_index, total):
+        for idx in range(self.start_index, stop):
             if self.cancel_event.is_set():
                 if self.on_status:
                     self.on_status("Stopped.")
