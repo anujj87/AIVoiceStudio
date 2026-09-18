@@ -62,7 +62,7 @@
         <span class="kw">return</span> self._model.generate(text, speed=speed)
 
 <span class="kw">class</span> <span class="cls">ClonedVoiceEngine</span>(BaseEngine):
-    <span class="str">"""XTTS v2 voice cloning engine."""</span>
+    <span class="str">"""Voice Lab voice cloning engine (Pocket TTS, Bark, F5-TTS)."""</span>
     <span class="kw">def</span> <span class="fn">__init__</span>(self, voice_entry: dict, client: <span class="str">"CloneClient"</span>):
         <span class="kw">super</span>().__init__(voice_entry)
         self._client = client
@@ -158,8 +158,8 @@
         <br><span class="desc">Defines class <code>ClonedVoiceEngine</code> inheriting from <code>BaseEngine</code>.</span>
       </li>
       <li>
-        <strong>Line 21:</strong> <code>&quot;&quot;&quot;XTTS v2 voice cloning engine.&quot;&quot;&quot;</code>
-        <br><span class="desc">Docstring: <em>XTTS v2 voice cloning engine.</em>. Documents the purpose of the following code.</span>
+        <strong>Line 21:</strong> <code>&quot;&quot;&quot;Voice Lab voice cloning engine (Pocket TTS, Bark, F5-TTS).&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Voice Lab voice cloning engine</em>. Documents the purpose of the following code.</span>
       </li>
       <li>
         <strong>Line 22:</strong> <code>def __init__(self, voice_entry: dict, client: &quot;CloneClient&quot;):</code>

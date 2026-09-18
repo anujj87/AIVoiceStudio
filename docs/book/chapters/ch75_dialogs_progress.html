@@ -16,6 +16,20 @@
 <div class="chapter-number">Chapter 75</div>
 <h1>Reusable Dialogs &amp; Progress</h1>
 
+<div class="info">
+  <strong>Current implementation (2026.3.1).</strong> Three dialogs joined this group and are
+  worth reading after the patterns below: <code>gui/accept_dialog.py</code> (the first-launch
+  terms of use — all check boxes required, the bold final box ticking the six conditions,
+  Escape swallowed at the key-hook level, closing counted as &ldquo;no&rdquo;, acceptance keyed
+  to <code>TERMS_VERSION</code>; <a href="ch81_terms_dialog.html">Chapter 81</a>), the
+  <em>Start Selected Recording</em> picker in <code>gui/main_frame.py</code> (two radio groups
+  where the first one relabels and refills a combo; <a href="ch80_start_selected_recording.html">Chapter 80</a>),
+  and the per-engine install/tuning dialogs in <code>gui/clone_engines_panel.py</code> /
+  <code>gui/voicelab_options_dialog.py</code>. <code>gui/progress.py</code> is used for every
+  long download and pip install, and pip failures are surfaced with the engine's own error text
+  rather than an exit code.
+</div>
+
 <h2>Learning Objectives</h2>
 <ul>
   <li>Build labelled-button dialogs that screen readers announce properly (vs. <code>wx.MessageBox</code>)</li>

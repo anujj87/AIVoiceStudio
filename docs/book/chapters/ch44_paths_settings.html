@@ -17,6 +17,21 @@
 <div class="chapter-number">Chapter 44</div>
 <h1>Paths, Settings &amp; Constants</h1>
 
+<div class="info">
+  <strong>Current implementation (2026.3.1).</strong> <code>paths.py</code> now also lays out
+  <code>tts_envs\&lt;engine&gt;</code> (one Python environment per pip-installed TTS engine)
+  alongside <code>addon_env</code>, <code>runtime</code>, <code>ffmpeg</code> and the model
+  and project folders. <code>settings.py</code> gained: <code>preview_compute</code> (the
+  Compute choice of each Preview button, keyed by category), <code>clone_engines</code>
+  (<code>engine</code>, <code>device</code>, <code>options.&lt;engine&gt;</code>),
+  <code>omnivoice_server</code> (host, port, device, steps, concurrency, API key, CORS),
+  <code>daisy</code>, <code>recording.per_tts</code>, and <code>terms_version</code> — the
+  last one written only when the user accepts the first-launch terms, and compared with
+  <code>constants.TERMS_VERSION</code> on every start. <code>constants.py</code>
+  carries <code>APP_VERSION</code> and <code>TERMS_VERSION</code>, which the installer
+  version must match.
+</div>
+
 <h2>Learning Objectives</h2>
 <ul>
   <li>Understand the AIVS path resolution system</li>

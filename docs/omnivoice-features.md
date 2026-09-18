@@ -18,6 +18,19 @@ The studio's two "versions" of OmniVoice are:
 * **Server** — engine id `omnivoice_server`; `omnivoice-server` runs as an
   OpenAI-compatible HTTP subprocess (`ai_voice_studio/omnivoice_server/`).
 
+> **Current implementation (2026.3.1).** Both engines live in one **shared** Python
+> environment, `%APPDATA%\AIVoiceStudio\tts_envs\omnivoice` (`python_runtime.
+> SHARED_ENVIRONMENTS`). This is the deliberate exception to "one environment per TTS
+> engine": they are the same model behind two front-ends and want the same base package
+> and the same CUDA PyTorch, so a second copy would duplicate gigabytes of wheels. The
+> CUDA wheels come from `voicelab.engines.PYTORCH_CUDA_INDEX` (`cu128`, the lowest index
+> that still builds for the Python 3.13 the application runs on). Install-time pins are
+> applied as an install *step* so `pip uninstall` keeps working. Neither engine is in
+> `models_catalog.json`: their catalog entries are generated from `voicelab/engines.py`
+> and carry `requires_package` / `requires_packages`. An engine installed before the
+> per-engine environments existed is still found in the shared `addon_env` until it is
+> reinstalled. See Chapters 76–78 of the bundled book.
+
 ---
 
 ## 1. What OmniVoice actually is

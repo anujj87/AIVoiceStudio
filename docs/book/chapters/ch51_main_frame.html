@@ -17,6 +17,19 @@
 <div class="chapter-number">Chapter 51</div>
 <h1>Main Frame &amp; Menu System</h1>
 
+<div class="info">
+  <strong>Current implementation (2026.3.1).</strong> The menus now read: <em>File</em> (New
+  Project, Open Project), <em>Edit</em> (Resume Recording, Restart Project..., Restart All
+  Recording, <strong>Start Selected Recording...</strong>, Remove Project...), <em>Tools</em>
+  (Record, Settings) and <em>Help</em> (Read Me, User Guide, Addon Development Guide,
+  Accessibility Guidelines, Python &amp; wxPython Book <code>F1</code>, <strong>Third-Party
+  Licences</strong>, About). The picker behind <em>Start Selected Recording...</em> is
+  implemented in this module (<code>_picker_entries</code> + <code>_StartRecordingDialog</code>)
+  and is described in <a href="ch80_start_selected_recording.html">Chapter 80</a>. Every
+  document opened from Help goes through one <code>_open_doc</code> helper, so source and frozen
+  builds behave the same.
+</div>
+
 <h2>Learning Objectives</h2>
 <ul>
   <li>Understand the MainFrame class and its responsibilities</li>

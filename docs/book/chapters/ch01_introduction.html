@@ -483,9 +483,9 @@ Hello, AI Voice Studio!</code></pre>
 │   │   └── daisy_builder.py     <span class="cm"># DAISY 2.02 book builder</span>
 │   ├── jobs/                    <span class="cm"># Background processing</span>
 │   │   └── synthesizer.py       <span class="cm"># Background TTS worker</span>
-│   ├── clone/                   <span class="cm"># Voice cloning (XTTS v2)</span>
-│   │   ├── __init__.py          <span class="cm"># CloneClient &amp; CloneEngine</span>
-│   │   └── worker.py            <span class="cm"># Cloning subprocess</span>
+│   ├── voicelab/                <span class="cm"># Voice cloning (Pocket TTS, Bark, F5-TTS)</span>
+│   │   ├── engines.py           <span class="cm"># Engine registry &amp; built-in voices</span>
+│   │   └── worker.py            <span class="cm"># Cloning subprocess (own env per engine)</span>
 │   ├── omnivoice/               <span class="cm"># OmniVoice TTS engine</span>
 │   │   ├── __init__.py          <span class="cm"># OmniVoiceEngine</span>
 │   │   └── worker.py            <span class="cm"># OmniVoice subprocess</span>
@@ -677,16 +677,16 @@ Hello, AI Voice Studio!</code></pre>
         <br><span class="desc"><code>│   │   └── synthesizer.py       # Background TTS worker</code></span>
       </li>
       <li>
-        <strong>Line 41:</strong> <code>│   ├── clone/                   # Voice cloning (XTTS v2)</code>
-        <br><span class="desc"><code>│   ├── clone/                   # Voice cloning (XTTS v2)</code></span>
+        <strong>Line 41:</strong> <code>│   ├── voicelab/                # Voice cloning (Pocket TTS, Bark, F5-TTS)</code>
+        <br><span class="desc">The Voice Lab package: the engines that clone a voice from a short sample. Each one is installed into its own Python environment (see Chapter 77).</span>
       </li>
       <li>
-        <strong>Line 42:</strong> <code>│   │   ├── __init__.py          # CloneClient &amp; CloneEngine</code>
-        <br><span class="desc">Constructor method. Called when creating a new instance of a class. Initializes the object's attributes.</span>
+        <strong>Line 42:</strong> <code>│   │   ├── engines.py           # Engine registry &amp; built-in voices</code>
+        <br><span class="desc">The engine registry as data: package names, built-in voices, licences and the CUDA wheel index.</span>
       </li>
       <li>
-        <strong>Line 43:</strong> <code>│   │   └── worker.py            # Cloning subprocess</code>
-        <br><span class="desc"><code>│   │   └── worker.py            # Cloning subprocess</code></span>
+        <strong>Line 43:</strong> <code>│   │   └── worker.py            # Cloning subprocess (own env per engine)</code>
+        <br><span class="desc">A standalone script the application starts with the chosen engine's own interpreter, so PyTorch never loads inside the application.</span>
       </li>
       <li>
         <strong>Line 44:</strong> <code>│   ├── omnivoice/               # OmniVoice TTS engine</code>

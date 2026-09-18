@@ -30,15 +30,18 @@ extend the application with new TTS engines, custom voices, additional languages
 and other capabilities. The addon system is inspired by the NVDA screen reader's
 addon architecture.</p>
 
-<div class="note"><strong>Requirements:</strong> AI Voice Studio 0.1.0 or later
+<div class="note"><strong>Requirements:</strong> AI Voice Studio 2026.3.1 or later
 with <strong>Developer Mode</strong> enabled in Settings. You also need Python
 3.11+ installed on your system (the addon system manages its own pip environment).</div>
 
-<div class="note"><strong>License note:</strong> AI Voice Studio is licensed GPL-3.0
-and allows free commercial use. All examples in this guide use engines that are
-also commercially licensed (MIT or Apache-2.0). When creating your own addon,
-ensure any third-party dependencies you use have compatible licenses for your
-intended use.</div>
+<div class="note"><strong>License note:</strong> AI Voice Studio is licensed GPL-3.0.
+All examples in this guide use engines that are also freely licensed (MIT or
+Apache-2.0). When creating your own addon, ensure any third-party dependencies you
+use have compatible licenses for your intended use &mdash; and remember that an
+engine's <em>code</em> and its <em>model weights</em> can carry different licences
+(F5-TTS is MIT code but CC-BY-NC-4.0 weights, for example). The complete list of
+what the application already bundles is in <strong>Help &rarr; Third-Party
+Licences</strong> (<code>docs/THIRD-PARTY-LICENSES.html</code>).</div>
 
 <h2>Contents</h2>
 <ul>
@@ -52,6 +55,7 @@ intended use.</div>
   <li><a href="#kokoro-example">Example 2: Kokoro Custom Voice</a></li>
   <li><a href="#zip-packaging">Packaging Addons as Distributable ZIPs</a></li>
   <li><a href="#pip-deps">Managing pip Dependencies</a></li>
+  <li><a href="#environments">Python Environments: Addons vs. TTS Engines</a></li>
   <li><a href="#voice-cloning">Addon Voice Cloning Support</a></li>
   <li><a href="#api">API Reference</a></li>
   <li><a href="#install">Installing and Managing Addons</a></li>
@@ -73,8 +77,8 @@ with a manifest file and optional Python code.</p>
   <li><strong>Add new voices</strong> &mdash; register voices that appear in the
       Recording window alongside built-in voices.</li>
   <li><strong>Install pip dependencies</strong> &mdash; the addon system manages
-      its own Python virtual environment; you can install any commercially-licensed
-      PyPI package via the <code>dependencies</code> field in your manifest.</li>
+      its own Python virtual environment (<code>addon_env</code>); you can install any
+      compatible PyPI package via the <code>dependencies</code> field in your manifest.</li>
   <li><strong>Support voice cloning</strong> &mdash; addons can register voice
       cloning engines that create custom voices from short audio samples.</li>
 </ul>
@@ -258,6 +262,46 @@ my_addon/<br>
 when the addon is enabled. No system-wide pip install is needed.</p>
 
 <!-- ================================================================ -->
+<h2 id="environments">Python Environments: Addons vs. TTS Engines</h2>
+
+<p>Since version 2026.3.1 the application does not have one Python environment: it
+creates <strong>one virtual environment per pip-installed TTS engine</strong>. This
+matters when you write an addon, because your code may be imported into the
+application while the engine it uses runs somewhere else.</p>
+
+<table>
+<tr><th>Environment</th><th>Used for</th><th>Contains</th></tr>
+<tr><td><code>addon_env</code></td><td>Your addon, the Developer category, the ONNX GPU runtime</td><td>Your <code>dependencies</code> list; the bundled sherpa-onnx runtime</td></tr>
+<tr><td><code>tts_envs\pocket_tts</code></td><td>Pocket TTS (Kyutai)</td><td>pocket-tts, soundfile, scipy</td></tr>
+<tr><td><code>tts_envs\bark</code></td><td>Bark (Suno AI)</td><td>transformers, torch, soundfile, scipy</td></tr>
+<tr><td><code>tts_envs\f5tts</code></td><td>F5-TTS</td><td>f5-tts, torch, torchaudio, soundfile</td></tr>
+<tr><td><code>tts_envs\omnivoice</code></td><td>OmniVoice and OmniVoice Server (shared deliberately)</td><td>omnivoice-triton / omnivoice-server, torch, CUDA PyTorch</td></tr>
+</table>
+
+<h3>What this means for an addon</h3>
+<ul>
+  <li>Your addon's modules are imported into the <strong>application process</strong>. If
+      your engine needs a package that conflicts with the bundled runtime (a second
+      <code>onnxruntime</code>, a full PyTorch, CUDA libraries), do not import it in the
+      application process: run the work in a subprocess started with the interpreter of the
+      environment that has the package, exactly as the Voice Lab engines do
+      (<code>voicelab.worker</code>).</li>
+  <li>Keep <code>dependencies</code> to packages that live happily next to the addon
+      environment's runtime. A heavy ML stack belongs in an engine environment, not in the
+      addon manifest.</li>
+  <li>Register and inspect an engine's built-in voices the same way for every engine: an
+      addon-provided voice appears in <strong>Available TTS</strong>, in the Preview
+      cascades and in the Recording window, and respects the category's <strong>Compute</strong>
+      choice (CPU, or GPU when an NVIDIA GPU is detected).</li>
+  <li>Removing an addon removes its files; packages installed into an engine's own
+      environment stay there until that engine is removed from Settings.</li>
+</ul>
+
+<div class="tip">To see a complete, working example of the worker pattern, read
+<code>ai_voice_studio/voicelab/worker.py</code> (a standalone script started with the
+engine's own interpreter) and Chapter 77 of the bundled book.</div>
+
+<!-- ================================================================ -->
 <h2 id="adding-tts">Adding a New TTS Voice (Step by Step)</h2>
 
 <p>This section walks through the complete process of adding a new TTS voice
@@ -267,7 +311,7 @@ as an addon, covering all the facilities AI Voice Studio provides.</p>
 <table>
 <tr><th>Type</th><th>Use Case</th><th>Dependencies</th></tr>
 <tr><td>Local ONNX</td><td>Offline, fast, bundled models</td><td>sherpa-onnx (bundled)</td></tr>
-<tr><td>Local PyTorch</td><td>Custom ML models</td><td>torch, transformers (commercially licensed)</td></tr>
+<tr><td>Local PyTorch</td><td>Custom ML models</td><td>torch, transformers &mdash; check each licence, and note that a CUDA build only exists for some Python versions</td></tr>
 <tr><td>Cloud API</td><td>High quality, requires internet</td><td>requests, aiohttp (must be commercially licensed)</td></tr>
 <tr><td>System TTS</td><td>OS built-in speech (license varies by OS)</td><td>pyttsx3 (optional)</td></tr>
 </table>
@@ -626,6 +670,12 @@ for pkg in packages:
 short reference recordings. The cloned voice then appears in the Recording
 window alongside downloaded voices.</p>
 
+<p>The application's own cloning engines are the <strong>Voice Lab</strong> engines
+(Pocket TTS, Bark, F5-TTS, configured in Settings &rarr; Voice clone) plus
+OmniVoice; a cloner you register through an addon is offered in the same places, and
+the cloned voices it creates are stored in the model store just like the built-in
+ones.</p>
+
 <h3>Implementing a Cloner</h3>
 <pre>class MyCloner:
     """Voice cloning engine."""
@@ -645,7 +695,8 @@ window alongside downloaded voices.</p>
 <h3>Registration</h3>
 <p>Set <code>"provides": ["voice_cloner"]</code> in your manifest and implement
 the cloner class. The Voice Clone tab in Settings will show your cloner
-alongside the built-in XTTS v2 cloner.</p>
+alongside the built-in Voice Lab cloners (Pocket TTS, Bark, F5-TTS) and the OmniVoice
+clone / voice-design modes.</p>
 
 <!-- ================================================================ -->
 <h2 id="api">API Reference</h2>
@@ -765,6 +816,27 @@ Developer settings panel, or check these log files:</p>
 <pre>Remove-Item -Recurse -Force "%APPDATA%\AIVoiceStudio\addon_env"</pre>
 <p>Restart AI Voice Studio. The environment will be recreated on the next
 addon installation.</p>
+
+<h3>The addon works but its engine cannot find a package I installed</h3>
+<ul>
+  <li>Check which environment the package went into. Addon <code>dependencies</code> go to
+      <code>addon_env</code>; each pip-installed TTS engine gets its own folder under
+      <code>%APPDATA%\AIVoiceStudio\tts_envs\&lt;engine&gt;</code>. Installing torch for
+      Bark does not make it visible to your addon, and vice versa.</li>
+  <li>If your engine needs a heavy dependency, run it in a worker subprocess started with
+      that environment's interpreter instead of importing it in the application process.</li>
+  <li>See <a href="#environments">Python Environments: Addons vs. TTS Engines</a>.</li>
+</ul>
+
+<h3>GPU is offered for my engine but the synthesis runs on the CPU</h3>
+<ul>
+  <li>The Compute combo chooses a provider; it cannot give a package GPU support it was not
+      installed with. A plain <code>pip install torch</code> on Windows is CPU-only &mdash;
+      the CUDA build has to come from the official PyTorch wheel index (see the
+      <code>PYTORCH_CUDA_INDEX</code> constant in <code>voicelab/engines.py</code>).</li>
+  <li>The CUDA index only carries wheels for some Python versions; when none matches the
+      application's interpreter the install falls back to CPU and says so.</li>
+</ul>
 
 </body>
 </html>

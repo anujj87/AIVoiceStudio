@@ -124,6 +124,17 @@
     <li><a href="chapters/ch75_dialogs_progress.html">Ch 75: Dialogs &amp; Progress</a></li>
   </ul>
 
+  <div class="part-header">Part X — Voice Lab &amp; the Current System</div>
+  <ul class="chapters">
+    <li><a href="chapters/ch76_voicelab_engines.html">Ch 76: Voice Lab Engines</a></li>
+    <li><a href="chapters/ch77_engine_environments.html">Ch 77: One Environment per Engine</a></li>
+    <li><a href="chapters/ch78_compute_choice.html">Ch 78: Compute Choice (CPU &amp; GPU)</a></li>
+    <li><a href="chapters/ch79_audio_io_shim.html">Ch 79: Audio I/O Without FFmpeg</a></li>
+    <li><a href="chapters/ch80_start_selected_recording.html">Ch 80: Start Selected Recording</a></li>
+    <li><a href="chapters/ch81_terms_dialog.html">Ch 81: First-Launch Terms Dialog</a></li>
+    <li><a href="chapters/ch82_licensing.html">Ch 82: Licensing &amp; Compliance</a></li>
+  </ul>
+
   <div class="part-header">Appendices</div>
   <ul class="chapters">
     <li><a href="chapters/appendix_a_reference.html">A: Python Quick Reference</a></li>
@@ -150,8 +161,10 @@
   </p>
   <hr>
   <p class="edition">
-    First Edition &bull; 2026 &bull; Python 3.13 &bull; wxPython 4.3<br>
-    Based on AI Voice Studio (AIVS) open-source project
+    Second Edition &bull; 2026 &bull; Python 3.13 &bull; wxPython 4.3<br>
+    Based on AI Voice Studio (AIVS) open-source project &bull; Version 2026.3.1<br>
+    Includes Part X: the Voice Lab engine subsystem, per-engine Python environments,<br>
+    the CPU/GPU compute choice, the audio I/O fallback and the licensing model
   </p>
 </div>
 
@@ -170,7 +183,7 @@
 </p>
 
 <h3>How This Book Is Organized</h3>
-<p>The book is divided into nine parts:</p>
+<p>The book is divided into ten parts:</p>
 <ol>
   <li><strong>Part I — Python Fundamentals</strong> (Chapters 1–10): Variables, control flow, functions, file I/O, error handling, modules, and object-oriented basics.</li>
   <li><strong>Part II — Intermediate Python</strong> (Chapters 11–18): Advanced OOP, decorators, context managers, regular expressions, testing, and structured data.</li>
@@ -181,7 +194,18 @@
   <li><strong>Part VII — Testing &amp; Deployment</strong> (Chapters 61–66): Unit testing, mocking, PyInstaller, Inno Setup, and CI/CD.</li>
   <li><strong>Part VIII — Advanced Topics</strong> (Chapters 67–72): Managed runtime, subprocess architecture, logging, performance, and security.</li>
   <li><strong>Part IX — Second Edition Additions</strong> (Chapters 73–75): Playlist generation, DAISY 3 book building, and reusable dialogs and progress windows.</li>
+  <li><strong>Part X — Voice Lab &amp; the Current System</strong> (Chapters 76–82): The voice-clone engine subsystem, one Python environment per engine, the CPU/GPU compute choice, audio decoding without FFmpeg, out-of-order recording, the first-launch terms dialog, and licensing.</li>
 </ol>
+
+<div class="info">
+  <strong>About this edition.</strong> Parts I–IX teach Python, wxPython and every
+  third-party library this application uses. <strong>Part X</strong> is written against the
+  <em>current</em> code base and documents the subsystems that grew after the first
+  edition: the Voice Lab clone engines, one virtualenv per engine, the compute band
+  (CPU 80–95&nbsp;%, full GPU), the soundfile audio fallback, out-of-order recording for
+  long books, the terms dialog, and the licence inventory. Every code excerpt in Part X
+  is taken from the shipped source and annotated line by line.
+</div>
 
 <h3>The Running Example: AI Voice Studio</h3>
 <p>
@@ -192,12 +216,12 @@
 </p>
 <ul>
   <li>wxPython GUI with accessibility support (NVDA, JAWS, Narrator)</li>
-  <li>Multiple TTS engines (Piper, Kokoro, Matcha, Kitten, XTTS v2 cloning)</li>
+  <li>Multiple TTS engines (Piper, Kokoro, Matcha, Kitten, OmniVoice, SAPI5/Windows voices, plus the Voice Lab clone engines: Pocket TTS, Bark, F5-TTS)</li>
   <li>Document parsing (PDF, DOCX, HTML, Markdown, EPUB)</li>
   <li>Background threading for non-blocking synthesis</li>
   <li>Virtual environment management and addon architecture</li>
   <li>PyInstaller packaging and Inno Setup installers</li>
-  <li>99+ unit tests with comprehensive coverage</li>
+  <li>370+ unit tests with comprehensive coverage</li>
 </ul>
 
 <h3>Prerequisites</h3>

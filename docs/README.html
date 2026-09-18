@@ -18,7 +18,7 @@
 <body>
 
 <h1>AI Voice Studio</h1>
-<p>Developed by <strong>Anuj Sharma</strong> &mdash; version 0.1.0 &mdash; licence: GPL-3.0.</p>
+<p>Developed by <strong>Anuj Sharma</strong> &mdash; version 2026.3.1 &mdash; licence: GPL-3.0.</p>
 
 <p>AI Voice Studio converts documents (PDF, TXT, DOC/DOCX, HTML, Markdown and
 clipboard text) into spoken audio files using free, offline neural voices. It is
@@ -27,18 +27,21 @@ screen readers such as NVDA, JAWS and Narrator.</p>
 
 <h2>Features at a glance</h2>
 <ul>
-  <li><strong>Offline text to speech</strong> &mdash; Piper, VITS, Kokoro, Matcha and Kitten voices, downloaded once from Settings and reused by all projects.</li>
-  <li><strong>Voice cloning</strong> &mdash; clone a voice from a 4&ndash;5 second WAV sample with Coqui XTTS v2, in 17 languages (optional ~2.5&nbsp;GB engine download).</li>
+  <li><strong>Offline text to speech</strong> &mdash; Piper, VITS, Kokoro, Matcha, Kitten, OmniVoice, OmniVoice Server, SAPI5 and the Windows Core voices, downloaded or installed once from Settings and reused by all projects.</li>
+  <li><strong>Voice cloning &mdash; the Voice Lab</strong> &mdash; clone a voice from a short sample with Pocket TTS (Kyutai), Bark (Suno AI), F5-TTS or OmniVoice. Each engine is installed into its <em>own</em> Python environment, so their dependencies never conflict.</li>
   <li><strong>Punctuation control</strong> &mdash; four modes, including &ldquo;All&rdquo;, which speaks every punctuation mark as a word (quote, dot, left paren, tic&hellip;) for voices that cannot pronounce punctuation.</li>
   <li><strong>Project-based recording</strong> &mdash; each document becomes a project; every segment is saved to disk immediately as WAV, MP3 or FLAC, and recording resumes where it stopped after a crash or close.</li>
+  <li><strong>Record a single file or the rest of the book</strong> &mdash; <em>Start Selected Recording</em> can re-record one chosen file only, or every file from the chosen break to the end of the project, whether the later files were recorded already or not.</li>
   <li><strong>Standard playlists</strong> &mdash; &ldquo;Audio files with playlist&rdquo; projects automatically get <code>.m3u8</code>, <code>.pls</code> and <code>.wpl</code> files next to the audio, so the whole recording plays in order in VLC, PotPlayer, GOM, Windows Media Player, Winamp and other modern players.</li>
   <li><strong>DAISY books</strong> &mdash; DAISY 2.02 audio books and DAISY 3 (Z39.86-2005) audio + text books with images, built automatically when recording completes and exportable as one ZIP file.</li>
-  <li><strong>GPU acceleration</strong> &mdash; optional CUDA runtime (about 1.8&nbsp;GB) downloaded from Settings &rarr; Compute; only an NVIDIA driver is required.</li>
+  <li><strong>GPU acceleration for every engine that supports it</strong> &mdash; a per-category Compute combo chooses CPU or GPU, the whole NVIDIA card is used on GPU, and an optional ONNX GPU runtime (about 1.8&nbsp;GB) covers the built-in engines; only an NVIDIA driver is required.</li>
+  <li><strong>Terms of use on first launch</strong> &mdash; a dialog states the conditions of use (voice-cloning rights, illegal use, commercial licences, system voices, no warranty) and the application starts only after you accept; acceptance is remembered per version.</li>
   <li><strong>Screen-reader friendly</strong> &mdash; real MSAA accessible names on every control, NVDA-style settings dialog, keyboard shortcuts throughout.</li>
 </ul>
 
 <h2>Quick start</h2>
 <ol>
+  <li>On first launch, read the Terms of Use, tick the agreement check box and press <strong>I Agree</strong>.</li>
   <li>Open <strong>Settings</strong> (Ctrl+,) and use the <strong>Download and remove</strong> category to install at least one voice (for example Piper, English US, medium).</li>
   <li>Create a <strong>New Project</strong> (Ctrl+Shift+N), choose a document and how it is split into audio files, and pick the punctuation mode.</li>
   <li>Press <strong>Start recording</strong> in the Recording window. Each finished segment is saved immediately.</li>
@@ -50,6 +53,7 @@ screen readers such as NVDA, JAWS and Narrator.</p>
   <tr><td>Ctrl+Shift+N</td><td>New Project</td></tr>
   <tr><td>Ctrl+Shift+R</td><td>Record (open the most recent project)</td></tr>
   <tr><td>Ctrl+,</td><td>Settings</td></tr>
+  <tr><td>F1</td><td>Open the bundled book (Help menu)</td></tr>
   <tr><td>Alt+F, Alt+E, Alt+T, Alt+H</td><td>Open the File, Edit, Tools or Help menu</td></tr>
   <tr><td>Arrow keys</td><td>Move through the Recent projects list and through the Settings categories</td></tr>
   <tr><td>Ctrl+Tab / Ctrl+Shift+Tab</td><td>Switch Settings category (wrapping)</td></tr>
@@ -59,23 +63,37 @@ screen readers such as NVDA, JAWS and Narrator.</p>
 
 <h2>Computing back-ends</h2>
 <p>The app offers <strong>Auto</strong>, <strong>GPU (CUDA)</strong> and
-<strong>CPU</strong> back-ends in the Recording window.</p>
+<strong>CPU</strong> back-ends in the Recording window, and a
+<strong>Compute</strong> combo next to every Preview button in Settings
+(<em>Available TTS</em>, <em>Recording settings</em>, <em>Punctuation</em>,
+<em>OmniVoice engines</em>). The choice is remembered per category.</p>
 <ul>
-  <li><strong>CPU</strong> is always available: the CPU ONNX Runtime ships with the application.</li>
-  <li><strong>GPU (CUDA)</strong> needs the optional GPU runtime, downloaded from Settings &rarr; Compute (about 1.8&nbsp;GB, includes CUDA 12 and cuDNN 9). It activates after the application restarts. Only an NVIDIA driver is needed &mdash; no CUDA toolkit installation.</li>
+  <li><strong>CPU</strong> is always available: the CPU ONNX Runtime ships with the application. A CPU run uses between <strong>80% and 95%</strong> of the machine's logical CPUs, so the desktop and the Recording window stay responsive.</li>
+  <li><strong>GPU (CUDA)</strong> for the built-in ONNX engines needs the optional GPU runtime, downloaded from Settings &rarr; Compute (about 1.8&nbsp;GB, includes CUDA 12 and cuDNN 9). It activates after the application restarts. Only an NVIDIA driver is needed &mdash; no CUDA toolkit installation.</li>
+  <li>The <strong>pip-installed Voice Lab engines</strong> (Pocket TTS, Bark, F5-TTS) need only the NVIDIA driver: the CUDA build of PyTorch is installed into the engine's own environment. A GPU run uses the whole available card, whatever the model.</li>
 </ul>
 
-<h2>Voice cloning (XTTS v2)</h2>
-<p>Some TTS engines can copy a voice from a short recording. AI Voice Studio
-uses <strong>Coqui XTTS v2</strong> for this: give the voice a name, choose the
-language spoken in the sample, and provide a 4&ndash;5 second WAV recording of
-one clear voice. The cloned voice then appears in <strong>Available TTS</strong>
-and the <strong>Recording window</strong> and can speak any of the 17 supported
-languages.</p>
-<p>The cloning engine (about 2.5&nbsp;GB, coqui-tts + PyTorch) is downloaded
-into your user folder from Settings &rarr; Voice clone; the XTTS model itself
-(about 2.1&nbsp;GB) downloads automatically on first use. The XTTS model is
-licensed under the <strong>Coqui Public Model Licence (non-commercial)</strong>.</p>
+<h2>Voice cloning &mdash; the Voice Lab</h2>
+<p>Three TTS engines are installed as Python packages rather than ONNX models,
+because they generate speech from a reference sample: <strong>Pocket TTS
+(Kyutai)</strong>, <strong>Bark (Suno AI)</strong> and
+<strong>F5-TTS</strong>. They live in
+<strong>Settings &rarr; Voice clone</strong>, where you can install or remove an
+engine, choose the device (CPU, GPU, Auto), pick a built-in voice or create a
+cloned one from a short recording, and tune the engine's generation defaults.
+<strong>OmniVoice</strong> (direct and HTTP-server versions) also supports voice
+cloning and design. The first synthesis after installing an engine downloads its
+model from Hugging Face and is therefore slower.</p>
+
+<h3>One Python environment per engine</h3>
+<p>Every pip-installed engine runs in its own virtual environment under
+<code>%APPDATA%\AIVoiceStudio\tts_envs\&lt;engine&gt;</code>, so the torch,
+torchaudio, transformers and triton versions one engine needs can never break
+another. The two OmniVoice engines deliberately share one environment
+(<code>tts_envs\omnivoice</code>) because they are the same model behind two
+front-ends; addons use the shared <code>addon_env</code>. Each engine's worker
+process runs on that environment's interpreter, so PyTorch and CUDA never load
+into the application process.</p>
 
 <h2>Punctuation modes</h2>
 <ul>
@@ -116,24 +134,52 @@ pending means the playlists are written immediately.</p>
   <li><strong>Resume recording</strong> &mdash; continue where the last recording stopped.</li>
   <li><strong>Restart project</strong> &mdash; delete all recordings and settings, keep only the project name, and recreate the project.</li>
   <li><strong>Restart all recording</strong> &mdash; delete all audio files and record every segment again from the beginning.</li>
-  <li><strong>Start selected recording</strong> &mdash; pick the file to record: <strong>Select an audio file</strong> lists the files already recorded in the project, <strong>Select by file break</strong> lists every file break of the project whether it is recorded or not. A second choice decides whether <strong>only the selected file</strong> is recorded or <strong>all files from there</strong> to the end of the project.</li>
+  <li><strong>Start selected recording</strong> &mdash; pick the file to record: <strong>Select an audio file</strong> lists the files already recorded in the project, <strong>Select by file break</strong> lists every file break of the project whether it is recorded or not. A second choice decides whether <strong>only the selected file</strong> is recorded or <strong>all files from there</strong> to the end of the project. The dialog opens even when nothing has been recorded yet, so a long book can be recorded out of order.</li>
   <li><strong>Remove project</strong> &mdash; delete the project from the menu and from your hard disk.</li>
 </ul>
+
+<h2>First launch &mdash; terms of use</h2>
+<p>On the first start, and again after a version whose terms changed, the
+application shows a Terms of Use dialog with six conditions of use and an
+<strong>&ldquo;I agree with all above terms&rdquo;</strong> check box. The bold
+check box ticks all six; the <strong>I Agree</strong> and
+<strong>Disagree (Close Program)</strong> buttons only become available once it
+is ticked. Disagreeing, pressing Escape or closing the window exits without
+starting the application. Acceptance is stored in
+<code>%APPDATA%\AIVoiceStudio\settings.json</code>.</p>
 
 <h2>Storage</h2>
 <ul>
   <li>Projects, recorded audio and <code>processed_text.json</code> (the exact spoken text of every segment) live in the project folder.</li>
   <li>Downloaded voices and cloned voices live in the model folder (changeable in Settings &rarr; General).</li>
-  <li>Optional runtimes (GPU, cloning engine) live under <code>%APPDATA%\AIVoiceStudio\runtime</code>.</li>
+  <li>One Python environment per pip-installed engine, and those engines' models: <code>%APPDATA%\AIVoiceStudio\tts_envs</code>.</li>
+  <li>Optional runtimes (ONNX GPU runtime, addon environment) and FFmpeg live under <code>%APPDATA%\AIVoiceStudio</code>.</li>
 </ul>
 
-<h2>Licences</h2>
-<p>The application is <strong>GPL-3.0</strong>. The TTS models keep their own
-licences: Piper (MIT), Kokoro (Apache-2.0), Kitten (Apache-2.0), MMS
-(CC-BY-NC), XTTS v2 (Coqui Public Model Licence, non-commercial).</p>
+<h2>Documentation</h2>
+<p>All of these are in the <strong>Help</strong> menu as well as the
+<code>docs</code> folder next to the application:</p>
+<table>
+  <tr><th>Document</th><th>What it covers</th></tr>
+  <tr><td><code>UserGuide.html</code></td><td>Every window, every Settings category, voice cloning, troubleshooting.</td></tr>
+  <tr><td><code>AddonDevelopmentGuide.html</code></td><td>Writing addons and TTS engines.</td></tr>
+  <tr><td><code>AccessibilityGuide.html</code></td><td>The accessibility rules the interface follows.</td></tr>
+  <tr><td><code>book/index.html</code></td><td>The bundled book (F1): 82 chapters and 3 appendices from basic Python to rebuilding this application.</td></tr>
+  <tr><td><code>THIRD-PARTY-LICENSES.html</code></td><td>Every bundled component, its licence and the full licence text where permitted.</td></tr>
+</table>
 
-<p>See the <a href="UserGuide.html">User Guide</a> for detailed instructions,
-troubleshooting and the full Settings reference.</p>
+<h2>Licences</h2>
+<p>The application is <strong>GPL-3.0</strong>. The engines and models keep
+their own licences: Piper (MIT), Kokoro (Apache-2.0), Kitten (Apache-2.0),
+Matcha-TTS (Apache-2.0 code), VITS zh-AISHELL3 (Apache-2.0 code, AISHELL3 data
+non-commercial), MMS (CC-BY-NC-4.0), OmniVoice and OmniVoice Server
+(Apache-2.0), Pocket TTS (Apache-2.0 code, per-voice licences), Bark (MIT),
+F5-TTS (MIT code, <strong>CC-BY-NC-4.0 weights &mdash; non-commercial</strong>),
+and the SAPI5 / Windows Core voices (Windows and vendor EULAs).</p>
+<p>See <strong>Help &rarr; Third-Party Licences</strong>
+(<code>docs/THIRD-PARTY-LICENSES.html</code>) for the complete list and the full
+licence texts, and the <a href="UserGuide.html">User Guide</a> for detailed
+instructions and troubleshooting.</p>
 
 </body>
 </html>

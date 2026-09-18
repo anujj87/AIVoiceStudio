@@ -17,6 +17,18 @@
 <div class="chapter-number">Chapter 68</div>
 <h1>Subprocess Architecture</h1>
 
+<div class="info">
+  <strong>Current implementation (2026.3.1).</strong> The isolation table below is still the
+  reason workers exist, but there are now more of them and each pip-installed engine's worker
+  runs on <em>that engine's own</em> interpreter, from
+  <code>%APPDATA%\AIVoiceStudio\tts_envs\&lt;engine&gt;</code>, instead of one shared environment
+  (<a href="ch77_engine_environments.html">Chapter 77</a>): the Voice Lab worker
+  (<code>voicelab/worker.py</code>, JSON lines over stdout), the OmniVoice worker, the OmniVoice
+  HTTP server, and the legacy fallback in the shared <code>addon_env</code>. Which interpreter is
+  chosen is decided from the environment's <code>site-packages</code> listing, never from a cached
+  probe.
+</div>
+
 <h2>Learning Objectives</h2>
 <ul>
   <li>Understand why AIVS uses subprocess isolation</li>
@@ -32,7 +44,7 @@
   <thead><tr><th>Component</th><th>Runtime</th><th>Isolation Reason</th></tr></thead>
   <tbody>
     <tr><td>Main App</td><td>wxPython + sherpa-onnx (ONNX)</td><td>Core application</td></tr>
-    <tr><td>Clone Worker</td><td>PyTorch + coqui-tts</td><td>PyTorch conflicts with ONNX</td></tr>
+    <tr><td>Voice Lab Worker</td><td>PyTorch + the engine's own packages (one environment per engine)</td><td>PyTorch conflicts with ONNX</td></tr>
     <tr><td>OmniVoice Worker</td><td>PyTorch + CUDA</td><td>CUDA/PyTorch isolation</td></tr>
     <tr><td>OmniVoice Server</td><td>HTTP server + PyTorch</td><td>Network service isolation</td></tr>
   </tbody>

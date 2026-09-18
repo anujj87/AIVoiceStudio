@@ -17,6 +17,18 @@
 <div class="chapter-number">Chapter 70</div>
 <h1>Performance Optimization</h1>
 
+<div class="info">
+  <strong>Current implementation (2026.3.1).</strong> The single biggest performance decision in
+  this release is the CPU thread budget: <code>compute.cpu_threads()</code> gives a run
+  <strong>80–95 %</strong> of the machine's logical CPUs (one core kept free on small machines),
+  and that value is passed to sherpa-onnx's <code>num_threads</code> and to
+  <code>torch.set_num_threads</code> in the worker, so the same budget applies to every backend.
+  On the GPU side the first CUDA device is used with the cuDNN autotuner, TF32 fast paths,
+  <code>high</code> float32 matmul precision and the autograd engine disabled. Engine instances
+  are cached per <code>(provider, model)</code>, so switching the Compute combo rebuilds an engine
+  instead of leaking two. See <a href="ch78_compute_choice.html">Chapter 78</a>.
+</div>
+
 <h2>Learning Objectives</h2>
 <ul>
   <li>Understand AIVS performance considerations</li>

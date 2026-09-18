@@ -17,6 +17,20 @@
 <div class="chapter-number">Chapter 42</div>
 <h1>Virtual Environments &amp; Packaging</h1>
 
+<div class="info">
+  <strong>Current implementation (2026.3.1).</strong> The application no longer has a single
+  managed environment. Every TTS engine that is installed with pip gets its <em>own</em>
+  virtualenv under <code>%APPDATA%\AIVoiceStudio\tts_envs\&lt;engine&gt;</code>
+  (<code>tts_envs\pocket_tts</code>, <code>tts_envs\bark</code>,
+  <code>tts_envs\f5tts</code>), the two OmniVoice engines deliberately share
+  <code>tts_envs\omnivoice</code>, and addons keep the original shared
+  <code>addon_env</code>. Engines are installed with the CUDA build of PyTorch from the one
+  index constant <code>voicelab.engines.PYTORCH_CUDA_INDEX</code> (<code>cu128</code> — the
+  lowest index that still builds for the Python 3.13 the application runs on), and each
+  install ends with an import check (<code>voicelab.verify_engine_import</code>). See
+  <a href="ch77_engine_environments.html">Chapter 77</a> for the full design.
+</div>
+
 <h2>Learning Objectives</h2>
 <ul>
   <li>Understand virtual environments and why they matter</li>

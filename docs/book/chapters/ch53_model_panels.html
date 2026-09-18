@@ -17,6 +17,18 @@
 <div class="chapter-number">Chapter 53</div>
 <h1>Model Management Panels</h1>
 
+<div class="info">
+  <strong>Current implementation (2026.3.1).</strong> Two additions to the panels described here:
+  every panel with a Preview button now builds a <strong>Compute</strong> row from
+  <code>gui/compute_choice.make_compute_row</code> (CPU, GPU when an NVIDIA GPU is detected,
+  Auto when both exist), storing the choice under <code>preview_compute.&lt;category&gt;</code>
+  and resolving it through <code>provider_for_preview</code>; and the available-voice list is
+  enriched with each installed engine's <strong>built-in</strong> voices and any cloned voices,
+  so they can be previewed and recorded everywhere. Package status is answered from the cached
+  per-environment probes in <code>venv_packages</code>, never by blocking the UI thread. See
+  <a href="ch78_compute_choice.html">Chapter 78</a>.
+</div>
+
 <h2>Learning Objectives</h2>
 <ul>
   <li>Understand the Download and Available TTS panels</li>

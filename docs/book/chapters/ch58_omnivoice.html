@@ -17,6 +17,17 @@
 <div class="chapter-number">Chapter 58</div>
 <h1>OmniVoice TTS Engine</h1>
 
+<div class="info">
+  <strong>Current implementation (2026.3.1).</strong> OmniVoice and OmniVoice Server both live in a
+  <em>single shared</em> Python environment (<code>tts_envs/omnivoice</code>) — the one documented
+  exception to “one environment per engine”, because both need the same base package and the same
+  CUDA PyTorch (see <a href="ch77_engine_environments.html">Chapter 77</a>). Install-time pins are
+  applied as an install step so that <code>pip uninstall</code> keeps working, and the CUDA wheels come
+  from the single index constant <code>PYTORCH_CUDA_INDEX</code>. An engine that was installed before
+  per-engine environments existed is still honoured from the shared addon environment until it is
+  reinstalled.
+</div>
+
 <h2>Learning Objectives</h2>
 <ul>
   <li>Understand the OmniVoice TTS engine (600+ languages)</li>

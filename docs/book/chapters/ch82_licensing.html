@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 82: Licensing &amp; Compliance - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part X — Voice Lab &amp; the Current System</div><ul class="chapters"><li><a href="ch76_voicelab_engines.html">Ch 76: Voice Lab Engines</a></li><li><a href="ch77_engine_environments.html">Ch 77: One Environment per Engine</a></li><li><a href="ch78_compute_choice.html">Ch 78: Compute Choice</a></li><li><a href="ch79_audio_io_shim.html">Ch 79: Audio I/O Without FFmpeg</a></li><li><a href="ch80_start_selected_recording.html">Ch 80: Start Selected Recording</a></li><li><a href="ch81_terms_dialog.html">Ch 81: First-Launch Terms</a></li><li><a href="ch82_licensing.html" class="active">Ch 82: Licensing &amp; Compliance</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 82</div>
+<h1>Licensing &amp; Compliance for a Multi-Engine Audio Application</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Separate the licence of an application, of its libraries, of model code and of model weights</li>
+  <li>Record licence names as data, next to the thing they apply to</li>
+  <li>Ship the licence texts where users and auditors will actually find them</li>
+  <li>Build a commercial-use matrix a non-lawyer can act on</li>
+  <li>Audit your own dependency set before a release, not after a complaint</li>
+</ul>
+
+<hr>
+
+<h2>82.1 Four Layers of Licensing in One Application</h2>
+
+<p>A TTS studio is not “licensed” in the singular. Four layers stack, and each can
+carry different terms:</p>
+
+<table>
+  <thead><tr><th>Layer</th><th>Example in this project</th><th>Typical licence</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Application</strong></td><td>AI Voice Studio itself</td><td>GPL-3.0</td></tr>
+    <tr><td><strong>Python libraries</strong></td><td>wxPython, NumPy, sherpa-onnx, ONNX Runtime, requests, pypdf, python-docx</td><td>MIT / BSD-3 / Apache-2.0 / wxWindows</td></tr>
+    <tr><td><strong>Model code</strong></td><td>f5-tts, pocket-tts, transformers, Bark’s repo</td><td>MIT / Apache-2.0</td></tr>
+    <tr><td><strong>Model weights &amp; voices</strong></td><td>F5-TTS checkpoints, MMS, AISHELL3 data, Pocket TTS voices</td><td>CC-BY-NC-4.0, per-voice terms, dataset licences</td></tr>
+  </tbody>
+</table>
+
+<p>The fourth layer is where the surprises live. F5-TTS is the canonical example in
+this project: the <em>code</em> is MIT, but the released <strong>weights are
+CC-BY-NC-4.0</strong>, which forbids commercial use. Anyone who reads only the
+repository’s main licence file and ships a product will be wrong.</p>
+
+<div class="note">
+  Nothing in this chapter is legal advice, and none of it replaces reading a licence
+  before shipping. The engineering point is narrower and fully actionable: <em>record
+  which licence applies to which component, and put that information in front of the
+  user</em>. Guessing is how projects end up unable to answer the simplest question a
+  distributor asks.
+</div>
+
+<h2>82.2 Licences as Data, Next to the Component</h2>
+
+<p>The engine registry carries a <code>license</code> field per engine, and the JSON
+model catalog carries one per TTS family. This is the single most useful decision in
+the whole chapter: the licence lives <em>with the component it describes</em>, so it
+cannot silently become stale in a separate document.</p>
+
+<pre><code>{
+    "id": "f5tts",
+    "name": "F5-TTS (transformer)",
+    "package": "f5-tts",
+    "packages": ("f5-tts", "torch", "torchaudio", "soundfile"),
+    "license": "MIT (code); CC-BY-NC-4.0 (weights)",
+    "homepage": "https://github.com/SWivid/F5-TTS",
+}</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+    <li><strong>Line 5:</strong> the two-part licence string<br>
+    <span class="desc">“MIT (code); CC-BY-NC-4.0 (weights)” names both layers and marks which is which. A single word here would be either misleading or useless: MIT alone hides the non-commercial weights, and CC-BY-NC-4.0 alone would deny the permissive code.</span></li>
+    <li><strong>Line 6:</strong> <code>homepage</code><br>
+    <span class="desc">The URL makes every claim checkable in one click, for a user and for an auditor. A licence statement without a source is a rumour.</span></li>
+    <li><strong>Why in the registry, not in a document?</strong><br>
+    <span class="desc">Because the registry is what the install dialog reads. When the user presses “Install engine…”, the sentence they see comes from this field — the disclosure happens at the moment of choice rather than in a file nobody opened.</span></li>
+  </ol>
+</div>
+
+<p>The same pattern in the model catalog, for the sherpa-onnx families:</p>
+
+<pre><code>{"id": "piper",       "license": "MIT"}
+{"id": "kokoro",      "license": "Apache-2.0"}
+{"id": "kitten",      "license": "Apache-2.0"}
+{"id": "vits_zh",     "license": "Apache-2.0"}
+{"id": "matcha",      "license": "CC-BY-4.0 (icefall conversion); LJSpeech/other datasets may have their own terms"}
+{"id": "omnivoice",       "license": "Apache-2.0"}
+{"id": "omnivoice_server", "license": "Apache-2.0 / MIT"}
+{"id": "sapi5",       "license": "Windows (built in)"}
+{"id": "windows_core", "license": "Windows (built in)"}</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+    <li><strong>Lines 1–4:</strong> the permissive families<br>
+    <span class="desc">Short, unambiguous strings. Uniform values are still recorded per entry, because the moment one of them changes (a new checkpoint under a different licence) the data is already the right shape.</span></li>
+    <li><strong>Line 5:</strong> Matcha-TTS<br>
+    <span class="desc">The longest string, and the most honest: the <em>conversion</em> is CC-BY-4.0 while the training data behind the checkpoints may impose its own conditions. Saying “may have their own terms” is not vagueness — it is the accurate statement, and it warns an integrator to check.</span></li>
+    <li><strong>Lines 6–7:</strong> the OmniVoice pair<br>
+    <span class="desc">Two front-ends over one project, with slightly different terms — which is exactly why the licence is per entry and not per “voice engine”.</span></li>
+    <li><strong>Lines 8–9:</strong> Windows voices<br>
+    <span class="desc">“Windows (built in)” is the truthful answer for SAPI5 and Windows Core voices: they are licensed by the operating system or the voice vendor, not by this application. This is the case the first-launch terms call out explicitly — the user must own the right to use those voices.</span></li>
+  </ol>
+</div>
+
+<h2>82.3 Where the Licences Have to Appear</h2>
+
+<p>Recording the data is half the job; the other half is putting it where people
+are. The project ships it in four places, each with a different audience:</p>
+
+<table>
+  <thead><tr><th>Artifact</th><th>Contents</th><th>Audience</th></tr></thead>
+  <tbody>
+    <tr><td><code>LICENSE</code></td><td>the application’s GPL-3.0 text plus a third-party summary</td><td>anyone reading the repository</td></tr>
+    <tr><td><code>docs/THIRD-PARTY-LICENSES.html</code></td><td>summary table of every bundled component, full texts for Apache-2.0 / MIT / BSD-3, links and accurate summaries for the rest</td><td>users and auditors, opened from the <em>Help</em> menu</td></tr>
+    <tr><td>Installer licence page</td><td><code>LICENSE</code>, shown before installation proceeds</td><td>everyone who installs the application</td></tr>
+    <tr><td>Install dialog per engine</td><td>the registry’s <code>license</code> string for the engine being installed</td><td>the user at the moment they choose an engine</td></tr>
+  </tbody>
+</table>
+
+<pre><code>[Setup]
+LicenseFile=..\LICENSE
+
+[Files]
+Source: "..\docs\THIRD-PARTY-LICENSES.html"; DestDir: "{app}\docs"; Flags: ignoreversion</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+    <li><strong>Lines 1–2:</strong> <code>LicenseFile</code><br>
+    <span class="desc">Inno Setup renders the given file on a page the user must accept to continue. Pointing it at the repository’s <code>LICENSE</code> means there is one file to maintain, and the installer cannot drift from it.</span></li>
+    <li><strong>Lines 4–5:</strong> the HTML page<br>
+    <span class="desc">Copied into the application folder so the Help menu can open it offline, long after installation. A licence page that only exists on the internet is unavailable in the one place it is most needed — a machine with no network.</span></li>
+    <li><strong>Why HTML rather than a text file?</strong><br>
+    <span class="desc">The page contains tables, links and several full-licence sections. HTML keeps it navigable by keyboard and readable by a screen reader, matching the rest of this application’s documentation.</span></li>
+  </ol>
+</div>
+
+<h2>82.4 Building an Auditable Inventory</h2>
+
+<p>Because the metadata is data, an inventory is a loop — not a manual table that goes
+stale the day someone adds an engine:</p>
+
+<pre><code>import json
+
+from ai_voice_studio.voicelab import engines
+
+print("== Voice Lab clone engines ==")
+for info in engines.ENGINES:
+    print(f"{info['name']:<34} {info['license']}")
+    print(f"{'':34} {info['homepage']}")
+
+print()
+print("== Catalog TTS families ==")
+with open("ai_voice_studio/tts/models_catalog.json", encoding="utf-8") as handle:
+    catalog = json.load(handle)
+for entry in catalog["tts"]:
+    print(f"{entry['name']:<34} {entry.get('license', '(not recorded)')}")</code></pre>
+
+<p>Output (trimmed) on the current project:</p>
+
+<pre><code>== Voice Lab clone engines ==
+Pocket TTS (Kyutai)                Apache-2.0 (code); per-voice licenses
+Bark (Suno AI, transformer)        MIT
+F5-TTS (transformer)               MIT (code); CC-BY-NC-4.0 (weights)
+
+== Catalog TTS families ==
+Piper                              MIT
+Kokoro-82M                         Apache-2.0
+Kitten TTS                         Apache-2.0
+VITS zh-AISHELL3                   Apache-2.0
+Matcha-TTS                         CC-BY-4.0 (icefall conversion); ...
+OmniVoice                          Apache-2.0
+OmniVoice Server                   Apache-2.0 / MIT
+SAPI5 (Windows voices)             Windows (built in)
+Windows Core voices                Windows (built in)</code></pre>
+
+<div class="tip">
+  Run this script (or a test that does the same) before every release. A component with
+  an empty licence field is the only thing you need to fix, and it takes seconds to find.
+</div>
+
+<h2>82.5 The Commercial-Use Matrix</h2>
+
+<p>The question users actually ask is not “what licence is Kokoro?” but “may I sell
+the audiobook I made?”. Converting a licence name into an answer requires knowing
+whether it touches the <em>output</em> or only the <em>software</em>:</p>
+
+<table>
+  <thead><tr><th>Component</th><th>Licence</th><th>Commercial use of the software</th><th>Commercial use of the audio</th></tr></thead>
+  <tbody>
+    <tr><td>Piper</td><td>MIT</td><td>yes</td><td>yes (check the individual voice)</td></tr>
+    <tr><td>Kokoro-82M</td><td>Apache-2.0</td><td>yes</td><td>yes</td></tr>
+    <tr><td>Kitten TTS</td><td>Apache-2.0</td><td>yes</td><td>yes</td></tr>
+    <tr><td>VITS zh-AISHELL3</td><td>Apache-2.0 code / AISHELL3 data</td><td>yes</td><td>check: the dataset is non-commercial</td></tr>
+    <tr><td>Matcha-TTS</td><td>CC-BY-4.0 (conversion)</td><td>yes</td><td>check the checkpoint’s training data</td></tr>
+    <tr><td>OmniVoice / Server</td><td>Apache-2.0</td><td>yes</td><td>yes</td></tr>
+    <tr><td>Pocket TTS</td><td>Apache-2.0 code / per-voice</td><td>yes</td><td>check the individual voice</td></tr>
+    <tr><td><strong>Bark</strong></td><td>MIT</td><td>yes</td><td>yes</td></tr>
+    <tr><td><strong>F5-TTS</strong></td><td>MIT code / <strong>CC-BY-NC-4.0 weights</strong></td><td>yes (the code)</td><td><strong>no</strong> with the released weights</td></tr>
+    <tr><td>SAPI5 / Windows Core voices</td><td>Windows and vendor EULAs</td><td>depends on your licence for those voices</td><td>depends on the voice</td></tr>
+  </tbody>
+</table>
+
+<div class="warning">
+  Two entries deserve to be highlighted in any user-facing documentation:
+  <strong>F5-TTS weights are non-commercial</strong>, and <strong>MMS / AISHELL3-family
+  data is non-commercial</strong>. Both are fine for personal and educational use, which
+  is why they remain in the catalog — with the terms stated where the engine or voice is
+  chosen, the user can make an informed decision instead of discovering the limitation
+  after publishing.
+</div>
+
+<h2>82.6 Obligations That Come With the Permissive Licences</h2>
+
+<p>“Permissive” does not mean “no obligations”. Three attach to almost everything in
+this dependency set:</p>
+
+<ol>
+  <li><strong>Attribution.</strong> MIT, BSD and Apache-2.0 all require the copyright
+  notice and licence text to be preserved in distributions. That is the entire reason
+  <code>THIRD-PARTY-LICENSES.html</code> exists and is installed alongside the app.</li>
+  <li><strong>NOTICE file (Apache-2.0).</strong> If a component ships a <code>NOTICE</code>
+  file, its contents must be reproduced. Check the wheels you bundle.</li>
+  <li><strong>State changes (Apache-2.0).</strong> If you modify Apache-2.0 code, say so.
+  This is why a build that patches a library needs a note.</li>
+  <li><strong>Copyleft.</strong> wxPython’s <em>wxWindows Library Licence</em> is
+  LGPL-compatible; dynamic linking is the usual reason such a GUI toolkit can be bundled
+  in a non-LGPL application. Its licence text belongs in the same document as the rest.</li>
+  <li><strong>Optional binaries.</strong> FFmpeg is downloaded on demand and is distributed
+  under LGPL/GPL depending on the build; the page states that this is the user’s
+  download, which keeps the question of redistribution with the user.</li>
+</ol>
+
+<h2>82.7 Mini Project: A Release Licence Check</h2>
+
+<p>Turn the inventory into a check that fails loudly when something is missing. A test
+is a better place than a checklist, because it runs every time:</p>
+
+<pre><code>import json
+from pathlib import Path
+
+from ai_voice_studio.voicelab import engines
+
+ROOT = Path(__file__).resolve().parents[1]
+PAGE = ROOT / "docs" / "THIRD-PARTY-LICENSES.html"
+
+
+def test_every_engine_states_its_licence():
+    for info in engines.ENGINES:
+        assert info.get("license"), f"{info['id']} has no licence recorded"
+        assert info.get("homepage"), f"{info['id']} has no source link"
+
+
+def test_catalog_families_state_their_licence():
+    catalog = json.loads(
+        (ROOT / "ai_voice_studio" / "tts" / "models_catalog.json").read_text("utf-8")
+    )
+    for entry in catalog["tts"]:
+        assert entry.get("license"), f"{entry['id']} has no licence recorded"
+
+
+def test_licence_page_exists_for_the_help_menu():
+    assert PAGE.is_file()
+    text = PAGE.read_text("utf-8").lower()
+    for needle in ("apache", "mit", "bsd", "cc-by-nc"):
+        assert needle in text, f"{needle} is not covered in the licence page"</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 4)</h4>
+  <ol>
+    <li><strong>Lines 6–7:</strong> resolving the repository root<br>
+    <span class="desc">Tests must not depend on the working directory: deriving paths from <code>__file__</code> means the same check runs from an IDE, from <code>pytest</code> and from CI.</span></li>
+    <li><strong>Lines 10–13:</strong> the engine check<br>
+    <span class="desc">Two assertions per engine: a licence <em>and</em> a source link. Recording one without the other is the half-finished state this test exists to prevent — an unexplained licence string is as hard to verify as a missing one.</span></li>
+    <li><strong>Lines 16–22:</strong> the catalog check<br>
+    <span class="desc">Reads the JSON data file rather than importing the catalog module, so the test keeps working even when the import path changes — it asserts the data, which is what ships.</span></li>
+    <li><strong>Lines 25–29:</strong> the page check<br>
+    <span class="desc">Asserts the file exists <em>and</em> mentions the four licence families that always apply. That single test would have caught the release where the page was missing entirely, or where the Apache text was dropped during an edit.</span></li>
+  </ol>
+</div>
+
+<h2>82.8 Key Takeaways</h2>
+<ul>
+  <li>Track four layers — application, libraries, model code, model weights — because they can differ</li>
+  <li>Store the licence next to the component as data, so UI and documentation read one source</li>
+  <li>Disclose at the moment of choice (the install dialog) and permanently (the installed licence page)</li>
+  <li>Give users a commercial-use matrix, not a list of licence names</li>
+  <li>Permissive licences still require attribution and, for Apache-2.0, NOTICE preservation</li>
+  <li>Make the inventory executable: a test that fails on a missing licence beats a checklist</li>
+  <li>Flag non-commercial components (F5-TTS weights, AISHELL3/MMS data) in bold, where the user chooses them</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch81_terms_dialog.html">← Ch 81</a> &nbsp;|&nbsp; <a href="appendix_a_reference.html">Appendix A — Python Reference →</a></p>
+</div></div></body>
+</html>

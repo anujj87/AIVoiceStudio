@@ -17,6 +17,17 @@
 <div class="chapter-number">Chapter 49</div>
 <h1>Model Downloader &amp; Artifacts</h1>
 
+<div class="info">
+  <strong>Current implementation (2026.3.1).</strong> The downloader itself is unchanged, but it
+  is no longer the only way an engine arrives. Engines whose catalog entry carries
+  <code>requires_package</code> (the Voice Lab engines and both OmniVoice engines) are
+  <em>excluded</em> from the Download/Remove list and are installed with pip into their own
+  Python environment instead (<a href="ch77_engine_environments.html">Chapter 77</a>). Those
+  engines' models are fetched from Hugging Face by the engine itself on first synthesis. The
+  shared artifacts (<code>vocos-22khz</code> for Matcha, the espeak-ng data for MMS) still
+  arrive through this downloader.
+</div>
+
 <h2>Learning Objectives</h2>
 <ul>
   <li>Understand the download pipeline for voice models</li>

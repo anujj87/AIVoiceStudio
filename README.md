@@ -7,7 +7,7 @@ that run locally through **ONNX Runtime** — no cloud, no account, full privacy
 Built with **Python + wxPython** and designed to be **fully accessible with
 screen readers** (NVDA, JAWS, Narrator).
 
-![License](https://img.shields.io/badge/license-GPL--3.0-blue)
+Version **2026.3.1** — ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
 
 ---
 
@@ -33,11 +33,13 @@ screen readers** (NVDA, JAWS, Narrator).
   from official open-source releases.
 - **Download / Remove model manager** with TTS → language → variant → voice
   cascading combo boxes and per-file progress.
-- **Voice clone tab** (XTTS v2): clone a voice from a 4–5 second WAV sample
-  of the person's voice — choose a name and language, the voice becomes
-  selectable everywhere and speaks 17 languages. The cloning engine (about
-  2.5 GB) is an optional download into the user folder, like the GPU runtime.
-- **Voice Clone category (CPU first)** — open-source voice-cloning engines
+- **Voice cloning** — a voice is cloned from a 5–15 second sample of the person
+  speaking: choose a name, pick the sample, optionally type its transcript, and the
+  voice becomes selectable everywhere. Cloning is provided by the **Voice Lab**
+  engines below and by **OmniVoice** (voice clone and voice design). The cloning engine
+  of earlier releases has been retired in favour of them (its name is not used here
+  because the component is gone).
+- **Voice Clone category (the Voice Lab)** — open-source voice-cloning engines
   that run on a normal **CPU** and additionally on the **GPU** when an NVIDIA
   card is detected: [Pocket TTS by
   Kyutai](https://github.com/kyutai-labs/pocket-tts),
@@ -48,9 +50,10 @@ screen readers** (NVDA, JAWS, Narrator).
   F5-TTS references) appear in **Available TTS**, in the Preview lists and in
   the Recording window, and you can clone your own voice from a 5–15 second
   recording (Bark clones from a `.npz` speaker embedding).
-- **Compute back-ends**: CPU always; **GPU (CUDA)** and **NPU (DirectML)** are
-  shown automatically when present; an **Auto** option is offered when more
-  than one back-end exists. The Voice Clone engines add their own device
+- **Compute back-ends**: CPU always; **GPU (CUDA)** is offered when an NVIDIA
+  GPU is detected; an **Auto** option is offered when more than one back-end
+  exists. (DirectML/NPU is deliberately not offered — sherpa-onnx has no
+  DirectML runtime to load.) The Voice Lab engines add their own device
   choice — CPU always, plus GPU and Auto when an NVIDIA GPU is present — both
   in Settings and per project in the Recording window.
 - **A Compute combo next to every Preview button**: in **Available TTS**,
@@ -104,6 +107,8 @@ python -m venv .venv
 
 Then:
 
+0. On first launch, tick the agreement check box in the terms-of-use dialog and
+   press **I Agree** (the application does not start otherwise).
 1. **Settings** (`Ctrl+,`) → **Download and remove** → pick
    `Piper` / `English (United States)` / `Medium quality` → **Download**.
 2. **File → New Project** (`Ctrl+Shift+N`) → name it, open a document, choose
@@ -118,18 +123,27 @@ Then:
 | Settings | `%APPDATA%\AIVoiceStudio\settings.json` |
 | Downloaded voices | `%APPDATA%\AIVoiceStudio\models` |
 | Cloned voices (Voice Clone) | `%APPDATA%\AIVoiceStudio\models\custom\<voice name>` |
+| Voice Lab engine models (Hugging Face cache) | `%USERPROFILE%\.cache\huggingface` |
+| ONNX GPU runtime / optional runtimes | `%APPDATA%\AIVoiceStudio\runtime` |
 | One virtualenv per pip-installed TTS engine | `%APPDATA%\AIVoiceStudio\tts_envs\<engine>` |
 | Managed environment for addons | `%APPDATA%\AIVoiceStudio\addon_env` |
 | Projects & audio | `%APPDATA%\AIVoiceStudio\projects\<project name>` |
 | FFmpeg | `%APPDATA%\AIVoiceStudio\ffmpeg` |
 | Logs | `%APPDATA%\AIVoiceStudio\logs\app.log` |
 
-## GPU / NPU
+## GPU
 
-- **GPU**: install `onnxruntime-gpu` (see `requirements-gpu.txt`) and have
-  NVIDIA CUDA drivers; the app then shows "GPU (CUDA)".
-- **NPU**: install `onnxruntime-directml` (see `requirements-npu.txt`); the app
-  shows "NPU (DirectML)" only when an NPU-capable accelerator is detected.
+- **GPU for the built-in ONNX engines**: install `onnxruntime-gpu` (see
+  `requirements-gpu.txt`) and have NVIDIA CUDA drivers; the app then shows
+  "GPU (CUDA)". The packaged application offers this as a download in
+  Settings → Compute. A GPU run uses the **whole available NVIDIA card** — any
+  CUDA-capable card the driver exposes, with no model or VRAM requirement —
+  while a CPU run uses **80–95 % of the logical CPUs**.
+- **GPU for the Voice Lab engines**: no extra runtime is needed beyond the
+  NVIDIA driver; each engine gets the CUDA build of PyTorch in its own
+  environment (see below).
+- **NPU (DirectML)**: not offered. sherpa-onnx ships no DirectML execution
+  provider, so there is nothing to load.
 
 ## Voice Clone engines (CPU, plus GPU when available)
 
@@ -254,10 +268,26 @@ and never fail a recording.
 > repository that may require accepting its terms and logging in
 > (`huggingface-cli login`) before the first synthesis.
 
+## Documentation
+
+All of these ship with the installer (`docs\`) and are in the **Help** menu:
+
+| Document | Contents |
+|---|---|
+| `README.html` | Features, shortcuts, project types, first launch, licences |
+| `UserGuide.html` | Every window and Settings category, voice cloning, troubleshooting |
+| `AddonDevelopmentGuide.html` | Writing addons and TTS engines |
+| `AccessibilityGuide.html` | The accessibility rules the UI follows |
+| `THIRD-PARTY-LICENSES.html` | Every bundled component with its licence and full text |
+| `book/index.html` (F1) | The bundled book: 82 chapters and 3 appendices from basic Python to rebuilding this application, including the Voice Lab, per-engine environments, compute choice and the terms dialog |
+
+`PROJECT_SPEC.md` is the specification behind the implementation and
+`DEV_PLAN.md` tracks the phases.
+
 ## Packaging
 
 See `packaging/` — `build.ps1` drives PyInstaller (per-arch) and Inno Setup to
-produce `AI-Voice-Studio-Setup-32.exe` / `-64.exe`. The installer offers the
+produce `AI-Voice-Studio-v-<version>-Setup-x64.exe` / `-x86.exe`. The installer offers the
 same wizard widgets as the ProgramLauncher reference project: a
 "for all users / for me only" radio on the directory page
 (`PrivilegesRequired=lowest` + `PrivilegesRequiredOverridesAllowed=dialog`,
@@ -267,9 +297,20 @@ Models are never bundled; they are downloaded by the user in-app.
 
 ## License
 
-GPL-3.0-or-later (see `LICENSE`). TTS models keep their own licenses:
-Piper = MIT, Kokoro-82M = Apache-2.0, MMS = CC-BY-NC (non-commercial).
-The application bundles `sherpa-onnx` (Apache-2.0) and `onnxruntime` (MIT).
+GPL-3.0-or-later (see `LICENSE`). Components keep their own licences:
+Piper = MIT, Kokoro-82M = Apache-2.0, Kitten TTS = Apache-2.0, Matcha-TTS =
+Apache-2.0, OmniVoice and OmniVoice Server = Apache-2.0, Pocket TTS =
+Apache-2.0, Bark = MIT, F5-TTS = MIT code with **CC-BY-NC-4.0 weights
+(non-commercial)**, MMS = CC-BY-NC (non-commercial), and the SAPI5 / Windows
+Core voices fall under Windows and vendor EULAs. The application bundles
+`sherpa-onnx` (Apache-2.0), `onnxruntime` (MIT), `wxPython` (wxWindows
+Licence), `numpy` (BSD-3-Clause), `requests` (Apache-2.0), `pypdf`
+(BSD-3-Clause) and `python-docx` (MIT). The complete list, with the licence
+texts, is `docs/THIRD-PARTY-LICENSES.html` (Help → Third-Party Licences).
+
+On first launch the application asks you to accept terms of use covering
+voice-cloning rights, illegal use, commercial licensing and system voices;
+it does not start unless you agree.
 
 ## Author
 

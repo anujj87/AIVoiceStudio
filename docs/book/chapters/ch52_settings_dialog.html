@@ -17,6 +17,18 @@
 <div class="chapter-number">Chapter 52</div>
 <h1>Settings Dialog</h1>
 
+<div class="info">
+  <strong>Current implementation (2026.3.1).</strong> The dialog now has a <strong>Voice Clone</strong>
+  page with one section per Voice Lab engine: install / remove the engine, its size and
+  licence, the device selector (CPU / GPU / Auto), per-engine tuning defaults and a
+  <strong>Compute</strong> combo next to each Preview button. Installs run in the engine’s
+  <em>own</em> Python environment, and the dialog reports the result of an import check when
+  pip finishes. See <a href="ch77_engine_environments.html">Chapter 77</a> and
+  <a href="ch78_compute_choice.html">Chapter 78</a>. Package status labels are answered from a
+  cached, non-blocking probe (<code>venv_packages</code>) so opening Settings stays instant under
+  a screen reader.
+</div>
+
 <h2>Learning Objectives</h2>
 <ul>
   <li>Understand the multi-tab Settings dialog architecture</li>

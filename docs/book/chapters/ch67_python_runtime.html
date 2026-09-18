@@ -22,6 +22,29 @@
 <div class="chapter-number">Chapter 67</div>
 <h1>Managed Python Runtime</h1>
 
+<div class="info">
+  <strong>Current implementation (2026.3.1).</strong> <code>python_runtime</code> no longer
+  manages one environment. It now creates and owns <strong>one virtualenv per pip-installed
+  TTS engine</strong> under <code>tts_envs\&lt;engine&gt;</code>:
+  <ul>
+    <li><code>environment_id(engine_id)</code> maps an engine id to its environment;
+      <code>SHARED_ENVIRONMENTS</code> folds <code>omnivoice_server</code> onto
+      <code>omnivoice</code> (the one deliberate exception), and everything else falls back to
+      the shared <code>addon_env</code>.</li>
+    <li><code>engine_runtime(engine_id)</code> prefers the engine's own environment and falls
+      back to <code>addon_env</code> for engines installed before this change.</li>
+    <li><code>venv_packages</code> caches its probes <em>per environment</em>, and
+      <code>package_present()</code> answers from the environment's <code>site-packages</code>
+      on disk for the decisions that must be right immediately — which interpreter starts an
+      engine's worker.</li>
+    <li>Installs pull CUDA PyTorch from <code>voicelab.engines.PYTORCH_CUDA_INDEX</code> when an
+      NVIDIA GPU is present, and fall back to the plain PyPI packages when no CUDA wheel exists
+      for the interpreter.</li>
+  </ul>
+  The full design, including the <code>ModuleNotFoundError: torch</code> bug that forced the
+  site-packages check, is <a href="ch77_engine_environments.html">Chapter 77</a>.
+</div>
+
 <h2>Learning Objectives</h2>
 <ul>
   <li>Understand why AIVS manages its own Python environment</li>

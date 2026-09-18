@@ -396,9 +396,9 @@
 
 <h2>8.4 Custom Exceptions</h2>
 
-<pre><code><span class="cm"># From ai_voice_studio/clone/__init__.py</span>
+<pre><code><span class="cm"># From ai_voice_studio/voicelab/__init__.py</span>
 <span class="kw">class</span> <span class="cls">CloneEngineError</span>(Exception):
-    <span class="str">"""Raised when the XTTS cloning engine is not installed or fails."""</span>
+    <span class="str">"""Raised when a Voice Lab engine is not installed or fails."""</span>
     <span class="kw">pass</span>
 
 <span class="cm"># From ai_voice_studio/omnivoice/__init__.py</span>
@@ -441,8 +441,8 @@
         <br><span class="desc">Defines class <code>CloneEngineError</code> inheriting from <code>Exception</code>.</span>
       </li>
       <li>
-        <strong>Line 3:</strong> <code>&quot;&quot;&quot;Raised when the XTTS cloning engine is not installed or fails.&quot;&quot;&quot;</code>
-        <br><span class="desc">Docstring: <em>Raised when the XTTS cloning engine is not installed or fails.</em>. Documents the purpose of the following code.</span>
+        <strong>Line 3:</strong> <code>&quot;&quot;&quot;Raised when a Voice Lab engine is not installed or fails.&quot;&quot;&quot;</code>
+        <br><span class="desc">Docstring: <em>Raised when a Voice Lab engine is not installed or fails.</em> (one of Pocket TTS, Bark, F5-TTS). Documents the purpose of the following code.</span>
       </li>
       <li>
         <strong>Line 4:</strong> <code>pass</code>

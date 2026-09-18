@@ -17,6 +17,21 @@
 <div class="chapter-number">Chapter 65</div>
 <h1>Inno Setup Installers</h1>
 
+<div class="info">
+  <strong>Current implementation (2026.3.1).</strong> The scripts are shared through
+  <code>installer_common.iss</code>, which the two architecture files include. The version
+  strings (<code>AppVersion</code>, <code>VersionInfoVersion</code>,
+  <code>VersionInfoProductVersion</code>) live there and must match
+  <code>constants.APP_VERSION</code>; the output file is
+  <code>AI-Voice-Studio-v-&lt;version&gt;-Setup-x64.exe</code>. The <code>[Files]</code> section
+  copies <code>LICENSE</code>, <code>README.md</code> and five documents into
+  <code>{app}\docs</code>: <code>README.html</code>, <code>UserGuide.html</code>,
+  <code>AddonDevelopmentGuide.html</code>, <code>AccessibilityGuide.html</code> and
+  <code>THIRD-PARTY-LICENSES.html</code> (the last is also the installer's licence page, and it
+  is what <em>Help &rarr; Third-Party Licences</em> opens). The book itself travels inside the
+  PyInstaller output (<code>_internal\docs\book</code>) rather than being listed here.
+</div>
+
 <h2>Learning Objectives</h2>
 <ul>
   <li>Understand the Inno Setup compilation process</li>

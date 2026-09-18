@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 80: Start Selected Recording - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part X — Voice Lab &amp; the Current System</div><ul class="chapters"><li><a href="ch76_voicelab_engines.html">Ch 76: Voice Lab Engines</a></li><li><a href="ch77_engine_environments.html">Ch 77: One Environment per Engine</a></li><li><a href="ch78_compute_choice.html">Ch 78: Compute Choice</a></li><li><a href="ch79_audio_io_shim.html">Ch 79: Audio I/O Without FFmpeg</a></li><li><a href="ch80_start_selected_recording.html" class="active">Ch 80: Start Selected Recording</a></li><li><a href="ch81_terms_dialog.html">Ch 81: First-Launch Terms</a></li><li><a href="ch82_licensing.html">Ch 82: Licensing &amp; Compliance</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 80</div>
+<h1>Start Selected Recording: Out-of-Order Recording for Long Books</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Turn a “resume where you stopped” feature into a general “record these segments” range</li>
+  <li>Model a worker’s position with a start index <em>and</em> an exclusive end index</li>
+  <li>Build a dialog whose combo box changes content based on a sidebar radio group</li>
+  <li>Keep the keyboard-and-screen-reader path usable when controls are rebuilt</li>
+  <li>Remove the guard rails that fight the user’s actual workflow</li>
+</ul>
+
+<hr>
+
+<h2>80.1 The Workflow It Has to Support</h2>
+
+<p>A 100-chapter book. The narrator records chapter 75 first because that is the
+chapter they have time for today, then jumps back to chapter 12, then finally
+records the introduction. The old behaviour — “start where you left off and
+continue to the end” — cannot express any of that.</p>
+
+<p>The feature is called <strong>Start Selected Recording…</strong> and it answers two
+questions separately:</p>
+
+<ol>
+  <li><strong>Where does the list of choices come from?</strong>
+  Either the audio files already recorded, or every file break in the project
+  (recorded or not).</li>
+  <li><strong>How far should recording go?</strong>
+  Only the chosen file, or the chosen file and everything after it.</li>
+</ol>
+
+<p>Those are two radio groups, and the first one also decides what the combo box
+contains. That single coupling is what makes the dialog feel obvious: one sidebar
+choice changes the list <em>and</em> its label.</p>
+
+<table>
+  <thead><tr><th>Sidebar choice</th><th>Combo label</th><th>Combo contents</th><th>Typical intent</th></tr></thead>
+  <tbody>
+    <tr><td>Select an audio file</td><td>Choose which recorded file to record again:</td><td>only files already recorded</td><td>“that take was wrong, redo it”</td></tr>
+    <tr><td>Select by file break</td><td>Choose which file to record by file break:</td><td>all 12 (or 100) breaks, recorded or not</td><td>“start on chapter 75 today”</td></tr>
+  </tbody>
+</table>
+
+<h2>80.2 The Range Contract in the Worker</h2>
+
+<p>Everything starts with the synthesis worker, because a dialog that cannot
+express “just this one” would have to lie. The worker already took a
+<code>start_index</code>; the feature adds an exclusive <code>end_index</code>:</p>
+
+<pre><code>def __init__(self, ..., start_index: int = 0, end_index: Optional[int] = None):
+    ...
+    self.start_index = max(0, start_index)
+    # end_index = start_index + 1 records a single segment; None means
+    # "to the end of the project" (the plain Start recording behaviour).
+    self.end_index = end_index
+
+
+def _segment_positions(self, total: int):
+    if self.end_index is not None:
+        stop = max(self.start_index, min(self.end_index, total))
+    else:
+        stop = total
+    for idx in range(self.start_index, stop):
+        yield idx</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+    <li><strong>Lines 1–3:</strong> the two parameters<br>
+    <span class="desc">Both are optional, so every existing call site keeps working <em>unchanged</em>: no argument means “start at the first pending segment and go to the end”, which is exactly the old behaviour. Backwards compatibility by default value is the cheapest kind of refactor.</span></li>
+    <li><strong>Line 5:</strong> <code>self.start_index = max(0, start_index)</code><br>
+    <span class="desc">A negative index would silently mean “from the end” in Python slicing rules, which is not what “start at segment −1” should ever do. Clamping to 0 makes the invalid input harmless.</span></li>
+    <li><strong>Line 8:</strong> the comment that defines the vocabulary<br>
+    <span class="desc">One sentence that makes <code>end_index</code> self-documenting: it is <em>exclusive</em>, and <code>start_index + 1</code> is the idiom for a single segment. Without that line, the next reader would have to guess whether the end is inclusive — and would guess wrong half the time.</span></li>
+    <li><strong>Line 14:</strong> <code>stop = max(self.start_index, min(self.end_index, total))</code><br>
+    <span class="desc">Two clamps in one expression: never go past the end of the project (<code>min</code>), and never produce an empty range when the caller passes an end before the start (<code>max</code>). A manual <code>if</code> for each would be four lines doing exactly this.</span></li>
+    <li><strong>Lines 17–18:</strong> a generator<br>
+    <span class="desc">The worker iterates positions through <code>range(...)</code>, which keeps the loop body free of index arithmetic and index-boundary bugs. “What percent am I done?” is derived from the range, not from counters that can drift.</span></li>
+  </ol>
+</div>
+
+<div class="tip">
+  Exclusive ends are a convention worth adopting deliberately: <code>range(a, b)</code>,
+  <code>list[a:b]</code> and this worker all agree, so no reader has to remember a
+  special case.
+</div>
+
+<h2>80.3 One Entry per Segment, Built Purely</h2>
+
+<p>The dialog needs, for each segment, three things: its 0-based position, its
+display name, and the audio file it already has (if any). Building that mapping is
+pure data work — no wx, no disk scanning beyond the files the caller passes in — so
+it lives in its own module-level function where it can be tested directly.</p>
+
+<pre><code>def _picker_entries(data: dict, saved: list[str]) -> list[dict]:
+    from ..util import sanitize_filename
+
+    segments = data.get("segments", []) or []
+    entries = []
+    by_stem: dict[str, int] = {}
+    by_name: dict[str, int] = {}
+    for position, seg in enumerate(segments):
+        title = str(seg.get("title") or f"segment {position + 1}")
+        entries.append({"position": position, "title": title, "file": None})
+        by_stem.setdefault(sanitize_filename(title, 80), position)
+        stored = os.path.basename(str(seg.get("saved") or ""))
+        if stored:
+            by_name.setdefault(stored, position)
+    for name in saved:
+        position = by_name.get(name)
+        if position is None:
+            position = by_stem.get(os.path.splitext(name)[0])
+        if position is None:
+            continue  # A stray file that no file break refers to.
+        if entries[position]["file"] is None:
+            entries[position]["file"] = name
+    return entries</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+    <li><strong>Lines 4–6:</strong> the starting structures<br>
+    <span class="desc">One entry per segment, in document order, with <code>file</code> unknown for now; plus two lookup dictionaries that will be filled in the same pass. Doing it in one pass means the two mapping strategies cannot disagree about positions.</span></li>
+    <li><strong>Line 7:</strong> reading the project data<br>
+    <span class="desc"><code>data.get("segments", []) or []</code> tolerates both a missing key and an explicit <code>None</code>. Project files are user-editable JSON, so “absent” and “null” must both be survivable.</span></li>
+    <li><strong>Lines 8–9:</strong> the title fallback<br>
+    <span class="desc">A segment without a title gets “segment 7”. A visible, correct placeholder beats an empty combo row that the screen reader announces as blank.</span></li>
+    <li><strong>Line 10:</strong> <code>sanitize_filename(title, 80)</code><br>
+    <span class="desc">The same function the recorder used to name audio files, with the same length limit. Reusing it is what makes <code>by_stem</code> a <em>valid</em> fallback: the audio file’s name minus its extension equals the sanitised title only if both sides agree on sanitation — and they do, because it is one function.</span></li>
+    <li><strong>Lines 11–13:</strong> the authoritative mapping<br>
+    <span class="desc">A segment’s <code>saved</code> field records the file it produced, so that path is the primary link. <code>os.path.basename</code> normalises a full path to a name, and <code>setdefault</code> keeps the first mapping if a project contains duplicates.</span></li>
+    <li><strong>Lines 14–16:</strong> matching the files on disk<br>
+    <span class="desc">Primary key is the recorded name; the secondary key is the sanitised title. Two strategies, because a metadata field can be out of date while the file names remain correct — the fallback rescues exactly that case.</span></li>
+    <li><strong>Lines 17–18:</strong> the deliberate <code>continue</code><br>
+    <span class="desc">An audio file that no break refers to is skipped rather than listed. The mode’s promise is “files that belong to this project”, and a stray file has no position to record from — offering it would create a choice the worker cannot execute.</span></li>
+    <li><strong>Line 19:</strong> first-wins assignment<br>
+    <span class="desc"><code>if entries[position]["file"] is None</code> keeps the earliest name when two files match one segment (for example an old take and a new one). Predictable, order-dependent, and easy to test.</span></li>
+  </ol>
+</div>
+
+<h2>80.4 The Dialog: Two Radio Groups, One Combo</h2>
+
+<pre><code>class _StartRecordingDialog(wx.Dialog):
+    def __init__(self, parent, entries):
+        super().__init__(parent, title="Start selected recording", size=(600, 320))
+        self._entries = [dict(entry) for entry in entries]
+
+        outer = wx.BoxSizer(wx.HORIZONTAL)
+        side_panel = wx.Panel(self)
+        sidebar = wx.BoxSizer(wx.VERTICAL)
+        self.file_radio = wx.RadioButton(
+            side_panel, label="Select an audio file", style=wx.RB_GROUP)
+        self.break_radio = wx.RadioButton(side_panel, label="Select by file break")
+        for radio in (self.file_radio, self.break_radio):
+            radio.SetName(radio.GetLabel())
+            sidebar.Add(radio, 0, wx.ALL, 6)
+        side_panel.SetSizerAndFit(sidebar)
+        side_panel.SetMinSize((240, -1))
+        side_panel.SetName("Recording selection mode")
+        if not any(entry.get("file") for entry in self._entries):
+            self.break_radio.SetValue(True)
+        outer.Add(side_panel, 0, wx.EXPAND | wx.ALL, 8)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+    <li><strong>Line 3:</strong> the constructor<br>
+    <span class="desc">The dialog receives <em>already computed</em> entries. It knows nothing about project files, the disk or the worker — which is why every UI state in this chapter can be tested without a project fixture.</span></li>
+    <li><strong>Line 4:</strong> copying the entries<br>
+    <span class="desc"><code>dict(entry)</code> per item means the dialog cannot modify the caller’s list. Defensive copying at a boundary like this costs microseconds and prevents a class of bug that is painful to trace.</span></li>
+    <li><strong>Lines 6–9:</strong> the sidebar<br>
+    <span class="desc">A horizontal sizer with a narrow left panel: the layout the requirements described. The first radio carries <code>wx.RB_GROUP</code>, which is what makes wxPython treat the two as <em>one</em> mutually exclusive group rather than two independent toggles.</span></li>
+    <li><strong>Lines 10–12:</strong> accessible names<br>
+    <span class="desc"><code>SetName(radio.GetLabel())</code> is the difference between NVDA announcing “Select an audio file, radio button, checked” and “radio button, checked”. Naming every control from its own label keeps the label and the accessible name from drifting apart.</span></li>
+    <li><strong>Line 13:</strong> <code>SetSizerAndFit</code><br>
+    <span class="desc">The panel sizes itself to its content, <em>then</em> the minimum width is raised to 240&nbsp;px. Fixing a sidebar width avoids the layout reflowing when the combobox content below changes.</span></li>
+    <li><strong>Lines 15–17:</strong> the sensible default<br>
+    <span class="desc">If nothing has been recorded yet, the file mode has an empty list and would show the user a dead combo, so “Select by file break” is pre-selected. This is the dialog doing the reasoning the user would otherwise have to do — and it is also why the workflow works on a brand-new project.</span></li>
+    <li><strong>Line 18:</strong> <code>outer.Add(side_panel, 0, wx.EXPAND | wx.ALL, 8)</code><br>
+    <span class="desc">Proportion <code>0</code>: the sidebar keeps its width while the combo column takes the remaining space. Getting proportions right here is what keeps the dialog from looking stretched when a project has 700 segments.</span></li>
+  </ol>
+</div>
+
+<pre><code>    def _fill_combo(self):
+        self.combo.Clear()
+        if self.file_radio.GetValue():
+            self.choice_label.SetLabel("Choose which recorded file to record again:")
+            update_accessible_name(self.combo, "Recorded audio files")
+            self.combo.SetToolTip(
+                "Audio files that are already recorded in this project")
+            items = [(entry["file"], entry["position"])
+                     for entry in self._entries if entry.get("file")]
+        else:
+            self.choice_label.SetLabel("Choose which file to record by file break:")
+            update_accessible_name(self.combo, "Project file breaks")
+            self.combo.SetToolTip(
+                "Every file break of the project, recorded or not")
+            items = [(entry["title"], entry["position"])
+                     for entry in self._entries]
+        for label, position in items:
+            self.combo.Append(str(label), position)
+        if self.combo.GetCount():
+            self.combo.SetSelection(0)
+        self.combo.Enable(self.combo.GetCount() > 0)
+        ok_btn = self.FindWindowById(wx.ID_OK)
+        if ok_btn is not None:
+            ok_btn.Enable(self.combo.GetCount() > 0)
+        self.Layout()</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 4)</h4>
+  <ol>
+    <li><strong>Line 2:</strong> <code>self.combo.Clear()</code><br>
+    <span class="desc">Refilling always starts by emptying. Forgetting this is the classic radio-button bug: the two lists concatenate and the combo shows recorded files followed by every break.</span></li>
+    <li><strong>Lines 3–9:</strong> the recorded-files branch<br>
+    <span class="desc">Label, accessible name and tooltip are set together with the items, so the three can never describe different things. The list comprehension filters on <code>entry.get("file")</code> — the same truth the dialog used to pick its default mode.</span></li>
+    <li><strong>Lines 10–16:</strong> the file-break branch<br>
+    <span class="desc">Every break, unconditionally. This is the branch that makes chapter 75 of a 100-chapter book recordable today: the list is the <em>project’s plan</em>, not its progress.</span></li>
+    <li><strong>Lines 17–18:</strong> labels and client data<br>
+    <span class="desc">The displayed string is what the user asked to see; the appended <code>position</code> is what the worker needs. Keeping both in the combo means the dialog never has to look anything up again after the user chooses.</span></li>
+    <li><strong>Lines 19–22:</strong> selection and enablement<br>
+    <span class="desc">Selecting the first item, then disabling the combo and <strong>the OK button</strong> when the list is empty. Disabling OK is the important half: a dialog that can be confirmed with no choice is a dialog that fails later with a confusing message.</span></li>
+    <li><strong>Line 23:</strong> <code>self.Layout()</code><br>
+    <span class="desc">A label that grows from “Choose which recorded file…” to “Choose which file to record by file break…” changes the required width. Laying out after the change is what stops the text being clipped — a small detail that is very visible to a user with a screen reader reading a truncated label.</span></li>
+  </ol>
+</div>
+
+<h2>80.5 Wiring It Together, and Deleting the Guard</h2>
+
+<pre><code>def _restart_selected(self):
+    recent = self._require_selected()
+    if not recent:
+        return
+    try:
+        data = project.load_project(recent["path"])
+    except (OSError, ValueError, KeyError) as exc:
+        wx.MessageBox(f"Could not open the project: {exc}",
+                      "Start selected recording", style=wx.OK | wx.ICON_ERROR)
+        return
+    saved = project.recorded_files(recent["path"])
+    # Deliberately no "has anything been recorded?" guard: a long book may be
+    # recorded out of order (chapter 75 of 100 today, the rest later), so the
+    # picker always opens.
+    if not data.get("segments"):
+        wx.MessageBox(
+            "This project has no file breaks yet, so there is nothing to record.",
+            "Start selected recording", style=wx.OK | wx.ICON_INFORMATION)
+        return
+    dlg = _StartRecordingDialog(self, _picker_entries(data, saved))
+    try:
+        if dlg.ShowModal() != wx.ID_OK:
+            return
+        start_index = dlg.start_index()
+        only_selected = dlg.only_selected()
+        chosen = dlg.chosen_file()
+    finally:
+        dlg.Destroy()
+    if start_index is None:
+        return
+    if chosen:
+        project.remove_recording(recent["path"], chosen)
+    self._open_recording(recent["path"], start_index=start_index,
+                         single_segment=only_selected)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 5)</h4>
+  <ol>
+    <li><strong>Lines 2–3:</strong> the selection check<br>
+    <span class="desc">This remains, because the command operates on <em>a</em> project: with nothing selected there is no context to ask about. It reports why instead of failing silently.</span></li>
+    <li><strong>Lines 4–9:</strong> loading the project<br>
+    <span class="desc">A narrow tuple of exception types (<code>OSError</code>, <code>ValueError</code>, <code>KeyError</code>) rather than a bare <code>except</code>: a corrupt project is reported, while a genuine programming error (<code>AttributeError</code>, <code>TypeError</code>) still surfaces as a crash worth fixing.</span></li>
+    <li><strong>Line 10:</strong> the files on disk<br>
+    <span class="desc"><code>project.recorded_files()</code> reads what is actually in the project folder, not just the metadata. This is why “Select an audio file” shows everything recorded, including files whose metadata was lost.</span></li>
+    <li><strong>Lines 11–16:</strong> the guard that was removed, and the one that stayed<br>
+    <span class="desc">The comment records the product decision: the old “this project has no recorded files yet” message made out-of-order recording impossible and was deleted. What remains is a real precondition — a project whose document was never split has no segments to choose from, so there is genuinely nothing to do. Distinguishing “the user has not finished everything” from “the user cannot start” is the whole point.</span></li>
+    <li><strong>Lines 17–25:</strong> the modal call<br>
+    <span class="desc">Three values are read out of the dialog <em>before</em> <code>Destroy()</code>, in a <code>try/finally</code> so a failed read still destroys the window. Reading widget state after destroying the window is a use-after-free waiting to happen, and wxPython reports it in unhelpful ways.</span></li>
+    <li><strong>Lines 26–31:</strong> delete, then record<br>
+    <span class="desc">The chosen recording is removed first so the segment behaves exactly as if it had never been recorded: the worker sees a pending segment. The call then passes the two things the picker produced, and nothing else — the recording window remains the single place where engine and voice are chosen.</span></li>
+  </ol>
+</div>
+
+<div class="note">
+  <strong>Why delete instead of overwrite?</strong> Because the project, the
+  <code>processed_text.json</code> log and the DAISY builders all key off “is this
+  segment recorded?”. Removing the file marks the segment pending in one step, so every
+  downstream consumer agrees without any of them needing to know about this dialog.
+</div>
+
+<h2>80.6 Handing the Choice to the Recording Window</h2>
+
+<pre><code>if self._start_index is None:
+    start_index = project.first_pending_index(self.project_dir)
+else:
+    start_index = min(self._start_index, len(self._segments))
+
+end_index = start_index + 1 if self._single_segment else None
+
+worker = SynthesisWorker(
+    ...,
+    start_index=start_index,
+    end_index=end_index,
+)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 6)</h4>
+  <ol>
+    <li><strong>Lines 1–4:</strong> the index<br>
+    <span class="desc"><code>None</code> means the user did not choose: keep the historical behaviour and resume at the first pending segment. Otherwise use the choice, clamped to the segment count so a project edited between opening the dialog and pressing Start cannot produce an out-of-range index.</span></li>
+    <li><strong>Line 6:</strong> one line that encodes the scope<br>
+    <span class="desc"><code>start_index + 1 if self._single_segment else None</code> — “just this one” becomes an exclusive end one past the start; “from here” becomes <code>None</code>, meaning to the end. The dialog’s radio buttons therefore need no further glue: they map onto the worker’s contract directly.</span></li>
+    <li><strong>Lines 8–12:</strong> construction<br>
+    <span class="desc">Both values travel as constructor arguments. Because the worker validates and clamps them (80.2), the dialog can hand over what the user chose without a defensive re-check — validation lives with the code that owns the range.</span></li>
+  </ol>
+</div>
+
+<div class="warning">
+  <strong>Single-segment recording has one consequence worth knowing:</strong> when the
+  run stops after its one segment, nothing is queued behind it, so “Stop” simply means
+  “this take is done”. Users who expect the old continue-to-the-end behaviour must pick
+  <em>Record all files from here</em>.
+</div>
+
+<h2>80.7 Mini Project: Drive the Range Without a GUI</h2>
+
+<p>The worker range is pure logic, so it can be exercised in five lines:</p>
+
+<pre><code>from ai_voice_studio.jobs.synthesizer import SynthesisWorker
+
+def positions(start, end, total):
+    worker = SynthesisWorker.__new__(SynthesisWorker)   # no thread, no wx
+    worker.start_index = start
+    worker.end_index = end
+    return list(worker._segment_positions(total))
+
+print(positions(0, None, 5))    # everything
+print(positions(3, 4, 5))       # only segment 4
+print(positions(3, None, 5))    # segment 4 to the end
+print(positions(4, 3, 5))       # empty: end before start
+print(positions(2, 99, 5))      # clamped to the project's end</code></pre>
+
+<div class="exercise">
+  <ol>
+    <li>Why is <code>end_index</code> exclusive rather than inclusive? Give both a
+    readability argument and a bug the inclusive convention invites.</li>
+    <li>Add a third sidebar mode, “Select by page range”, to a scratch copy. What must
+    change in <code>_picker_entries</code>, the dialog and the worker?</li>
+    <li>Write a test that builds a 4-segment project with no recordings and asserts
+    the dialog opens in file-break mode and that <code>wx.MessageBox</code> is never
+    called. (This is the regression test for the guard that was removed.)</li>
+    <li>Explain why the dialog reads its three values before
+    <code>Destroy()</code>, and what symptom you would expect if it did not.</li>
+  </ol>
+</div>
+
+<h2>80.8 Key Takeaways</h2>
+<ul>
+  <li>Give the worker an explicit range (start + exclusive end) instead of a “resume” flag; the dialog then becomes a thin front end</li>
+  <li>Keep list-building in a pure function so every UI state is testable without a project fixture</li>
+  <li>One radio group can legitimately change another control’s contents — set the label, accessible name and items together</li>
+  <li>Choose the default that keeps a brand-new project usable, and disable OK when a list is genuinely empty</li>
+  <li>Delete guards that encode a workflow assumption the user did not ask for; keep the ones that reflect a real precondition</li>
+  <li>Mark a segment pending by removing its file, so every downstream consumer agrees in one step</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch79_audio_io_shim.html">← Ch 79</a> &nbsp;|&nbsp; <a href="ch81_terms_dialog.html">Ch 81 — First-Launch Terms →</a></p>
+</div></div></body>
+</html>

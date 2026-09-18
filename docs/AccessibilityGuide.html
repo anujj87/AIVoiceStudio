@@ -39,6 +39,9 @@ screen readers (NVDA, JAWS, Narrator) and keyboard-only navigation.</p>
   <li><a href="#contrast">Color and Contrast</a></li>
   <li><a href="#dialogs">Dialogs and Windows</a></li>
   <li><a href="#menus">Menus and Shortcuts</a></li>
+  <li><a href="#groups">Radio Groups and Dependent Controls</a></li>
+  <li><a href="#gated">Gated Buttons and Consent Dialogs</a></li>
+  <li><a href="#longops">Long Operations and Progress</a></li>
   <li><a href="#errors">Error Handling</a></li>
   <li><a href="#checklist">Developer Checklist</a></li>
 </ul>
@@ -152,6 +155,7 @@ self.btn.SetToolTip("Begin synthesizing audio for all pending segments")</pre>
 <tr><td>Arrow keys</td><td>Navigate within lists, combos, radio groups</td></tr>
 <tr><td>Ctrl+Tab / Ctrl+Shift+Tab</td><td>Switch settings categories</td></tr>
 <tr><td>Ctrl+S</td><td>Apply settings (in Settings dialog)</td></tr>
+<tr><td>F1</td><td>Open the bundled book</td></tr>
 <tr><td>F5</td><td>Refresh (Log Viewer)</td></tr>
 </table>
 
@@ -250,7 +254,85 @@ self.log_text.SetName(f"Log file {filename}: showing last 200 of 1500 lines")
 <tr><td>Ctrl+Shift+N</td><td>File</td><td>New Project</td></tr>
 <tr><td>Ctrl+Shift+R</td><td>Tools</td><td>Record</td></tr>
 <tr><td>Ctrl+,</td><td>Tools</td><td>Settings</td></tr>
+<tr><td>F1</td><td>Help</td><td>Python &amp; wxPython Book</td></tr>
 </table>
+<p>Menu items without an accelerator must still be reachable with the keyboard:
+<strong>Alt</strong> opens the menu bar, the mnemonic letter opens the menu
+(<code>&amp;Edit</code>, <code>Start &amp;Selected Recording...</code>) and the
+arrow keys move between items.</p>
+
+<!-- ================================================================ -->
+<h2 id="groups">Radio Groups and Dependent Controls</h2>
+
+<p>Several dialogs make one decision change what the rest of the dialog means.
+The <strong>Start Selected Recording</strong> picker is the reference example:
+two radio buttons choose the <em>source</em> of the file list (the audio files
+already recorded, or every file break of the project), a combo box lists that
+source, and a second pair of radio buttons chooses the <em>scope</em> (only the
+selected file, or every file from there to the end).</p>
+
+<h3>Rules</h3>
+<ul>
+  <li>Put each single-choice set in its own <code>wx.RadioBox</code> (or a group of
+      <code>wx.RadioButton</code>s with <code>wx.RB_GROUP</code> on the first). Never mix two
+      independent decisions into one group &mdash; a screen-reader user hears only the
+      position and label.</li>
+  <li>When a radio button changes what a neighbouring control contains, update both the
+      control's <em>contents</em> and its <em>accessible name</em> and label. The picker's
+      combo is labelled <em>&ldquo;Choose which recorded file to record again&rdquo;</em> in one mode and
+      <em>&ldquo;Choose which file to record by file break&rdquo;</em> in the other, and its name is
+      updated with the label so the change is announced.</li>
+  <li>Preserve the user's selection when switching modes if the same item exists in both;
+      otherwise select the first item and say so in the label. An empty list is not an
+      error &mdash; disable only the OK button, never the whole dialog.</li>
+  <li>Do not block a dialog because &ldquo;there is nothing to choose yet&rdquo; when the user's
+      next action would create it. The picker opens for a project with no recordings at all
+      and starts in the mode that lists everything, so chapter 75 of a 100-chapter book can
+      be recorded before chapter 1.</li>
+</ul>
+
+<div class="good">GOOD: two radio boxes, a combo whose label follows the choice, an OK button
+that is disabled only while the combo is empty.</div>
+<div class="bad">BAD: one radio group with four unrelated buttons; a combo that silently
+changes its contents without announcing it.</div>
+
+<!-- ================================================================ -->
+<h2 id="gated">Gated Buttons and Consent Dialogs</h2>
+
+<p>The first-launch <strong>Terms of Use</strong> dialog requires every condition
+to be accepted before the application will start. Two rules make that both safe
+and accessible:</p>
+<ul>
+  <li><strong>Say why a button is unavailable.</strong> A disabled button is skipped by
+      screen readers; put the instruction in the dialog's static text (&ldquo;Tick the final
+      check box to enable these buttons&rdquo;) rather than leaving the user guessing.</li>
+  <li><strong>A closing action must mean &ldquo;no&rdquo;.</strong> Escape, the window close box
+      and Alt+F4 must all end the dialog with the not-accepted result. Swallow
+      <code>EVT_CHAR_HOOK</code> for Escape so it cannot be handled elsewhere, and never
+      treat a closed dialog as consent.</li>
+  <li>Remember the answer, but key it to the <em>text</em> the user agreed to (a version
+      constant), not to the dialog being seen; and re-prompt after an update rather than
+      silently assuming consent carries over.</li>
+</ul>
+
+<!-- ================================================================ -->
+<h2 id="longops">Long Operations and Progress</h2>
+
+<p>Model downloads, engine installs (pip) and synthesis run off the UI thread.
+The accessibility requirements:</p>
+<ul>
+  <li>The progress dialog names the work in progress and stays cancellable; Escape cancels.</li>
+  <li>Progress text is updated on the status control <em>and</em> its accessible name, so
+      the change is announced rather than only drawn.</li>
+  <li>A failed install must report the engine's own error text, not just an exit code, and
+      must leave the user able to retry from the same dialog.</li>
+  <li>Never use a modal progress dialog that cannot be cancelled; the Recording window's
+      Pause and Stop must work while a segment is being synthesized.</li>
+</ul>
+
+<div class="tip"><strong>Screen-reader smoke test:</strong> launch a frozen build with an
+empty <code>%APPDATA%</code> folder and walk the first-launch dialog, the picker, a Settings
+category change and the Recording window with NVDA running before shipping a release.</div>
 
 <!-- ================================================================ -->
 <h2 id="errors">Error Handling</h2>
@@ -283,6 +365,10 @@ self.log_text.SetName(f"Log file {filename}: showing last 200 of 1500 lines")
 <tr><td>8</td><td>Keyboard shortcuts work</td><td>Test all listed shortcuts</td></tr>
 <tr><td>9</td><td>Theme contrast is maintained</td><td>Switch to Dark mode and verify readability</td></tr>
 <tr><td>10</td><td>Focus is managed on dialog open/close</td><td>Open/close dialogs and verify focus position</td></tr>
+<tr><td>11</td><td>Every radio group is a single decision with its own label</td><td>Tab through the group and listen to what is announced</td></tr>
+<tr><td>12</td><td>Controls whose contents depend on a choice update the label and accessible name</td><td>Change the radio button and re-read the combo box</td></tr>
+<tr><td>13</td><td>Gated dialogs cannot be dismissed into a &ldquo;yes&rdquo;</td><td>Press Escape and the close box; the action must not run</td></tr>
+<tr><td>14</td><td>Long operations announce progress and can be cancelled</td><td>Start a download or an install and press Escape</td></tr>
 </table>
 
 <div class="tip"><strong>Testing tip:</strong> Enable NVDA or Narrator and navigate

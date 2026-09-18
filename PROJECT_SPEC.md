@@ -20,8 +20,9 @@ Key properties:
   tab (official open-source model URLs). This keeps the installer small and licenses transparent.
 - Output formats: **WAV, MP3, FLAC** (MP3/FLAC via FFmpeg, downloaded on demand to the app data folder).
 - Input formats: **PDF, TXT, DOC/DOCX, HTML, MD, and clipboard text**.
-- Compute back-ends: **CPU, GPU (CUDA), NPU (DirectML)** with auto-detection; unavailable
-  back-ends are hidden from the UI.
+- Compute back-ends: **CPU, GPU (CUDA)** with auto-detection; unavailable back-ends are
+  hidden from the UI. (DirectML/NPU was planned but is never offered — sherpa-onnx ships no
+  DirectML execution provider to load.)
 
 ## 2. Research summary (what we read before coding)
 
@@ -43,12 +44,28 @@ Key properties:
 | **VITS (multilingual)** | MPL-2.0 (Coqui) | en, de, es, fr, ja, ko, zh… | `vctk`, `ljspeech`, `aishell3`… | No | sherpa-onnx sample models on GitHub Releases |
 | **Matcha-TTS** | CC-BY-4.0 / MIT | en, de, es, fr, nl… | single | No | sherpa-onnx releases |
 | **MMS TTS** | CC-BY-NC-4.0 (note: non-commercial) | 1100+ languages | `eng`, `deu`, `fra`, `spa`… | No | sherpa-onnx releases |
-| **Coqui VITS / XTTS v2 (ONNX)** | MPL-2.0 / CPML | multi | `xtts_v2` | **Yes** (reference + speaker embedding) | HF mirrors; XTTS v2 has an official ONNX export |
+### 2.2.1 The engines the catalog now ships (2026.3.1)
 
-Voice-cloning support (Settings → Voice Clone tab) targets **Coqui XTTS v2 (ONNX export)** and
-**Piper fine-tuned voice uploads** (a `.onnx` + `.onnx.json` pair trained from the user's own
-voice is a valid "clone" workflow that is fully offline and free). The voice-clone tab lists only
-TTS engines flagged `voice_cloning: true` in the catalog.
+`models_catalog.json` describes **nine** families (Piper, Kokoro-82M, Kitten TTS, VITS
+zh-AISHELL3, Matcha-TTS, OmniVoice, OmniVoice Server, SAPI5 and the Windows Core voices)
+and `tts/catalog.get_tts_list()` appends the **Voice Lab** engines, whose metadata lives
+next to their built-in voices in `voicelab/engines.py`:
+
+| Engine | id | Install package(s) | Licence |
+|---|---|---|---|
+| Pocket TTS (Kyutai) | `pocket_tts` | `pocket-tts`, soundfile, scipy | Apache-2.0 (per-voice terms) |
+| Bark (Suno AI) | `bark` | `transformers`, `torch`, soundfile, scipy | MIT |
+| F5-TTS | `f5tts` | `f5-tts`, `torch`, `torchaudio`, soundfile | MIT code, **CC-BY-NC-4.0 weights** |
+| OmniVoice | `omnivoice` | `omnivoice-triton` (+ PyTorch, CUDA) | Apache-2.0 |
+| OmniVoice Server | `omnivoice_server` | `omnivoice-server` (+ PyTorch, CUDA) | Apache-2.0 |
+
+Voice cloning (Settings → Voice Clone) is provided by the Voice Lab engines and by
+OmniVoice; **Coqui XTTS v2 was retired** in favour of them (it was the cloning engine of
+earlier releases and needed a ~2.5 GB engine download plus a ~2.1 GB model on first use).
+Piper fine-tuned voice uploads (an `.onnx` + `.onnx.json` pair trained on the user's own
+voice) remain a valid fully offline "clone" workflow. Engines are flagged in the catalog
+with `requires_package` when they are installed as Python packages rather than downloaded
+as ONNX artifacts; the panels turn that into an installed / not-installed state.
 
 ### 2.3 Compute providers
 
@@ -56,18 +73,18 @@ TTS engines flagged `voice_cloning: true` in the catalog.
 |---|---|---|
 | CPU | `onnxruntime` (bundled) | `CPUExecutionProvider` |
 | GPU | `onnxruntime-gpu` (user-installable at setup/update) | `CUDAExecutionProvider`, `TensorrtExecutionProvider` |
-| NPU | `onnxruntime-directml` (user-installable, Windows) | `DmlExecutionProvider` (Intel/AMD/Qualcomm NPU via DirectML) |
+| NPU (DirectML) | not shipped | none — sherpa-onnx has no DirectML provider to load, so the option is deliberately absent |
 
-Detection rules:
+Detection rules (current implementation):
 
 - **CPU** is always available.
 - **GPU** is offered only if a CUDA-capable provider is present (check `onnxruntime.get_available_providers()`
   and/or presence of `onnxruntime-gpu` import + `nvidia-smi`).
-- **NPU** is offered only if `DmlExecutionProvider` is available **and** a DirectML/NPU-capable
-  accelerator exists on the system (queried via `wmi` / PnP device enumeration; gracefully
-  skipped if the query fails).
+- **NPU (DirectML)** is **never** offered: sherpa-onnx has no DirectML execution provider to
+  load, so an NPU entry would be a choice that cannot run. `compute.py` documents this and
+  the combo never lists it.
 - If more than one compute option is available, an **Auto** entry is added (preference order:
-  GPU → NPU → CPU).
+  GPU → CPU).
 
 **How much compute is used** (whatever back-end is selected):
 
@@ -92,9 +109,30 @@ provider the preview passes to `get_engine`.
 
 ### 3.1 Settings dialog (File → Settings / `Ctrl+,`)
 
-A tabbed dialog with **OK / Cancel / Apply** buttons. Tabs:
+A tabbed dialog with **OK / Cancel / Apply** buttons. The categories, in the order
+they appear (`SettingsDialog.CATEGORIES`):
 
-1. **General** — Theme combo box: `System default`, `Light`, `Dark`. Applies live.
+| # | Category class | Title |
+|---|---|---|
+| 1 | `_GeneralPanel` | General |
+| 2 | `DownloadPanel` | Download and remove |
+| 3 | `AvailablePanel` | Available TTS |
+| 4 | `VoiceClonePanel` | Voice clone (the Voice Lab engines) |
+| 5 | `_OmniVoiceEnginesPanel` | OmniVoice engines |
+| 6 | `_OmniVoiceServerPanel` | OmniVoice Server |
+| 7 | `_RecordingSettingsPanel` | Recording settings |
+| 8 | `_PunctuationPanel` | Punctuation |
+| 9 | `_AudioModePanel` | Audio file creation |
+| 10 | `_DaisySettingsPanel` | DAISY settings |
+| 11 | `_ComputePanel` | Compute |
+| 12 | `_DeveloperPanel` | Developer (only with Developer Mode) |
+| 13 | `_ResetPanel` | Reset |
+
+Details:
+
+1. **General** — Theme combo box: `System default`, `Light`, `Dark` (applies live),
+   the recordings and models folders (each with Browse...), and Enable Developer Mode,
+   which reveals the Developer category and heavy logging.
 2. **Download and remove** (model manager):
    - Combo 1: Select TTS (catalog top-level, e.g. Piper, Kokoro).
    - Combo 2: Select language (of that TTS).
@@ -130,7 +168,8 @@ A tabbed dialog with **OK / Cancel / Apply** buttons. Tabs:
    - Combo 1: TTS, Combo 2: Language, Combo 3: Variant (only entries of cloning-capable TTS).
    - **Upload voice** button → file dialog for audio sample (`.wav/.mp3/.flac/.onnx`).
    - For Piper: a `.onnx` + `.onnx.json` pair is copied into the user model folder and registered
-     under the uploaded file name. For XTTS: a reference audio path is recorded.
+     under the uploaded file name. For the Voice Lab engines: a reference audio path is
+     recorded (this entry is legacy - the XTTS cloner was retired).
    - Registered clone names appear in **Available TTS → Voice combo** and are usable everywhere.
 6. **Recording settings**:
    - Punctuation combo: `Default (TTS default)`, `None`, `Math`, `All`.
@@ -142,6 +181,34 @@ A tabbed dialog with **OK / Cancel / Apply** buttons. Tabs:
    - Description text for each mode (see §3.4).
 8. **Reset** — **Reset to default** button; shows confirmation "All settings will go back to
    their default values." and clears models cache info.
+9. **Compute** — detected CPU/GPU capability, and download/remove of the optional ONNX GPU
+   runtime (about 1.8 GB). Restart requested after a change.
+10. **Developer** — heavy logging, addon install/enable/disable/remove, the addon Python
+    environment (pip install, package listing) and diagnostics. Hidden without Developer Mode.
+11. **DAISY settings** — language, publisher and whether the DAISY 3 book embeds the text.
+
+Each category that shows a **Preview** button also carries a **Compute** combo; the choice is
+stored per category under `preview_compute.<category>`.
+
+### 3.1.1 First launch — terms of use
+
+Before any subsystem is initialised (`main.py` → `gui.accept_dialog.require_terms_acceptance`),
+the application shows a **Terms of Use** dialog on the first launch and again after an update
+whose terms text changed:
+
+- Six check boxes state the conditions of use: no voice cloning without rights or prior
+  permission; no illegal use; commercial users must read each TTS licence and use only engines
+  that permit commercial use (or have written permission); use only SAPI5 / Windows Core voices
+  the user has the right to use; the author provides no warranty and accepts no responsibility
+  for legal or illegal use; and voice cloning is a normal feature of modern neural TTS that the
+  user will use carefully and legally.
+- A final, bold check box **"I agree with all above terms"** is the master switch: ticking it
+  ticks the six conditions, unticking it clears them.
+- **I Agree** and **Disagree (Close Program)** stay disabled until that final check box is ticked.
+  Escape is swallowed at the key-hook level, and closing the window counts as Disagree.
+- The application starts **only** from the I Agree path. Acceptance is stored as
+  `terms_version` (compared with `constants.TERMS_VERSION`), so it is remembered until the next
+  version whose terms changed, a fresh profile or a reinstall.
 
 ### 3.2 Accessibility guidelines (must-follow)
 
@@ -274,6 +341,30 @@ and open the **Recording** window for this project. Projects are listed in **Fil
   MP3/FLAC files. Download FFmpeg now? (saved to %APPDATA%\AIVoiceStudio\ffmpeg)" — **Yes**
   downloads it (official gyan.dev build) and auto-converts; **No** switches back to WAV.
 
+### 3.6.1 Start Selected Recording (Edit menu)
+
+`Edit → Start Selected Recording...` opens a dialog whose sidebar first decides *what the
+list means*, then what to do with the choice:
+
+| Sidebar choice | Combo label | Combo lists |
+|---|---|---|
+| **Select an audio file** (default) | "Choose which recorded file to record again:" | only the project's recorded audio files |
+| **Select by file break** | "Choose which file to record by file break:" | every file break of the project, recorded or not |
+
+and a second pair decides the scope:
+
+- **Only record selected file** (default) — records that one file and stops; the following
+  file is not touched whether or not it was already recorded.
+- **Record all files from here** — records the chosen file and every file after it to the end
+  of the project (the previous behaviour of "restart selected recording", now opt-in).
+
+Mechanics: the chosen recording is deleted (its segment returns to `pending`), the
+`RecordingDialog` opens with the chosen start position and (for the single-file scope) an
+exclusive `end_index`, so `jobs.synthesizer.SynthesisWorker` stops after that segment. The
+dialog **never** refuses to open for lack of recordings; with none, it starts in the
+by-file-break mode, so one chapter of a long book can be recorded before chapter 1. The only
+blocked case is a project whose document was never split into file breaks.
+
 ### 3.7 Project file
 
 Each project folder contains `project.json`:
@@ -302,14 +393,14 @@ AI-voice-studio/
 ├── README.md                  # user + developer docs
 ├── requirements.txt           # core deps (bundled)
 ├── requirements-gpu.txt       # optional GPU runtime
-├── requirements-npu.txt       # optional NPU/DirectML runtime
+├── requirements-npu.txt       # legacy record; DirectML/NPU is never offered
 ├── main.py                    # entry point
 ├── ai_voice_studio/
 │   ├── __init__.py
 │   ├── paths.py               # user data dirs (%APPDATA%\AIVoiceStudio)
 │   ├── settings.py            # persisted settings (JSON)
 │   ├── constants.py           # app constants + theme enum
-│   ├── compute.py             # CPU/GPU/NPU/Auto detection, CPU thread budget
+│   ├── compute.py             # CPU/GPU detection, NVIDIA probe, CPU thread budget (80-95%)
 │   ├── python_runtime/        # managed virtualenvs (one per TTS engine + addon_env)
 │   ├── venv_packages.py       # cached per-environment package probes
 │   ├── tts/
@@ -352,6 +443,58 @@ AI-voice-studio/
     └── test_settings.py
 ```
 
+#### 4.0.1 Current module map (2026.3.1)
+
+The tree above is the original layout. The application has since grown the following
+modules; this is the authoritative map:
+
+```
+AI-voice-studio/
+├── main.py                    # entry point: terms gate, then the GUI
+├── ai_voice_studio/
+│   ├── constants.py           # APP_VERSION, TERMS_VERSION, theme + format constants
+│   ├── paths.py               # %APPDATA%\AIVoiceStudio layout (projects, models, tts_envs, logs)
+│   ├── settings.py            # persisted settings (defaults, reset, recent projects)
+│   ├── project.py             # project.json read/write, segments, saved files
+│   ├── compute.py             # NVIDIA probe, CPU thread budget (80-95%), provider choice
+│   ├── runtime.py             # sherpa-onnx / onnxruntime loading and provider setup
+│   ├── heavy_logging.py       # per-subsystem logs + crash log (Developer Mode)
+│   ├── venv_packages.py       # cached per-environment package probes
+│   ├── python_runtime/        # managed virtualenvs: one per TTS engine + addon_env
+│   ├── addons/                # addon discovery, manifest validation, registration
+│   ├── tts/
+│   │   ├── catalog.py         # JSON catalog + helpers; appends the Voice Lab engines
+│   │   ├── models_catalog.json# nine ONNX / built-in TTS families
+│   │   ├── downloader.py      # resumable downloads
+│   │   ├── models.py          # installed-model state
+│   │   ├── engine.py          # sherpa-onnx wrapper + engine cache
+│   │   └── windows_tts.py     # SAPI5 and Windows Core voice enumeration
+│   ├── voicelab/              # Pocket TTS, Bark, F5-TTS
+│   │   ├── engines.py         # registry, built-in voices, PYTORCH_CUDA_INDEX
+│   │   ├── options.py         # per-engine tuning vocabulary
+│   │   ├── worker.py          # standalone worker subprocess (torch lives here)
+│   │   └── __init__.py        # device choice, worker client, VoicelabEngine, verify_engine_import
+│   ├── omnivoice/             # direct OmniVoice engine (spec, worker, voice store)
+│   ├── omnivoice_server/      # OpenAI-compatible OmniVoice HTTP server manager
+│   ├── documents/             # parsers, splitter, playlist builder, DAISY 2.02 / 3 builders
+│   ├── audio/                 # WAV writer, MP3/FLAC conversion, FFmpeg download
+│   ├── jobs/synthesizer.py    # background synthesis worker (+ start/end range)
+│   └── gui/
+│       ├── main_frame.py      # menus, recent projects, Start Selected Recording picker
+│       ├── settings_dialog.py # all thirteen categories
+│       ├── model_panels.py    # Download/Remove, Available TTS
+│       ├── clone_engines_panel.py # Voice Clone (Voice Lab engines)
+│       ├── compute_choice.py  # the per-category Preview Compute combo
+│       ├── accept_dialog.py   # first-launch terms of use
+│       ├── voicelab_options_dialog.py / omnivoice_options_dialog.py
+│       ├── new_project_wizard.py, recording_dialog.py, dialogs.py, progress.py
+│       ├── theme.py, a11y.py, events.py
+├── docs/                      # README/UserGuide/Addon/Accessibility/THIRD-PARTY-LICENSES + book/
+├── packaging/                 # PyInstaller spec, installer_common.iss, installer_32/64.iss, build.ps1
+├── tools/                     # a11y audits, end-to-end probes, book PDF builder
+└── tests/                     # unit, GUI smoke, engine-environment and book guards (22 files)
+```
+
 ### 4.1 Threading model
 
 - GUI thread: wxPython only.
@@ -376,8 +519,12 @@ AI-voice-studio/
 - Installer options: install location, Start Menu folder, desktop icon, "Open readme after
   install" checkbox, "Start AI Voice Studio after setup" checkbox.
 - PyInstaller `--onefile`/`--onedir` spec bundling the app + `onnxruntime` + `sherpa-onnx`
-  + parsers; model data lives in user dir (never in `Program Files`).
-- Optional runtime add-ons downloaded by the user inside the app (GPU/NPU runtimes, FFmpeg).
+  + parsers + the `docs` folder (including the book); model data lives in user dir (never in
+  `Program Files`). Built output: `dist\AI-Voice-Studio-v-<version>-Setup-x64.exe`
+  (or `-x86`); the version lives in `installer_common.iss` and must match
+  `constants.APP_VERSION`.
+- Optional runtime add-ons downloaded by the user inside the app (the ONNX GPU runtime, FFmpeg,
+  and the per-engine Python environments with their PyTorch/CUDA wheels).
 
 ## 6. Out of scope (first release)
 

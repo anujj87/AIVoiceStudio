@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 79: Audio I/O Without FFmpeg - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part X — Voice Lab &amp; the Current System</div><ul class="chapters"><li><a href="ch76_voicelab_engines.html">Ch 76: Voice Lab Engines</a></li><li><a href="ch77_engine_environments.html">Ch 77: One Environment per Engine</a></li><li><a href="ch78_compute_choice.html">Ch 78: Compute Choice</a></li><li><a href="ch79_audio_io_shim.html" class="active">Ch 79: Audio I/O Without FFmpeg</a></li><li><a href="ch80_start_selected_recording.html">Ch 80: Start Selected Recording</a></li><li><a href="ch81_terms_dialog.html">Ch 81: First-Launch Terms</a></li><li><a href="ch82_licensing.html">Ch 82: Licensing &amp; Compliance</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 79</div>
+<h1>Audio I/O That Works on a Machine With No FFmpeg</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Understand why <code>torchaudio.load</code> stopped being self-contained</li>
+  <li>Probe a third-party decoder on a real file instead of trusting documentation</li>
+  <li>Replace one API with another transparently, and restore the original when it works</li>
+  <li>Convert reference audio once, deterministically, instead of failing on a format</li>
+  <li>Report a degraded-but-working path to the user instead of hiding it</li>
+</ul>
+
+<hr>
+
+<h2>79.1 The Failure That Started This</h2>
+
+<p>A user installed F5-TTS and pressed Preview. The engine loaded, the model
+downloaded, and then:</p>
+
+<pre><code>RuntimeError: Failed to create AudioDecoder for C:\Users\...\tmpvmlfm3u2.wav:
+Could not load libtorchcodec. Likely causes:
+  1. FFmpeg is not properly installed in your environment...
+  2. The PyTorch version (2.11.0+cu128) is not compatible with this
+     version of TorchCodec...
+OSError: Could not load this library:
+  ...\torchcodec\libtorchcodec_core9.dll</code></pre>
+
+<p>Three things were true at once, and it is worth separating them:</p>
+
+<ul>
+  <li>From <strong>torchaudio 2.9</strong> onward, <code>load</code>/<code>save</code>
+  decode through <strong>TorchCodec</strong>; torchaudio’s own
+  <code>backend</code> argument is accepted and <em>ignored</em>. Code that looks like
+  it selects a decoder no longer selects anything.</li>
+  <li>TorchCodec on Windows needs FFmpeg’s <strong>shared</strong> libraries
+  (<code>avcodec-*.dll</code> and friends), which belong to an FFmpeg build the
+  application does not ship.</li>
+  <li>The user’s machine had no FFmpeg at all. Every version TorchCodec tried
+  failed, which is why the message lists six versions — that wall of text is one
+  failure repeated, not six problems.</li>
+</ul>
+
+<div class="info">
+  The application already downloads FFmpeg <em>on request</em> for MP3/FLAC output.
+  Requiring it for <em>reading</em> audio would turn an optional feature into a hard
+  requirement, so the audio path was fixed in code instead.
+</div>
+
+<h2>79.2 Measure, Do Not Assume</h2>
+
+<p>TorchCodec is not always broken — it works perfectly on a machine with FFmpeg.
+Replacing it unconditionally would throw away a capable decoder. So the code measures
+it, on a real file:</p>
+
+<pre><code>def _write_probe_wav(path, sample_rate=16000, seconds=0.05):
+    frames = max(1, int(sample_rate * seconds))
+    with wave.open(path, "wb") as handle:
+        handle.setnchannels(1)
+        handle.setsampwidth(2)
+        handle.setframerate(int(sample_rate))
+        handle.writeframes(struct.pack(f"<{frames}h", *([0] * frames)))
+
+
+def _torchcodec_works(torchaudio):
+    path = os.path.join(tempfile.gettempdir(), "aivs_voicelab_probe.wav")
+    try:
+        _write_probe_wav(path)
+        torchaudio.load(path)
+        return True
+    except Exception:
+        return False
+    finally:
+        with contextlib.suppress(OSError):
+            os.remove(path)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+    <li><strong>Lines 1–7:</strong> <code>_write_probe_wav</code><br>
+    <span class="desc">Builds the smallest possible WAV with the standard library: one channel, 16-bit samples, 0.05 seconds of silence.<code>wave</code> needs no dependency, so this works even on a machine where every audio library is broken — which is precisely the situation being tested. The <code>_write_probe_wav</code> name says what it writes; the <code>frames = max(1, ...)</code> guard prevents a zero-frame file, which some decoders reject for a different reason and would produce a misleading “broken” verdict.</span></li>
+    <li><strong>Line 4:</strong> <code>struct.pack(f"&lt;{frames}h", *([0] * frames))</code><br>
+    <span class="desc">Little-endian sequence of signed 16-bit zeros — raw PCM in exactly the layout a WAV header promises. Generating samples in code beats bundling a fixture file, because the probe must not depend on anything the packaging step might forget to include.</span></li>
+    <li><strong>Lines 10–12:</strong> the actual measurement<br>
+    <span class="desc">A real decode, not a version check. Feature detection by attempting the operation is the only method that survives version combinations nobody documented — and this bug is proof that documented compatibility tables are not enough.</span></li>
+    <li><strong>Lines 13–17:</strong> cleanup on every path<br>
+    <span class="desc"><code>finally</code> removes the temp file even when the decode fails, so a broken decoder cannot leave litter in <code>%TEMP%</code> on every launch. <code>contextlib.suppress(OSError)</code> keeps a failed cleanup from masking the real result.</span></li>
+  </ol>
+</div>
+
+<h2>79.3 A Drop-In Replacement Built on soundfile</h2>
+
+<p><code>soundfile</code> wraps libsndfile, and — crucially — <strong>libsndfile
+ships inside the wheel</strong>. Reading WAV, FLAC, OGG and MP3 therefore works with
+nothing installed on the machine.</p>
+
+<pre><code>def _soundfile_load(sf, torch, uri, frame_offset=0, num_frames=-1,
+                    normalize=True, channels_first=True, format=None,
+                    buffer_size=4096, backend=None):
+    if hasattr(uri, "read"):
+        data, sample_rate = sf.read(uri, dtype="float32", always_2d=True)
+    else:
+        try:
+            start = max(0, int(frame_offset or 0))
+        except (TypeError, ValueError):
+            start = 0
+        try:
+            frames = int(num_frames)
+        except (TypeError, ValueError):
+            frames = -1
+        data, sample_rate = sf.read(
+            str(uri), start=start, frames=(frames if frames > 0 else -1),
+            dtype="float32", always_2d=True,
+        )
+    samples = np.ascontiguousarray(data.T if channels_first else data)
+    tensor = torch.from_numpy(samples.astype(np.float32, copy=False))
+    return tensor, int(sample_rate)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+    <li><strong>Lines 1–2:</strong> the signature<br>
+    <span class="desc">It mirrors <code>torchaudio.load</code> exactly, including the arguments the engines pass but that do not apply (<code>normalize</code>, <code>format</code>, <code>buffer_size</code>, <code>backend</code>). A shim that accepts a narrower signature is a shim that breaks the first time an engine passes a new keyword — the engines here are third-party code that changes between releases.</span></li>
+    <li><strong>Line 3:</strong> file-like objects<br>
+    <span class="desc">Callers may pass an open file or a buffer rather than a path; <code>hasattr(uri, "read")</code> routes that case to soundfile’s own handling, so the shim covers both call styles.</span></li>
+    <li><strong>Lines 5–14:</strong> offsets and frame counts<br>
+    <span class="desc">Frame slicing is converted from torchaudio’s conventions to soundfile’s: a negative or unparsable <code>num_frames</code> becomes “the whole file”, and a negative offset clamps to zero. Defensive conversion here means a caller passing <code>None</code> gets audio instead of an exception about a type.</span></li>
+    <li><strong>Line 15:</strong> the shape flip<br>
+    <span class="desc">soundfile returns <code>(frames, channels)</code>; torchaudio returns <code>(channels, frames)</code>. <code>data.T</code> plus <code>np.ascontiguousarray</code> fixes both the axis order and the memory layout — the second part matters because a non-contiguous array passed to <code>torch.from_numpy</code> can produce wrong strides or copies deep inside an engine.</span></li>
+    <li><strong>Line 16:</strong> the tensor<br>
+    <span class="desc"><code>astype(np.float32, copy=False)</code> avoids a copy when the dtype already matches, and <code>int(sample_rate)</code> normalises NumPy integers to plain Python ints, which is what the engines and WAV writers expect.</span></li>
+  </ol>
+</div>
+
+<p>The saving side is the mirror image, with one extra concern — integer PCM must
+stay integer:</p>
+
+<pre><code>def _soundfile_save(sf, torch, uri, src, sample_rate, channels_first=True,
+                    format=None, encoding=None, bits_per_sample=None,
+                    buffer_size=4096, backend=None, compression=None):
+    data = src
+    if hasattr(data, "detach"):      # torch tensor
+        data = data.detach()
+    if hasattr(data, "cpu"):
+        data = data.cpu()
+    if hasattr(data, "numpy"):
+        data = data.numpy()
+    array = np.asarray(data)
+    if channels_first and array.ndim > 1:
+        array = array.T
+    if array.dtype.kind in "iu":     # integer PCM stays integer
+        sf.write(str(uri), array, int(sample_rate))
+    else:
+        sf.write(str(uri), np.clip(array.astype(np.float32), -1.0, 1.0),
+                 int(sample_rate))</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+    <li><strong>Lines 5–10:</strong> duck-typed conversion<br>
+    <span class="desc">The argument may be a PyTorch tensor (possibly on the GPU), a NumPy array or a plain list. Each <code>hasattr</code> step unwraps one layer — <code>detach</code> before <code>cpu</code> before <code>numpy</code> is the order that works for a tensor with gradients on a CUDA device. Duck typing is the right tool here because importing torch inside these helpers would defeat the point of keeping them dependency-light.</span></li>
+    <li><strong>Lines 11–13:</strong> channel order<br>
+    <span class="desc">The same flip as on load, guarded by <code>array.ndim &gt; 1</code> so mono data is not accidentally squeezed into a 1-D array.</span></li>
+    <li><strong>Lines 14–15:</strong> the integer branch<br>
+    <span class="desc">Sound is often handled as int16 PCM in this project. Writing int16 through libsndfile preserves it exactly; converting to float and back would add rounding for no reason. <code>dtype.kind in "iu"</code> is the compact way to say “signed or unsigned integer”.</span></li>
+    <li><strong>Lines 16–18:</strong> the float branch<br>
+    <span class="desc">Float audio is clipped to −1.0…1.0 <em>before</em> writing, because libsndfile’s behaviour with out-of-range floats has changed between versions. An explicit clip makes the file’s contents predictable everywhere.</span></li>
+  </ol>
+</div>
+
+<h2>79.4 Installing the Shim Only When Needed</h2>
+
+<pre><code>_AUDIO_SHIM_ENV = "AIVS_VOICELAB_NO_AUDIO_SHIM"
+
+
+def _install_audio_io_shim(torchaudio=None, soundfile=None, torch=None):
+    if str(os.environ.get(_AUDIO_SHIM_ENV, "")).strip().lower() in ("0", "false", "no"):
+        return None
+    if torchaudio is None:
+        try:
+            import torchaudio as _torchaudio
+        except Exception:
+            return None
+        torchaudio = _torchaudio
+    if getattr(torchaudio, "_aivs_soundfile_io", False):
+        return None
+    if _torchcodec_works(torchaudio):
+        return None
+    if soundfile is None:
+        try:
+            soundfile = _import_soundfile()
+        except Exception:
+            return (... a message explaining decoding is unavailable ...)
+    if torch is None:
+        try:
+            import torch as _torch
+        except Exception:
+            return None
+        torch = _torch
+
+    def load(*args, **kwargs):
+        return _soundfile_load(soundfile, torch, *args, **kwargs)
+
+    def save(*args, **kwargs):
+        return _soundfile_save(soundfile, torch, *args, **kwargs)
+
+    torchaudio.load = load
+    torchaudio.save = save
+    torchaudio._aivs_soundfile_io = True
+    return ("Audio files are read with the bundled soundfile library: this "
+            "computer has no FFmpeg, which the TorchCodec decoder torchaudio "
+            "normally uses needs. WAV, FLAC, OGG and MP3 work; formats only "
+            "FFmpeg can decode (for example m4a/AAC) do not.")</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 4)</h4>
+  <ol>
+    <li><strong>Lines 1–4:</strong> the opt-out switch<br>
+    <span class="desc"><code>AIVS_VOICELAB_NO_AUDIO_SHIM=0</code> disables the swap. An escape hatch for a machine where the measurement is wrong is what keeps a clever workaround from becoming an unfixable bug: a user (or the developer) can always get the original behaviour back without editing code.</span></li>
+    <li><strong>Lines 5–10:</strong> getting hold of torchaudio<br>
+    <span class="desc">The module can be passed in (tests do that) or imported. If it cannot be imported at all there is nothing to shim — an engine that needs torchaudio will fail on its own import with a clearer message than anything this function could invent.</span></li>
+    <li><strong>Lines 11–12:</strong> idempotence<br>
+    <span class="desc">The marker attribute on the module itself means a second call does nothing. Without it, the shim would wrap the shim: <code>load</code> would call soundfile through a function that calls soundfile, and a future un-shim would be impossible.</span></li>
+    <li><strong>Lines 13–14:</strong> the decision<br>
+    <span class="desc">The single most important line pair in the module: <em>if the real decoder works, do nothing</em>. This is what keeps the wider format support (and the platform’s own codecs) for users who have FFmpeg.</span></li>
+    <li><strong>Lines 15–22:</strong> the fallback library<br>
+    <span class="desc">If soundfile is missing too, the function returns a message rather than raising: the engine will then either fail with its own error or succeed some other way, and the message explains the situation in the log either way.</span></li>
+    <li><strong>Lines 24–33:</strong> the swap<br>
+    <span class="desc">Two closures bound to the already-imported libraries, assigned onto the module object. Assigning module attributes (rather than wrapping the module in a proxy) means every engine that already did <code>import torchaudio</code> and calls <code>torchaudio.load(...)</code> picks up the replacement with no cooperation at all.</span></li>
+    <li><strong>The returned note</strong><br>
+    <span class="desc">The text is not a warning to be discarded — it travels back to the application with the synthesis response, where <code>VoicelabEngine._report_notes</code> logs it. A user who later wonders why an <code>.m4a</code> reference failed has the answer in the log next to the run that failed.</span></li>
+  </ol>
+</div>
+
+<h2>79.5 Reference Clips in Other Formats</h2>
+
+<p>Voice cloning feeds a <em>reference recording</em> to the engine. F5-TTS cleans
+its reference with <code>pydub</code>, which shells out to FFmpeg for anything that
+is not a WAV. An MP3 reference therefore died with
+<code>[WinError 2] The system cannot find the file specified</code> — even though the
+Voice Clone page advertises MP3, FLAC and OGG.</p>
+
+<pre><code>_WAV_SUFFIXES = (".wav", ".wave")
+
+
+def _convert_to_wav(path, soundfile=None):
+    try:
+        sf = soundfile if soundfile is not None else _import_soundfile()
+        size = os.path.getsize(path)
+        stamp = int(os.path.getmtime(path))
+        key = f"{path}|{size}|{stamp}".encode("utf-8", "replace")
+        digest = hashlib.md5(key).hexdigest()[:12]
+        destination = os.path.join(
+            tempfile.gettempdir(), f"aivs_reference_{digest}.wav")
+        if os.path.isfile(destination) and os.path.getsize(destination) > 0:
+            return destination
+        data, sample_rate = sf.read(str(path), dtype="float32", always_2d=True)
+        sf.write(destination, data, int(sample_rate))
+        return destination
+    except Exception:
+        return path</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 5)</h4>
+  <ol>
+    <li><strong>Line 1:</strong> <code>_WAV_SUFFIXES</code><br>
+    <span class="desc">The formats the engines’ own pre-processing can already read. Anything else is converted before the engine sees it.</span></li>
+    <li><strong>Lines 3–6:</strong> the cache key<br>
+    <span class="desc">Path + size + modification time, hashed to a short digest. Including size and mtime means the key changes when the file changes, so the converted copy can never be stale — the classic trap with a name-only cache. <code>errors="replace"</code> on encode keeps a path with unusual characters from raising.</span></li>
+    <li><strong>Lines 7–11:</strong> the destination<br>
+    <span class="desc">A deterministic name in the temp folder, derived from the source. Deterministic means a second preview of the same voice reuses the converted file instead of converting again — which matters because converting is slower than reading.</span></li>
+    <li><strong>Lines 12–13:</strong> the reuse check<br>
+    <span class="desc"><code>os.path.isfile(...) and os.path.getsize(...) &gt; 0</code> rejects a zero-byte leftover from an interrupted write. Trusting existence alone would hand the engine an empty file and produce a mystifying error much later.</span></li>
+    <li><strong>Lines 14–16:</strong> the conversion<br>
+    <span class="desc">Read as float32 and write as WAV with the same sample rate: no resampling, no normalisation, no quality loss beyond the original decode. The engine receives exactly the audio the user chose.</span></li>
+    <li><strong>Lines 17–19:</strong> the honest fallback<br>
+    <span class="desc">On any failure the original path is returned. Leaving the file untouched lets the engine either handle it itself or report precisely what it cannot read — which is far more useful to the user than a silent swap to a file that may not be equivalent.</span></li>
+  </ol>
+</div>
+
+<div class="warning">
+  <strong>Why not just install FFmpeg?</strong> Because an application that requires a
+  system-wide binary for its core feature is an application that fails on locked-down
+  machines, and because the reference-clip path only needs a <em>decoder</em> — which the
+  bundled <code>soundfile</code> wheel already is.
+</div>
+
+<h2>79.6 Mini Project: Prove the Fix on Your Machine</h2>
+
+<p>Run this in an engine’s own environment (replace the path with your
+<code>tts_envs</code> folder) to see the difference the shim makes:</p>
+
+<pre><code>import os, tempfile, wave, struct
+
+import torchaudio
+
+from ai_voice_studio.voicelab.worker import _install_audio_io_shim
+
+path = os.path.join(tempfile.gettempdir(), "probe.wav")
+with wave.open(path, "wb") as handle:
+    handle.setnchannels(1)
+    handle.setsampwidth(2)
+    handle.setframerate(16000)
+    handle.writeframes(struct.pack("<1600h", *([0] * 1600)))
+
+try:
+    audio, rate = torchaudio.load(path)
+    print("before shim: OK", audio.shape, rate)
+except Exception as exc:
+    print("before shim: FAILED", type(exc).__name__)
+
+note = _install_audio_io_shim()
+print("note:", note)
+
+audio, rate = torchaudio.load(path)
+print("after shim : OK", audio.shape, rate)</code></pre>
+
+<p>On a machine with FFmpeg the note is <code>None</code> and both loads succeed; on a
+machine without it the first load raises and the second returns a tensor.</p>
+
+<div class="exercise">
+  <ol>
+    <li>Why does the shim live in the <em>worker</em> rather than in the application
+    process? Answer in terms of process boundaries and dependencies.</li>
+    <li>Add (in a scratch copy) a <code>_soundfile_load</code> that ignores
+    <code>channels_first</code>. Which engine would break first, and how would the
+    symptom look — an exception, silence, or garbage audio?</li>
+    <li>Time a preview with an MP3 reference twice. Explain what the second run
+    saves and why the cache key must include the file’s mtime.</li>
+    <li>Convert an <code>.m4a</code> file with the current code and explain the
+    result from the note’s text rather than from an error message.</li>
+  </ol>
+</div>
+
+<h2>79.7 Key Takeaways</h2>
+<ul>
+  <li>Library behaviour changes across versions: <code>torchaudio</code> now delegates decoding to TorchCodec</li>
+  <li>Detect capability by <em>trying the operation</em> on a real input, then fall back only if it truly fails</li>
+  <li>Write shims with the full signature of the API they replace, and assign them onto the module object</li>
+  <li>Make workarounds idempotent and switchable with an environment variable</li>
+  <li>Convert user media once, with a cache key derived from path, size and mtime</li>
+  <li>Never silently change what the user gave you — if you cannot process it, return it untouched</li>
+  <li>Send notes back to the application and log them: a degraded path that works should still be explainable</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch78_compute_choice.html">← Ch 78</a> &nbsp;|&nbsp; <a href="ch80_start_selected_recording.html">Ch 80 — Start Selected Recording →</a></p>
+</div></div></body>
+</html>

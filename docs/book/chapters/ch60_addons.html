@@ -17,6 +17,18 @@
 <div class="chapter-number">Chapter 60</div>
 <h1>Addon System</h1>
 
+<div class="info">
+  <strong>Current implementation (2026.3.1).</strong> Addons continue to run in the shared managed
+  environment (<code>addon_env</code>, see <a href="ch77_engine_environments.html">Chapter 77</a>
+  for why it is now called <em>shared</em>: each pip-installed TTS engine has its own), and the
+  Developer category that manages them is hidden until Developer Mode is on. Two consequences
+  worth knowing when writing an addon: your modules are imported into the application process,
+  so a heavy second runtime (another <code>onnxruntime</code>, PyTorch, CUDA) belongs in an engine
+  environment reached through a worker subprocess; and addon-provided voices take part in the
+  per-category <strong>Compute</strong> choice like any other voice
+  (<a href="ch78_compute_choice.html">Chapter 78</a>).
+</div>
+
 <h2>Learning Objectives</h2>
 <ul>
   <li>Understand the addon architecture (inspired by NVDA)</li>

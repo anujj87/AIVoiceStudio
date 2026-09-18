@@ -17,6 +17,25 @@
 <div class="chapter-number">Chapter 50</div>
 <h1>Compute Back-end Detection</h1>
 
+<div class="info">
+  <strong>Current implementation (2026.3.1).</strong> <code>compute.py</code> now answers three
+  separate questions, and they must not be confused:
+  <ul>
+    <li><em>Is there an NVIDIA GPU?</em> — <code>has_nvidia_gpu()</code>, a cached
+    <code>nvidia-smi</code> driver probe (no PyTorch import, no VRAM or model check, so any
+    CUDA-capable card qualifies).</li>
+    <li><em>May an ONNX engine use it?</em> — that additionally needs the optional GPU runtime
+    downloaded from Settings, because sherpa-onnx ships its own runtime and a second
+    <code>onnxruntime</code> in one process corrupts the graph loader. The pip-installed Voice
+    Lab engines need only the driver: they bring their own PyTorch.</li>
+    <li><em>How much of the machine may a run use?</em> — <code>cpu_threads()</code> returns the
+    top of the <strong>80–95&nbsp;%</strong> band of logical CPUs, and <code>cuda_device_index()</code>
+    is always <code>0</code> (whatever card the driver exposes).</li>
+  </ul>
+  The choice is offered per category next to every Preview button. Full detail, code and line
+  annotations: <a href="ch78_compute_choice.html">Chapter 78</a>.
+</div>
+
 <h2>Learning Objectives</h2>
 <ul>
   <li>Understand how AIVS detects available compute back-ends</li>

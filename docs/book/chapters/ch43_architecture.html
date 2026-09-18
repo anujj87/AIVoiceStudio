@@ -22,6 +22,28 @@
 <div class="chapter-number">Chapter 43</div>
 <h1>Project Architecture</h1>
 
+<div class="info">
+  <strong>Current implementation (2026.3.1).</strong> The package has grown these modules since
+  this chapter was written: <code>project.py</code> (project.json read/write),
+  <code>runtime.py</code> (sherpa-onnx loading and providers), <code>heavy_logging.py</code>,
+  <code>venv_packages.py</code> (per-environment package probes),
+  <code>python_runtime/</code> (one managed virtualenv per TTS engine),
+  <code>voicelab/</code> (Pocket TTS, Bark, F5-TTS + their worker), <code>omnivoice/</code>,
+  <code>omnivoice_server/</code>, <code>addons/</code>,
+  <code>tts/windows_tts.py</code> (SAPI5 / Windows Core voices),
+  <code>documents/playlist_builder.py</code>, <code>documents/daisy_builder.py</code> and
+  <code>documents/daisy3_builder.py</code>, and in the GUI
+  <code>gui/compute_choice.py</code> (the per-category Compute combo),
+  <code>gui/accept_dialog.py</code> (first-launch terms), <code>gui/dialogs.py</code>,
+  <code>gui/progress.py</code>, <code>gui/events.py</code> and
+  <code>gui/clone_engines_panel.py</code> / <code>gui/voicelab_options_dialog.py</code> /
+  <code>gui/omnivoice_options_dialog.py</code>. The repository now also carries
+  <code>docs/book</code> (the bundled book), <code>tools/</code> (accessibility audits and
+  end-to-end probes) and 22 test files. <code>main.py</code> starts with the terms-of-use gate
+  before any subsystem is built. See <a href="ch76_voicelab_engines.html">Chapters 76-82</a>
+  for the parts the rest of this book predates.
+</div>
+
 <h2>Learning Objectives</h2>
 <ul>
   <li>Understand the complete architecture of AIVS</li>

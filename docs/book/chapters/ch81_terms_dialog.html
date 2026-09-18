@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 81: A First-Launch Terms Dialog - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part X — Voice Lab &amp; the Current System</div><ul class="chapters"><li><a href="ch76_voicelab_engines.html">Ch 76: Voice Lab Engines</a></li><li><a href="ch77_engine_environments.html">Ch 77: One Environment per Engine</a></li><li><a href="ch78_compute_choice.html">Ch 78: Compute Choice</a></li><li><a href="ch79_audio_io_shim.html">Ch 79: Audio I/O Without FFmpeg</a></li><li><a href="ch80_start_selected_recording.html">Ch 80: Start Selected Recording</a></li><li><a href="ch81_terms_dialog.html" class="active">Ch 81: First-Launch Terms</a></li><li><a href="ch82_licensing.html">Ch 82: Licensing &amp; Compliance</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 81</div>
+<h1>A First-Launch Terms Dialog That Cannot Be Bypassed</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Gate application start-up behind a modal dialog in a way that survives every exit path</li>
+  <li>Remember acceptance per application version, so updates re-prompt and daily use does not</li>
+  <li>Gate buttons on a group of checkboxes, and let one master checkbox drive the rest</li>
+  <li>Handle the wx traps: Escape, the close box, <kbd>Alt</kbd>+<kbd>F4</kbd>, and modal vs non-modal code paths</li>
+  <li>Test a modal dialog without a user, and why “shown non-modally” matters</li>
+</ul>
+
+<hr>
+
+<h2>81.1 The Requirement, Stated Precisely</h2>
+
+<p>The application synthesises speech from arbitrary documents and clones voices.
+The requirement was a first-launch dialog with six acknowledgements that:</p>
+
+<ol>
+  <li>must be <strong>all ticked</strong> to proceed;</li>
+  <li>enables its <strong>I Agree</strong> and <strong>Disagree (Close Program)</strong>
+  buttons only once every box is ticked;</li>
+  <li>must <strong>not</strong> let the user through by refusing, by Escape, or by
+  forcibly closing the dialog;</li>
+  <li>must never appear again after agreement — <strong>until the next update or a fresh
+  install</strong>.</li>
+</ol>
+
+<p>Requirement 4 is the subtle one: “once per version, forever” is a completely
+different store from “once per installation”.</p>
+
+<h2>81.2 Versioned Acceptance in Settings</h2>
+
+<pre><code>APP_VERSION = "2026.3.1"
+
+# Version of the first-launch terms/acceptance dialog. Bump this on every
+# release so the dialog shows again after an update.
+TERMS_VERSION = "2026.3.1"
+
+
+def terms_current(settings) -> bool:
+    return settings.get("terms_version", "") == TERMS_VERSION
+
+
+def record_acceptance(settings) -> None:
+    settings.set("terms_version", TERMS_VERSION)
+    settings.save()</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+    <li><strong>Lines 1–5:</strong> two version constants, on purpose<br>
+    <span class="desc">The application version and the terms version can move independently: a bug-fix release may ship without changing the legal text, a podgy release may change only the terms. Keeping them separate means changing the wording is <em>one line</em>, and no one has to reason about which releases “count”.</span></li>
+    <li><strong>Lines 8–10:</strong> <code>terms_current</code><br>
+    <span class="desc">A pure comparison against a settings value, with an empty-default for the first run. It returns <code>False</code> for anything that is not an exact match — including a settings file from an older version and a corrupt value. That default is what makes an update prompt again without any migration code.</span></li>
+    <li><strong>Lines 13–15:</strong> <code>record_acceptance</code><br>
+    <span class="desc">Writes <em>and saves immediately</em>. Deferring the save to a later “save settings on exit” would lose the acceptance in exactly the case that matters — the user accepts and then the application crashes for an unrelated reason.</span></li>
+  </ol>
+</div>
+
+<div class="warning">
+  <strong>Uninstalling does not delete user data.</strong> Settings live in
+  <code>%APPDATA%\AIVoiceStudio</code>, which the uninstaller deliberately leaves alone
+  (it contains the user’s projects). So a reinstall that ships the <em>same</em> terms
+  version will <em>not</em> re-prompt. That is why the version must be bumped — it is
+  the only mechanism that re-prompts an existing user.
+</div>
+
+<h2>81.3 The Dialog, Control by Control</h2>
+
+<pre><code>class AcceptanceDialog(wx.Dialog):
+    def __init__(self, parent=None):
+        super().__init__(
+            parent,
+            title="Welcome to AI Voice Studio - Terms of Use",
+            style=wx.DEFAULT_DIALOG_STYLE & ~wx.CLOSE_BOX,
+        )
+        self._accepted = False
+
+        panel = wx.Panel(self)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+
+        intro = wx.StaticText(panel, label=(
+            "Welcome to AI Voice Studio.\n\n"
+            "Please read each point below carefully. You must accept "
+            "all of them to use this application."))
+        intro.Wrap(560)
+        sizer.Add(intro, 0, wx.ALL, 10)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+    <li><strong>Lines 3–8:</strong> the style expression<br>
+    <span class="desc"><code>wx.DEFAULT_DIALOG_STYLE &amp; ~wx.CLOSE_BOX</code> clears the close-box bit from a set of style flags. This removes the title-bar × button on platforms where the close box is part of that style — removing the obvious way to dismiss the dialog without deciding. It is a hint, not a guarantee, which is why the close <em>event</em> is also handled (81.5).</span></li>
+    <li><strong>Line 9:</strong> <code>self._accepted = False</code><br>
+    <span class="desc">State is initialised to the safe value. If any code path forgets to set it, the result is “not accepted”, and the application does not start — the failure mode leans in the safe direction.</span></li>
+    <li><strong>Lines 11–12:</strong> panel and vertical sizer<br>
+    <span class="desc">A <code>wx.Panel</code> gives the contents a proper background and correct tab order; the vertical sizer stacks the terms and lets <code>Fit</code> size the dialog around them.</span></li>
+    <li><strong>Lines 14–19:</strong> the introduction<br>
+    <span class="desc">Short, and it says what is required (“You must accept all of them”). A user who reads one line before ticking boxes should learn from it what the buttons will do.</span></li>
+    <li><strong>Line 20:</strong> <code>intro.Wrap(560)</code><br>
+    <span class="desc">A fixed wrap width keeps the dialog’s shape stable regardless of the platform’s font and DPI. Without it, the dialog is as wide as the longest sentence — which on a 100&nbsp;% or 150&nbsp;% DPI machine is off-screen.</span></li>
+  </ol>
+</div>
+
+<pre><code>        self._checkboxes = []
+        for index, text in enumerate(_TERMS, start=1):
+            wrapped = "\n".join(textwrap.wrap(text, width=90))
+            box = wx.CheckBox(panel, label=f"{index}.  {wrapped}")
+            box.Bind(wx.EVT_CHECKBOX, self._on_toggle)
+            self._checkboxes.append(box)
+            sizer.Add(box, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+
+        self._agree_all = wx.CheckBox(panel, label=_AGREE_ALL_LABEL)
+        self._agree_all.SetFont(self._agree_all.GetFont().Bold())
+        self._agree_all.Bind(wx.EVT_CHECKBOX, self._on_agree_all)
+        self._checkboxes.append(self._agree_all)
+        sizer.Add(self._agree_all, 0, wx.LEFT | wx.RIGHT | wx.TOP, 10)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+    <li><strong>Line 1:</strong> one list holds every checkbox<br>
+    <span class="desc">The term checkboxes <em>and</em> the agree-all one live in <code>self._checkboxes</code>. That single collection is what makes “is everything ticked?” a one-line expression — and it is also the reason the property below has to exist.</span></li>
+    <li><strong>Line 3:</strong> <code>textwrap.wrap(text, width=90)</code><br>
+    <span class="desc">The terms are long sentences. wxPython’s <code>wx.CheckBox</code> has no <code>Wrap()</code> method (unlike <code>StaticText</code>), so a long label is simply cut off or produces an absurdly wide dialog. Wrapping the string <em>before</em> creating the control — and joining the lines with <code>\n</code> — is the portable way to get a multi-line checkbox. The newline also preserves the full text for a screen reader.</span></li>
+    <li><strong>Line 4:</strong> the numbered label<br>
+    <span class="desc">“1.” through “6.” lets a screen-reader user say “I disagree with point 3” instead of reading the sentence aloud. The two spaces after the number keep the text visually aligned.</span></li>
+    <li><strong>Line 5:</strong> binding the handler<br>
+    <span class="desc">Every box gets <code>_on_toggle</code>, including the master one bound separately below, so any change updates the button state immediately. Re-using one handler is what keeps the gating logic in a single place.</span></li>
+    <li><strong>Lines 9–12:</strong> the master checkbox<br>
+    <span class="desc">Bold, because it means “all of the above”, and appended into the same list so that “all ticked” includes it. The requirement was explicit that the agree-all box itself is required — it is a shortcut for the other six, not a replacement for them.</span></li>
+  </ol>
+</div>
+
+<pre><code>        btn_row = wx.BoxSizer(wx.HORIZONTAL)
+        self._agree_btn = wx.Button(panel, wx.ID_OK, _AGREE_LABEL)
+        self._disagree_btn = wx.Button(panel, wx.ID_CANCEL, _DISAGREE_LABEL)
+        self._agree_btn.Bind(wx.EVT_BUTTON, self._on_agree)
+        self._disagree_btn.Bind(wx.EVT_BUTTON, self._on_disagree)
+        btn_row.Add(self._disagree_btn, 0, wx.RIGHT, 8)
+        btn_row.Add(self._agree_btn, 0, wx.LEFT, 8)
+        sizer.Add(btn_row, 0, wx.ALIGN_CENTRE | wx.ALL, 12)
+
+        panel.SetSizer(sizer)
+        sizer.Fit(self)
+        self.CentreOnScreen()
+
+        self.Bind(wx.EVT_CHAR_HOOK, self._on_char_hook)
+        self.Bind(wx.EVT_CLOSE, self._on_close)
+        self._on_toggle(None)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 4)</h4>
+  <ol>
+    <li><strong>Lines 2–3:</strong> explicit ids, explicit labels<br>
+    <span class="desc"><code>wx.ID_OK</code> and <code>wx.ID_CANCEL</code> are used for the standard “modal result” plumbing, while the visible text says exactly what each button does. <em>Disagree (Close Program)</em> tells the user the consequence before they press it — the honest alternative to “Cancel”.</span></li>
+    <li><strong>Line 8:</strong> <code>wx.ALIGN_CENTRE</code><br>
+    <span class="desc">(Native wx spelling.) Centring the two buttons gives the dialog a stable, symmetric shape that does not shift when one of them is disabled.</span></li>
+    <li><strong>Line 11:</strong> <code>sizer.Fit(self)</code><br>
+    <span class="desc">Sizes the dialog around its contents once, rather than hard-coding a pixel size. Text metrics differ between platforms and DPI settings; fitting is the only thing that behaves the same everywhere.</span></li>
+    <li><strong>Line 12:</strong> <code>self.CentreOnScreen()</code><br>
+    <span class="desc">On a multi-monitor setup a centred-on-parent dialog may open on a screen the user is not looking at. “On screen” (with no parent, since this dialog has none) is the right choice for a dialog that appears before the main window exists.</span></li>
+    <li><strong>Lines 14–15:</strong> the two escape hatches<br>
+    <span class="desc"><code>EVT_CHAR_HOOK</code> sees keystrokes <em>before</em> any child control, which is what makes an Escape handler reliable even when focus is inside a checkbox; <code>EVT_CLOSE</code> catches the window-close path. Both are handled in 81.5.</span></li>
+    <li><strong>Line 16:</strong> the initial gating<br>
+    <span class="desc">Calling the handler once at the end applies the rule to the freshly built state. Without it the buttons would be enabled until something is clicked — an inconsistency the user can see.</span></li>
+  </ol>
+</div>
+
+<h2>81.4 Gating, and a Master Checkbox</h2>
+
+<pre><code>    @property
+    def _term_checkboxes(self):
+        """Every checkbox except the final "agree with all" one."""
+        return self._checkboxes[:-1]
+
+    def _on_agree_all(self, event) -> None:
+        value = self._agree_all.GetValue()
+        for box in self._term_checkboxes:
+            box.SetValue(value)
+        self._on_toggle(None)
+
+    def _all_checked(self) -> bool:
+        return all(box.GetValue() for box in self._checkboxes)
+
+    def _on_toggle(self, event) -> None:
+        ready = self._all_checked()
+        self._agree_btn.Enable(ready)
+        self._disagree_btn.Enable(ready)</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 5)</h4>
+  <ol>
+    <li><strong>Lines 2–4:</strong> the slicing property<br>
+    <span class="desc">A name for “everything except the last one”, instead of <code>[:-1]</code> scattered through the class. If a future release adds a seventh term, only this property changes — the master checkbox still drives exactly the term list.</span></li>
+    <li><strong>Lines 6–9:</strong> the master handler<br>
+    <span class="desc">Reads the master box’s own value and copies it to every term box. Copying (rather than toggling) makes the operation idempotent: clicking the master twice leaves all boxes consistent, which is what a user expects and what makes the behaviour easy to test.</span></li>
+    <li><strong>Line 10:</strong> re-evaluating afterwards<br>
+    <span class="desc"><code>_on_toggle(None)</code> is called directly. Programmatic changes (<code>SetValue</code>) do <em>not</em> fire <code>EVT_CHECKBOX</code>, so without this call the buttons would stay disabled after the user ticked the master box — a real bug caught while testing this class.</span></li>
+    <li><strong>Lines 12–13:</strong> the single source of truth<br>
+    <span class="desc"><code>all(...)</code> over the whole list, including the master box. One expression answers the only question that matters, so “all of them, plus the agree-all one” cannot drift between code paths.</span></li>
+    <li><strong>Lines 15–18:</strong> the gating itself<br>
+    <span class="desc">Both buttons are enabled together. That is deliberate: the user should be able to make a decision either way once they have read the terms, and disabling only one of them would make “Disagree” unreachable and look like a trap.</span></li>
+    <li><strong>The parameter is <code>event</code>, and it is unused</strong><br>
+    <span class="desc">The handler is called both by events and directly with <code>None</code>, so the signature must accept the event object. A comment or a default value would do; passing <code>None</code> is the simplest convention and is used consistently here.</span></li>
+  </ol>
+</div>
+
+<h2>81.5 Every Exit Path Leads to “Not Accepted”</h2>
+
+<pre><code>    def _on_agree(self, event) -> None:
+        if not self._all_checked():
+            return
+        self._accepted = True
+        self._finish(wx.ID_OK)
+
+    def _on_disagree(self, event) -> None:
+        self._accepted = False
+        self._finish(wx.ID_NO)
+
+    def _finish(self, code: int) -> None:
+        if self.IsModal():
+            self.EndModal(code)
+        else:
+            self.Close()
+
+    def _on_char_hook(self, event) -> None:
+        if event.GetKeyCode() == wx.WXK_ESCAPE:
+            return
+        event.Skip()
+
+    def _on_close(self, event) -> None:
+        if not self._accepted:
+            self._accepted = False
+            if self.IsModal():
+                self.EndModal(wx.ID_NO)
+            else:
+                event.Skip()
+            return
+        event.Skip()</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 6)</h4>
+  <ol>
+    <li><strong>Lines 2–3:</strong> the re-check<br>
+    <span class="desc">The button is disabled when the conditions are not met, but the handler checks anyway. UI state and logic state are different things — a disabled button can still be activated by an accelerator, a test, or a stray programmatic <code>ProcessEvent</code>. The check costs one line and removes that class of accident.</span></li>
+    <li><strong>Lines 7–9:</strong> disagreement<br>
+    <span class="desc"><code>wx.ID_NO</code> (not <code>ID_CANCEL</code>) is returned, so the caller can distinguish “the user said no” from “something else closed this”. Callers that only care whether it is OK are unaffected.</span></li>
+    <li><strong>Lines 11–15:</strong> <code>_finish</code>, the modal/non-modal split<br>
+    <span class="desc">The important detail: <code>EndModal</code> on a dialog that was shown with <code>Show()</code> raises an assertion, and tests show dialogs non-modally. Asking <code>IsModal()</code> makes one code path serve the application (modal) and the tests (non-modal) without a test-only hook.</span></li>
+    <li><strong>Lines 17–20:</strong> the Escape hook<br>
+    <span class="desc">Escape is swallowed — the handler returns without calling <code>event.Skip()</code>, so no further handler ever sees the key. Swallowing is the correct response here: refusing the terms is a decision, and it should require pressing the button that says what it does. Every other key is forwarded with <code>event.Skip()</code> so normal navigation, <kbd>Tab</kbd> and <kbd>Space</kbd> keep working.</span></li>
+    <li><strong>Lines 22–29:</strong> the close handler<br>
+    <span class="desc">Reaching this method without acceptance means the user closed the window (title-bar ×, <kbd>Alt</kbd>+<kbd>F4</kbd>, a window manager command). The dialog then ends with <code>ID_NO</code> — closing is treated as disagreement, which is exactly the requirement that force-closing must not launch the application.</span></li>
+    <li><strong>Line 30:</strong> the accepted path<br>
+    <span class="desc">If the user already accepted, the close event is passed along normally (<code>event.Skip()</code>) so the window closes without a second result being reported.</span></li>
+  </ol>
+</div>
+
+<h2>81.6 Wiring It Into Start-Up</h2>
+
+<pre><code>def _require_terms_acceptance(settings: Settings) -> bool:
+    if terms_current(settings):
+        return True
+    log = logging.getLogger("main")
+    log.info("Showing first-launch terms acceptance dialog")
+    app = wx.App(False)
+    dialog = AcceptanceDialog(None)
+    try:
+        accepted = dialog.ShowModal() == wx.ID_OK and dialog.accepted
+    finally:
+        dialog.Destroy()
+    if accepted:
+        record_acceptance(settings)
+        log.info("Terms accepted (version %s)", settings.get("terms_version"))
+    else:
+        log.info("Terms not accepted - application will not start")
+    return accepted
+
+
+def main() -> int:
+    settings = Settings()
+    developer_mode = settings.get("developer_mode", False)
+    _setup_logging(developer_mode)
+
+    log = logging.getLogger("main")
+    log.info("AI Voice Studio starting (Python %s)", sys.version.split()[0])
+
+    if not _require_terms_acceptance(settings):
+        return 0
+
+    _init_python_runtime()
+    _init_addons()
+    _warm_package_cache()
+
+    app = wx.App(False)
+    store = ModelStore()
+    frame = MainFrame(None, settings, store)
+    apply_theme(frame, settings.theme)
+    frame.Show()
+    return app.MainLoop() or 0</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 7)</h4>
+  <ol>
+    <li><strong>Lines 2–3:</strong> the fast path<br>
+    <span class="desc">An accepted user pays one settings read. Nothing is imported and no window is created, which is what keeps the dialog from slowing down every launch for the rest of the version’s life.</span></li>
+    <li><strong>Lines 5–7:</strong> a <code>wx.App</code> for the dialog<br>
+    <span class="desc">wxPython needs an application object with a message loop before any window can be created. Creating it here — and letting the local reference go when the function returns — means the main window’s own <code>wx.App</code> in <code>main()</code> can be created afterwards without conflict (verified: a second <code>wx.App(False)</code> succeeds once the first is released).</span></li>
+    <li><strong>Line 8:</strong> reading both the result and the flag<br>
+    <span class="desc"><code>ShowModal() == wx.ID_OK</code> <em>and</em> <code>dialog.accepted</code>. Two independent conditions, which is the belt-and-braces version of a security-relevant check: a future refactor that returns <code>ID_OK</code> from the wrong place still cannot let the application start.</span></li>
+    <li><strong>Lines 9–10:</strong> <code>try/finally</code> with <code>Destroy()</code><br>
+    <span class="desc">Standard wx hygiene: the native window is released on every path, including an exception raised while showing the dialog.</span></li>
+    <li><strong>Lines 11–15:</strong> recording the outcome either way<br>
+    <span class="desc">Both branches log. The acceptance line includes the version that was accepted, which is the single most useful line when a user later asks “why did the dialog come back?”. The decline line makes a support question (“it closes immediately”) answerable from the log.</span></li>
+    <li><strong>Lines 22–23:</strong> before any subsystem<br>
+    <span class="desc">This position is deliberate. The check runs <em>after</em> logging is configured (so the dialog can be logged) and <em>before</em> the runtime, addons and package probes (so nothing expensive or network-touching happens for a user who has not accepted).</span></li>
+    <li><strong>Line 25:</strong> the early return<br>
+    <span class="desc">Returning <code>0</code> from <code>main()</code> means a clean exit code for “the user chose not to continue” — not an error. An installer or launcher that checks the exit code then does not report a failure.</span></li>
+  </ol>
+</div>
+
+<div class="warning">
+  <strong>A real bug this wiring produced once:</strong> an early version logged from a
+  helper that assumed the module-level <code>log</code> object, which did not exist at that
+  point in start-up — the frozen build died instantly with <code>NameError</code>. The
+  fix was to obtain the logger locally (<code>logging.getLogger("main")</code>) in the
+  function, and the lesson is general: code that runs <em>before</em> initialisation
+  completes may only rely on what it obtained itself. A frozen smoke test that launches
+  the packaged executable with an isolated data folder is what catches this class of bug.
+</div>
+
+<h2>81.7 Testing a Modal Dialog Without a User</h2>
+
+<table>
+  <thead><tr><th>Behaviour to prove</th><th>How the test drives it</th></tr></thead>
+  <tbody>
+    <tr><td>Buttons disabled until every box is ticked</td><td>build the dialog, assert <code>IsEnabled()</code> is <code>False</code>, tick all boxes, call the toggle handler, assert <code>True</code></td></tr>
+    <tr><td>Agree records the version</td><td>tick everything, call <code>_on_agree</code>, assert <code>settings.get("terms_version")</code></td></tr>
+    <tr><td>Disagree records nothing</td><td>tick everything, call <code>_on_disagree</code>, assert the setting is still empty</td></tr>
+    <tr><td>Master box drives the terms</td><td><code>SetValue(True)</code> on the master, call its handler, assert all six term boxes are ticked; then repeat with <code>False</code></td></tr>
+    <tr><td>Escape cannot dismiss</td><td>send <code>EVT_CHAR_HOOK</code> with <code>WXK_ESCAPE</code> and assert no result was produced</td></tr>
+    <tr><td>A new version re-prompts</td><td><code>terms_current()</code> against a settings object holding an older version string</td></tr>
+  </tbody>
+</table>
+
+<div class="tip">
+  Note how the tests call the handlers directly rather than simulating clicks. Because
+  the handlers take an <code>event</code> they never use, <code>handler(None)</code> works —
+  a small design decision that makes a whole class of dialog testable without a robot.
+</div>
+
+<h2>81.8 Mini Project: A Settings-Backed One-Time Prompt</h2>
+
+<p>The same pattern, minus wx, for anything you build yourself:</p>
+
+<pre><code>import json, os
+
+PROMPT_VERSION = "3"
+PATH = os.path.join(os.path.expanduser("~"), ".my_tool_state.json")
+
+
+def load_state():
+    try:
+        with open(PATH, encoding="utf-8") as handle:
+            return json.load(handle)
+    except (OSError, ValueError):
+        return {}
+
+
+def save_state(state):
+    with open(PATH, "w", encoding="utf-8") as handle:
+        json.dump(state, handle, indent=2)
+
+
+def needs_prompt():
+    return load_state().get("accepted_version") != PROMPT_VERSION
+
+
+def mark_accepted():
+    state = load_state()
+    state["accepted_version"] = PROMPT_VERSION
+    save_state(state)</code></pre>
+
+<p>Bump <code>PROMPT_VERSION</code> when the text changes; a new installation (no state
+file) prompts automatically because the missing key never equals the version.</p>
+
+<div class="exercise">
+  <ol>
+    <li>Why is the close event treated as disagreement rather than being ignored?
+    What would “ignore” mean for the user?</li>
+    <li>Add a seventh term in a scratch copy. Which lines of the dialog change, and which
+    do not? Explain using <code>_term_checkboxes</code>.</li>
+    <li>Delete the <code>_on_toggle(None)</code> call at the end of <code>__init__</code>
+    and describe the visible symptom on a real launch.</li>
+    <li>Write a test that proves a settings file carrying the previous terms version
+    re-prompts, and one that proves the current version does not. Run both.</li>
+  </ol>
+</div>
+
+<h2>81.9 Key Takeaways</h2>
+<ul>
+  <li>Gate on a <strong>versioned</strong> acceptance value, not on a boolean, if future updates must re-prompt</li>
+  <li>Set the safe default first and check twice at the boundary: style tricks and disabled buttons are hints, not guarantees</li>
+  <li>Handle Escape with <code>EVT_CHAR_HOOK</code> and the close box with <code>EVT_CLOSE</code>; both must lead to “not accepted”</li>
+  <li>Programmatic <code>SetValue</code> fires no events — call the state handler yourself</li>
+  <li>Branch on <code>IsModal()</code> so one implementation serves the application and the tests</li>
+  <li>Run the prompt before any subsystem initialisation, and log both outcomes with the version</li>
+  <li>Uninstallers leave user data behind: the version bump is the only reliable re-prompt</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch80_start_selected_recording.html">← Ch 80</a> &nbsp;|&nbsp; <a href="ch82_licensing.html">Ch 82 — Licensing &amp; Compliance →</a></p>
+</div></div></body>
+</html>

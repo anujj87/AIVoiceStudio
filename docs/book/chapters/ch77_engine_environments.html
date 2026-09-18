@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 77: One Python Environment per Engine - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part X — Voice Lab &amp; the Current System</div><ul class="chapters"><li><a href="ch76_voicelab_engines.html">Ch 76: Voice Lab Engines</a></li><li><a href="ch77_engine_environments.html" class="active">Ch 77: One Environment per Engine</a></li><li><a href="ch78_compute_choice.html">Ch 78: Compute Choice</a></li><li><a href="ch79_audio_io_shim.html">Ch 79: Audio I/O Without FFmpeg</a></li><li><a href="ch80_start_selected_recording.html">Ch 80: Start Selected Recording</a></li><li><a href="ch81_terms_dialog.html">Ch 81: First-Launch Terms</a></li><li><a href="ch82_licensing.html">Ch 82: Licensing &amp; Compliance</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 77</div>
+<h1>One Python Environment per Engine</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Create and manage a virtualenv per engine, from inside a frozen application</li>
+  <li>Map an engine id to an environment folder deterministically</li>
+  <li>Answer “is this package installed?” three ways — cached, asynchronous and straight from disk</li>
+  <li>Plan a CUDA-aware pip install, and understand why the wheel index matters</li>
+  <li>Verify an installation by importing the engine, and explain the failures that check catches</li>
+</ul>
+
+<hr>
+
+<h2>77.1 The Problem: One Shared Environment Cannot Hold Two Engines</h2>
+
+<p>TTS engines are ordinary Python packages that depend on machine-learning
+frameworks. Their requirements conflict constantly:</p>
+
+<ul>
+  <li>two engines need two different <code>torch</code> releases;</li>
+  <li>one engine pins <code>transformers&lt;4.40</code> while another needs 4.46+;</li>
+  <li>one engine ships a <code>torchao</code>-style sub-dependency whose module was
+  <em>renamed</em> in a later release, so a newer version breaks the engine at import
+  time even though pip considers the install valid.</li>
+</ul>
+
+<p>This is exactly the failure mode that made the project move from one shared
+environment to <strong>one environment per engine</strong>. The layout is:</p>
+
+<pre><code>%APPDATA%\AIVoiceStudio\
+├── addon_env\                 shared environment (addons, Developer tab)
+└── tts_envs\
+    ├── pocket_tts\            Pocket TTS only
+    ├── bark\                  Bark + transformers + torch
+    ├── f5tts\                 F5-TTS + torch + torchaudio
+    └── omnivoice\             OmniVoice + OmniVoice Server (shared on purpose)</code></pre>
+
+<div class="info">
+  Engines that genuinely want the same packages may share an environment. In this
+  project the two OmniVoice front-ends (the direct runner and the HTTP server) both
+  need the same <code>omnivoice</code> base package and the same CUDA PyTorch, so a
+  second environment would only duplicate gigabytes of wheels. That exception is
+  written down as data (<code>SHARED_ENVIRONMENTS</code>) rather than hidden in a
+  condition somewhere in the GUI.
+</div>
+
+<h2>77.2 Mapping an Engine to Its Environment</h2>
+
+<pre><code>def _safe_env_name(engine_id: str | None) -> str:
+    name = "".join(
+        char if char.isalnum() or char in "_-" else "_"
+        for char in (engine_id or "").strip().lower()
+    )
+    return name or "default"
+
+
+def environment_id(engine_id: str | None) -> str:
+    name = _safe_env_name(engine_id)
+    return SHARED_ENVIRONMENTS.get(name, name)
+
+
+def engine_env_dir(engine_id: str) -> str:
+    return os.path.join(
+        paths.user_data_dir(), _TTS_ENVS_DIR, environment_id(engine_id)
+    )</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+    <li><strong>Lines 1–6:</strong> <code>_safe_env_name</code><br>
+    <span class="desc">Sanitises an id into a safe folder name: every character that is not alphanumeric, <code>_</code> or <code>-</code> becomes <code>_</code>, and the result is lower-cased. This matters because the folder name is built from data that arrives from the registry, a settings file or a test — and a stray character would otherwise create a path that Windows refuses. The <code>or "default"</code> tail guarantees a non-empty name even for <code>None</code>.</span></li>
+    <li><strong>Lines 9–11:</strong> <code>environment_id</code><br>
+    <span class="desc">The single place where “which environment does engine X use?” is answered. Two OmniVoice ids collapse onto one folder here, which means <em>every</em> caller — installer, uninstaller, probe cache, worker starter — agrees automatically. Putting this mapping anywhere else would eventually produce an install in one folder and a probe in another.</span></li>
+    <li><strong>Lines 14–18:</strong> <code>engine_env_dir</code><br>
+    <span class="desc"><code>paths.user_data_dir()</code> resolves per-user, per-OS state (<code>%APPDATA%</code> on Windows, <code>~/.local/share</code> on Linux, <code>~/Library/Application Support</code> on macOS), so the application never writes inside its own installation folder — which matters because the installation folder is read-only for a normal user.</span></li>
+  </ol>
+</div>
+
+<p>The runtime object itself is a thin wrapper over one environment directory:</p>
+
+<pre><code>class PythonRuntime:
+    def __init__(self, env_dir: str | None = None):
+        self._env_dir = env_dir or os.path.join(
+            paths.user_data_dir(), _ADDON_ENV_DIR
+        )
+        self._system_python: str | None = None
+        self._lock = threading.RLock()
+
+    @property
+    def python_exe(self) -> str:
+        return _python_exe_for_env(self._env_dir)
+
+    @property
+    def is_created(self) -> bool:
+        return os.path.isfile(self.python_exe)
+
+    @property
+    def site_packages_dirs(self) -> List[str]:
+        found: List[str] = []
+        for pattern in ("Lib/site-packages", "lib/python*/site-packages"):
+            found.extend(sorted(glob.glob(os.path.join(self._env_dir, pattern))))
+        return [path for path in found if os.path.isdir(path)]
+
+    def ensure_env(self) -> str:
+        if self.is_created:
+            return self._env_dir
+        os.makedirs(self._env_dir, exist_ok=True)
+        subprocess.run(
+            [self.system_python, "-m", "venv", self._env_dir, "--clear"],
+            capture_output=True, text=True, check=True,
+            cwd=tempfile.gettempdir(), creationflags=creationflags,
+        )
+        return self._env_dir</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+    <li><strong>Lines 2–5:</strong> the constructor<br>
+    <span class="desc">An explicit <code>env_dir</code> makes the class testable with a temporary folder; the default is the shared addon environment, so existing addon code is unchanged. <code>_system_python</code> is filled lazily (finding a base interpreter is a search) and a lock guards it, because several threads may build a runtime at once.</span></li>
+    <li><strong>Lines 8–9:</strong> <code>python_exe</code><br>
+    <span class="desc">A tiny platform-aware function chooses <code>Scripts/python.exe</code> on Windows versus <code>bin/python</code> elsewhere. Centralising it means no other module ever hard-codes a path separator.</span></li>
+    <li><strong>Lines 12–13:</strong> <code>is_created</code><br>
+    <span class="desc">The environment exists when its interpreter exists. That is the cheapest reliable test: a half-built folder without an interpreter is correctly treated as “not created”, and the next install repairs it.</span></li>
+    <li><strong>Lines 16–21:</strong> <code>site_packages_dirs</code><br>
+    <span class="desc">Returns the folder(s) that hold installed packages, looking for both the Windows layout and the POSIX layout with a wildcarded Python version. Two layouts, one list — and the empty list is a valid answer meaning “nothing installed yet”. This property is the foundation of the synchronous disk probes in 77.4.</span></li>
+    <li><strong>Lines 23–31:</strong> <code>ensure_env</code><br>
+    <span class="desc">Idempotent by design (<code>if self.is_created: return</code>), then creates the virtualenv with the <em>system</em> interpreter — a frozen PyInstaller application cannot use <code>sys.executable</code> for this, because that is the application itself. <code>check=True</code> turns a failed <code>venv</code> creation into an exception the caller can report, and <code>cwd=tempfile.gettempdir()</code> avoids inheriting a working directory that may no longer exist, which is a classic way for subprocess creation to fail on a background thread.</span></li>
+  </ol>
+</div>
+
+<pre><code>def get_runtime(engine_id: str | None = None) -> PythonRuntime:
+    global _default_runtime
+    if not engine_id:
+        if _default_runtime is None:
+            with _runtime_lock:
+                if _default_runtime is None:
+                    _default_runtime = PythonRuntime()
+        return _default_runtime
+    key = environment_id(engine_id)
+    with _runtime_lock:
+        runtime = _engine_runtimes.get(key)
+        if runtime is None:
+            runtime = PythonRuntime(engine_env_dir(engine_id))
+            _engine_runtimes[key] = runtime
+        return runtime</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+    <li><strong>Line 1:</strong> the optional <code>engine_id</code><br>
+    <span class="desc">Calling it with no argument returns the shared environment; calling it with an id returns that engine’s own environment. One function serves both, so callers never pick a class.</span></li>
+    <li><strong>Lines 3–8:</strong> the double-checked singleton<br>
+    <span class="desc">The lock is taken only on a miss, and inside it the check is repeated. Two threads racing to build the shared runtime end up with one object — important because two runtime objects would each cache their own “is it created?” answer and could disagree.</span></li>
+    <li><strong>Lines 9–14:</strong> the per-engine dictionary<br>
+    <span class="desc">Keyed by <code>environment_id</code>, <em>not</em> by engine id, so the two OmniVoice engines deliberately share one runtime object.</span></li>
+  </ol>
+</div>
+
+<h2>77.3 Installing: Two pip Steps, Not One</h2>
+
+<p>On a machine with an NVIDIA GPU, the plain PyPI <code>torch</code> wheel for
+Windows is <strong>CPU-only</strong>. A GPU engine therefore needs wheels from
+PyTorch’s own index. Those wheels are not mirrored on PyPI, and the index does not
+carry the engine’s other packages — so the install is planned as an ordered list
+of steps:</p>
+
+<pre><code>PYTORCH_CUDA_INDEX = "https://download.pytorch.org/whl/cu128"
+
+_CUDA_PACKAGES = {
+    "pocket_tts": ("torch",),
+    "bark": ("torch",),
+    "f5tts": ("torch", "torchaudio"),
+}
+
+
+def install_plan(engine_id):
+    packages = list(packages_for(engine_id))
+    steps = []
+    cuda = list(engines.cuda_packages(engine_id))
+    index = engines.cuda_index_url(engine_id)
+    if cuda and index and has_cuda() and not venv_packages.installed(
+        "torch", engine=engine_id
+    ):
+        steps.append((cuda, index))
+        packages = [p for p in packages if p not in cuda]
+    if packages:
+        steps.append((packages, None))
+    return steps</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 4)</h4>
+  <ol>
+    <li><strong>Line 1:</strong> <code>PYTORCH_CUDA_INDEX</code><br>
+    <span class="desc">The wheel index for CUDA builds. The <code>cu128</code> tag is chosen to match the Python the application runs on: an older index (<code>cu121</code>) stops at Python 3.12 and has no wheels at all for 3.13, which produces the infuriating <em>“No matching distribution found for torch”</em> while installing an engine. Version tags like this belong in exactly one constant — and the OmniVoice installers read the same constant, so every CUDA wheel in the product comes from one index.</span></li>
+    <li><strong>Lines 3–7:</strong> <code>_CUDA_PACKAGES</code><br>
+    <span class="desc">Which packages must come from that index <em>per engine</em>. F5-TTS needs <code>torchaudio</code> as well, and taking the two from the same index is what stops a build mix (a CUDA <code>torch</code> with a CPU <code>torchaudio</code> is a runtime crash, not a warning).</span></li>
+    <li><strong>Line 10:</strong> <code>packages = list(packages_for(engine_id))</code><br>
+    <span class="desc">Start from the full list the registry declares, then remove whatever the CUDA step already installed. The registry stays the single source of truth about <em>what</em> is needed; the plan only decides <em>from where</em>.</span></li>
+    <li><strong>Line 13:</strong> the condition<br>
+    <span class="desc">Three independent facts must hold: the engine has CUDA packages, the index is known, an NVIDIA GPU with a working driver is present, and PyTorch is not already installed in this environment. The last clause is what makes a re-run cheap and avoids re-downloading gigabytes when only a small package is missing.</span></li>
+    <li><strong>Lines 14–15:</strong> step one<br>
+    <span class="desc">The CUDA packages plus the index URL. Returning <code>(packages, index)</code> pairs — rather than a single command line — lets the GUI show each step’s progress and keeps the pip invocation in one place.</span></li>
+    <li><strong>Lines 16–17:</strong> step two<br>
+    <span class="desc">Everything else from the default index (<code>None</code> means “no <code>--index-url</code>”). Ordering matters: installing the CUDA build first prevents pip from resolving a CPU torch as a dependency of the engine and then having nothing to do in step one.</span></li>
+  </ol>
+</div>
+
+<div class="warning">
+  <strong>Never put version specifiers in the registry’s <code>packages</code> tuple.</strong>
+  The same tuple feeds “Remove engine…”, and <code>pip uninstall "torchao&lt;0.18"</code>
+  fails — leaving the user with an engine that cannot be removed. Compatibility pins
+  are applied as an install-time step, not as the package name.
+</div>
+
+<h2>77.4 Three Answers to “Is It Installed?”</h2>
+
+<p>The Settings dialog builds all of its pages up front. The original code asked
+the question by starting <code>python -c "import importlib.metadata…"</code> inside
+the environment — a second or more per package, a dozen of them, all while the
+window was being drawn. The current module answers the same question three ways:</p>
+
+<table>
+  <thead><tr><th>API</th><th>Cost</th><th>Used by</th></tr></thead>
+  <tbody>
+    <tr><td><code>version(pkg, engine=…)</code></td><td>memory; on a cold cache it starts one background probe <em>and</em> reads disk</td><td>labels that must fill in while the window stays responsive</td></tr>
+    <tr><td><code>request(pkg, on_ready=…, engine=…)</code></td><td>one worker thread</td><td>panels that want to refresh themselves when the answer arrives</td></tr>
+    <tr><td><code>package_present(pkg, engine=…)</code></td><td>a directory listing, synchronous</td><td>deciding <em>which interpreter the worker must run with</em></td></tr>
+  </tbody>
+</table>
+
+<pre><code>def _disk_distributions(engine: Optional[str] = None) -> Dict[str, str]:
+    try:
+        from .python_runtime import get_runtime
+        folders = get_runtime(engine).site_packages_dirs
+    except Exception:
+        return {}
+    found: Dict[str, str] = {}
+    for folder in folders:
+        try:
+            stamp = os.path.getmtime(folder)
+        except OSError:
+            continue
+        with _lock:
+            entry = _disk_cache.get(folder)
+        if entry is not None and entry[0] == stamp:
+            found.update(entry[1])
+            continue
+        listed: Dict[str, str] = {}
+        try:
+            for name in os.listdir(folder):
+                if not name.endswith(".dist-info"):
+                    continue
+                distribution, _, version_text = name[:-len(".dist-info")].partition("-")
+                listed[_normalize(distribution)] = version_text
+        except OSError:
+            continue
+        with _lock:
+            _disk_cache[folder] = (stamp, listed)
+        found.update(listed)
+    return found</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 5)</h4>
+  <ol>
+    <li><strong>Lines 2–5:</strong> getting the folders<br>
+    <span class="desc">Delegates to the runtime object so this module never builds a path itself. Wrapped in <code>try/except</code> returning an empty dict: “I cannot tell” must not crash a GUI that is merely drawing a label.</span></li>
+    <li><strong>Lines 7–12:</strong> the stamp check<br>
+    <span class="desc">The folder’s modification time is the cache key. Any pip operation changes it, so the cache is invalidated by the act of installing — without a single explicit “please clear the cache” call from the installer.</span></li>
+    <li><strong>Lines 13–20:</strong> the listing<br>
+    <span class="desc">Every installed distribution leaves a <code>&lt;name&gt;-&lt;version&gt;.dist-info</code> folder. Splitting on the <em>first</em> dash (<code>partition</code>) and stripping the suffix yields name and version, and <code>_normalize()</code> applies PEP&nbsp;503 normalisation so <code>f5_tts</code>, <code>f5-tts</code> and <code>F5.TTS</code> are one key. Reading files instead of importing them is why this is safe on the GUI thread.</span></li>
+    <li><strong>Lines 21–26:</strong> caching and merging<br>
+    <span class="desc">The listing is stored under the stamp and merged into one dictionary across folders. A partially written directory (pip is mid-install) is handled by the outer <code>OSError</code> guard: the next call sees a new stamp and re-reads.</span></li>
+  </ol>
+</div>
+
+<pre><code>def package_present(package: str, engine: Optional[str] = None) -> bool:
+    name = _normalize(package)
+    if not name:
+        return False
+    if name in _disk_distributions(engine):
+        return True
+    try:
+        folders = get_runtime(engine).site_packages_dirs
+    except Exception:
+        return False
+    stem = name.replace("-", "_")
+    for folder in folders:
+        if os.path.isdir(os.path.join(folder, stem)):
+            return True
+        if os.path.isfile(os.path.join(folder, stem + ".py")):
+            return True
+    return False</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 6)</h4>
+  <ol>
+    <li><strong>Lines 2–5:</strong> the normalised short-circuit<br>
+    <span class="desc">An empty name can never match, and the fast path asks the same disk listing used everywhere else.</span></li>
+    <li><strong>Lines 9–13:</strong> the fallbacks<br>
+    <span class="desc">Some hand-patched or vendor-installed environments have the importable module or package folder but no <code>dist-info</code> metadata (this is common with wheels unpacked by other tools). Accepting a folder <code>stem/</code> or a module <code>stem.py</code> means such an environment is still detected as usable rather than looking empty.</span></li>
+    <li><strong>The point of the function</strong><br>
+    <span class="desc">It is <em>synchronous and cache-free</em>. It exists for exactly one decision, described next, where a slightly stale answer would send a worker into the wrong environment.</span></li>
+  </ol>
+</div>
+
+<h2>77.5 Choosing the Interpreter for the Worker</h2>
+
+<p>This is where the three probes earn their keep. A worker started in the wrong
+environment does not report the engine’s real error; it reports
+<code>ModuleNotFoundError: No module named 'torch'</code> — a message that says
+nothing about which environment was used and sends the reader hunting in the wrong
+place.</p>
+
+<pre><code>def _runtime(self):
+    required = tuple(engines.import_modules(self.engine_id)) or (
+        engines.probe_package(self.engine_id),
+    )
+    required = tuple(name for name in required if name)
+    engine_runtime = get_runtime(self.engine_id)
+    if engine_runtime.is_created and (
+        not required
+        or all(venv_packages.package_present(name, engine=self.engine_id)
+               for name in required)
+    ):
+        return engine_runtime
+    runtime = get_runtime()
+    if not runtime.is_created:
+        runtime.ensure_env()
+    if not required or all(venv_packages.package_present(name) for name in required):
+        return runtime
+    raise VoicelabError(
+        f"{engines.engine_name(self.engine_id)} is not installed in its own "
+        "Python environment any more. Install it again from Settings > Voice Clone."
+    )</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 7)</h4>
+  <ol>
+    <li><strong>Lines 2–5:</strong> what the engine needs<br>
+    <span class="desc">The worker’s own module list (the same tuple the worker checks at start-up) with the single probe package as a fallback. The list is <em>shared data</em>: the worker and the application must not disagree about what “installed” means, and there is a test asserting the two copies have not drifted apart.</span></li>
+    <li><strong>Lines 6–12:</strong> prefer the engine’s own environment<br>
+    <span class="desc">Both conditions are required: the environment must exist <em>and</em> every required module must be present in it, checked with the synchronous <code>package_present</code>. Using the cached probe here would be the bug the docstring warns about — a probe that has not answered yet returns <code>None</code>, which reads as “not installed”, which silently downgrades to the shared environment.</span></li>
+    <li><strong>Lines 13–16:</strong> the fallback<br>
+    <span class="desc">Engines installed before per-engine environments existed still live in the shared environment, so an installation is honoured there. The environment is created if missing, because the caller is about to start a process in it.</span></li>
+    <li><strong>Lines 17–21:</strong> the honest failure<br>
+    <span class="desc">If neither environment can satisfy the engine, the error says so and tells the user exactly what to do. This is the difference between a support ticket that reads “it says No module named torch” and one that reads “it told me to reinstall the engine”.</span></li>
+  </ol>
+</div>
+
+<h2>77.6 Verify the Install, Do Not Assume It</h2>
+
+<p>pip succeeding means the dependency graph resolved — <em>not</em> that the engine
+can import. A resolved combination can still fail at import time when a
+sub-dependency renamed a module. So after installing, the application imports the
+engine once, in its own environment, and reports what happens:</p>
+
+<pre><code>def verify_engine_import(engine_id: str, timeout: float = 300.0) -> Optional[str]:
+    modules = engines.import_modules(engine_id)
+    if not modules:
+        return None
+    try:
+        runtime = get_runtime(engine_id)
+        if not runtime.is_created:
+            return None
+        python_exe = runtime.python_exe
+    except Exception as exc:
+        return f"Could not start the engine's Python environment: {exc}"
+    if not os.path.isfile(python_exe):
+        return None
+    script = "import " + ", ".join(modules)
+    try:
+        result = subprocess.run(
+            [python_exe, "-c", script],
+            capture_output=True, text=True, timeout=timeout,
+            creationflags=flags,
+        )
+    except subprocess.TimeoutExpired:
+        return (f"Loading {engines.engine_name(engine_id)} took too long "
+                f"({int(timeout)}s) and was stopped.")
+    except OSError as exc:
+        return f"Could not run the engine's Python environment: {exc}"
+    if result.returncode == 0:
+        return None
+    detail = (result.stderr or result.stdout or "").strip().splitlines()
+    last = detail[-1] if detail else f"exit code {result.returncode}"
+    return f"{engines.engine_name(engine_id)} is installed but failed to load: {last}"</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 8)</h4>
+  <ol>
+    <li><strong>Lines 2–4:</strong> the module list<br>
+    <span class="desc">Exactly the modules the worker will need. An empty list means the registry has nothing to verify and the check is skipped rather than guessed.</span></li>
+    <li><strong>Lines 5–11:</strong> the interpreter<br>
+    <span class="desc">Each failure to even locate the environment is converted into a message, not an exception: this function’s return value <em>is</em> the user-facing report, so it tells rather than raises.</span></li>
+    <li><strong>Line 13:</strong> <code>script = "import " + ", ".join(modules)</code><br>
+    <span class="desc">One interpreter run imports everything at once, so the empty case cannot happen and the cost is a single process start-up.</span></li>
+    <li><strong>Lines 15–21:</strong> the subprocess call<br>
+    <span class="desc">A 300-second timeout is deliberately generous: the first import of a large model package may load native libraries from disk and take minutes on a cold cache, and killing it would report a false failure. <code>text=True</code> decodes the output so it can be shown verbatim.</span></li>
+    <li><strong>Lines 22–24:</strong> the timeout branch<br>
+    <span class="desc">Telling the user “it took too long and was stopped” is honest and actionable; letting the GUI hang behind an import would look like a freeze.</span></li>
+    <li><strong>Lines 27–30:</strong> the failure branch<br>
+    <span class="desc">Only the <em>last</em> line of stderr is surfaced. Python tracebacks end with the genuinely informative line, and the full traceback is far too long for a dialog — it belongs in the log, which the install dialog also writes.</span></li>
+    <li><strong>A note on the return convention</strong><br>
+    <span class="desc">“Problem, or <code>None</code>” keeps the caller trivial: <code>problem = verify_engine_import(id); if problem: show(problem)</code>. Compare that to a function that raises, where the caller must also remember to catch.</span></li>
+  </ol>
+</div>
+
+<div class="tip">
+  This check is the single highest-value addition to the installer flow. A missing
+  module discovered during installation costs a minute; discovered three chapters
+  into recording, it costs the trust of the whole feature.
+</div>
+
+<h2>77.7 Mini Project: Inspect the Environments From Python</h2>
+
+<pre><code>from ai_voice_studio import python_runtime, venv_packages
+
+for engine_id in ("pocket_tts", "bark", "f5tts"):
+    runtime = python_runtime.get_runtime(engine_id)
+    print(f"{engine_id:12} env={runtime.env_dir}")
+    print(f"{'':12} created={runtime.is_created}")
+    for package in ("torch", "torchaudio", "soundfile"):
+        present = venv_packages.package_present(package, engine=engine_id)
+        print(f"{'':12} {package:10} {present}")</code></pre>
+
+<p>Run it once before an install and once after, and you are watching the same
+decision <code>CloneWorker._runtime</code> makes when it picks an interpreter.</p>
+
+<div class="exercise">
+  <ol>
+    <li>Why does <code>environment_id()</code> exist instead of every caller using
+    <code>engine_id</code> directly? Give one concrete bug the current design prevents.</li>
+    <li>Add a fourth entry to <code>SHARED_ENVIRONMENTS</code> that makes
+    <code>f5tts</code> use the <code>bark</code> environment. Predict which tests would
+    fail, then run the suite and compare.</li>
+    <li>Write a small script that prints <code>install_plan("bark")</code> on this
+    machine. Explain the output for a machine with an NVIDIA GPU and for one without.</li>
+    <li>Time <code>venv_packages.version()</code> on a cold cache versus a warm one.
+    Then explain why the cold path still answers correctly instead of returning
+    <code>None</code>.</li>
+  </ol>
+</div>
+
+<h2>77.8 Key Takeaways</h2>
+<ul>
+  <li>One virtualenv per engine is the only reliable answer to conflicting ML dependencies</li>
+  <li>Map ids to environments in <em>one</em> function so every subsystem agrees</li>
+  <li>CUDA wheels come from PyTorch’s index, in a separate pip step, keyed to the Python version in use</li>
+  <li>Answer “is it installed?” from disk when correctness matters, and asynchronously when responsiveness matters</li>
+  <li>Never let a non-blocking cache decide which interpreter starts a worker</li>
+  <li>Verify by importing — a successful pip run is not a working engine</li>
+  <li>Never put version specifiers in the list used for uninstalling</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch76_voicelab_engines.html">← Ch 76</a> &nbsp;|&nbsp; <a href="ch78_compute_choice.html">Ch 78 — Compute Choice →</a></p>
+</div></div></body>
+</html>

@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 76: Voice Lab Engine Subsystem - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part X — Voice Lab &amp; the Current System</div><ul class="chapters"><li><a href="ch76_voicelab_engines.html" class="active">Ch 76: Voice Lab Engines</a></li><li><a href="ch77_engine_environments.html">Ch 77: One Environment per Engine</a></li><li><a href="ch78_compute_choice.html">Ch 78: Compute Choice</a></li><li><a href="ch79_audio_io_shim.html">Ch 79: Audio I/O Without FFmpeg</a></li><li><a href="ch80_start_selected_recording.html">Ch 80: Start Selected Recording</a></li><li><a href="ch81_terms_dialog.html">Ch 81: First-Launch Terms</a></li><li><a href="ch82_licensing.html">Ch 82: Licensing &amp; Compliance</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 76</div>
+<h1>Voice Lab: Building a Voice-Cloning Engine Subsystem</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Design a plugin registry that describes engines as data instead of code</li>
+  <li>Turn a pip-installed model package into a catalog-shaped voice entry</li>
+  <li>Drive a long-lived worker subprocess over a JSON-lines protocol</li>
+  <li>Plug one engine wrapper into an existing engine cache without touching call sites</li>
+  <li>Separate <em>pure</em> request-building code (easy to test) from the process code around it</li>
+</ul>
+
+<hr>
+
+<h2>76.1 Why a New Subsystem Was Needed</h2>
+
+<p>The first version of the Voice Clone page drove a single engine through one
+dedicated client class. Every new clone engine then promised the same four
+things — <em>install me</em>, <em>list my voices</em>, <em>load my model once</em>,
+<em>speak text</em> — but with completely different Python packages, different
+package names and different numbers of built-in voices. Writing one client per
+engine would have multiplied the same bugs by three.</p>
+
+<p>The current design keeps the shape of the app (<code>tts.engine.get_engine</code>
+still returns something with a <code>synthesize()</code> method) and puts all the
+differences into <strong>data</strong>:</p>
+
+<table>
+  <thead><tr><th>Concern</th><th>Where it lives now</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td>Which engines exist, what they install, which voices they ship</td><td><code>voicelab/engines.py</code></td><td>Pure data — importable without PyTorch, no GUI, testable</td></tr>
+    <tr><td>Per-engine tuning knobs (steps, temperature, seed…)</td><td><code>voicelab/options.py</code></td><td>One shared vocabulary, validated in one place</td></tr>
+    <tr><td>Actually running an engine</td><td><code>voicelab/worker.py</code> (standalone script)</td><td>PyTorch must never be imported into the GUI process</td></tr>
+    <tr><td>Talking to the worker</td><td><code>voicelab/__init__.py</code> (<code>CloneWorker</code>)</td><td>One IPC implementation for every engine</td></tr>
+    <tr><td>App-facing adapter</td><td><code>VoicelabEngine</code></td><td>Implements the existing <code>TtsEngine.synthesize</code> contract</td></tr>
+  </tbody>
+</table>
+
+<div class="info">
+  The three engines in the current build are <strong>Pocket TTS</strong> (Kyutai,
+  <code>pocket-tts</code>), <strong>Bark</strong> (Suno, via <code>transformers</code>)
+  and <strong>F5-TTS</strong> (<code>f5-tts</code>). All three run on the CPU and can
+  additionally run on an NVIDIA GPU — see <a href="ch78_compute_choice.html">Chapter 78</a>.
+  An earlier fourth engine (NeuTTS) was removed from the project: it required a
+  Hugging&nbsp;Face login, which no part of this application should depend on.
+</div>
+
+<h2>76.2 Engines as Data: the Registry</h2>
+
+<p>Every engine is one dictionary. The fields are deliberately small in number,
+because each one has exactly one consumer:</p>
+
+<pre><code>{
+    "id": "pocket_tts",
+    "name": "Pocket TTS (Kyutai)",
+    "engine": "pocket_tts",
+    "package": "pocket-tts",
+    "packages": ("pocket-tts", "soundfile", "scipy"),
+    "license": "Apache-2.0 (code); per-voice licenses",
+    "homepage": "https://github.com/kyutai-labs/pocket-tts",
+    "size_hint": "~450 MB (model) + PyTorch",
+    "devices": "cpu+gpu",
+    "voice_cloning": True,
+    "note": ( ... one paragraph shown in the UI ... ),
+    "languages": _languages(("en", "fr", "de", "es", "it", "pt"),
+                            "pocket_v1", "Pocket TTS 100M"),
+}</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 1)</h4>
+  <ol>
+    <li><strong>Lines 1–3:</strong> <code>id</code>, <code>name</code>, <code>engine</code><br>
+    <span class="desc"><code>id</code> is the key used everywhere else (settings keys, voice entries, worker requests). <code>name</code> is only ever displayed. <code>engine</code> is the string the voice entry carries so that <code>tts.engine.get_engine</code> can find the right wrapper; keeping it equal to <code>id</code> is a convention, not a requirement.</span></li>
+    <li><strong>Line 4:</strong> <code>"package": "pocket-tts"</code><br>
+    <span class="desc">The <em>single</em> pip distribution whose presence means “this engine is installed”. Chapter 77 shows how this one string decides both “Install engine…” availability and which virtualenv the worker is started with.</span></li>
+    <li><strong>Line 5:</strong> <code>"packages": (...)</code><br>
+    <span class="desc">Everything handed to <code>pip install</code>. Plain names only — deliberately no version specifiers, because the same tuple is used by “Remove engine” and <code>pip uninstall</code> cannot accept requirements like <code>name&lt;1.0</code>.</span></li>
+    <li><strong>Line 6:</strong> <code>"license"</code><br>
+    <span class="desc">Shown in the install dialog and matched by the licence table in the packaged <code>THIRD-PARTY-LICENSES.html</code> (Chapter 82). F5-TTS is the important case: the <em>code</em> is MIT while the <em>weights</em> are CC-BY-NC-4.0, which forbids commercial use.</span></li>
+    <li><strong>Lines 7–8:</strong> <code>homepage</code>, <code>size_hint</code><br>
+    <span class="desc">Documentation the user can act on before downloading gigabytes. <code>size_hint</code> is a string on purpose: it is an estimate for humans, not a number any code branches on.</span></li>
+    <li><strong>Line 9:</strong> <code>"devices": "cpu+gpu"</code><br>
+    <span class="desc">Read by <code>gpu_supported()</code> with the substring test <code>"gpu" in devices</code>. Every Voice Lab engine is <code>cpu+gpu</code>: the CPU always works, the GPU is an <em>addition</em> — never a replacement.</span></li>
+    <li><strong>Line 10:</strong> <code>"voice_cloning": True</code><br>
+    <span class="desc">Lets the UI show the “clone your own voice” affordance only for engines that can actually do it. A flag in data beats an <code>isinstance</code> check in the GUI.</span></li>
+    <li><strong>Lines 11–12:</strong> <code>note</code><br>
+    <span class="desc">A paragraph from the registry straight into a label — the user reads the engine’s own description instead of a paraphrase maintained in the GUI.</span></li>
+    <li><strong>Lines 13–14:</strong> <code>languages</code><br>
+    <span class="desc">Built by the helper <code>_languages()</code> in the same catalog shape the JSON model catalog uses (<code>code</code> → <code>name</code> → <code>variants</code> → <code>voices</code>), so panels that already render catalog data render Voice Lab engines with no new code.</span></li>
+  </ol>
+</div>
+
+<h2>76.3 Voices That Come From the Package</h2>
+
+<p>Sherpa-onnx engines download <em>model artifacts</em> and then expose voices
+from the downloaded files. Voice Lab engines are different: their voices are
+supplied by the installed Python package, so they cannot live in the JSON
+catalog. Bark alone would need 130 rows (twelve languages × ten speakers plus
+the lightweight English checkpoint), and F5-TTS points at reference files
+<em>inside</em> its own wheel.</p>
+
+<p>The solution is a factory that produces entries in exactly the shape
+<code>ModelStore.installed_voices</code> returns:</p>
+
+<pre><code>def _entry(engine_id, language, variant, voice, voice_name, **extra):
+    entry = {
+        "tts": engine_id,
+        "tts_name": engine_name(engine_id),
+        "language": language,
+        "variant": variant,
+        "voice": voice,
+        "voice_name": voice_name,
+        "sid": 0,
+        "engine": engine_id,
+        "dir": "",
+        "builtin_voice": True,
+        "requires_package": probe_package(engine_id),
+    }
+    entry.update(extra)
+    return entry</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 2)</h4>
+  <ol>
+    <li><strong>Line 1:</strong> the signature<br>
+    <span class="desc">Positional arguments describe the voice; <code>**extra</code> carries engine-specific additions (Bark’s <code>repo</code>, F5-TTS’s <code>ref_resource</code>). A variadic tail keeps the factory generic while still allowing one engine to add fields.</span></li>
+    <li><strong>Lines 2–4:</strong> <code>tts</code>, <code>tts_name</code>, <code>engine</code><br>
+    <span class="desc">Three keys that mean almost the same thing, each consumed by a different layer: <code>tts</code> is what the Download panel groups by, <code>tts_name</code> is the label, <code>engine</code> is what <code>get_engine</code> switches on. Reconciliation happens once, here, instead of in five panels.</span></li>
+    <li><strong>Lines 5–8:</strong> <code>language</code>, <code>variant</code>, <code>voice</code>, <code>voice_name</code><br>
+    <span class="desc">The same four-part voice identity used by the JSON catalog, so a voice entry is interchangeable no matter where it came from.</span></li>
+    <li><strong>Line 9:</strong> <code>"sid": 0</code><br>
+    <span class="desc">Speaker id for engines that address voices numerically. PyTorch engines address voices by <em>name</em> (Bark’s <code>v2/en_speaker_3</code>), so the numeric id stays a harmless default rather than a special case in the renderer.</span></li>
+    <li><strong>Line 10:</strong> <code>"dir": ""</code><br>
+    <span class="desc">Empty on purpose: these voices have no model directory on disk. Panels that display <code>dir</code> get an empty string instead of a path that does not exist — the absence is <em>stated</em>, not implied.</span></li>
+    <li><strong>Line 11:</strong> <code>"builtin_voice": True</code><br>
+    <span class="desc">How the UI knows this voice cannot be downloaded or removed; it is a property of the engine’s package.</span></li>
+    <li><strong>Line 12:</strong> <code>"requires_package"</code><br>
+    <span class="desc">Usually the same field name the catalog uses for “this engine needs a pip package in the shared environment”. Reusing it means the existing installed/not-installed logic applies unchanged — the panel that greys out unavailable voices needs no Voice Lab branch.</span></li>
+    <li><strong>Lines 13–14:</strong> <code>entry.update(extra)</code><br>
+    <span class="desc">Applied last so an engine may override a default if it must, and so callers that pass nothing get exactly the generic entry.</span></li>
+  </ol>
+</div>
+
+<p>The Bark generator is worth reading because it shows how much UI code a data
+factory removes:</p>
+
+<pre><code>if engine_id == "bark":
+    voices = []
+    for code, label in _BARK_LANGUAGES:
+        for speaker in range(10):
+            voices.append(_entry(
+                "bark", code, "bark_v2", f"v2/{code}_speaker_{speaker}",
+                f"{label} speaker {speaker + 1} (of 10)",
+            ))
+    for speaker in range(10):
+        voices.append(_entry(
+            "bark", "en", "bark_small", f"v2/en_speaker_{speaker}",
+            f"Bark small - English speaker {speaker + 1} (of 10)",
+            repo="suno/bark-small",
+        ))
+    return voices</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 3)</h4>
+  <ol>
+    <li><strong>Lines 2–3:</strong> the nested loops<br>
+    <span class="desc">Twelve languages × ten speakers = 120 preset voices, generated instead of typed. When Bark adds a language, one tuple entry adds ten voices.</span></li>
+    <li><strong>Line 5:</strong> <code>f"v2/{code}_speaker_{speaker}"</code><br>
+    <span class="desc">Bark’s speaker id format. The <code>v2/</code> prefix is part of the identifier Bark itself expects, so it is built here rather than patched in later.</span></li>
+    <li><strong>Line 6:</strong> the human label<br>
+    <span class="desc">“English speaker 3 (of 10)” tells the user how many options exist, which changes how they listen. Generating labels from data keeps them consistent for all 120 voices.</span></li>
+    <li><strong>Lines 8–13:</strong> the small-checkpoint voices<br>
+    <span class="desc"><code>suno/bark-small</code> is English-only but much lighter on a CPU, so it is offered as a separate <em>variant</em> of English with <code>repo</code> set on the entry. The worker later prioritises <code>repo</code> over the default checkpoint, which is how the variant choice reaches the model loader.</span></li>
+  </ol>
+</div>
+
+<div class="tip">
+  Voice lists like this are the reason <code>count_builtin_voices()</code> exists as a
+  public helper: the GUI shows “26 voices”, and a test can assert that number without
+  re-implementing the loop.
+</div>
+
+<h2>76.4 Driving an Engine in a Subprocess</h2>
+
+<p>PyTorch and friends are heavy, slow to import and occasionally crash the
+process. None of that belongs in a GUI process that also holds the user’s
+recordings. The application therefore runs <code>voicelab/worker.py</code> as a
+separate interpreter process and talks to it over pipes:</p>
+
+<pre><code>{"cmd": "ping"}
+{"cmd": "synthesize", "engine": "bark", "device": "cuda", "text": "...",
+ "threads": 15, "voice": "v2/en_speaker_3", "repo": "suno/bark",
+ "options": {"temperature": 0.7}}
+</code></pre>
+
+<p>One line of request in, one line of JSON out. The worker keeps the model
+loaded between requests, so recording 200 segments pays the load cost once.
+<code>CloneWorker._ensure_proc</code> starts the process and immediately sends
+<code>ping</code> — a worker that cannot even import its engine answers with an
+error <em>before</em> the first paragraph of a book is involved.</p>
+
+<pre><code>class CloneWorker:
+    def __init__(self, engine_id, device=DEVICE_CPU, timeout=1800.0):
+        self.engine_id = engine_id
+        self.device = resolve_device(device)
+        self._proc = None
+        self._lock = threading.RLock()
+        self._timeout = timeout
+        self._next_id = 0</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 4)</h4>
+  <ol>
+    <li><strong>Line 1:</strong> <code>class CloneWorker</code><br>
+    <span class="desc">One instance per (engine, device) pair. The class owns exactly one process; the module-level <code>worker_for()</code> cache gives callers a shared instance so two panels do not start two copies of a multi-gigabyte model.</span></li>
+    <li><strong>Lines 2–3:</strong> the constructor’s first statements<br>
+    <span class="desc"><code>resolve_device</code> is called <em>once, here</em>: “auto” or “gpu” becomes a concrete <code>cpu</code>/<code>cuda</code> at construction time, so every later request describes what is actually happening rather than what the user asked for.</span></li>
+    <li><strong>Line 4:</strong> <code>self._proc = None</code><br>
+    <span class="desc">The process is created lazily on first use. Constructing a worker is free, which is what lets the GUI build voice lists — and tests create workers — without spawning interpreters.</span></li>
+    <li><strong>Line 5:</strong> <code>self._lock = threading.RLock()</code><br>
+    <span class="desc">A re-entrant lock, because the recording thread writes a request and then reads a response; <code>RLock</code> means a helper called from inside the locked section cannot deadlock itself. It is the only synchronisation the class needs, since a process pipe is otherwise usable from several threads.</span></li>
+    <li><strong>Line 6:</strong> <code>self._timeout = 1800.0</code><br>
+    <span class="desc">Thirty minutes. A CPU Bark run on a long paragraph is slow but healthy; a shorter timeout would kill work that is still progressing. A timeout exists at all so a wedged process cannot freeze the recording forever.</span></li>
+    <li><strong>Line 7:</strong> <code>self._next_id = 0</code><br>
+    <span class="desc">Request counter reserved for pairing requests with responses. JSON-lines is strictly sequential today; the id makes a future interleaved protocol possible without re-designing the class.</span></li>
+  </ol>
+</div>
+
+<h2>76.5 Building the Request (Pure Code, Easy Tests)</h2>
+
+<p>The hardest part of any IPC layer to test is the plumbing. The trick used here
+is to move every decision <em>out</em> of the plumbing: <code>build_synthesize_request()</code>
+takes plain values and returns a plain dictionary, so a unit test can assert the
+exact JSON the worker would receive with no process and no wx involved.</p>
+
+<pre><code>def build_synthesize_request(*, engine_id, device, text,
+                             voice_entry=None, speed=1.0, tuning=None):
+    entry = voice_entry or {}
+    resolved = resolve_device(device)
+    request = {
+        "cmd": "synthesize",
+        "engine": engine_id,
+        "device": resolved,
+        "text": text,
+        "speed": float(speed),
+        "threads": cpu_thread_count(),
+    }
+    for key in _VOICE_KEYS:
+        value = entry.get(key)
+        if value:
+            request[key] = value
+    if engine_id == "bark" and not request.get("repo"):
+        request["repo"] = ("suno/bark-small"
+                           if entry.get("variant") == "bark_small" else "suno/bark")
+    overrides = _options.clean(engine_id, tuning)
+    if not overrides:
+        overrides = _options.clean(engine_id, entry.get("options"))
+    if overrides:
+        request["options"] = overrides
+    return request</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 5)</h4>
+  <ol>
+    <li><strong>Lines 1–2:</strong> keyword-only parameters (<code>*</code>)<br>
+    <span class="desc">The leading <code>*</code> forbids positional arguments. With six similar strings in play (“engine”, “device”, “text”), a positional call is a silent bug; keyword-only forces every call site to name what it passes.</span></li>
+    <li><strong>Line 3:</strong> <code>entry = voice_entry or {}</code><br>
+    <span class="desc">Still works when no voice entry is supplied (a quick preview may have none), and never mutates the caller’s dictionary.</span></li>
+    <li><strong>Line 4:</strong> <code>resolved = resolve_device(device)</code><br>
+    <span class="desc">“auto” is turned into a concrete device <em>before</em> the request is built, so the JSON on the wire is always truthful and the worker never needs to know what “auto” means.</span></li>
+    <li><strong>Lines 5–12:</strong> the base request<br>
+    <span class="desc">Six keys every request carries. <code>threads</code> comes from <code>cpu_thread_count()</code>, which delegates to <code>compute.cpu_threads()</code> — the 80–95&nbsp;% band of Chapter 78. The worker does not decide how much CPU to use; the application does, and the worker applies it.</span></li>
+    <li><strong>Lines 13–16:</strong> copying the voice keys<br>
+    <span class="desc">Only non-empty values are copied, from an explicit allow-list (<code>_VOICE_KEYS</code>). An allow-list beats “send the whole entry” for two reasons: the request cannot leak UI-only fields into the engine, and the set of fields the worker must understand stays small enough to document.</span></li>
+    <li><strong>Lines 17–20:</strong> the Bark checkpoint rule<br>
+    <span class="desc">Bark downloads one of two repositories. The <em>variant</em> (“Bark small”) is a voice-list concept the engine does not know, so it is translated here into the repository the worker passes to <code>transformers</code>. Note the <code>not request.get("repo")</code> guard: an entry that already set <code>repo</code> (as <code>_entry</code> does for bark-small voices) wins, so both paths agree.</span></li>
+    <li><strong>Lines 21–24:</strong> tuning overrides<br>
+    <span class="desc">Two carriers are supported and cleaned by the same validator: the function argument (Settings defaults applied by the panel) and the voice entry (per-project overrides stored in the project). Empty results are omitted entirely, so an untouched project sends no <code>options</code> key at all and the engine uses its own defaults.</span></li>
+  </ol>
+</div>
+
+<h2>76.6 Plugging Into the Existing Engine Cache</h2>
+
+<p>The rest of the application knows only one thing about a speech engine: it can
+be asked to turn text into int16 samples. <code>VoicelabEngine</code> implements
+that contract and nothing more.</p>
+
+<pre><code>class VoicelabEngine:
+    def __init__(self, voice_entry, device=DEVICE_CPU):
+        engine_id = voice_entry.get("engine")
+        if not engines.is_engine(engine_id):
+            raise VoicelabError(f"'{engine_id}' is not a Voice Lab engine.")
+        self.voice_entry = voice_entry
+        self.engine_id = engine_id
+        self.tuning = _options.clean(engine_id, voice_entry.get("options"))
+        self.device = resolve_device(
+            voice_entry.get("device") or device or DEVICE_CPU)
+        self.sample_rate = _DEFAULT_SAMPLE_RATE
+        self._worker = worker_for(engine_id, self.device)
+
+    def synthesize(self, text, sid=0, speed=1.0, pitch=1.0, volume=1.0):
+        if not text.strip():
+            raise ValueError("Nothing to synthesize")
+        request = build_synthesize_request(
+            engine_id=self.engine_id, device=self.device, text=text,
+            voice_entry=self.voice_entry, speed=speed, tuning=self.tuning)
+        samples, sample_rate, report = self._worker.synthesize(request)
+        self._report_unused_options(report)
+        self._report_notes(report)
+        if sample_rate:
+            self.sample_rate = sample_rate
+        if pitch != 1.0:
+            samples = _shift_pitch(samples, pitch)
+        if volume != 1.0:
+            samples = _apply_volume(samples, volume)
+        return samples</code></pre>
+
+<div class="line-explanation">
+  <h4>Explain Line by Line Code Description (Block 6)</h4>
+  <ol>
+    <li><strong>Lines 2–5:</strong> the guard clause<br>
+    <span class="desc">A voice entry from the wrong source (say, a sherpa-onnx voice) fails immediately with a clear message instead of building a request no worker can serve. <code>VoicelabError</code> is a dedicated exception type so callers can catch engine problems without catching everything.</span></li>
+    <li><strong>Lines 8–9:</strong> <code>self.tuning</code><br>
+    <span class="desc">The voice entry’s stored overrides are validated once at construction. Validation is not repeated per segment, and a malformed value can never reach the worker.</span></li>
+    <li><strong>Lines 10–12:</strong> device resolution order<br>
+    <span class="desc">The voice entry wins, then the constructor argument, then CPU. This ordering is what makes “this project records on the GPU” survive from the Recording window all the way to the process.</span></li>
+    <li><strong>Line 13:</strong> <code>worker_for(...)</code><br>
+    <span class="desc">Returns the shared worker for that (engine, device). Two engines, or the same engine on two devices, still get separate processes — a CUDA process cannot change its device mid-run.</span></li>
+    <li><strong>Lines 16–17:</strong> the empty-text guard<br>
+    <span class="desc">A blank segment (a page containing only a heading marker, say) would otherwise cost a model run that produces silence. Failing fast keeps the synthesizer’s error handling in charge.</span></li>
+    <li><strong>Lines 18–20:</strong> the request<br>
+    <span class="desc">All the intelligence lives in the pure builder — this method only decides <em>which</em> parameters come from the instance and which from the call.</span></li>
+    <li><strong>Lines 21–23:</strong> the response triple<br>
+    <span class="desc"><code>samples</code>, the engine’s real <code>sample_rate</code> and a <code>report</code> dictionary. The report is not an error channel: it carries “these options were skipped” and human notes such as “audio was decoded with soundfile because this machine has no FFmpeg”.</span></li>
+    <li><strong>Lines 24–27:</strong> adapting the sample rate<br>
+    <span class="desc">Each engine speaks at its own rate (24&nbsp;kHz here). Updating <code>self.sample_rate</code> from the response means the writer downstream creates WAV files with the correct header even if an engine changes its rate between versions.</span></li>
+    <li><strong>Lines 28–32:</strong> pitch and volume<br>
+    <span class="desc">Pitch shifting and volume are applied by the <em>application</em>, on the returned samples, using the same helpers as the ONNX engines. One implementation means the Audio Effects slider behaves identically no matter which engine spoke, and an engine that cannot do pitch shifting does not need a new parameter.</span></li>
+  </ol>
+</div>
+
+<div class="warning">
+  <strong>Keep heavy imports out of the GUI.</strong> Nothing in
+  <code>voicelab/__init__.py</code> imports <code>torch</code>. Voice lists, device
+  detection and request building all work with plain Python + NumPy — which is also
+  why the whole subsystem is unit-testable on a machine with no GPU and no models.
+</div>
+
+<h2>76.7 Mini Project: A Voice List From a Registry</h2>
+
+<p>Build a tiny script that turns the registry into a report — the same shape of
+work the Settings pages do:</p>
+
+<pre><code>from ai_voice_studio.voicelab import engines
+
+for engine_id in engines.engine_ids():
+    info = engines.engine(engine_id)
+    print(f"{info['name']:<34} {engines.count_builtin_voices(engine_id):>4} voices")
+    print(f"    installs : {', '.join(engines.packages(engine_id))}")
+    print(f"    license  : {info['license']}")
+    print(f"    gpu      : {engines.gpu_supported(engine_id)}")</code></pre>
+
+<p>Output on the current build (trimmed):</p>
+
+<pre><code>Pocket TTS (Kyutai)                  26 voices
+    installs : pocket-tts, soundfile, scipy
+    license  : Apache-2.0 (code); per-voice licenses
+    gpu      : True
+Bark (Suno AI, transformer)         130 voices
+    installs : transformers, torch, soundfile, scipy
+    license  : MIT
+    gpu      : True
+F5-TTS (transformer)                  2 voices
+    installs : f5-tts, torch, torchaudio, soundfile
+    license  : MIT (code); CC-BY-NC-4.0 (weights)
+    gpu      : True</code></pre>
+
+<div class="exercise">
+  <ol>
+    <li>Add a fourth engine entry to <code>ENGINES</code> — a fake one is fine
+    (<code>id="demo"</code>, <code>packages=("demo-tts",)</code>). Which other
+    dictionaries in <code>engines.py</code> must gain an entry before the worker
+    could load it, and why do the two lists exist separately?</li>
+    <li>Write a unit test that asserts every voice of every installed engine has a
+    non-empty <code>voice</code>, <code>voice_name</code> and <code>language</code>,
+    then run it. (Hint: no wx, no torch — iterate <code>all_builtin_voices()</code>.)</li>
+    <li>Change <code>build_synthesize_request</code> in a scratch copy so it always
+    sends <code>options</code>, even when empty, and explain from the worker’s side
+    why “no key” is the better protocol.</li>
+    <li>Trace what happens to <code>threads</code> end to end: from
+    <code>cpu_thread_count()</code> here to <code>_limit_cpu</code> in the worker.
+    Which layer would you change to give a single engine only half the CPU?</li>
+  </ol>
+</div>
+
+<h2>76.8 Key Takeaways</h2>
+<ul>
+  <li>Describe engines as <strong>data</strong>; then the GUI, the installer and the worker all read one source of truth</li>
+  <li>Generate catalog-shaped voice entries so existing panels need no special cases</li>
+  <li>Never import a heavy ML framework into the GUI process — run it in a worker subprocess</li>
+  <li>Keep request building <em>pure</em>: no processes, no wx, completely unit-testable</li>
+  <li>An adapter that satisfies the existing interface is cheaper than teaching every call site about a new engine type</li>
+  <li>Send “how much of the machine to use” from the application, and let the worker apply it</li>
+</ul>
+
+<hr>
+<p style="text-align: center;"><a href="ch75_dialogs_progress.html">← Ch 75</a> &nbsp;|&nbsp; <a href="ch77_engine_environments.html">Ch 77 — One Environment per Engine →</a></p>
+</div></div></body>
+</html>

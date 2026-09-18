@@ -17,6 +17,20 @@
 <div class="chapter-number">Chapter 45</div>
 <h1>Project Model &amp; Persistence</h1>
 
+<div class="info">
+  <strong>Current implementation (2026.3.1).</strong> A project's <code>tts</code> block now
+  also holds <code>omni</code> (the OmniVoice mode, design instructions, reference clip and
+  generation parameters) and <code>engine_options</code>
+  (<code>{"engine": id, "values": {...}}</code>, the per-project Voice Lab overrides written by
+  <em>Engine tuning...</em>, in addition to the Settings defaults). Each segment still carries
+  <code>index</code>, <code>title</code>, <code>text</code>, <code>saved</code> and
+  <code>status</code>, and those two fields are what the <em>Start Selected Recording</em>
+  picker reads: a segment with <code>saved</code> is offered as a recorded file, every title is
+  offered as a file break. Re-recording a file clears <code>saved</code> and returns the
+  segment to <code>pending</code>. The recording <em>range</em> (start position and whether to
+  stop after one file) is a runtime argument, deliberately not stored in the project.
+</div>
+
 <h2>Learning Objectives</h2>
 <ul>
   <li>Understand the AIVS project data model</li>

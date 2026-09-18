@@ -17,6 +17,16 @@
 <div class="chapter-number">Chapter 56</div>
 <h1>Background Synthesis Worker</h1>
 
+<div class="info">
+  <strong>Current implementation (2026.3.1).</strong> <code>SynthesisWorker</code> gained an
+  optional exclusive <code>end_index</code>: with it set the worker stops cleanly after that one
+  segment, which is what makes &ldquo;only record the selected file&rdquo; possible; with it
+  <code>None</code> it records from the start position to the end of the project, the original
+  behaviour. Either way playback of the run is unchanged — progress events, instant disk save
+  per segment and the resume-from-first-unsaved rule all still apply, and after the last segment
+  the playlists / DAISY files are written as before.
+</div>
+
 <h2>Learning Objectives</h2>
 <ul>
   <li>Understand the complete SynthesisWorker implementation</li>

@@ -17,6 +17,22 @@
 <div class="chapter-number">Chapter 64</div>
 <h1>PyInstaller Packaging</h1>
 
+<div class="info">
+  <strong>Current implementation (2026.3.1).</strong> The spec now also bundles the whole
+  <code>docs</code> folder — including <code>docs/book</code> — and lists the newer modules in
+  <code>hiddenimports</code>: <code>ai_voice_studio.gui.accept_dialog</code> (the first-launch
+  terms gate, which <code>main.py</code> imports before anything else),
+  <code>gui.compute_choice</code>, <code>gui.clone_engines_panel</code>,
+  <code>gui.voicelab_options_dialog</code>, <code>gui.omnivoice_options_dialog</code>, the
+  <code>voicelab</code> / <code>omnivoice</code> / <code>omnivoice_server</code> packages,
+  <code>documents.daisy3_builder</code>, <code>documents.playlist_builder</code> and
+  <code>tts.windows_tts</code>. PyTorch and the Voice Lab engines are deliberately <em>not</em>
+  frozen: they are installed at runtime into per-engine environments under
+  <code>%APPDATA%\AIVoiceStudio\tts_envs</code>. A missing <code>hiddenimports</code> entry
+  fails in the frozen build only, so smoke-run the frozen executable with an isolated
+  <code>%APPDATA%</code> after every packaging change.
+</div>
+
 <h2>Learning Objectives</h2>
 <ul>
   <li>Understand how PyInstaller bundles Python apps</li>

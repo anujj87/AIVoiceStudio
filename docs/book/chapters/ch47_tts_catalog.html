@@ -17,6 +17,18 @@
 <div class="chapter-number">Chapter 47</div>
 <h1>TTS Catalog &amp; Model Store</h1>
 
+<div class="info">
+  <strong>Current implementation (2026.3.1).</strong> The JSON catalog now describes nine TTS
+  families — Piper, Kokoro-82M, Kitten TTS, VITS zh-AISHELL3, Matcha-TTS, OmniVoice,
+  OmniVoice Server, SAPI5 and the Windows Core voices. The Voice Lab clone engines
+  (Pocket TTS, Bark, F5-TTS) are deliberately <em>not</em> in this file: their voices come
+  from the installed Python package, so they live in <code>voicelab/engines.py</code> and are
+  emitted in the same catalog shape — see
+  <a href="ch76_voicelab_engines.html">Chapter 76</a>. Engines that are pip packages also
+  carry a <code>requires_package</code> field, which the panels turn into an installed /
+  not-installed state (see <a href="ch77_engine_environments.html">Chapter 77</a>).
+</div>
+
 <h2>Learning Objectives</h2>
 <ul>
   <li>Understand the TTS catalog data structure</li>

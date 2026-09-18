@@ -33,6 +33,10 @@ licence &mdash; check each one before commercial use.</p>
   <tr><td>sherpa-onnx</td><td>Apache-2.0</td><td><a href="https://github.com/k2-fsa/sherpa-onnx">github.com/k2-fsa/sherpa-onnx</a></td></tr>
   <tr><td>ONNX Runtime</td><td>MIT</td><td><a href="https://github.com/microsoft/onnxruntime">github.com/microsoft/onnxruntime</a></td></tr>
   <tr><td>numpy</td><td>BSD-3-Clause</td><td><a href="https://numpy.org/">numpy.org</a></td></tr>
+  <tr><td>requests</td><td>Apache-2.0</td><td><a href="https://github.com/psf/requests">github.com/psf/requests</a></td></tr>
+  <tr><td>pypdf (PDF import)</td><td>BSD-3-Clause</td><td><a href="https://github.com/py-pdf/pypdf">github.com/py-pdf/pypdf</a></td></tr>
+  <tr><td>python-docx (DOCX import)</td><td>MIT</td><td><a href="https://github.com/python-openxml/python-docx">github.com/python-openxml/python-docx</a></td></tr>
+  <tr><td>onnxruntime-gpu (optional download)</td><td>MIT</td><td><a href="https://github.com/microsoft/onnxruntime">github.com/microsoft/onnxruntime</a></td></tr>
   <tr><td>FFmpeg (optional download)</td><td>LGPL-2.1 / GPL (build dependent)</td><td><a href="https://ffmpeg.org/">ffmpeg.org</a></td></tr>
   <tr><td>OmniVoice (k2-fsa)</td><td>Apache-2.0</td><td><a href="https://github.com/k2-fsa/OmniVoice">github.com/k2-fsa/OmniVoice</a></td></tr>
   <tr><td>OmniVoice Server</td><td>Apache-2.0</td><td><a href="https://github.com/maemreyo/omnivoice-server">github.com/maemreyo/omnivoice-server</a></td></tr>
@@ -48,10 +52,16 @@ licence &mdash; check each one before commercial use.</p>
 </table>
 
 <div class="note">The engine dependencies installed into each engine's own
-Python environment (torch, torchaudio, soundfile, scipy, transformers and
-friends) keep their own licences &mdash; all in the BSD/MIT/Apache-2.0 family.
-The exact list is visible inside each engine environment with
-<code>pip license</code>.</div>
+Python environment keep their own licences. The main ones are
+<strong>PyTorch</strong> and <strong>torchaudio</strong> (BSD-style),
+<strong>soundfile</strong> (BSD-3-Clause, which ships libsndfile under the
+LGPL), <strong>scipy</strong> (BSD-3-Clause),
+<strong>transformers</strong> (Apache-2.0) and
+<strong>omnivoice-triton</strong> / <strong>omnivoice-server</strong>
+(Apache-2.0). Those packages are downloaded on demand into
+<code>%APPDATA%\AIVoiceStudio\tts_envs\&lt;engine&gt;</code> and are not part of
+the installer. Each environment also carries its own licence files; the exact
+list is visible with <code>pip list</code> in that environment.</div>
 
 <h2>GNU General Public License v3.0</h2>
 <p>AI Voice Studio itself. The full text ships as <code>LICENSE</code> next to

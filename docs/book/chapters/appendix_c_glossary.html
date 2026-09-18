@@ -89,7 +89,7 @@
     <li><a href="ch54_new_project_wizard.html">Ch 54: New Project Wizard</a></li>
     <li><a href="ch55_recording.html">Ch 55: Recording Dialog</a></li>
     <li><a href="ch56_synthesis_worker.html">Ch 56: Background Synthesis Worker</a></li>
-    <li><a href="ch57_clone_engine.html">Ch 57: Voice Cloning (XTTS v2)</a></li>
+    <li><a href="ch57_clone_engine.html">Ch 57: Voice Cloning (Voice Lab)</a></li>
     <li><a href="ch58_omnivoice.html">Ch 58: OmniVoice TTS Engine</a></li>
     <li><a href="ch59_daisy_builder.html">Ch 59: DAISY Book Builder</a></li>
     <li><a href="ch60_addons.html">Ch 60: Addon System</a></li>
@@ -151,7 +151,7 @@
 <dd>In sherpa-onnx, an audio callback receives synthesized audio samples from the TTS engine. The callback is invoked from a background thread whenever a chunk of audio is ready for output.</dd>
 
 <dt>Aggregator</dt>
-<dd>In the AIVoiceStudio catalog system, an aggregator fetches and caches model catalogs from multiple upstream sources (Piper, Coqui, etc.) and provides a unified interface for querying available models.</dd>
+<dd>In the AIVoiceStudio catalog system, an aggregator would fetch and cache model catalogs from multiple upstream sources (Piper, Kokoro, sherpa-onnx releases, ...) and provide a unified interface for querying available models. In the current implementation the catalog is a single reviewed JSON file (<code>tts/models_catalog.json</code>) plus the Voice Lab entries generated from <code>voicelab/engines.py</code>, so no aggregator runs at runtime.</dd>
 
 <dt>Async/Await</dt>
 <dd>Python's built-in asynchronous programming syntax. <code>async def</code> defines a coroutine function, and <code>await</code> suspends execution until an awaitable (coroutine, Future, Task) completes. Used with <code>asyncio</code> for non-blocking I/O operations.</dd>
@@ -198,7 +198,7 @@
 <dd>Converting a value from one type to another: <code>int("42")</code>, <code>float(5)</code>, <code>str(3.14)</code>. Also called type conversion.</dd>
 
 <dt>Catalog</dt>
-<dd>In AIVoiceStudio, the TTS catalog is a registry of all available voice models, organized by provider (Piper, Coqui), language, and quality. Stored as a JSON file with metadata for each model.</dd>
+<dd>In AIVoiceStudio, the TTS catalog is a registry of all available voice models, organized by engine (Piper, Kokoro-82M, Kitten, Matcha, VITS, OmniVoice, SAPI5, Windows Core) plus the Voice Lab engines, then by language and quality. Stored as a JSON file with metadata for each model, with the Voice Lab entries appended from <code>voicelab/engines.py</code>.</dd>
 
 <dt>CLI (Command-Line Interface)</dt>
 <dd>A text-based interface for interacting with software. Python's <code>argparse</code> module provides CLI argument parsing. AIVoiceStudio uses CLI for its build scripts.</dd>
@@ -719,7 +719,73 @@
 <dd>Operations that don't create new data copies, improving performance. Python's <code>memoryview</code> and buffer protocol enable zero-copy slicing. NumPy array views are zero-copy.</dd>
 
 <dt>Zone</dt>
-<dd>In audio processing, a zone defines a region of audio for playback, editing, or effects. In AIVoiceStudio, synthesis zones map text segments to audio output regions.</dd>
+<dd>In audio processing, a zone defines a region of audio playback, editing, or effects. In AIVoiceStudio, synthesis zones map text segments to audio output regions.</dd>
+</dl>
+
+<hr>
+
+<h2>Glossary additions — Part X (the current system)</h2>
+
+<p>Terms introduced by the Voice Lab subsystem, the per-engine environments, the compute
+choice and the licensing model. Each one links to the chapter that explains it.</p>
+
+<dl class="glossary">
+<dt>Bark</dt>
+<dd>Suno AI's transformer audio model, used in the Voice Lab as a voice-cloning engine. MIT licensed, over one hundred speaker presets across twelve languages. Installed as the <code>transformers</code> package plus PyTorch. See <a href="ch76_voicelab_engines.html">Chapter 76</a>.</dd>
+
+<dt>Compute choice</dt>
+<dd>The per-category CPU / GPU / Auto combo box shown next to every Preview button, remembered per category in Settings under <code>preview_compute.&lt;category&gt;</code>. See <a href="ch78_compute_choice.html">Chapter 78</a>.</dd>
+
+<dt>CPU thread band (80–95&nbsp;%)</dt>
+<dd>The share of logical CPUs a CPU run may use, computed by <code>compute.cpu_threads()</code> and applied in the worker with <code>torch.set_num_threads</code>. The top of the band is used; machines too small for a non-empty band leave one core free.</dd>
+
+<dt>CUDA wheel index</dt>
+<dd><code>https://download.pytorch.org/whl/cu128</code> — the source of the PyTorch CUDA build. Used because the plain PyPI <code>torch</code> wheel is CPU-only on Windows. The <code>cu128</code> tag must match the Python version in use.</dd>
+
+<dt>dist-info folder</dt>
+<dd>A <code>&lt;name&gt;-&lt;version&gt;.dist-info</code> directory pip writes for every installed distribution. Listing these folders is how the application answers “is this package installed?” without starting an interpreter.</dd>
+
+<dt>Engine environment (<code>tts_envs</code>)</dt>
+<dd>One Python virtualenv per TTS engine under <code>%APPDATA%\AIVoiceStudio\tts_envs\&lt;engine&gt;</code>, so engines with conflicting dependencies never share site-packages. See <a href="ch77_engine_environments.html">Chapter 77</a>.</dd>
+
+<dt>F5-TTS</dt>
+<dd>A flow-matching transformer TTS with zero-shot voice cloning. MIT licensed <em>code</em>, but its released <strong>weights are CC-BY-NC-4.0</strong> (non-commercial). See <a href="ch82_licensing.html">Chapter 82</a>.</dd>
+
+<dt>GPU (CUDA) path</dt>
+<dd>A run on any CUDA-capable NVIDIA card — no model list and no VRAM minimum. The worker maximises the card with cuDNN autotuning, TF32 and <code>"high"</code> float32 matmul precision.</dd>
+
+<dt>JSON-lines worker protocol</dt>
+<dd>The Voice Lab IPC format: one JSON request per line on stdin, one JSON response per line on stdout. Keeps the model loaded between segments.</dd>
+
+<dt>libsndfile</dt>
+<dd>The native library bundled inside the <code>soundfile</code> wheel. It decodes WAV, FLAC, OGG and MP3 with nothing installed on the machine — the foundation of the FFmpeg-free audio path.</dd>
+
+<dt>Pocket TTS</dt>
+<dd>Kyutai's 100M-parameter, CPU-first voice-cloning TTS (<code>pocket-tts</code>), 26 built-in voices in six languages. Apache-2.0 code, per-voice licences.</dd>
+
+<dt>Preview compute</dt>
+<dd>See <em>Compute choice</em>. The value stored is one of <code>cpu</code>, <code>cuda</code> or <code>auto</code>.</dd>
+
+<dt>soundfile audio shim</dt>
+<dd>The runtime replacement of <code>torchaudio.load</code>/<code>save</code> with soundfile, installed only after a real decode proves TorchCodec cannot load (a machine without FFmpeg). Opt out with <code>AIVS_VOICELAB_NO_AUDIO_SHIM=0</code>. See <a href="ch79_audio_io_shim.html">Chapter 79</a>.</dd>
+
+<dt>Start Selected Recording</dt>
+<dd>The Edit-menu command that opens the recording picker: choose a mode (recorded audio file, or any file break), a target and a scope (this file only, or this file and everything after it). See <a href="ch80_start_selected_recording.html">Chapter 80</a>.</dd>
+
+<dt>Terms version (<code>TERMS_VERSION</code>)</dt>
+<dd>The value compared against the stored acceptance. Bumping it in <code>constants.py</code> is what makes the first-launch dialog appear again after an update. See <a href="ch81_terms_dialog.html">Chapter 81</a>.</dd>
+
+<dt>TorchCodec</dt>
+<dd>The decoding library torchaudio uses from version 2.9 onward. On Windows it requires FFmpeg's shared DLLs, and its <code>backend</code> argument no longer selects a decoder.</dd>
+
+<dt>TF32 (TensorFloat-32)</dt>
+<dd>A tensor-core fast path for float32 maths, enabled for GPU inference. Practically indistinguishable in TTS output, markedly faster.</dd>
+
+<dt>Voice Lab</dt>
+<dd>The subsystem that installs and drives the pip-based voice-clone engines (Pocket TTS, Bark, F5-TTS) inside their own Python environments, through a worker subprocess. See <a href="ch76_voicelab_engines.html">Chapter 76</a>.</dd>
+
+<dt>Voice registry</dt>
+<dd><code>voicelab/engines.py</code>: the data description of each engine — packages, licence, homepage, device support and built-in voices — read by the GUI, the installer and the worker alike.</dd>
 </dl>
 
 <!-- ════════════════════════════════════════════════════════════════════

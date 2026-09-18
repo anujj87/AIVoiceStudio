@@ -143,6 +143,157 @@
   </tbody>
 </table>
 
+<h2>B.5 Voice Lab, Compute and Environment Modules</h2>
+
+<p>The modules added after the first edition (see <a href="ch76_voicelab_engines.html">Part X</a>).
+Everything here is importable without PyTorch and without wx, which is what makes the
+subsystem unit-testable on any machine.</p>
+
+<h3>compute.py</h3>
+<table>
+  <thead><tr><th>Function</th><th>Returns</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>has_nvidia_gpu(force=False)</code></td><td>bool</td><td><code>nvidia-smi</code> driver probe, cached for the session</td></tr>
+    <tr><td><code>detect(force=False)</code></td><td>dict</td><td><code>{'cpu': True, 'cuda': …, 'dml': False}</code></td></tr>
+    <tr><td><code>cpu_threads(total=None)</code></td><td>int</td><td>Threads a CPU run may use: the top of the 80–95&nbsp;% band</td></tr>
+    <tr><td><code>cuda_device_index()</code></td><td>int</td><td>Always <code>0</code>: the first NVIDIA card the driver exposes</td></tr>
+    <tr><td><code>gpu_summary()</code></td><td>str</td><td>Card name and memory, for display</td></tr>
+    <tr><td><code>available_compute()</code></td><td>list</td><td>Options the UI may offer, with <code>auto</code> when there is a choice</td></tr>
+    <tr><td><code>resolve_compute(choice)</code></td><td>str</td><td>Turn <code>auto|cpu|cuda|dml</code> into a concrete back-end</td></tr>
+    <tr><td><code>provider_for(compute)</code></td><td>str</td><td>Back-end → the string sherpa-onnx expects</td></tr>
+    <tr><td><code>runtime_hint(compute)</code></td><td>str</td><td>Human note about which runtime a back-end needs</td></tr>
+  </tbody>
+</table>
+
+<h3>gui/compute_choice.py</h3>
+<table>
+  <thead><tr><th>Function</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>choices()</code></td><td><code>(value, label)</code> pairs for the per-category combo</td></tr>
+    <tr><td><code>settings_key(category)</code></td><td><code>preview_compute.&lt;category&gt;</code></td></tr>
+    <tr><td><code>saved_choice(settings, category)</code></td><td>Stored choice, or <code>cpu</code></td></tr>
+    <tr><td><code>provider_for_preview(choice, engine_id=None)</code></td><td>Voice Lab → its own device; others → ONNX compute detection</td></tr>
+    <tr><td><code>make_compute_row(parent, settings, category, default="cpu")</code></td><td>Builds <code>(label, combo)</code> and persists the choice on change</td></tr>
+  </tbody>
+</table>
+
+<h3>voicelab/engines.py</h3>
+<table>
+  <thead><tr><th>Function</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>ENGINES</code></td><td>The registry: one dict per clone engine (packages, licence, homepage, languages)</td></tr>
+    <tr><td><code>engine_ids()</code> / <code>is_engine(id)</code> / <code>engine(id)</code></td><td>Lookups used by the GUI, the worker and the settings pages</td></tr>
+    <tr><td><code>packages(id)</code></td><td>pip packages for install <em>and</em> uninstall (plain names only)</td></tr>
+    <tr><td><code>import_modules(id)</code></td><td>Modules the worker checks before the engine can speak</td></tr>
+    <tr><td><code>cuda_packages(id)</code> / <code>cuda_index_url(id)</code></td><td>What to take from the PyTorch CUDA wheel index, and that index</td></tr>
+    <tr><td><code>probe_package(id)</code></td><td>The single distribution whose presence means “installed”</td></tr>
+    <tr><td><code>builtin_voices(id)</code> / <code>all_builtin_voices()</code></td><td>Package-provided voices in catalog shape</td></tr>
+    <tr><td><code>count_builtin_voices(id)</code></td><td>How many voices the engine ships</td></tr>
+    <tr><td><code>PYTORCH_CUDA_INDEX</code></td><td><code>https://download.pytorch.org/whl/cu128</code> — one index for all CUDA wheels</td></tr>
+  </tbody>
+</table>
+
+<h3>voicelab/__init__.py</h3>
+<table>
+  <thead><tr><th>Function / class</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>has_cuda(force=False)</code></td><td>NVIDIA driver probe (same source of truth as <code>compute</code>)</td></tr>
+    <tr><td><code>device_options()</code></td><td>CPU always; GPU and Auto when a driver is present</td></tr>
+    <tr><td><code>resolve_device(choice)</code></td><td><code>cpu|cuda|auto</code> → concrete device, falling back to CPU</td></tr>
+    <tr><td><code>is_installed(id)</code> / <code>installed_version(id)</code></td><td>Per-engine environment first, shared environment as fallback</td></tr>
+    <tr><td><code>install_plan(id)</code></td><td><code>[(packages, index_url_or_None), …]</code> — CUDA step first when there is a GPU</td></tr>
+    <tr><td><code>packages_for(id)</code></td><td>The registry's package list (never version-pinned)</td></tr>
+    <tr><td><code>verify_engine_import(id, timeout=300)</code></td><td>Imports the engine once in its own env; returns a problem or <code>None</code></td></tr>
+    <tr><td><code>cpu_thread_count()</code></td><td>Delegates to <code>compute.cpu_threads()</code></td></tr>
+    <tr><td><code>build_synthesize_request(**)</code></td><td>Pure builder for the worker's JSON request</td></tr>
+    <tr><td><code>CloneWorker(engine_id, device, timeout)</code></td><td>One persistent worker process; <code>synthesize()</code>, <code>close()</code></td></tr>
+    <tr><td><code>worker_for(id, device)</code> / <code>close_workers()</code></td><td>Shared worker cache and shutdown</td></tr>
+    <tr><td><code>VoicelabEngine(voice_entry, device)</code></td><td>Adapter implementing <code>TtsEngine.synthesize</code></td></tr>
+    <tr><td><code>VoicelabError</code></td><td>Raised when an engine is missing or fails to synthesize</td></tr>
+  </tbody>
+</table>
+
+<h3>voicelab/options.py</h3>
+<table>
+  <thead><tr><th>Function</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>specs(id)</code> / <code>spec(id, key)</code></td><td>The tuning vocabulary: type, range, default, label</td></tr>
+    <tr><td><code>defaults(id)</code></td><td>Every key at its engine default</td></tr>
+    <tr><td><code>clean(id, values)</code></td><td>Coerce, clamp and drop defaults — what the worker receives</td></tr>
+    <tr><td><code>problems(id, values)</code></td><td>Human-readable validation messages for the dialogs</td></tr>
+    <tr><td><code>describe_overrides(id, values)</code></td><td>One-line summary of what the user changed</td></tr>
+    <tr><td><code>settings_key(id)</code></td><td>Where the per-engine defaults live in Settings</td></tr>
+    <tr><td><code>max_seconds_note(id)</code></td><td>Note about engines that cap segment length</td></tr>
+  </tbody>
+</table>
+
+<h3>python_runtime/__init__.py</h3>
+<table>
+  <thead><tr><th>Function</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>environment_id(engine_id)</code></td><td>Folder id of the env that holds an engine (OmniVoice pair shares one)</td></tr>
+    <tr><td><code>engine_env_dir(engine_id)</code></td><td><code>%APPDATA%/AIVoiceStudio/tts_envs/&lt;env&gt;</code></td></tr>
+    <tr><td><code>get_runtime(engine_id=None)</code></td><td>Lazy singleton <code>PythonRuntime</code> per environment</td></tr>
+    <tr><td><code>engine_runtime(engine_id)</code></td><td>The env that actually holds an engine's packages, with shared fallback</td></tr>
+    <tr><td><code>engine_env_exists(engine_id)</code></td><td>True when the engine has its own (created) env</td></tr>
+    <tr><td><code>PythonRuntime.ensure_env()</code> / <code>ensure_pip()</code></td><td>Create the virtualenv and its pip</td></tr>
+    <tr><td><code>PythonRuntime.pip_install(...)</code> / <code>pip_uninstall(...)</code></td><td>Install/remove packages (optional <code>--index-url</code>)</td></tr>
+    <tr><td><code>PythonRuntime.pip_list()</code></td><td>Installed packages as dicts</td></tr>
+    <tr><td><code>PythonRuntime.run_in_env(script)</code></td><td>Run a snippet in the env and capture its output</td></tr>
+    <tr><td><code>PythonRuntime.site_packages_dirs</code></td><td>The env's site-packages folder(s) — used for on-disk probes</td></tr>
+  </tbody>
+</table>
+
+<h3>venv_packages.py</h3>
+<table>
+  <thead><tr><th>Function</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>version(package, engine=None)</code></td><td>Cached version; on a cold cache reads site-packages directly. Never blocks</td></tr>
+    <tr><td><code>installed(package, engine=None)</code></td><td><code>bool(version(...))</code></td></tr>
+    <tr><td><code>package_present(package, engine=None)</code></td><td><strong>Synchronous</strong> disk check — decides the worker's interpreter</td></tr>
+    <tr><td><code>request(package, on_ready, engine=None)</code></td><td>Start one background probe; <code>on_ready(version_or_None)</code> runs on the worker thread</td></tr>
+    <tr><td><code>is_known(package, engine=None)</code></td><td>True when a fresh cached answer exists</td></tr>
+    <tr><td><code>invalidate(*packages, engine=None)</code></td><td>Forget cached results after install/uninstall</td></tr>
+    <tr><td><code>warm(packages=None)</code></td><td>Background warm-up of the shared environment's probes</td></tr>
+  </tbody>
+</table>
+
+<h3>voicelab/worker.py (runs in the engine's own interpreter)</h3>
+<table>
+  <thead><tr><th>Function</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>_maximize_cuda(torch)</code></td><td>Whole-card inference: cuDNN autotune, TF32, <code>"high"</code> precision, no autograd</td></tr>
+    <tr><td><code>_limit_cpu(torch, threads)</code></td><td>Applies the 80–95&nbsp;% thread count the application computed</td></tr>
+    <tr><td><code>_apply_compute_settings(device, threads)</code></td><td>One entry point for the device choice</td></tr>
+    <tr><td><code>_torchcodec_works(torchaudio)</code></td><td>Measures the real decoder on a tiny probe WAV</td></tr>
+    <tr><td><code>_install_audio_io_shim(...)</code></td><td>Backs <code>torchaudio.load/save</code> with soundfile when TorchCodec is broken</td></tr>
+    <tr><td><code>_convert_to_wav(path)</code></td><td>Converts a reference clip once (cached by path, size, mtime)</td></tr>
+    <tr><td><code>_resolve_resource(spec)</code></td><td>Resolves <code>"package:relative/path"</code> to a real file inside a package</td></tr>
+    <tr><td><code>_supported_kwargs(callable, kwargs)</code></td><td>Feature-detects which tuning options an engine version accepts</td></tr>
+    <tr><td><code>Backend</code></td><td>Base class: one loaded engine (<code>PocketBackend</code>, <code>BarkBackend</code>, <code>F5Backend</code>)</td></tr>
+  </tbody>
+</table>
+
+<h3>gui/accept_dialog.py</h3>
+<table>
+  <thead><tr><th>Name</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>AcceptanceDialog</code></td><td>First-launch terms dialog; every exit path except “I Agree” returns <code>ID_NO</code></td></tr>
+    <tr><td><code>terms_current(settings)</code></td><td>True when <code>terms_version</code> equals <code>TERMS_VERSION</code></td></tr>
+    <tr><td><code>record_acceptance(settings)</code></td><td>Stores and saves the accepted version</td></tr>
+    <tr><td><code>_TERMS</code></td><td>The six acknowledgement strings, in display order</td></tr>
+  </tbody>
+</table>
+
+<h3>jobs/synthesizer.py — SynthesisWorker (range arguments)</h3>
+<table>
+  <thead><tr><th>Argument</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>start_index</code></td><td>0-based segment to start from (default <code>0</code>)</td></tr>
+    <tr><td><code>end_index</code></td><td><strong>Exclusive</strong> end; <code>start_index + 1</code> records one segment, <code>None</code> means “to the end”</td></tr>
+  </tbody>
+</table>
+
 <hr>
 
 <p style="text-align: center;">

@@ -17,6 +17,23 @@
 <div class="chapter-number">Chapter 48</div>
 <h1>TTS Engine Integration</h1>
 
+<div class="info">
+  <strong>Current implementation (2026.3.1).</strong> The sherpa-onnx wrapper described here is
+  still the engine for the ONNX and built-in voices, and it now sits behind two more layers:
+  <ul>
+    <li><code>tts/engine.py</code> is reached through <code>tts/models.py</code>, which resolves
+      a voice entry — including the pip-installed Voice Lab engines' built-in and cloned
+      voices — and hands sherpa-onnx the right model files.</li>
+    <li><code>voicelab.VoicelabEngine</code> implements the same <code>synthesize()</code>
+      contract by talking to a worker subprocess running on that engine's own interpreter, so
+      PyTorch and CUDA never load in the application process (see
+      <a href="ch76_voicelab_engines.html">Chapter 76</a>).</li>
+    <li>Reference audio for cloning is decoded without FFmpeg when TorchCodec cannot load
+      (<a href="ch79_audio_io_shim.html">Chapter 79</a>), and the engine cache key includes the
+      provider, so a compute change rebuilds the engine.</li>
+  </ul>
+</div>
+
 <h2>Learning Objectives</h2>
 <ul>
   <li>Understand how multiple TTS engines are unified under one interface</li>

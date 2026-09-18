@@ -17,6 +17,18 @@
 <div class="chapter-number">Chapter 55</div>
 <h1>Recording Dialog</h1>
 
+<div class="info">
+  <strong>Current implementation (2026.3.1).</strong> The window still opens on a project, but it
+  now accepts a <em>start position</em> and a <em>scope</em> from the caller
+  (<code>start_index</code>, and <code>single_segment</code> which becomes an exclusive
+  <code>end_index</code> for the worker), which is how <em>Start Selected Recording...</em>
+  records one chosen file, or every file from a chosen break to the end. A status line above
+  the Start button reports what was chosen (&ldquo;Ready: segment 12 of 40 — chapter 12&hellip;&rdquo;)
+  before the first click. The compute selector is the same per-category combo described in
+  <a href="ch78_compute_choice.html">Chapter 78</a>, and <em>Engine tuning...</em> edits this
+  project's Voice Lab overrides (see <a href="ch80_start_selected_recording.html">Chapter 80</a>).
+</div>
+
 <h2>Learning Objectives</h2>
 <ul>
   <li>Understand the Recording Dialog's complete UI</li>

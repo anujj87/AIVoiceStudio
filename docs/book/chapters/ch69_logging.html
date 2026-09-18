@@ -17,6 +17,19 @@
 <div class="chapter-number">Chapter 69</div>
 <h1>Logging &amp; Diagnostics</h1>
 
+<div class="info">
+  <strong>Current implementation (2026.3.1).</strong> <code>heavy_logging.py</code> installs
+  per-subsystem log files (<code>gui.log</code>, <code>tts.log</code>, <code>engine.log</code>,
+  <code>recording.log</code>, <code>addons.log</code>, <code>download.log</code>) plus
+  <code>crash.log</code> for unhandled exceptions, and <code>log_exception_with_context()</code>
+  is the hook addon authors are told to use. Heavy logging is switched on by Developer Mode
+  (<code>settings.developer_mode</code>), which is also what reveals the Developer category.
+  The application always writes <code>logs\app.log</code>. A smoke run of the frozen build is
+  checked by reading that file: a clean launch has the startup lines and no traceback, which is
+  how the terms-dialog <code>NameError</code> and a missing <code>hiddenimports</code> entry were
+  both caught.
+</div>
+
 <h2>Learning Objectives</h2>
 <ul>
   <li>Understand the AIVS logging system (basic and heavy modes)</li>

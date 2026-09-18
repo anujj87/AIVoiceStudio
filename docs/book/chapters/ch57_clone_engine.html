@@ -15,7 +15,23 @@
 <div class="main-content">
 
 <div class="chapter-number">Chapter 57</div>
-<h1>Voice Cloning (XTTS v2)</h1>
+<h1>Voice Cloning: from XTTS v2 to the Voice Lab</h1>
+
+<div class="warning">
+  <strong>Superseded (2026.3.1).</strong> XTTS v2 is no longer part of the application. Voice
+  cloning is now provided by the <strong>Voice Lab</strong>: three pip-installed engines —
+  <strong>Pocket TTS</strong> (Kyutai), <strong>Bark</strong> (Suno) and <strong>F5-TTS</strong> — each in its own
+  Python environment, driven by a subprocess worker. This chapter still teaches the
+  <em>ideas</em> that survived the change (a dedicated client, a JSON-lines protocol, one loaded
+  model reused across segments), so read it for the architecture and then continue with:
+  <ul>
+    <li><a href="ch76_voicelab_engines.html">Chapter 76 — the Voice Lab engine subsystem</a></li>
+    <li><a href="ch77_engine_environments.html">Chapter 77 — one environment per engine</a></li>
+    <li><a href="ch78_compute_choice.html">Chapter 78 — CPU and GPU compute</a></li>
+  </ul>
+  A fourth engine (NeuTTS) was removed because it required a Hugging Face login; no part of
+  this application depends on an account.
+</div>
 
 <h2>Learning Objectives</h2>
 <ul>
