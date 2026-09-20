@@ -27,9 +27,24 @@ from __future__ import annotations
 import inspect
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from . import languages
+
+# The two engine ids OmniVoice is reachable through: the direct engine
+# (``omnivoice-triton``) and the OpenAI-compatible HTTP server
+# (``omnivoice-server``).  Both share one model, one voice library and one
+# language table, so the GUI asks this tuple instead of keeping its own copy.
+ENGINE_IDS: Tuple[str, ...] = ("omnivoice", "omnivoice_server")
+
+
 # OmniVoice output sample rate (kHz) - same for the base model, the triton
 # runners and the HTTP server.
 SAMPLE_RATE = 24000
+
+
+def is_engine(value: Optional[str]) -> bool:
+    """True when ``value`` names one of the OmniVoice engines."""
+    return bool(value) and str(value) in ENGINE_IDS
+
 
 # ---------------------------------------------------------------------------
 # Generation defaults (AI Voice Studio level)
@@ -151,29 +166,29 @@ NONVERBAL_TAGS = [
     "dissatisfaction-hnn",
 ]
 
-# Curated example language codes for the optional language hint.  OmniVoice
-# auto-detects the language from the text, so this list is only for users who
-# want to steer pronunciation explicitly.
+# The full language table of the model lives in ``languages.py`` (646 entries,
+# copied from upstream ``docs/languages.md``); these examples stay as the short
+# "well known languages" list used by the documentation and by quick hints.
 LANGUAGE_EXAMPLES = [
-    "en (English)", "zh (Chinese)", "hi (Hindi)", "ar (Arabic)",
+    "en (English)", "zh (Chinese)", "hi (Hindi)", "arb (Standard Arabic)",
     "es (Spanish)", "fr (French)", "de (German)", "ja (Japanese)",
     "ko (Korean)", "vi (Vietnamese)", "ru (Russian)", "pt (Portuguese)",
 ]
 
 
 def clean_language(value: Optional[str]) -> Optional[str]:
-    """Normalise a language hint.
+    """Normalise a language hint to the id the engine expects.
 
     ``"auto"`` / ``""`` / ``None`` all mean "let OmniVoice detect it" and are
     mapped to ``None`` (the model's native auto-detect behaviour).  Anything
-    else is trimmed and lower-cased.
+    else is resolved against the model's own language table
+    (:mod:`ai_voice_studio.omnivoice.languages`), so an English name
+    (``"English"``), an ISO 639-3 code (``"eng"``) and a picker label
+    (``"English (en)"``) all become the ``"en"`` the request must carry, while
+    a code the table does not know is passed through lower-cased so a newer
+    engine version is never blocked.
     """
-    if value is None:
-        return None
-    value = str(value).strip()
-    if not value or value.lower() in ("auto", "automatic", "any"):
-        return None
-    return value.lower()
+    return languages.normalise(value)
 
 
 def voice_id_instruct(engine: Optional[str], voice_id: Optional[str]) -> str:

@@ -35,6 +35,7 @@ from ai_voice_studio.gui.settings_dialog import SettingsDialog  # noqa: E402
 from ai_voice_studio.settings import Settings  # noqa: E402
 from ai_voice_studio.tts.models import ModelStore  # noqa: E402
 from ai_voice_studio import compute  # noqa: E402
+from ai_voice_studio.omnivoice import languages as omni_languages  # noqa: E402
 from ai_voice_studio import voicelab  # noqa: E402
 from ai_voice_studio.gui import compute_choice  # noqa: E402
 from ai_voice_studio.voicelab import engines as voice_lab  # noqa: E402
@@ -771,6 +772,36 @@ class StartSelectedRecordingDialogTest(_AppMixin):
         self.assertTrue(dlg.only_selected())
         self.assertEqual(dlg.chosen_file(), "01 chapter 1.wav")
 
+    def test_the_focus_lands_on_the_sidebar_mode_not_the_combo(self):
+        """The dialog opens on the radio button, not inside the combo box.
+
+        The dialog hands the focus to its default (OK) button while it is
+        built, so the move happens on the show event instead of in the
+        constructor; from there on it is the checked mode button.
+        """
+        from ai_voice_studio.gui import main_frame as main_frame_module
+
+        dlg = self._dialog()
+        self.assertIs(dlg.initial_focus_control(), dlg.file_radio)
+        event = mock.Mock()
+        event.IsShown.return_value = True
+        with mock.patch.object(main_frame_module.wx, "CallAfter") as call_after:
+            dlg._on_show(event)
+            dlg._on_show(event)  # a second show must not re-steal the focus
+        scheduled = [getattr(call.args[0], "__name__", "")
+                     for call in call_after.call_args_list if call.args]
+        self.assertEqual(scheduled, ["_focus_first_control"])
+        self.assertNotIn("SetFocus", scheduled)  # the combo is not focused
+        # The event always keeps propagating, shown or hidden.
+        self.assertEqual(event.Skip.call_count, 2)
+        dlg._focus_first_control()  # and the focus call itself is harmless
+
+    def test_with_nothing_recorded_the_break_radio_takes_the_focus(self):
+        dlg = self._dialog(entries=[
+            {"position": 0, "title": "01 chapter 1", "file": None},
+        ])
+        self.assertIs(dlg.initial_focus_control(), dlg.break_radio)
+
     def test_select_by_file_break_lists_every_break_of_the_project(self):
         dlg = self._dialog()
         dlg.break_radio.SetValue(True)
@@ -989,7 +1020,19 @@ class PreviewComputeChoiceTest(_AppMixin):
                          "cpu")
 
     def test_the_preview_provider_follows_the_choice(self):
-        with mock.patch.object(compute, "has_nvidia_gpu", return_value=True):
+        # "auto" resolves through the *whole* detection chain, so the optional
+        # GPU runtime must be in place as well as the NVIDIA driver (the pair
+        # tests/test_compute.py patches): patching only the driver check made
+        # this test answer "what is installed on this machine?" instead of
+        # "what does the choice mean?".  The detection cache is cleared for
+        # the call and put back afterwards, so a probe that ran earlier in
+        # the session cannot answer for it.
+        cached = getattr(compute.detect, "_cache", None)
+        self.addCleanup(setattr, compute.detect, "_cache", cached)
+        with mock.patch("ai_voice_studio.compute.runtime.is_installed",
+                        return_value=True), \
+                mock.patch.object(compute, "has_nvidia_gpu", return_value=True):
+            compute.detect._cache = None  # type: ignore[attr-defined]
             self.assertEqual(compute_choice.provider_for_preview("cpu"), "cpu")
             self.assertEqual(compute_choice.provider_for_preview("cuda"), "cuda")
             self.assertEqual(compute_choice.provider_for_preview("auto"), "cuda")
@@ -1001,6 +1044,14 @@ class PreviewComputeChoiceTest(_AppMixin):
             self.assertEqual(
                 compute_choice.provider_for_preview("cpu", "pocket_tts"), "cpu"
             )
+        # A machine with the driver but no downloaded GPU runtime keeps the
+        # CPU preview: the option is offered, "auto" does not pick it.
+        with mock.patch("ai_voice_studio.compute.runtime.is_installed",
+                        return_value=False), \
+                mock.patch.object(compute, "has_nvidia_gpu", return_value=True):
+            compute.detect._cache = None  # type: ignore[attr-defined]
+            self.assertEqual(compute_choice.provider_for_preview("auto"), "cpu")
+            self.assertEqual(compute_choice.provider_for_preview("cuda"), "cuda")
 
 
 class RecordingDialogTest(_AppMixin):
@@ -1281,6 +1332,95 @@ class StartSelectedRecordingWiringTest(_AppMixin):
         captured = self._start(dlg)
         self.assertEqual(captured["start_index"], 0)
         self.assertIsNone(captured["end_index"])
+
+
+class OmniVoiceLanguagePickerTest(_AppMixin):
+    """OmniVoice options: Auto first, then every language it was trained on.
+
+    OmniVoice detects the language on its own and sometimes guesses wrong on
+    short lines, so the picker is what pins it.  Whatever the user picks or
+    types, what reaches the project has to be a language id - or ``None``,
+    which is "Auto" and no hint at all.
+    """
+
+    def _dialog(self, omni=None):
+        from ai_voice_studio.gui.omnivoice_options_dialog import (
+            OmniVoiceOptionsDialog,
+        )
+
+        dlg = OmniVoiceOptionsDialog(self.frame, engine_label="OmniVoice",
+                                     omni=omni or {}, project_name="demo")
+        self.addCleanup(dlg.Destroy)
+        return dlg
+
+    def test_auto_is_the_first_entry_and_sends_no_hint(self):
+        dlg = self._dialog()
+        self.assertEqual(dlg.language_combo.GetCount(),
+                         omni_languages.COUNT + 1)
+        self.assertEqual(dlg.language_combo.GetString(0),
+                         omni_languages.AUTO_LABEL)
+        self.assertEqual(dlg.language_combo.GetSelection(), 0)
+        self.assertEqual(dlg.language_combo.GetValue(), omni_languages.AUTO_LABEL)
+        self.assertIsNone(dlg.selected_language())
+        self.assertIsNone(dlg.get_omni()["language"])
+
+    def test_every_language_of_the_table_is_offered(self):
+        dlg = self._dialog()
+        listed = [dlg.language_combo.GetString(i)
+                  for i in range(1, dlg.language_combo.GetCount())]
+        self.assertEqual(listed, [omni_languages.label(code)
+                                  for code in omni_languages.language_ids()])
+
+    def test_choosing_a_language_forces_it(self):
+        dlg = self._dialog()
+        index = omni_languages.selection_index("hi")
+        self.assertEqual(dlg.language_combo.GetString(index), "Hindi (hi)")
+        dlg.language_combo.SetSelection(index)
+        dlg.language_combo.SetValue(dlg.language_combo.GetString(index))
+        self.assertEqual(dlg.selected_language(), "hi")
+        self.assertEqual(dlg.get_omni()["language"], "hi")
+
+    def test_a_stored_hint_selects_its_row(self):
+        for stored, expected in (("de", "de"), ("deu", "de"),
+                                 ("German", "de"), ("zh", "zh")):
+            with self.subTest(stored=stored):
+                self.assertEqual(self._dialog(
+                    {"language": stored}).selected_language(), expected)
+        # The chosen row is what the user sees and what the engine receives.
+        dlg = self._dialog({"language": "ja"})
+        self.assertEqual(dlg.language_combo.GetStringSelection(), "Japanese (ja)")
+        self.assertEqual(dlg.language_combo.GetValue(), "Japanese (ja)")
+        self.assertEqual(dlg.get_omni()["language"], "ja")
+
+    def test_auto_stays_auto(self):
+        for stored in ("auto", "", None, omni_languages.AUTO_LABEL):
+            with self.subTest(stored=stored):
+                dlg = self._dialog({"language": stored})
+                self.assertEqual(dlg.language_combo.GetSelection(), 0)
+                self.assertIsNone(dlg.get_omni()["language"])
+
+    def test_an_unknown_hint_is_neither_lost_nor_confused_with_a_name(self):
+        # A hint from a newer engine survives a round trip untouched.
+        dlg = self._dialog({"language": "xx-newer"})
+        self.assertEqual(dlg.selected_language(), "xx-newer")
+        self.assertEqual(dlg.get_omni()["language"], "xx-newer")
+
+    def test_a_typed_name_or_code_is_understood(self):
+        for typed, expected in (("Japanese", "ja"), ("jpn", "ja"),
+                                ("English (en)", "en"), ("  Hindi  ", "hi")):
+            with self.subTest(typed=typed):
+                dlg = self._dialog()
+                dlg.language_combo.SetValue(typed)
+                self.assertEqual(dlg.selected_language(), expected)
+
+    def test_the_picker_stays_visible_in_every_voice_mode(self):
+        """It lives in the advanced group, which no mode hides."""
+        dlg = self._dialog({"mode": "clone", "language": "zh"})
+        parent = dlg.language_combo.GetParent()
+        self.assertIsNot(parent, dlg.design_group.GetStaticBox())
+        self.assertIsNot(parent, dlg.clone_group.GetStaticBox())
+        self.assertIs(parent, dlg.duration_ctrl.GetParent())
+        self.assertEqual(dlg.get_omni()["language"], "zh")
 
 
 class AvailablePanelThreadTest(_AppMixin):

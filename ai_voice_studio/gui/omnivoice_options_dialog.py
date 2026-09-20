@@ -11,7 +11,8 @@ Exposes the full OmniVoice feature set for the Recording window:
   transcript (leave blank -> the engine auto-transcribes it via Whisper).
 * **Generation knobs** - diffusion steps, CFG guidance scale, token
   sampling temperature, voice-diversity temperature, denoise, fixed
-  duration, optional RNG seed and an optional language hint.
+  duration, optional RNG seed and the **language picker** (Auto plus every
+  language the model was trained on, so pronunciation can be pinned).
 * **Inline controls** - non-verbal symbols and pronunciation hints are
   passed through untouched, so the supported tags are listed here.
 
@@ -29,7 +30,7 @@ from typing import Any, Dict, Optional
 
 import wx
 
-from ..omnivoice import spec
+from ..omnivoice import languages, spec
 from .a11y import add_labeled, finalize_accessibility
 
 _NONE = "(not set)"
@@ -216,15 +217,28 @@ class OmniVoiceOptionsDialog(wx.Dialog):
         adv_grid = wx.FlexGridSizer(cols=2, vgap=6, hgap=8)
         adv_grid.AddGrowableCol(1)
 
-        self.language_ctrl = wx.TextCtrl(adv.GetStaticBox())
-        self.language_ctrl.SetName("Language hint")
-        self.language_ctrl.SetToolTip(
-            "Optional language hint for pronunciation. Examples: "
-            + ", ".join(spec.LANGUAGE_EXAMPLES)
-            + ". Leave empty to auto-detect from the text."
+        # -- language picker ----------------------------------------------
+        # "Auto" keeps the model's own detection; every other entry pins the
+        # language.  The table lives in ``omnivoice.languages`` and each label
+        # is "Name (id)", which ``languages.normalise`` maps straight back to
+        # the id the request builders send.  The whole list is handed to wx in
+        # one go on purpose: appending 647 items one by one makes the combo
+        # recompute its best size per item, which costs seconds in this grid.
+        self.language_combo = wx.ComboBox(
+            adv.GetStaticBox(), style=wx.CB_DROPDOWN,
+            choices=[label for label, _value in languages.choices()],
         )
-        add_labeled(adv.GetStaticBox(), adv_grid, "Language hint (optional)",
-                    self.language_ctrl, flag=wx.LEFT | wx.RIGHT, border=2)
+        self.language_combo.SetName("Language")
+        self.language_combo.SetToolTip(
+            f"{languages.AUTO_LABEL} keeps OmniVoice's own detection, which is "
+            "right most of the time but guesses wrong on very short lines. "
+            f"Pick one of the {languages.COUNT} languages OmniVoice was "
+            "trained on to force it, or type a code (en, eng) or a name. "
+            "Applies to every voice mode."
+        )
+        self.language_combo.SetSelection(0)
+        add_labeled(adv.GetStaticBox(), adv_grid, "Language",
+                    self.language_combo, flag=wx.LEFT | wx.RIGHT, border=2)
 
         self.num_step_ctrl = wx.SpinCtrl(
             adv.GetStaticBox(), min=spec.NUM_STEP_MIN, max=spec.NUM_STEP_MAX,
@@ -414,7 +428,7 @@ class OmniVoiceOptionsDialog(wx.Dialog):
 
         self.ref_audio_ctrl.SetValue(omni.get("ref_audio") or "")
         self.ref_text_ctrl.SetValue(omni.get("ref_text") or "")
-        self.language_ctrl.SetValue(omni.get("language") or "")
+        self._set_language(omni.get("language"))
 
         self.num_step_ctrl.SetValue(int(omni.get("num_step") or spec.DEFAULT_NUM_STEP))
         self.guidance_ctrl.SetValue(float(
@@ -438,6 +452,33 @@ class OmniVoiceOptionsDialog(wx.Dialog):
         seed = omni.get("seed")
         self.seed_ctrl.SetValue(str(seed) if seed is not None else "")
 
+    # -- language picker ----------------------------------------------------
+    def _set_language(self, value: Optional[str]):
+        """Show a stored hint in the picker (auto / known / verbatim)."""
+        normalised = languages.normalise(value)
+        index = languages.selection_index(normalised)
+        if index:
+            self.language_combo.SetSelection(index)
+            self.language_combo.SetValue(self.language_combo.GetString(index))
+        elif normalised:
+            # A language this table does not list - a newer engine's, or a code
+            # typed by hand.  Keep it exactly as stored rather than losing it.
+            self.language_combo.SetSelection(wx.NOT_FOUND)
+            self.language_combo.SetValue(str(value).strip())
+        else:
+            self.language_combo.SetSelection(0)
+            self.language_combo.SetValue(languages.AUTO_LABEL)
+
+    def selected_language(self) -> Optional[str]:
+        """The chosen language id, or ``None`` to let OmniVoice detect it.
+
+        The text of the box decides: every list entry is ``"Name (id)"`` and
+        the table maps it back to the id, so choosing from the list and typing
+        a name, an id or an ISO 639-3 code all arrive at the engine as the
+        same value.  ``None`` means "Auto" - the request carries no hint.
+        """
+        return languages.normalise(self.language_combo.GetValue())
+
     def get_omni(self) -> Dict[str, Any]:
         """Return the canonical ``omni`` dict the Recording window saves."""
         mode = _MODE_CHOICES[self.mode_box.GetSelection()][0]
@@ -460,7 +501,7 @@ class OmniVoiceOptionsDialog(wx.Dialog):
             instruct=instruct,
             ref_audio=self.ref_audio_ctrl.GetValue().strip() if mode == "clone" else "",
             ref_text=self.ref_text_ctrl.GetValue().strip() if mode == "clone" else "",
-            language=self.language_ctrl.GetValue().strip() or None,
+            language=self.selected_language(),
             num_step=int(self.num_step_ctrl.GetValue()),
             guidance_scale=float(self.guidance_ctrl.GetValue()),
             class_temperature=float(self.class_temp_ctrl.GetValue()),

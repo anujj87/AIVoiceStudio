@@ -39,7 +39,7 @@ from ..settings import Settings
 from ..tts import catalog, windows_tts
 from ..util import sanitize_filename
 from ..tts.models import ModelStore
-from . import dialogs
+from . import dialogs, language_choice
 from .a11y import (
     add_labeled,
     finalize_accessibility,
@@ -331,6 +331,7 @@ class RecordingDialog(wx.Dialog):
         self.tts_combo.Bind(wx.EVT_COMBOBOX, self._on_tts)
         self.lang_combo.Bind(wx.EVT_COMBOBOX, self._on_lang)
         self.variant_combo.Bind(wx.EVT_COMBOBOX, self._on_variant)
+        self.voice_combo.Bind(wx.EVT_COMBOBOX, self._on_voice_change)
         self.omni_btn.Bind(wx.EVT_BUTTON, self._on_omni_options)
         self.engine_options_btn.Bind(wx.EVT_BUTTON, self._on_engine_options)
         self.Bind(wx.EVT_CLOSE, self._on_close)
@@ -607,6 +608,13 @@ class RecordingDialog(wx.Dialog):
 
     def _populate_langs(self, tts_id):
         tts = catalog.find_tts(tts_id) if tts_id else None
+        if language_choice.is_omnivoice(tts_id):
+            # OmniVoice: the Language box is the engine's language hint (Auto
+            # plus all 646 languages of the model), not a key into the voice
+            # list - every OmniVoice voice can speak every one of them.
+            language_choice.fill(self.lang_combo, self._omni_language_hint())
+            self._on_lang(None)
+            return
         langs = sorted({v["language"] for v in self._voices if v["tts"] == tts_id})
         self.lang_combo.Clear()
         for code in langs:
@@ -621,8 +629,12 @@ class RecordingDialog(wx.Dialog):
         lang_sel = self.lang_combo.GetSelection()
         variant_sel = self.variant_combo.GetSelection()
         tts_id = self.tts_combo.GetClientData(tts_sel) if tts_sel >= 0 else None
-        lang = self.lang_combo.GetClientData(lang_sel) if lang_sel >= 0 else None
-        variant = self.variant_combo.GetClientData(variant_sel) if variant_sel >= 0 else None
+        lang = language_choice.code_at(self.lang_combo, lang_sel) if lang_sel >= 0 else None
+        variant = language_choice.code_at(self.variant_combo, variant_sel) if variant_sel >= 0 else None
+        if language_choice.is_omnivoice(tts_id):
+            # The pinned language is a hint to the engine, so it never removes
+            # voices from the list.
+            lang = None
         return [
             v for v in self._voices
             if v["tts"] == tts_id
@@ -642,8 +654,24 @@ class RecordingDialog(wx.Dialog):
         tts_sel = self.tts_combo.GetSelection()
         lang_sel = self.lang_combo.GetSelection()
         tts_id = self.tts_combo.GetClientData(tts_sel) if tts_sel >= 0 else None
-        lang = self.lang_combo.GetClientData(lang_sel) if lang_sel >= 0 else None
         tts = catalog.find_tts(tts_id) if tts_id else None
+        if language_choice.is_omnivoice(tts_id):
+            # The chosen language is stored as this project's OmniVoice hint
+            # (Auto clears it); the variants stay complete either way.
+            self._store_omni_language(language_choice.hint_of(self.lang_combo))
+            variants = sorted({
+                v["variant"] for v in self._voices if v["tts"] == tts_id
+            })
+            self.variant_combo.Clear()
+            for vid in variants:
+                variant = (catalog.find_variant(tts, language_choice.AUTO_KEY, vid)
+                           if tts else None)
+                self.variant_combo.Append(variant["name"] if variant else vid, vid)
+            if self.variant_combo.GetCount():
+                self.variant_combo.SetSelection(0)
+            self._on_variant(None)
+            return
+        lang = language_choice.code_at(self.lang_combo, lang_sel) if lang_sel >= 0 else None
         variants = sorted({
             v["variant"] for v in self._voices
             if v["tts"] == tts_id and v["language"] == lang
@@ -668,6 +696,11 @@ class RecordingDialog(wx.Dialog):
             self.voice_combo.SetSelection(0)
         self._update_omni_ui()
 
+    def _on_voice_change(self, _):
+        """Another voice was picked: refresh the OmniVoice options/summary
+        (a voice-library voice carries its own language pin)."""
+        self._update_omni_ui()
+
     # -- OmniVoice options (per project) ------------------------------------
     def _selected_tts_id(self):
         sel = self.tts_combo.GetSelection()
@@ -680,12 +713,39 @@ class RecordingDialog(wx.Dialog):
     def _omni_settings(self) -> dict:
         return self.data.get("tts", {}).get("omni") or {}
 
+    def _omni_language_hint(self):
+        """The OmniVoice language this project will pin (``None`` = auto).
+
+        The project's own choice (Settings-free: it is kept in
+        ``project.json``) wins; a voice-library voice carries its own pin,
+        which is what the Language box shows while the project has none.
+        """
+        voice = self._selected_voice()
+        stored = None
+        if voice and voice.get("custom_omni"):
+            stored = (voice.get("omni") or {}).get("language")
+        return self._omni_settings().get("language") or stored or None
+
+    def _store_omni_language(self, hint):
+        """Keep ``hint`` (a language id, or ``None`` for auto) with the rest
+        of this project's OmniVoice options."""
+        tts = self.data.setdefault("tts", {})
+        omni = tts.get("omni")
+        if not isinstance(omni, dict):
+            omni = {}
+        if hint:
+            omni["language"] = hint
+        else:
+            omni.pop("language", None)
+        if omni:
+            tts["omni"] = omni
+
     @staticmethod
     def _omni_summary_text(omni: dict, engine: str | None = None) -> str:
         """Short human summary of the stored per-project OmniVoice options."""
         if not omni:
             return ""
-        from ..omnivoice import spec  # noqa: PLC0415
+        from ..omnivoice import languages, spec  # noqa: PLC0415
         mode = omni.get("mode", "auto")
         if mode == "clone":
             ref = omni.get("ref_audio") or ""
@@ -700,6 +760,10 @@ class RecordingDialog(wx.Dialog):
             bits.append(f"{omni['num_step']} steps")
         if omni.get("guidance_scale") is not None:
             bits.append(f"guidance {omni['guidance_scale']:g}")
+        if omni.get("language"):
+            # A pinned language is worth showing: it is the fix for short
+            # lines that OmniVoice would otherwise detect as a neighbour.
+            bits.append(f"language {languages.display_name(omni['language'])}")
         if omni.get("seed") is not None:
             bits.append(f"seed {omni['seed']}")
         suffix = f" - {', '.join(bits)}" if bits else ""
@@ -719,6 +783,12 @@ class RecordingDialog(wx.Dialog):
         self.omni_btn.Show(visible and not is_library)
         self.omni_summary.Show(visible)
         if visible:
+            # Keep the Language box on the language this project will send:
+            # the project's choice wins, else the library voice's own pin.
+            language_choice.select(
+                self.lang_combo,
+                self._omni_language_hint() or language_choice.AUTO_KEY,
+            )
             if is_library:
                 omni = voice.get("omni") or {}
                 if omni.get("mode") == "clone":
@@ -728,6 +798,9 @@ class RecordingDialog(wx.Dialog):
                 else:
                     text = ("Voice library voice - design: "
                             f"{omni.get('instruct') or '(auto attributes)'}")
+                text += (" Language: "
+                         + language_choice.label(self._omni_language_hint())
+                         + ".")
             else:
                 omni = self._omni_settings()
                 text = self._omni_summary_text(omni)
@@ -920,16 +993,25 @@ class RecordingDialog(wx.Dialog):
 
     def _select_project_cascade(self, tts):
         """Preselect language / variant / voice stored in the project."""
-        for combo, key, apply in (
-            (self.lang_combo, tts.get("language"), self._on_lang),
-            (self.variant_combo, tts.get("variant"), self._on_variant),
-        ):
-            if not key:
-                continue
-            for i in range(combo.GetCount()):
-                if combo.GetClientData(i) == key:
-                    combo.SetSelection(i)
-                    apply(None)
+        if language_choice.is_omnivoice(tts.get("tts")):
+            # The pin lives in the project's OmniVoice options; the catalog
+            # language of every OmniVoice voice stays "auto".
+            language_choice.select(
+                self.lang_combo,
+                self._omni_language_hint() or language_choice.AUTO_KEY,
+            )
+            self._on_lang(None)
+        elif tts.get("language"):
+            for i in range(self.lang_combo.GetCount()):
+                if language_choice.code_at(self.lang_combo, i) == tts["language"]:
+                    self.lang_combo.SetSelection(i)
+                    self._on_lang(None)
+                    break
+        if tts.get("variant"):
+            for i in range(self.variant_combo.GetCount()):
+                if language_choice.code_at(self.variant_combo, i) == tts["variant"]:
+                    self.variant_combo.SetSelection(i)
+                    self._on_variant(None)
                     break
         voice_id = tts.get("voice")
         if voice_id:
@@ -1039,7 +1121,14 @@ class RecordingDialog(wx.Dialog):
             from ..omnivoice import spec  # noqa: PLC0415
 
             if voice.get("custom_omni"):
-                omni = voice.get("omni") or {}
+                # A voice-library voice keeps its own clone/design identity;
+                # an explicit project language still overrides its own pin.
+                omni = dict(voice.get("omni") or {})
+                pin = self._omni_settings().get("language")
+                if pin:
+                    omni["language"] = pin
+                    voice = dict(voice)
+                    voice["omni"] = omni
             else:
                 voice = spec.apply_omni_to_voice(voice, self._omni_settings())
                 omni = voice.get("omni") or {}

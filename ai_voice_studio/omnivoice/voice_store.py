@@ -35,6 +35,7 @@ from typing import Any, Dict, Iterable, List, Tuple
 from .. import paths
 from ..tts import catalog
 from ..util import sanitize_filename
+from . import languages
 
 log = logging.getLogger(__name__)
 
@@ -124,6 +125,7 @@ def create_voice(
     ref_audio: str = "",
     ref_text: str = "",
     instruct: str = "",
+    language: str | None = None,
 ) -> Dict[str, Any]:
     """Create a universal OmniVoice voice and register it in ``store``.
 
@@ -132,6 +134,10 @@ def create_voice(
     engine agnostic: it is usable through the direct engine *and* the server
     engine.  Returns the stored custom-voice entry (its ``name`` may have
     been sanitized).
+
+    ``language`` pins the created voice to one of the model's languages
+    (``"hi"``, ``"zh"`` ...); ``None``/``"auto"`` leaves OmniVoice's own
+    detection in charge.
     """
     if mode not in ("clone", "design"):
         raise ValueError(f"Unknown voice mode '{mode}'")
@@ -153,6 +159,9 @@ def create_voice(
         "sample": "",
         "reference": "",
     }
+    pin = languages.normalise(language)
+    if pin:
+        extra["omni_language"] = pin
     if mode == "clone":
         ref = (ref_audio or "").strip()
         if not ref or not os.path.isfile(ref):
@@ -208,7 +217,9 @@ def _omni_for(voice: Dict[str, Any]) -> Dict[str, Any]:
         "instruct": (voice.get("instruct") or "").strip(),
         "ref_audio": sample if mode == "clone" else "",
         "ref_text": (voice.get("ref_text") or "").strip() if mode == "clone" else "",
-        "language": None,
+        # The language the voice was created with (None = let the engine
+        # detect it).  An explicit project choice overrides it.
+        "language": languages.normalise(voice.get("omni_language")),
     }
 
 

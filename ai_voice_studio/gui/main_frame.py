@@ -654,6 +654,7 @@ class _StartRecordingDialog(wx.Dialog):
     def __init__(self, parent, entries):
         super().__init__(parent, title="Start selected recording", size=(600, 320))
         self._entries = [dict(entry) for entry in entries]
+        self._focus_done = False
 
         outer = wx.BoxSizer(wx.HORIZONTAL)
 
@@ -714,7 +715,34 @@ class _StartRecordingDialog(wx.Dialog):
             self.CentreOnParent()
         else:
             self.Centre()
-        wx.CallAfter(self.combo.SetFocus)
+        # Focus the sidebar mode radio button - the first control of the
+        # dialog and the checked one - so a screen reader starts on "Select an
+        # audio file" instead of jumping straight into the combo box.  It has
+        # to wait for the show event: a dialog hands the focus to its default
+        # (OK) button while it is being created, and that would win.
+        self.Bind(wx.EVT_SHOW, self._on_show)
+
+    # ---------------------------------------------------------------- focus
+    def _on_show(self, event):
+        """Move the cursor to the mode button once the dialog is on screen."""
+        event.Skip()
+        if event.IsShown() and not self._focus_done:
+            self._focus_done = True
+            wx.CallAfter(self._focus_first_control)
+
+    def initial_focus_control(self):
+        """The control the dialog focuses when it opens.
+
+        The sidebar mode radio button comes first: it says how the combo box
+        below is filled, so it is what the user (and a screen reader) has to
+        meet first.  The checked one is chosen, which is always "Select an
+        audio file" unless nothing has been recorded yet.
+        """
+        return self.break_radio if self.break_radio.GetValue() else self.file_radio
+
+    def _focus_first_control(self):
+        """Put the keyboard cursor on :meth:`initial_focus_control`."""
+        self.initial_focus_control().SetFocus()
 
     # ------------------------------------------------------------------ state
     def _fill_combo(self):

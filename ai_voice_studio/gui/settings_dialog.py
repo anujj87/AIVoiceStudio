@@ -78,7 +78,7 @@ from .events import (
     EVT_DOWNLOAD_FINISHED,
     EVT_DOWNLOAD_PROGRESS,
 )
-from . import dialogs
+from . import dialogs, language_choice
 from .clone_engines_panel import VoiceClonePanel
 from .model_panels import AvailablePanel, DownloadPanel
 from .theme import apply_theme
@@ -1726,6 +1726,21 @@ class _OmniVoiceEnginesPanel(_SettingsPanel):
         self.mode_combo.SetSelection(0)
         add_labeled(self, grid, "2. Creation mode", self.mode_combo,
                     flag=wx.LEFT | wx.RIGHT, border=2)
+        # 3) language: Auto (the engine detects it) or one of the 646
+        # languages OmniVoice was trained on, pinned into the created voice so
+        # every recording that uses it stays on that language.
+        self.omni_language_combo = wx.ComboBox(
+            self, style=wx.CB_READONLY,
+            name="Language for the created voice",
+        )
+        language_choice.fill(self.omni_language_combo)
+        self.omni_language_combo.SetToolTip(
+            f"{language_choice.label(None)} keeps OmniVoice's own detection. "
+            f"Pick one of the {language_choice.COUNT} languages the "
+            "model was trained on to pin the created voice to it."
+        )
+        add_labeled(self, grid, "3. Language", self.omni_language_combo,
+                    flag=wx.LEFT | wx.RIGHT, border=2)
         sizer.Add(grid, 0, wx.EXPAND | wx.ALL, 6)
 
         self.mode_tip = wx.StaticText(self, label="")
@@ -1910,6 +1925,8 @@ class _OmniVoiceEnginesPanel(_SettingsPanel):
         self._library = voice_store.omni_custom_voices(self.store)
         self._lib_names = [
             f"{v['name']} — {'clone' if v.get('mode') == 'clone' else 'design'}"
+            + (f" — {language_choice.label(v.get('omni_language'))}"
+               if v.get("omni_language") else "")
             for v in self._library
         ]
         self.voices_list.Clear()
@@ -2012,6 +2029,7 @@ class _OmniVoiceEnginesPanel(_SettingsPanel):
             entry = voice_store.create_voice(
                 self.store, name=name, mode=mode,
                 ref_audio=ref_audio, ref_text=ref_text, instruct=instruct,
+                language=language_choice.hint_of(self.omni_language_combo),
             )
         except ValueError as exc:
             status.SetLabel("")

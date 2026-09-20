@@ -21,7 +21,7 @@ from ..tts.downloader import (
     ModelDownloader,
 )
 from ..tts.models import ModelStore
-from . import dialogs
+from . import dialogs, language_choice
 from .a11y import add_labeled, finalize_accessibility
 from .events import (
     DownloadFinishedEvent,
@@ -328,6 +328,9 @@ class AvailablePanel(_ManagerPanel):
         self.store = store
         self._voices: list = []  # parallel list of voice entries
         self.settings = settings
+        # The language pinned in the Language box while an OmniVoice engine is
+        # selected (a hint to the engine, not a key into the voice list).
+        self._omni_language = None
 
         sizer = wx.BoxSizer(wx.VERTICAL)
         grid = wx.FlexGridSizer(cols=2, vgap=6, hgap=8)
@@ -386,12 +389,13 @@ class AvailablePanel(_ManagerPanel):
         if not voice:
             return None
         return (voice.get("tts"), voice.get("language"),
-                voice.get("variant"), voice.get("voice"))
+                voice.get("variant"), voice.get("voice"),
+                self._omni_language)
 
     def _restore_selection(self, prev):
         if not prev:
             return
-        tts_id, lang, variant, voice_id = prev
+        tts_id, lang, variant, voice_id, omni_language = prev
 
         def _cd(combo, index):
             return combo.GetClientData(index) if index >= 0 else None
@@ -403,14 +407,21 @@ class AvailablePanel(_ManagerPanel):
                 break
         else:
             return
-        for i in range(self.lang_combo.GetCount()):
-            key = _cd(self.lang_combo, i)
-            if key and key[0] == tts_id and key[1] == lang:
-                self.lang_combo.SetSelection(i)
-                self._on_lang(None)
-                break
+        if language_choice.is_omnivoice(tts_id):
+            # OmniVoice's Language box is the engine's hint; restore it and
+            # keep the voice list whole.
+            self._omni_language = omni_language
+            language_choice.fill(self.lang_combo, omni_language)
+            self._on_lang(None)
         else:
-            return
+            for i in range(self.lang_combo.GetCount()):
+                key = _cd(self.lang_combo, i)
+                if key and key[0] == tts_id and key[1] == lang:
+                    self.lang_combo.SetSelection(i)
+                    self._on_lang(None)
+                    break
+            else:
+                return
         for i in range(self.variant_combo.GetCount()):
             key = _cd(self.variant_combo, i)
             if key and key[0] == tts_id and key[1] == lang and key[2] == variant:
@@ -579,6 +590,13 @@ class AvailablePanel(_ManagerPanel):
             return
         sel = self.tts_combo.GetSelection()
         tts_id = self.tts_combo.GetClientData(sel) if sel >= 0 else None
+        if language_choice.is_omnivoice(tts_id):
+            # An OmniVoice engine: Auto plus all 646 languages of the model.
+            # The choice is a hint to the engine (see gui/language_choice.py),
+            # so the voice list below stays complete.
+            language_choice.fill(self.lang_combo, self._omni_language)
+            self._on_lang(None)
+            return
         matching = {k: v for k, v in groups.items() if k[0] == tts_id}
         self.lang_combo.Clear()
         for key, items in sorted(matching.items()):
@@ -590,13 +608,23 @@ class AvailablePanel(_ManagerPanel):
         self._on_lang(None)
 
     def _on_lang(self, _):
-        key = self.lang_combo.GetClientData(self.lang_combo.GetSelection()) if self.lang_combo.GetSelection() >= 0 else None
-        if not key:
-            self.variant_combo.Clear()
-            self.voice_combo.Clear()
-            return
+        sel = self.tts_combo.GetSelection()
+        tts_id = self.tts_combo.GetClientData(sel) if sel >= 0 else None
         groups = self._groups()
-        matching = {k: v for k, v in groups.items() if k[0] == key[0] and k[1] == key[1]}
+        if language_choice.is_omnivoice(tts_id):
+            # OmniVoice: the language is the engine's hint, so every voice of
+            # that engine stays selectable whatever is pinned here.
+            self._omni_language = language_choice.hint_of(self.lang_combo)
+            matching = {k: v for k, v in groups.items() if k[0] == tts_id}
+        else:
+            key = language_choice.code_at(self.lang_combo,
+                                          self.lang_combo.GetSelection())
+            if not key:
+                self.variant_combo.Clear()
+                self.voice_combo.Clear()
+                return
+            matching = {k: v for k, v in groups.items()
+                        if k[0] == key[0] and k[1] == key[1]}
         self.variant_combo.Clear()
         for vkey, items in sorted(matching.items()):
             tts = catalog.find_tts(vkey[0])
@@ -639,6 +667,11 @@ class AvailablePanel(_ManagerPanel):
         if not voice:
             wx.MessageBox("Select a voice first.", "Preview", style=wx.OK | wx.ICON_INFORMATION)
             return
+        if language_choice.is_omnivoice(voice.get("tts")) and self._omni_language:
+            # Preview the pinned language too (a copy: the list entry keeps
+            # its catalog language).
+            voice = dict(voice)
+            voice["language"] = self._omni_language
         self.preview_btn.Disable()
         self.detail.SetLabel("Synthesizing preview...")
         # Snapshot the compute choice on the UI thread; the job runs on a worker.
