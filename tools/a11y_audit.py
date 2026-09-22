@@ -1,8 +1,19 @@
 """Headless screen-reader label audit.
 
-Walks every constructible panel/dialog in the app and prints, for each
-input control (text, combo, spin, check, radio, list, listctrl), the
-accessible name a screen reader (NVDA/JAWS/Narrator) would announce.
+Walks every constructible window in the app and prints, for each input
+control (text, combo, spin, check, radio, list, listctrl), the accessible
+name a screen reader (NVDA/JAWS/Narrator) would announce.
+
+Covered windows:
+
+* every Settings dialog category panel
+* the recording window (built from a real project folder)
+* the OmniVoice voice-options dialog and every Voice Lab tuning dialog
+* the first-launch terms dialog
+* the main window's welcome panel
+* the New Project wizard (all pages)
+* the "Start selected recording" picker
+* the progress dialog and the reusable action dialog
 
 Flags:
   * !DEFAULT  - name is empty or the wxWidgets default class name, i.e.
@@ -20,7 +31,8 @@ import sys
 
 import wx
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
 from ai_voice_studio.settings import Settings  # noqa: E402
 from ai_voice_studio.tts.models import ModelStore  # noqa: E402
@@ -145,60 +157,11 @@ def dump(title, win):
 
 
 def main():
-    os.makedirs("build/a11y_models", exist_ok=True)
-    store = ModelStore(
-        state_file=os.path.join(os.getcwd(), "build", "a11y_models", "models_state.json")
-    )
-    settings = Settings()
+    from a11y_windows import iter_windows
 
-    app = wx.App(False)
-
-    # -- Settings dialog: every category panel ---------------------------
-    import ai_voice_studio.gui.settings_dialog as sd
-
-    dlg = sd.SettingsDialog(None, settings, store)
-    dlg.SetSize((1000, 900))
-    dlg.Show()
-    for i, cls in enumerate(dlg.CATEGORIES):
-        dlg._show_category(i)
-        dlg.Layout()
-        dump(f"[{cls.title}] panel", dlg._panels[i])
-    dlg.Destroy()
-
-    # -- Recording dialog (uses a real sample project) -------------------
-    from ai_voice_studio.gui.recording_dialog import RecordingDialog
-
-    project_dir = os.path.join("build", "e2e_omnivoice", "design")
-    if os.path.isfile(os.path.join(project_dir, "project.json")):
-        rd = RecordingDialog(None, project_dir, settings, store)
-        rd.SetSize((900, 800))
-        rd.Show()
-        dump("Recording dialog", rd)
-        rd.Destroy()
-    else:
-        print("\nRecordingDialog skipped: no sample project at", project_dir)
-
-    # -- OmniVoice options dialog (recording voice settings) -------------
-    from ai_voice_studio.gui.omnivoice_options_dialog import OmniVoiceOptionsDialog
-
-    od = OmniVoiceOptionsDialog(None, engine_label="OmniVoice", omni={}, project_name="demo")
-    od.SetSize((760, 800))
-    od.Show()
-    dump("OmniVoice options dialog", od)
-    od.Destroy()
-
-    # -- Voice Lab tuning dialog (one instance per engine) ---------------
-    from ai_voice_studio.gui.voicelab_options_dialog import VoiceLabOptionsDialog
-    from ai_voice_studio.voicelab import engines as voice_lab
-
-    for engine_id in voice_lab.engine_ids():
-        vd = VoiceLabOptionsDialog(
-            None, engine_id, values={}, project_name="demo"
-        )
-        vd.SetSize((760, 800))
-        vd.Show()
-        dump(f"Voice Lab options dialog ({engine_id})", vd)
-        vd.Destroy()
+    app = wx.App(False)  # noqa: F841 - must stay referenced
+    for title, window in iter_windows():
+        dump(title, window)
 
 
 if __name__ == "__main__":

@@ -138,8 +138,11 @@ class DownloadPanel(_ManagerPanel):
         sizer.Add(self.progress_label, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 6)
 
         btns = wx.BoxSizer(wx.HORIZONTAL)
-        self.download_btn = wx.Button(self, label="Download selected variant")
-        self.remove_btn = wx.Button(self, label="Remove selected variant")
+        # Access keys: Alt+D downloads, Alt+R removes (the visible label
+        # keeps the & as the Windows mnemonic marker; screen readers hear
+        # the name without it).
+        self.download_btn = wx.Button(self, label="&Download selected variant")
+        self.remove_btn = wx.Button(self, label="&Remove selected variant")
         self.cancel_btn = wx.Button(self, label="Cancel download")
         self.cancel_btn.Disable()
         self.download_btn.SetName("Download selected variant")
@@ -358,7 +361,7 @@ class AvailablePanel(_ManagerPanel):
         )
         btns.Add(compute_label, 0, wx.LEFT | wx.RIGHT | wx.ALIGN_CENTER_VERTICAL, 4)
         btns.Add(self.compute_combo, 0, wx.ALL | wx.ALIGN_CENTER_VERTICAL, 4)
-        self.preview_btn = wx.Button(self, label="Preview selected voice")
+        self.preview_btn = wx.Button(self, label="&Preview selected voice")
         self.preview_btn.SetName("Preview selected voice")
         btns.Add(self.preview_btn, 0, wx.ALL, 4)
         sizer.Add(btns, 0, wx.LEFT, 2)

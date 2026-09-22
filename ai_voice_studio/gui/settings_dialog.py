@@ -746,7 +746,9 @@ class _RecordingSettingsPanel(_SettingsPanel):
         self.sample_text.SetName("Preview text")
         sizer.Add(self.sample_text, 0, wx.EXPAND | wx.ALL, 6)
 
-        self.preview_btn = wx.Button(self, label="Preview")
+        # Alt+P previews (the & is the Windows access-key marker; the
+        # accessible name stays "Preview").
+        self.preview_btn = wx.Button(self, label="&Preview")
         self.preview_btn.SetName("Preview")
         # Which back-end the Preview speaks with (CPU, GPU when detected,
         # Auto); remembered per category in Settings.
@@ -1210,7 +1212,9 @@ class _PunctuationPanel(_SettingsPanel):
         self.example_out.Wrap(700)
         sizer.Add(self.example_out, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 6)
 
-        self.preview_btn = wx.Button(self, label="Preview")
+        # Alt+P previews (the & is the Windows access-key marker; the
+        # accessible name stays "Preview").
+        self.preview_btn = wx.Button(self, label="&Preview")
         self.preview_btn.SetName("Preview")
         # Which back-end the Preview speaks with (CPU, GPU when detected,
         # Auto); remembered per category in Settings.
@@ -1870,7 +1874,7 @@ class _OmniVoiceEnginesPanel(_SettingsPanel):
         self.preview_text.SetName("Preview text")
         add_labeled(lib_box, pv_grid, "Preview text", self.preview_text,
                     flag=wx.LEFT | wx.RIGHT, border=2)
-        self.preview_btn = wx.Button(lib_box, label="Preview selected voice")
+        self.preview_btn = wx.Button(lib_box, label="&Preview selected voice")
         self.preview_btn.SetName("Preview voice library voice")
         pv_grid.Add(self.preview_btn, 0, wx.ALL, 2)
         # Which back-end the preview runs on.  OmniVoice itself needs CUDA, so

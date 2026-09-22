@@ -18,6 +18,7 @@ import textwrap
 import wx
 
 from ..constants import TERMS_VERSION
+from .a11y import set_accessible_name
 
 # One entry per required checkbox, in display order.
 _TERMS = [
@@ -74,6 +75,12 @@ class AcceptanceDialog(wx.Dialog):
         for index, text in enumerate(_TERMS, start=1):
             wrapped = "\n".join(textwrap.wrap(text, width=90))
             box = wx.CheckBox(panel, label=f"{index}.  {wrapped}")
+            # The wx-level name of a check box is "check" until it is set,
+            # and the six terms would then all be announced identically
+            # ("check box"), so each one carries its own term as the
+            # accessible name.  The number is spoken too, so "term 3 of 6"
+            # can be recognised while arrowing through the list.
+            set_accessible_name(box, f"Term {index}: {text}")
             box.Bind(wx.EVT_CHECKBOX, self._on_toggle)
             self._checkboxes.append(box)
             sizer.Add(box, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
@@ -81,6 +88,7 @@ class AcceptanceDialog(wx.Dialog):
         # The last checkbox stands for "all above": ticking it automatically
         # ticks (and un-ticking it un-ticks) every term checkbox.
         self._agree_all = wx.CheckBox(panel, label=_AGREE_ALL_LABEL)
+        set_accessible_name(self._agree_all, _AGREE_ALL_LABEL)
         self._agree_all.SetFont(self._agree_all.GetFont().Bold())
         self._agree_all.Bind(wx.EVT_CHECKBOX, self._on_agree_all)
         self._checkboxes.append(self._agree_all)

@@ -729,8 +729,89 @@ class MainFrameTest(_AppMixin):
             new_item = [i for i in menubar.GetMenu(0).GetMenuItems()
                         if i.GetItemLabelText() == "New Project"][0]
             self.assertIn("Ctrl+Shift+N", new_item.GetItemLabel())
+            # "Show project folder" is the last Edit-menu action.
+            self.assertEqual(labels[-1], "Show project folder")
         finally:
             frame.Destroy()
+
+    def _project_frame(self):
+        """A MainFrame whose single recent project is selected."""
+        tmp = tempfile.mkdtemp(prefix="aivs_smoke_")
+        self.addCleanup(shutil.rmtree, tmp, True)
+        project.create_project(
+            tmp, "Selected project", "doc.txt", MODE_PAGE_WITH_H1,
+            [{"index": 1, "title": "chapter 1", "text": "Text 1."}],
+        )
+        settings = Settings(path=os.path.join(tmp, "settings.json"))
+        settings.add_recent_project("Selected project", tmp)
+        frame = MainFrame(settings=settings, store=self._empty_store())
+        self.addCleanup(frame.Destroy)
+        frame.recent_list.SetSelection(0)
+        return frame, tmp
+
+    def test_show_project_folder_opens_the_selected_projects_folder(self):
+        frame, tmp = self._project_frame()
+        opened = []
+        with mock.patch("ai_voice_studio.gui.main_frame.open_folder",
+                        side_effect=opened.append):
+            frame._show_project_folder()
+        self.assertEqual(opened, [tmp])
+        self.assertEqual(frame.GetStatusBar().GetStatusText(), f"Opened {tmp}")
+
+    def test_show_project_folder_warns_when_the_folder_is_gone(self):
+        frame, tmp = self._project_frame()
+        shutil.rmtree(tmp)
+        messages = []
+        with mock.patch("ai_voice_studio.gui.main_frame.open_folder") as opener, \
+                mock.patch.object(wx, "MessageBox",
+                                  side_effect=lambda *a, **k: messages.append(a[0])):
+            frame._show_project_folder()
+        self.assertFalse(opener.called)
+        self.assertEqual(len(messages), 1)
+        self.assertIn(tmp, messages[0])
+
+    def test_the_context_menu_ends_with_show_project_folder(self):
+        frame, _tmp = self._project_frame()
+        labels = []
+        with mock.patch.object(
+            frame.recent_list, "PopupMenu",
+            side_effect=lambda menu: labels.extend(
+                i.GetItemLabelText() for i in menu.GetMenuItems() if not i.IsSeparator()
+            ),
+        ):
+            evt = mock.MagicMock()
+            evt.GetPosition.return_value = wx.Point(4, 4)
+            frame._on_recent_context_menu(evt)
+        self.assertEqual(labels, ["Resume Recording", "Restart Project...",
+                                  "Restart All Recording",
+                                  "Start Selected Recording...",
+                                  "Remove Project...", "Show project folder"])
+
+    def test_the_context_menu_from_the_keyboard_keeps_the_selection(self):
+        """The application-menu key has no position: the selected row wins."""
+        frame, tmp = self._project_frame()
+        evt = mock.MagicMock()
+        evt.GetPosition.return_value = wx.DefaultPosition
+        seen = []
+        with mock.patch.object(
+            frame.recent_list, "PopupMenu", side_effect=lambda menu: seen.append(menu),
+        ):
+            frame._on_recent_context_menu(evt)
+        self.assertEqual(frame.recent_list.GetSelection(), 0)
+        self.assertEqual(frame._selected_recent()["path"], tmp)
+
+    def test_the_edit_menu_action_opens_the_folder(self):
+        """The Edit-menu item reaches the same handler as the popup item."""
+        frame, tmp = self._project_frame()
+        menubar = frame.GetMenuBar()
+        edit_menu = menubar.GetMenu(menubar.FindMenu("Edit"))
+        item_id = [i.GetId() for i in edit_menu.GetMenuItems()
+                   if i.GetItemLabelText() == "Show project folder"][0]
+        opened = []
+        with mock.patch("ai_voice_studio.gui.main_frame.open_folder",
+                        side_effect=opened.append):
+            frame.ProcessEvent(wx.MenuEvent(wx.wxEVT_MENU, item_id))
+        self.assertEqual(opened, [tmp])
 
 
 class StartSelectedRecordingDialogTest(_AppMixin):

@@ -50,6 +50,8 @@ from typing import Dict, Optional
 
 import numpy as np
 
+from .. import omnivoice_quality as quality
+
 log = logging.getLogger(__name__)
 
 _SAMPLE_RATE = 24000  # OmniVoice output sample rate
@@ -608,6 +610,8 @@ class OmniVoiceEngine:
         self,
         voice_entry: dict,
         worker: OmniVoiceWorker | None = None,
+        drone_attempts: int = quality.DRONE_ATTEMPTS,
+        repair_attempts: int = quality.DRONE_REPAIR_ATTEMPTS,
     ):
         from . import spec  # noqa: PLC0415
 
@@ -637,6 +641,15 @@ class OmniVoiceEngine:
         self.class_temperature = omni.get("class_temperature")
         self.duration = omni.get("duration")
         self.seed = omni.get("seed")
+        # Drone ("no speech") recovery: this engine is the same model as the
+        # HTTP server with a different front-end, and it makes the same bad
+        # draw, so it gets the same repair policy (``omnivoice_quality``).
+        self.drone_attempts = max(1, int(drone_attempts))
+        self.repair_attempts = max(1, int(repair_attempts))
+        #: What the last segment needed fixing (see ``_repair_message``), so a
+        #: caller can warn the user instead of shipping a droning take.
+        self.last_repairs: list = []
+        self.last_warnings: list = []
 
     def synthesize(
         self,
@@ -649,19 +662,8 @@ class OmniVoiceEngine:
         """Synthesize text; returns int16 samples at 24 kHz."""
         if not text.strip():
             raise ValueError("Nothing to synthesize")
-        samples = self._worker.synthesize(
-            text=text,
-            speed=float(speed),
-            ref_audio=self.ref_audio,
-            ref_text=self.ref_text,
-            instruct=self.instruct,
-            language=self.language,
-            num_step=self.num_step,
-            guidance_scale=self.guidance_scale,
-            class_temperature=self.class_temperature,
-            duration=self.duration,
-            seed=self.seed,
-        )
+        samples = self._synthesize_checked(text, float(speed))
+        self._report_quality(samples)
         if pitch != 1.0:
             from ..tts.engine import _shift_pitch  # noqa: PLC0415
 
@@ -671,6 +673,89 @@ class OmniVoiceEngine:
 
             samples = _apply_volume(samples, volume)
         return samples
+
+    def _draw(self, text: str, speed: float, seed):
+        """One worker request, shaped for the shared drone policy.
+
+        Returns ``(samples, server_flagged)`` — the direct engine has no server
+        to flag a bad take, so its own audio is the only evidence.
+        """
+        samples = self._worker.synthesize(
+            text=text,
+            speed=speed,
+            ref_audio=self.ref_audio,
+            ref_text=self.ref_text,
+            instruct=self.instruct,
+            language=self.language,
+            num_step=self.num_step,
+            guidance_scale=self.guidance_scale,
+            class_temperature=self.class_temperature,
+            duration=self.duration,
+            seed=seed,
+        )
+        return samples, False
+
+    def _synthesize_checked(self, text: str, speed: float) -> np.ndarray:
+        """One segment's text as samples, without the OmniVoice drone.
+
+        The direct engine and the HTTP server are the same model behind two
+        front-ends, so a chunk can come back as a loud low-frequency drone in
+        either of them (upstream k2-fsa/OmniVoice issues #37, #73, #144), and
+        this one has nobody to warn it: the worker returns WAV bytes and the
+        buzz used to be written straight into the recorded segment.
+
+        The recovery policy is shared with the server engine
+        (``omnivoice_quality``): draw the segment again — a drone is a bad roll,
+        not a bad setting, and the retry costs nothing until it is needed — and
+        when every draw is a drone, re-record the text in sentence-sized pieces
+        and join them.  Pieces are joined in order, so one segment is still
+        exactly one file.
+
+        The whole segment is one request here (the worker has no request-size
+        cap), so a re-draw re-renders all of it: a segment that drones pays
+        roughly one extra render per retry, and a repaired segment is generated
+        piece by piece.
+        """
+        self.last_repairs = []
+        self.last_warnings = []
+
+        def draw(piece: str, piece_seed):
+            return self._draw(piece, speed, piece_seed)
+
+        samples, record = quality.recover(
+            text,
+            draw,
+            seed=self.seed,
+            attempts=self.drone_attempts,
+            repair_attempts=self.repair_attempts,
+        )
+        if record:
+            self.last_repairs = [record]
+            self.last_warnings = [self._repair_message(record)]
+            for message in self.last_warnings:
+                log.warning(message)
+        return samples
+
+    def _report_quality(self, samples) -> None:
+        """Judge the finished segment as a whole.
+
+        Safety net over the repaired take: a drone at the seam between two
+        pieces, or one shorter than a single piece's verdict, would only be
+        visible on the whole segment.
+        """
+        verdict = quality.judge(samples)
+        if verdict.bad:
+            message = (
+                "OmniVoice thinks part of this segment is noise rather than "
+                f"speech ({verdict.reason}). Listen to it before publishing."
+            )
+            self.last_warnings.append(message)
+            log.warning(message)
+
+    @staticmethod
+    def _repair_message(record: dict) -> str:
+        """One user-readable line about a repaired (or unrepaired) drone."""
+        return quality.repair_message(record)
 
     def close(self) -> None:
         self._worker.close()

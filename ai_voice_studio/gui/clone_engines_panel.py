@@ -288,7 +288,7 @@ class VoiceClonePanel(wx.Panel):
                     flag=wx.LEFT | wx.RIGHT, border=2)
         inner.Add(preview_grid, 0, wx.EXPAND | wx.ALL, 2)
 
-        self.preview_btn = wx.Button(box, label="Preview selected voice")
+        self.preview_btn = wx.Button(box, label="&Preview selected voice")
         self.preview_btn.SetName("Preview selected voice")
         inner.Add(self.preview_btn, 0, wx.ALL, 2)
         self.preview_status = wx.StaticText(box, label="")

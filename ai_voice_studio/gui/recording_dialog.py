@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 import threading
+import time
 import wx
 
 from .. import compute, project
@@ -138,6 +140,9 @@ class RecordingDialog(wx.Dialog):
         self._pause_event = threading.Event()
         self._progress_dlg: TaskProgressDialog | None = None
         self._warned_one_file = False
+        # When the last start attempt was triggered (one keystroke or click is
+        # not allowed to start two runs - see _on_start).
+        self._start_requested_at = 0.0
         self._start_index = None if start_index is None else max(0, int(start_index))
         self._single_segment = bool(single_segment)
 
@@ -268,7 +273,9 @@ class RecordingDialog(wx.Dialog):
 
         # -- controls --------------------------------------------------------
         btns = wx.BoxSizer(wx.HORIZONTAL)
-        self.start_btn = wx.Button(self, label="Start recording")
+        # Alt+R starts (or resumes) recording: the letters so far underline
+        # the R of "recording".
+        self.start_btn = wx.Button(self, label="Start &recording")
         self.pause_btn = wx.Button(self, label="Pause")
         self.resume_btn = wx.Button(self, label="Resume")
         self.stop_btn = wx.Button(self, label="Stop")
@@ -334,11 +341,62 @@ class RecordingDialog(wx.Dialog):
         self.voice_combo.Bind(wx.EVT_COMBOBOX, self._on_voice_change)
         self.omni_btn.Bind(wx.EVT_BUTTON, self._on_omni_options)
         self.engine_options_btn.Bind(wx.EVT_BUTTON, self._on_engine_options)
+        # Alt+R also reaches this handler: the button's own mnemonic (Start
+        # &recording) is answered by the Windows dialog manager, and that path
+        # can miss (a keyboard layout whose Alt+R produces a character that
+        # matches no mnemonic, or a modifier state Windows does not translate
+        # into the letter).  _on_start() de-duplicates the two paths, so one
+        # keystroke still starts exactly one run.
+        self.Bind(wx.EVT_CHAR_HOOK, self._on_char_hook)
         self.Bind(wx.EVT_CLOSE, self._on_close)
         self.Bind(EVT_SYNTH_STATUS, self._on_synth_status)
         self.Bind(EVT_SYNTH_SEGMENT_DONE, self._on_segment_done)
         self.Bind(EVT_SYNTH_FINISHED, self._on_finished)
         self.Bind(EVT_SYNTH_ERROR, self._on_error)
+
+    # access keys -----------------------------------------------------------
+    def _on_char_hook(self, evt: wx.KeyEvent) -> None:
+        """Access key: Alt+R starts (or resumes) recording.
+
+        ``Start &recording`` underlines the R and is enough while Windows
+        matches the key against the label.  This handler is the independent
+        path for the cases where that does not happen (and the reason the
+        shortcut works with any keyboard layout): the key is matched on the
+        letter itself.  Both paths end in _on_start(), which de-duplicates
+        them, so one keystroke starts one run.
+        """
+        if self.start_btn.IsEnabled() and self._alt_r_pressed(evt):
+            log.info("Alt+R: starting the recording (access key)")
+            self._on_start(None)
+            return
+        evt.Skip()
+
+    @staticmethod
+    def _alt_r_pressed(evt: wx.KeyEvent) -> bool:
+        """True when the event is Alt+R, whatever the keyboard layout.
+
+        AltGr arrives as Ctrl+Alt, so a Ctrl modifier means it is not the
+        access key.  wx can also hand an Alt+letter combination over as an
+        untranslated key (key code 0) on this build, which is why the raw
+        scan code and, as a last resort, the physical key state are consulted
+        before giving up.
+        """
+        if not evt.AltDown() or evt.ControlDown():
+            return False
+        key = evt.GetKeyCode()
+        if key in (ord("R"), ord("r")):
+            return True
+        if key != 0 or sys.platform != "win32":
+            return False
+        try:
+            scan = (evt.GetRawKeyFlags() >> 16) & 0xFF
+        except Exception:  # noqa: BLE001 - raw flags are not always available
+            scan = 0
+        if scan == 0x13:  # the R key's scan code
+            return True
+        import ctypes  # noqa: PLC0415
+
+        return bool(ctypes.windll.user32.GetKeyState(0x52) & 0x8000)
 
     def _selected_compute(self) -> str:
         """Return the selected compute mode key (with 'auto' resolved).
@@ -1093,7 +1151,35 @@ class RecordingDialog(wx.Dialog):
             except Exception:  # noqa: BLE001
                 pass
 
-    def _on_start(self, _):
+    # One keystroke, one run ------------------------------------------------
+    # Alt+R can arrive twice for a single keystroke: the Windows dialog
+    # manager answers the button's mnemonic and the CHAR_HOOK above sees the
+    # key as well.  Both land here, so the second activation of the very same
+    # keystroke is ignored.  The window is far shorter than any human repeat
+    # press, so a real second press - after a warning box has been read, for
+    # example - still gets through.
+    _START_DEDUPE_SECONDS = 0.4
+
+    def _on_start(self, event):
+        """Start (or resume) recording - the Start button and Alt+R."""
+        now = time.monotonic()
+        if (now - self._start_requested_at) < self._START_DEDUPE_SECONDS:
+            return
+        self._start_requested_at = now
+        try:
+            self._begin_recording()
+        except Exception as exc:  # noqa: BLE001 - never fail silently
+            # A frozen window has nowhere to print a traceback, and a
+            # shortcut that appears to do nothing is exactly what a swallowed
+            # exception looks like.  Report it instead.
+            log.exception("Starting the recording failed")
+            self.status.SetLabel(f"Could not start recording: {exc}")
+            wx.MessageBox(
+                f"Could not start recording:\n\n{exc}",
+                "Recording", style=wx.OK | wx.ICON_ERROR,
+            )
+
+    def _begin_recording(self):
         voice = self._selected_voice()
         if not voice:
             wx.MessageBox("Select a voice first.", "Recording",
@@ -1225,6 +1311,10 @@ class RecordingDialog(wx.Dialog):
             self.status.SetLabel(
                 f"Recording started (resuming from segment {start_index + 1})."
             )
+        # In the log so that "the shortcut did nothing" can be told apart from
+        # "the shortcut never reached the window".
+        log.info("Recording started: segment %d of %d, engine %s.",
+                 start_index + 1, len(self._segments), voice.get("engine"))
 
     def _download_ffmpeg_job(self):
         try:

@@ -3,10 +3,11 @@
 Milestones map to the implementation order. Each phase ends with something runnable/verifiable.
 Status is tracked at the top; check boxes are updated as phases complete.
 
-Current release: **2026.3.1** (`constants.APP_VERSION` / `TERMS_VERSION` /
-`installer_common.iss`). Test suite: 22 files, 396 cases (unit, GUI smoke,
-engine-environment, book, documentation and start-selected-recording guards).
-Installer: `dist\AI-Voice-Studio-v-2026-3-1-Setup-x64.exe`.
+Current release: **2026.3.3** (`constants.APP_VERSION`;
+`TERMS_VERSION` stays 2026.3.1 because the terms text did not change, so an
+upgrade does not ask the user to accept them again; `installer_common.iss`).
+Test suite: unit, GUI smoke, engine-environment, book, documentation and
+accessibility guards. Installer: `dist\AI-Voice-Studio-v-2026-3-3-Setup-x64.exe`.
 
 ## Phase 0 — Research & specification ✅
 - [x] Study [bookworm](https://github.com/blindpandas/bookworm) and other accessible readers

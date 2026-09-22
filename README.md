@@ -7,7 +7,7 @@ that run locally through **ONNX Runtime** — no cloud, no account, full privacy
 Built with **Python + wxPython** and designed to be **fully accessible with
 screen readers** (NVDA, JAWS, Narrator).
 
-Version **2026.3.1** — ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
+Version **2026.3.3** — ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
 
 ---
 

@@ -43,6 +43,9 @@ from typing import Any, Dict, Optional
 
 import numpy as np
 
+from .. import omnivoice_quality as quality
+from ..omnivoice_quality import split_sentences
+
 log = logging.getLogger(__name__)
 
 _SAMPLE_RATE = 24000  # OmniVoice output sample rate
@@ -62,6 +65,116 @@ ENGINE_ID = "omnivoice_server"
 # one and concatenated; the audio the caller receives is identical to what
 # one giant request would produce (if the server accepted it).
 _TEXT_CHUNK_TARGET = 9_500
+
+# ---------------------------------------------------------------------------
+# Drone ("no speech") handling
+# ---------------------------------------------------------------------------
+# OmniVoice sometimes renders a chunk as a loud low-frequency drone instead of
+# a voice (upstream issues #37 / #73 / #144; measured on this machine at 28% of
+# the chunks of a real Hindi chapter — and 2 of 6 draws of one paragraph).  The
+# server detects it and answers with the ``X-No-Speech-Detected`` header, but
+# only *reports* it — the drone used to go straight into the recorded file.
+#
+# The detector, the splitting and the repair policy live in
+# ``ai_voice_studio/omnivoice_quality.py`` because the *direct* OmniVoice
+# engine needs exactly the same treatment; this module re-exports the policy
+# so existing callers (and the dev probe) keep importing it from here.
+# ``_synthesize_chunk`` below is the whole of this engine's part: judge what the
+# server returned, draw again while it is a drone, and only then re-record the
+# chunk in sentence-sized pieces.  Either way the caller receives one
+# continuous take per text, so one segment stays one file.
+DRONE_ATTEMPTS = quality.DRONE_ATTEMPTS
+DRONE_REPAIR_ATTEMPTS = quality.DRONE_REPAIR_ATTEMPTS
+DRONE_MAX_PIECES = quality.DRONE_MAX_PIECES
+DRONE_REPAIR_MAX_DEPTH = quality.DRONE_REPAIR_MAX_DEPTH
+DRONE_REPAIR_MIN_CHARS = quality.DRONE_REPAIR_MIN_CHARS
+DRONE_REPAIR_MAX_DRAWS = quality.DRONE_REPAIR_MAX_DRAWS
+DRONE_REPAIR_CHARS = quality.DRONE_REPAIR_CHARS
+split_text_for_repair = quality.split_text_for_repair
+
+# ---------------------------------------------------------------------------
+# Failed requests
+# ---------------------------------------------------------------------------
+# A request can come back as an HTTP 500 with a generic "Internal Server Error"
+# body even though the server is healthy: the generation for that one request
+# returned an empty tensor, and ``tensors_to_wav_bytes`` refuses to build a WAV
+# from it ("tensors_to_wav_bytes[0]: tensor is empty (size=0)").  The server's
+# own log names the text ("Generation returned no audio for text: '629'").
+# Measured while recording a real Hindi chapter over the clone endpoint: 3 such
+# answers among 152 requests (2%) — rare per request, routine over a chapter,
+# and two of the three landed minutes apart during one recording.  One of them
+# ended a segment with "Segment 19 failed: Clone synthesis failed: server
+# returned HTTP 500" and threw away everything recorded after it.  It is a bad
+# draw, not a bad request, so the text is sent again.
+
+#: Sends of one piece of text before its failure is reported to the caller.
+#: Small on purpose: the failure it absorbs is transient (a second draw comes
+#: back clean), while a dead server must still surface quickly.
+REQUEST_ATTEMPTS = 3
+
+#: Failures worth sending the same text again.  An HTTP 5xx is the server
+#: itself failing on a request it accepted; a 4xx (422 validation, 413 too
+#: large) is the server *rejecting* the request, so repeating it can only fail
+#: the same way.  The rest are the connection going away mid-synthesis.
+_RETRYABLE_HINTS = (
+    "timed out",
+    "timeout",
+    "connection reset",
+    "connection aborted",
+    "connection refused",
+    "no connection could be made",
+    "remote end closed",
+    "incompleteread",
+    "broken pipe",
+    "temporarily unavailable",
+)
+
+#: Log levels the server writes into its own structured log for a problem.
+_PROBLEM_LEVELS = ("[WARNING", "[ERROR", "[CRITICAL")
+
+_HTTP_STATUS_MARKER = "server returned http "
+
+#: Name of the log file ``start()`` sends the server's stdout to.
+_LOG_NAME = "omnivoice_server.log"
+
+
+def _tail_of(path: str, lines: int) -> str:
+    """Last ``lines`` lines of a text file, or ``""`` when unreadable."""
+    if not path or not os.path.isfile(path):
+        return ""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            return "".join(fh.readlines()[-lines:])
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def _request_status_code(message: str) -> int | None:
+    """The HTTP status named in an error message, or ``None``.
+
+    ``_http_error_detail`` renders a request failure as
+    "server returned HTTP 500: ..."; a message that names no status (a
+    connection error, a timeout) has nothing to parse.
+    """
+    low = (message or "").lower()
+    start = low.find(_HTTP_STATUS_MARKER)
+    if start < 0:
+        return None
+    digits = ""
+    for char in low[start + len(_HTTP_STATUS_MARKER):]:
+        if not char.isdigit():
+            break
+        digits += char
+    return int(digits) if digits else None
+
+
+def _retryable_request_failure(message: str) -> bool:
+    """True when re-sending the same text can plausibly succeed."""
+    status = _request_status_code(message)
+    if status is not None:
+        return status >= 500
+    low = (message or "").lower()
+    return any(hint in low for hint in _RETRYABLE_HINTS)
 
 
 def _read_server_config() -> dict:
@@ -93,7 +206,49 @@ DEFAULT_CORS_ORIGINS = (
 # ---------------------------------------------------------------------------
 # Long-text splitting (server rejects > 10,000 characters with HTTP 422)
 # ---------------------------------------------------------------------------
-_SENTENCE_END = ".!?\u0964\u0965\u3002\uff01\uff1f\u2026\"\u201d\u2019\u00bb"
+def _response_headers(resp) -> dict:
+    """Response headers as a lower-cased ``{name: value}`` dict.
+
+    The server reports a drone with ``X-No-Speech-Detected: true`` and the
+    audio duration with ``X-Audio-Duration-S``.  Test doubles and some
+    transports expose no headers at all, hence the guard.
+    """
+    headers = getattr(resp, "headers", None)
+    if headers is None:
+        return {}
+    try:
+        return {str(k).lower(): str(v) for k, v in headers.items()}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def _group_fragments(fragments: list, limit: int) -> list:
+    """Join ``fragments`` into groups of at most ``limit`` characters.
+
+    A fragment longer than the limit is hard-cut (a "sentence" with no
+    punctuation at all would otherwise never fit the request cap).
+    """
+    groups: list = []
+    buf: list = []
+    buf_len = 0
+    for fragment in fragments:
+        if len(fragment) > limit:
+            if buf:
+                groups.append(" ".join(buf))
+                buf, buf_len = [], 0
+            for j in range(0, len(fragment), limit):
+                piece = fragment[j:j + limit].strip()
+                if piece:
+                    groups.append(piece)
+            continue
+        if buf_len + len(fragment) + 1 > limit and buf:
+            groups.append(" ".join(buf))
+            buf, buf_len = [], 0
+        buf.append(fragment)
+        buf_len += len(fragment) + 1
+    if buf:
+        groups.append(" ".join(buf))
+    return groups
 
 
 def split_text_for_server(text: str, limit: int = _TEXT_CHUNK_TARGET) -> list:
@@ -120,39 +275,7 @@ def split_text_for_server(text: str, limit: int = _TEXT_CHUNK_TARGET) -> list:
             chunks.append(paragraph)
             continue
         # Paragraph itself too long: split at sentence boundaries.
-        sentences: list = []
-        start = 0
-        for i, ch in enumerate(paragraph):
-            if ch in _SENTENCE_END:
-                # Include trailing quotes/brackets after the terminator.
-                sentences.append(paragraph[start:i + 1])
-                start = i + 1
-        if start < len(paragraph):
-            sentences.append(paragraph[start:])
-        buf: list = []
-        buf_len = 0
-        for sentence in sentences:
-            sentence = sentence.strip()
-            if not sentence:
-                continue
-            if len(sentence) > limit:
-                # A single "sentence" longer than the cap (no punctuation at
-                # all): hard-cut so the request still validates.
-                if buf:
-                    chunks.append(" ".join(buf))
-                    buf, buf_len = [], 0
-                for j in range(0, len(sentence), limit):
-                    piece = sentence[j:j + limit].strip()
-                    if piece:
-                        chunks.append(piece)
-                continue
-            if buf_len + len(sentence) + 1 > limit and buf:
-                chunks.append(" ".join(buf))
-                buf, buf_len = [], 0
-            buf.append(sentence)
-            buf_len += len(sentence) + 1
-        if buf:
-            chunks.append(" ".join(buf))
+        chunks.extend(_group_fragments(split_sentences(paragraph), limit))
     return chunks if chunks else [text[:limit]]
 
 
@@ -218,6 +341,8 @@ class OmniVoiceServerManager:
         api_key: str = "",
         cors_origins: str = DEFAULT_CORS_ORIGINS,
         model_id: str = "k2-fsa/OmniVoice",
+        drone_attempts: int = DRONE_ATTEMPTS,
+        repair_attempts: int = DRONE_REPAIR_ATTEMPTS,
     ):
         self._host = host
         self._port = port
@@ -227,6 +352,13 @@ class OmniVoiceServerManager:
         self._api_key = api_key
         self._cors_origins = cors_origins
         self._model_id = model_id
+        #: Draws allowed per chunk before the sentence-level repair kicks in,
+        #: and attempts per sentence-sized piece while repairing.
+        self.drone_attempts = max(1, int(drone_attempts))
+        self.repair_attempts = max(1, int(repair_attempts))
+        #: What the last ``synthesize`` / ``synthesize_clone`` call had to
+        #: repair: one dict per affected chunk (see ``_synthesize_chunk``).
+        self.last_repairs: list = []
         self._proc: subprocess.Popen | None = None
         self._lock = threading.RLock()
         self._ready = threading.Event()
@@ -317,7 +449,7 @@ class OmniVoiceServerManager:
         # server looked broken while it was perfectly healthy.  Send the
         # output to a log file (truncated on each start) instead.
         from ..paths import logs_dir  # noqa: PLC0415
-        self._log_path = os.path.join(logs_dir(), "omnivoice_server.log")
+        self._log_path = os.path.join(logs_dir(), _LOG_NAME)
         try:
             self._log_fh = open(
                 self._log_path, "w", encoding="utf-8", errors="replace"
@@ -400,15 +532,46 @@ class OmniVoiceServerManager:
                 self._log_fh = None
             log.info("OmniVoice server stopped.")
 
+    def _last_server_problem(self) -> str:
+        """The last problem line the server itself logged, or ``""``.
+
+        A request-level 500 is answered with a generic body ("Internal Server
+        Error") that says nothing about the cause; the reason is in the
+        server's own log ("Generation returned no audio for text: '629'"),
+        which is where the actionable half of the story lives.  Quoting that
+        one line turns an opaque HTTP failure into a named one.  The long
+        engine-side traceback is deliberately not quoted: it is not the reason
+        for anything, and the log file has it anyway.
+        """
+        text = self._log_tail(80)
+        if not text:
+            # We did not start this server (the app started it in another
+            # process, or this manager is a late arrival), so fall back to the
+            # one place the server ever writes.
+            from ..paths import logs_dir  # noqa: PLC0415
+            text = _tail_of(os.path.join(logs_dir(), _LOG_NAME), 80)
+        for line in reversed(text.splitlines()):
+            line = line.strip()
+            if not line or not any(level in line for level in _PROBLEM_LEVELS):
+                continue
+            # "2026-09-21T21:34:47Z [WARNING] [module] reason" -> "reason"
+            _, _, reason = line.rpartition("] ")
+            return (reason or line).strip()
+        return ""
+
+    def _request_error_detail(self, exc: Exception) -> str:
+        """``_http_error_detail``, plus the server's own reason for a 5xx."""
+        detail = self._http_error_detail(exc)
+        status = _request_status_code(detail)
+        if status is not None and status >= 500:
+            reason = self._last_server_problem()
+            if reason and reason not in detail:
+                detail = f"{detail} (server log: {reason})"
+        return detail
+
     def _log_tail(self, lines: int = 40) -> str:
         """Last lines of the server log file (for error reporting)."""
-        if not self._log_path or not os.path.isfile(self._log_path):
-            return ""
-        try:
-            with open(self._log_path, encoding="utf-8", errors="replace") as fh:
-                return "".join(fh.readlines()[-lines:])
-        except Exception:  # noqa: BLE001
-            return ""
+        return _tail_of(self._log_path or "", lines)
 
     def restart(self, timeout: float = 120.0) -> None:
         """Restart the server (stop then start)."""
@@ -500,51 +663,94 @@ class OmniVoiceServerManager:
         # that), so long texts are synthesized chunk by chunk and joined.
         # Chunks inherit the same voice/instructions/parameters; the audio is
         # concatenated in order, which is exactly what one giant request would
-        # have produced if the API accepted it.
-        samples = None
-        for chunk in split_text_for_server(text):
-            payload: Dict[str, Any] = {
-                "model": "omnivoice",
-                "input": chunk,
-                "voice": voice,
-                "response_format": response_format or "wav",
-                "speed": speed,
-                "stream": bool(stream),
-            }
-            for name, value in optional.items():
-                if value is not None:
-                    payload[name] = value
-            # Voice design instructions are the strongest control and are
-            # only sent when the caller provided a real description.
-            if instructions:
-                payload["instructions"] = instructions
-
-            data = json.dumps(payload).encode("utf-8")
-            req = urllib.request.Request(
-                url,
-                data=data,
-                headers={"Content-Type": "application/json"},
-                method="POST",
+        # have produced if the API accepted it.  A chunk that comes back as a
+        # drone is drawn again (and repaired sentence by sentence if needed),
+        # so the caller still receives one continuous take per text.
+        def _send(piece: str, piece_seed: Optional[int]):
+            return self._post_speech(
+                piece,
+                url=url,
+                voice=voice,
+                instructions=instructions,
+                speed=speed,
+                stream=stream,
+                response_format=response_format,
+                optional=optional,
+                seed=piece_seed,
+                request_timeout_s=request_timeout_s,
             )
-            if self._api_key:
-                req.add_header("Authorization", f"Bearer {self._api_key}")
 
-            # Long texts legitimately take minutes on CPU; the socket timeout
-            # must scale with the text or long recordings die mid-flight with
-            # "Synthesis failed: timed out".
-            request_timeout = self._request_timeout(request_timeout_s, chunk)
-            try:
-                with urllib.request.urlopen(req, timeout=request_timeout) as resp:
-                    wav_bytes = resp.read()
-            except Exception as exc:
-                raise OmniVoiceServerError(
-                    f"Synthesis failed: {self._http_error_detail(exc)}"
-                ) from exc
-
-            part = self._wav_bytes_to_samples(wav_bytes)
+        samples = None
+        repairs: list = []
+        for chunk in split_text_for_server(text):
+            part, repair = self._synthesize_chunk(chunk, seed=seed, send=_send)
+            if repair:
+                repairs.append(repair)
             samples = part if samples is None else np.concatenate([samples, part])
 
+        self.last_repairs = repairs
         return samples
+
+    def _post_speech(
+        self,
+        chunk: str,
+        *,
+        url: str,
+        voice: str,
+        instructions: str,
+        speed: float,
+        stream: bool,
+        response_format: str,
+        optional: Dict[str, Any],
+        seed: Optional[int],
+        request_timeout_s: int | None,
+    ) -> tuple:
+        """One ``/v1/audio/speech`` request; returns ``(wav_bytes, headers)``."""
+        import urllib.request  # noqa: PLC0415
+
+        payload: Dict[str, Any] = {
+            "model": "omnivoice",
+            "input": chunk,
+            "voice": voice,
+            "response_format": response_format or "wav",
+            "speed": speed,
+            "stream": bool(stream),
+        }
+        for name, value in optional.items():
+            if name == "seed":
+                continue
+            if value is not None:
+                payload[name] = value
+        if seed is not None:
+            payload["seed"] = seed
+        # Voice design instructions are the strongest control and are
+        # only sent when the caller provided a real description.
+        if instructions:
+            payload["instructions"] = instructions
+
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            url,
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        if self._api_key:
+            req.add_header("Authorization", f"Bearer {self._api_key}")
+
+        # Long texts legitimately take minutes on CPU; the socket timeout
+        # must scale with the text or long recordings die mid-flight with
+        # "Synthesis failed: timed out".
+        request_timeout = self._request_timeout(request_timeout_s, chunk)
+        try:
+            with urllib.request.urlopen(req, timeout=request_timeout) as resp:
+                wav_bytes = resp.read()
+                headers = _response_headers(resp)
+        except Exception as exc:
+            raise OmniVoiceServerError(
+                f"Synthesis failed: {self._request_error_detail(exc)}"
+            ) from exc
+        return wav_bytes, headers
 
     def synthesize_clone(
         self,
@@ -580,12 +786,13 @@ class OmniVoiceServerManager:
         url = f"{self.base_url}/v1/audio/speech/clone"
         # The server caps ``text`` at 10,000 characters (HTTP 422 above
         # that), so long texts are synthesized chunk by chunk against the
-        # same uploaded reference sample and joined in order.
-        chunks = split_text_for_server(text)
-        samples = None
-        for chunk in chunks:
-            body = self._clone_multipart_body(
-                chunk,
+        # same uploaded reference sample and joined in order.  A drone chunk
+        # is drawn again (and repaired sentence by sentence if needed), so the
+        # caller still receives one continuous take per text.
+        def _send(piece: str, piece_seed: Optional[int]):
+            return self._post_clone(
+                piece,
+                url=url,
                 ref_audio_path=ref_audio_path,
                 ref_text=ref_text,
                 speed=speed,
@@ -604,35 +811,95 @@ class OmniVoiceServerManager:
                 audio_chunk_duration=audio_chunk_duration,
                 audio_chunk_threshold=audio_chunk_threshold,
                 request_timeout_s=request_timeout_s,
-                seed=seed,
+                seed=piece_seed,
             )
 
-            req = urllib.request.Request(
-                url,
-                data=body,
-                headers={
-                    "Content-Type": "multipart/form-data; boundary=----AIVoiceStudioBoundary",
-                },
-                method="POST",
-            )
-            if self._api_key:
-                req.add_header("Authorization", f"Bearer {self._api_key}")
-
-            # Cloning adds reference-audio preprocessing on top of generation,
-            # so its timeout gets the same text-aware scale plus headroom.
-            request_timeout = self._request_timeout(request_timeout_s, chunk)
-            try:
-                with urllib.request.urlopen(req, timeout=request_timeout) as resp:
-                    wav_bytes = resp.read()
-            except Exception as exc:
-                raise OmniVoiceServerError(
-                    f"Clone synthesis failed: {self._http_error_detail(exc)}"
-                ) from exc
-
-            part = self._wav_bytes_to_samples(wav_bytes)
+        chunks = split_text_for_server(text)
+        samples = None
+        repairs: list = []
+        for chunk in chunks:
+            part, repair = self._synthesize_chunk(chunk, seed=seed, send=_send)
+            if repair:
+                repairs.append(repair)
             samples = part if samples is None else np.concatenate([samples, part])
 
+        self.last_repairs = repairs
         return samples
+
+    def _post_clone(
+        self,
+        chunk: str,
+        *,
+        url: str,
+        ref_audio_path: str,
+        ref_text: str,
+        speed: float,
+        response_format: str,
+        num_step: int | None,
+        guidance_scale: float | None,
+        denoise: bool | None,
+        t_shift: float | None,
+        position_temperature: float | None,
+        class_temperature: float | None,
+        duration: float | None,
+        language: str | None,
+        layer_penalty_factor: float | None,
+        preprocess_prompt: bool | None,
+        postprocess_output: bool | None,
+        audio_chunk_duration: float | None,
+        audio_chunk_threshold: float | None,
+        request_timeout_s: int | None,
+        seed: int | None,
+    ) -> tuple:
+        """One ``/v1/audio/speech/clone`` request; ``(wav_bytes, headers)``."""
+        import urllib.request  # noqa: PLC0415
+
+        body = self._clone_multipart_body(
+            chunk,
+            ref_audio_path=ref_audio_path,
+            ref_text=ref_text,
+            speed=speed,
+            response_format=response_format,
+            num_step=num_step,
+            guidance_scale=guidance_scale,
+            denoise=denoise,
+            t_shift=t_shift,
+            position_temperature=position_temperature,
+            class_temperature=class_temperature,
+            duration=duration,
+            language=language,
+            layer_penalty_factor=layer_penalty_factor,
+            preprocess_prompt=preprocess_prompt,
+            postprocess_output=postprocess_output,
+            audio_chunk_duration=audio_chunk_duration,
+            audio_chunk_threshold=audio_chunk_threshold,
+            request_timeout_s=request_timeout_s,
+            seed=seed,
+        )
+
+        req = urllib.request.Request(
+            url,
+            data=body,
+            headers={
+                "Content-Type": "multipart/form-data; boundary=----AIVoiceStudioBoundary",
+            },
+            method="POST",
+        )
+        if self._api_key:
+            req.add_header("Authorization", f"Bearer {self._api_key}")
+
+        # Cloning adds reference-audio preprocessing on top of generation,
+        # so its timeout gets the same text-aware scale plus headroom.
+        request_timeout = self._request_timeout(request_timeout_s, chunk)
+        try:
+            with urllib.request.urlopen(req, timeout=request_timeout) as resp:
+                wav_bytes = resp.read()
+                headers = _response_headers(resp)
+        except Exception as exc:
+            raise OmniVoiceServerError(
+                f"Clone synthesis failed: {self._request_error_detail(exc)}"
+            ) from exc
+        return wav_bytes, headers
 
     @staticmethod
     def _clone_multipart_body(
@@ -755,6 +1022,110 @@ class OmniVoiceServerManager:
         # bounded to at least 120s and at most 30 minutes.
         scaled = 30.0 + chars * 0.04
         return float(min(max(scaled, 120.0), 1800.0))
+
+    # -- Drone handling ------------------------------------------------------
+
+    @staticmethod
+    def _attempt_seed(seed: int | None, attempt: int) -> int | None:
+        """Seed for one draw of a chunk (see ``omnivoice_quality``)."""
+        return quality.attempt_seed(seed, attempt)
+
+    def _draw(self, send):
+        """``draw(text, seed) -> (samples, server_flagged)`` over ``send``.
+
+        ``send(piece, seed)`` performs one request and returns
+        ``(wav_bytes, headers)``.  The drone recovery only wants samples plus
+        the server's own verdict, so this adapter is the whole of this
+        engine's part in the shared policy.
+
+        It is also where a failed *request* is absorbed, because that is a bad
+        draw rather than a bad request: the server answers HTTP 500 when one
+        generation came back empty (see ``REQUEST_ATTEMPTS`` above), so the
+        same text is sent again — with ``quality.retry_seed`` giving it a
+        different roll, while the seed of the next drone attempt stays what
+        the shared policy computed.  The take that comes back is then judged
+        exactly as a first take would be.  A failure that survives every
+        attempt is raised unchanged, so a dead server still looks like one.
+        """
+        def draw(text: str, seed):
+            failure: Exception | None = None
+            for retry in range(REQUEST_ATTEMPTS):
+                if failure is not None:
+                    log.info(
+                        "OmniVoice server request failed (%s); sending the "
+                        "%d-character chunk again (attempt %d of %d).",
+                        failure, len(text), retry + 1, REQUEST_ATTEMPTS,
+                    )
+                try:
+                    wav_bytes, headers = send(
+                        text, quality.retry_seed(seed, retry)
+                    )
+                except OmniVoiceServerError as exc:
+                    if not _retryable_request_failure(str(exc)):
+                        raise
+                    failure = exc
+                    continue
+                return (
+                    self._wav_bytes_to_samples(wav_bytes),
+                    headers.get("x-no-speech-detected") == "true",
+                )
+            assert failure is not None  # REQUEST_ATTEMPTS >= 1
+            raise failure
+
+        return draw
+
+    def _best_attempt(self, text: str, *, send, seed, attempts: int) -> tuple:
+        """Draw ``text`` until a take passes the drone check, or attempts run out.
+
+        Returns ``(samples, verdict, attempts_used)`` — the best-scoring take
+        when every attempt was a drone, so the caller always has audio to fall
+        back on.
+        """
+        return quality.best_take(
+            text, self._draw(send), seed=seed, attempts=attempts
+        )
+
+    def _synthesize_chunk(self, chunk: str, *, seed, send) -> tuple:
+        """One server-sized text chunk as samples, without the OmniVoice drone.
+
+        Returns ``(samples, repair_record_or_None)``; the record describes what
+        had to be done, and is ``None`` when the first draw was clean.
+
+        The policy itself is shared with the direct OmniVoice engine
+        (``omnivoice_quality``): a bad draw is repaired by drawing the chunk
+        again — the failure is drawn per request at a roughly constant rate
+        whatever the text size, so most chunks are fixed by a second (rarely
+        third) draw and the retry costs nothing until it is needed — and when
+        every draw of a chunk is a drone, the chunk is re-recorded in pieces
+        instead.  Only ``samples`` is returned, joined in order, so one segment
+        stays one file.  A chunk that stays a drone keeps its best-looking take
+        and is reported instead of failing the whole recording.
+        """
+        return quality.recover(
+            chunk,
+            self._draw(send),
+            seed=seed,
+            attempts=self.drone_attempts,
+            repair_attempts=self.repair_attempts,
+        )
+
+    def _repair_by_pieces(self, text: str, *, send, seed, depth: int,
+                          budget: int) -> tuple:
+        """Re-record ``text`` in smaller pieces and join them in order.
+
+        Returns ``(samples, unresolved, pieces, draws)``; the splitting rules,
+        the budget and the deep-split accounting all live in the shared
+        ``omnivoice_quality.repair_by_pieces``.
+        """
+        return quality.repair_by_pieces(
+            text,
+            self._draw(send),
+            seed=seed,
+            depth=depth,
+            budget=budget,
+            repair_attempts=self.repair_attempts,
+            max_depth=DRONE_REPAIR_MAX_DEPTH,
+        )
 
     @staticmethod
     def _wav_bytes_to_samples(wav_bytes: bytes) -> np.ndarray:
@@ -978,6 +1349,9 @@ class OmniVoiceServerEngine:
         self._language = spec.clean_language(
             self._omni.get("language") or voice_entry.get("language")
         )
+        #: What the last segment needed fixing (see ``_repair_message``), so a
+        #: caller can warn the user instead of shipping a droning take.
+        self.last_warnings: list = []
 
     def _omni_kwargs(self) -> Dict[str, Any]:
         """Advanced generation knobs configured for this voice.
@@ -1050,6 +1424,8 @@ class OmniVoiceServerEngine:
                 **kwargs,
             )
 
+        self._report_quality(samples)
+
         if pitch != 1.0:
             from ..tts.engine import _shift_pitch  # noqa: PLC0415
             samples = _shift_pitch(samples, pitch)
@@ -1057,6 +1433,35 @@ class OmniVoiceServerEngine:
             from ..tts.engine import _apply_volume  # noqa: PLC0415
             samples = _apply_volume(samples, volume)
         return samples
+
+    def _report_quality(self, samples) -> None:
+        """Turn the server pipeline's repairs into log lines and warnings.
+
+        Every drone the client had to re-draw or re-record is named here, so a
+        segment that needed fixing can be found in the app log; a take that
+        still looks like noise is warned about loudly because the recording
+        finished "successfully" and nothing else would tell the user.
+        """
+        records = list(getattr(self._server, "last_repairs", []) or [])
+        self.last_warnings = [self._repair_message(r) for r in records]
+        for message in self.last_warnings:
+            log.warning(message)
+        # Safety net over the finished take: a boundary between two repaired
+        # chunks, or a drone shorter than one chunk's verdict, would only be
+        # visible on the whole segment.
+        verdict = quality.judge(samples)
+        if verdict.bad:
+            message = (
+                "OmniVoice thinks part of this segment is noise rather than "
+                f"speech ({verdict.reason}). Listen to it before publishing."
+            )
+            self.last_warnings.append(message)
+            log.warning(message)
+
+    @staticmethod
+    def _repair_message(record: dict) -> str:
+        """One user-readable line about a repaired (or unrepaired) drone."""
+        return quality.repair_message(record)
 
     def close(self) -> None:
         """Stop the server (only if we started it)."""

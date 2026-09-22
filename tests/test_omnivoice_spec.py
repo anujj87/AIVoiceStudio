@@ -21,7 +21,13 @@ from unittest import mock
 import numpy as np
 
 from ai_voice_studio.omnivoice import build_synthesize_request, spec
+from ai_voice_studio.omnivoice_quality import (
+    RETRY_SEED_STRIDE,
+    attempt_seed,
+    retry_seed,
+)
 from ai_voice_studio.omnivoice_server import (
+    REQUEST_ATTEMPTS,
     OmniVoiceServerManager,
     OmniVoiceServerError,
     split_text_for_server,
@@ -577,6 +583,257 @@ class ServerLogRedirectionTest(unittest.TestCase):
         tail = mgr._log_tail()
         self.assertIsInstance(tail, str)
 
+
+
+def _multipart_field(body: bytes, name: str) -> str:
+    """The value of one form field in a multipart request body."""
+    raw = body.decode("utf-8", errors="replace")
+    marker = f'name="{name}"\r\n\r\n'
+    start = raw.find(marker)
+    if start < 0:
+        return ""
+    start += len(marker)
+    end = raw.find("\r\n", start)
+    return raw[start:end if end >= 0 else None]
+
+
+class RetrySeedTest(unittest.TestCase):
+    """A request re-sent inside one attempt must not reuse a drone seed."""
+
+    def test_first_send_keeps_the_callers_seed(self):
+        self.assertEqual(retry_seed(7, 0), 7)
+        self.assertIsNone(retry_seed(None, 0))
+
+    def test_an_unseeded_request_stays_unseeded(self):
+        # Nothing to rotate: an unseeded draw already samples freely, so
+        # pinning a retry to a seed would make it *less* likely to differ.
+        self.assertIsNone(retry_seed(None, 1))
+        self.assertIsNone(retry_seed(None, 2))
+
+    def test_a_seeded_request_moves_off_its_seed(self):
+        self.assertEqual(retry_seed(7, 1), 7 + RETRY_SEED_STRIDE)
+        # Its own stride: a request retry never meets a drone retry's seed.
+        self.assertNotEqual(retry_seed(7, 1), attempt_seed(7, 1))
+        self.assertNotEqual(retry_seed(7, 1), 7)
+
+
+class RequestRetryTest(unittest.TestCase):
+    """A failed request is a bad draw, not a lost segment.
+
+    The server answers HTTP 500 with a generic "Internal Server Error" body
+    when one generation comes back empty — its own log names the text,
+    "Generation returned no audio for text: '629'" — while every request around
+    it succeeds (measured: 3 such answers among 152 clone requests while
+    recording one Hindi chapter).  One of them used to end a segment with
+    "Segment 19 failed: Clone synthesis failed: server returned HTTP 500",
+    discarding the rest of the chapter, so the same text is sent again with a
+    different draw.
+    """
+
+    def setUp(self):
+        self.requests: list = []
+        self.mgr = OmniVoiceServerManager(host="127.0.0.1", port=8881)
+
+    def _fake_urlopen(self, plan):
+        def urlopen(req, timeout=None):
+            self.requests.append(req)
+            return plan(len(self.requests))
+        return urlopen
+
+    def _http_error(self, code: int, message: str) -> urllib.error.HTTPError:
+        body = json.dumps({"error": {"message": message}}).encode()
+        return urllib.error.HTTPError(
+            url="http://127.0.0.1:8881/v1/audio/speech/clone",
+            code=code, msg=message,
+            hdrs=email.message.Message(), fp=io.BytesIO(body),
+        )
+
+    @staticmethod
+    def _flagged(data: bytes):
+        """The server's own "no speech" verdict on an otherwise fine take."""
+        resp = _FakeResponse(data)
+        resp.headers = {"X-No-Speech-Detected": "true"}
+        return resp
+
+    def _clone(self, seed=7):
+        """One clone synthesis against a real (temporary) reference file."""
+        with tempfile.TemporaryDirectory() as tmp:
+            ref = os.path.join(tmp, "ref.wav")
+            with open(ref, "wb") as fh:
+                fh.write(_wav_bytes())
+            return self.mgr.synthesize_clone(
+                "629", ref_audio_path=ref, ref_text="sample", seed=seed,
+            )
+
+    def _run(self, plan):
+        with mock.patch.object(urllib.request, "urlopen",
+                               self._fake_urlopen(plan)):
+            return self._clone()
+
+    def test_a_failed_request_is_sent_again(self):
+        def plan(i):
+            if i == 1:
+                raise self._http_error(500, "Internal Server Error")
+            return _FakeResponse(_wav_bytes())
+
+        samples = self._run(plan)
+
+        self.assertEqual(len(self.requests), 2)
+        self.assertEqual(samples.size, 200)          # the take that came back
+        # Same text both times: the request is repeated, not changed.
+        texts = [_multipart_field(r.data, "text") for r in self.requests]
+        self.assertEqual(texts, ["629", "629"])
+        # ... and the retry is a different draw, off its own stride.
+        self.assertEqual(
+            [_multipart_field(r.data, "seed") for r in self.requests],
+            ["7", str(7 + RETRY_SEED_STRIDE)],
+        )
+
+    def test_a_clean_request_is_sent_once(self):
+        samples = self._run(lambda i: _FakeResponse(_wav_bytes()))
+        self.assertEqual(len(self.requests), 1)
+        self.assertEqual(samples.size, 200)
+
+    def test_every_attempt_failing_still_raises(self):
+        with mock.patch.object(
+            urllib.request, "urlopen",
+            self._fake_urlopen(
+                lambda i: (_ for _ in ()).throw(
+                    self._http_error(500, "Internal Server Error"))
+            ),
+        ):
+            with self.assertRaises(OmniVoiceServerError) as ctx:
+                self._clone()
+
+        self.assertEqual(len(self.requests), REQUEST_ATTEMPTS)
+        message = str(ctx.exception)
+        self.assertIn("Clone synthesis failed", message)
+        self.assertIn("server returned HTTP 500", message)
+        # A request-level 500 is still an answered request: no restart dialog.
+        from ai_voice_studio.gui.dialogs import looks_like_server_error
+        self.assertFalse(looks_like_server_error(message))
+
+    def test_a_rejected_request_is_not_sent_again(self):
+        """A 4xx is the server refusing the request, so a repeat cannot help."""
+        with mock.patch.object(
+            urllib.request, "urlopen",
+            self._fake_urlopen(
+                lambda i: (_ for _ in ()).throw(
+                    self._http_error(422, "Request validation failed"))
+            ),
+        ):
+            with self.assertRaises(OmniVoiceServerError) as ctx:
+                self._clone()
+
+        self.assertEqual(len(self.requests), 1)
+        self.assertIn("server returned HTTP 422", str(ctx.exception))
+
+    def test_a_dead_server_is_still_reported_as_one(self):
+        refused = ConnectionRefusedError(
+            "[WinError 10061] No connection could be made because the target "
+            "machine actively refused it"
+        )
+        with mock.patch.object(
+            urllib.request, "urlopen",
+            self._fake_urlopen(lambda i: (_ for _ in ()).throw(refused)),
+        ):
+            with self.assertRaises(OmniVoiceServerError) as ctx:
+                self._clone()
+
+        self.assertEqual(len(self.requests), REQUEST_ATTEMPTS)
+        from ai_voice_studio.gui.dialogs import looks_like_server_error
+        self.assertTrue(looks_like_server_error(str(ctx.exception)))
+
+    def test_a_failed_request_does_not_use_up_a_drone_attempt(self):
+        """The two retries are independent: the drone policy still gets its
+        own seeds (the caller's first, then ``attempt_seed``), so a failed
+        request costs a re-send and nothing else."""
+        def plan(i):
+            if i == 1:
+                raise self._http_error(500, "Internal Server Error")
+            if i == 2:
+                return self._flagged(_wav_bytes())   # drone attempt 0
+            return _FakeResponse(_wav_bytes())       # drone attempt 1: clean
+
+        samples = self._run(plan)
+
+        self.assertEqual(len(self.requests), 3)
+        self.assertEqual(
+            [_multipart_field(r.data, "seed") for r in self.requests],
+            ["7", str(7 + RETRY_SEED_STRIDE), str(attempt_seed(7, 1))],
+        )
+        self.assertEqual(samples.size, 200)
+        self.assertEqual(self.mgr.last_repairs, [])
+
+    def test_the_error_quotes_the_servers_own_reason(self):
+        """"Internal Server Error" alone says nothing; the server log does."""
+        with tempfile.TemporaryDirectory() as tmp:
+            log_path = os.path.join(tmp, "omnivoice_server.log")
+            with open(log_path, "w", encoding="utf-8") as fh:
+                fh.write(
+                    'INFO:     127.0.0.1:3155 - "POST /v1/audio/speech/clone '
+                    'HTTP/1.1" 200 OK\n'
+                    "2026-09-21T21:34:44Z [INFO ] "
+                    "[omnivoice_server.services.inference] [TRACE] CLONE mode "
+                    "kwargs prepared: ref_audio=C:\\tmp\\ref_audio.wav\n"
+                    "2026-09-21T21:34:47Z [WARNING] "
+                    "[omnivoice_server.services.inference] Generation "
+                    "returned no audio for text: '629'\n"
+                    'INFO:     127.0.0.1:3157 - "POST /v1/audio/speech/clone '
+                    'HTTP/1.1" 500 Internal Server Error\n'
+                    "ERROR:    Exception in ASGI application\n"
+                    "Traceback (most recent call last):\n"
+                    '  File "speech.py", line 744, in create_speech_clone\n'
+                    "ValueError: tensors_to_wav_bytes[0]: tensor is empty "
+                    "(size=0)\n"
+                )
+            self.mgr._log_path = log_path
+            with mock.patch.object(
+                urllib.request, "urlopen",
+                self._fake_urlopen(
+                    lambda i: (_ for _ in ()).throw(
+                        self._http_error(500, "Internal Server Error"))
+                ),
+            ):
+                with self.assertRaises(OmniVoiceServerError) as ctx:
+                    self._clone()
+
+        message = str(ctx.exception)
+        self.assertIn(
+            "server log: Generation returned no audio for text: '629'", message
+        )
+        # The traceback is not quoted: it is long and it is not the reason.
+        self.assertNotIn("Traceback", message)
+
+    def test_the_reason_is_found_when_another_process_started_the_server(self):
+        """The manager answering requests may not be the one that started the
+        server, so the server's standard log location is read as a fallback."""
+        with tempfile.TemporaryDirectory() as tmp:
+            with open(os.path.join(tmp, "omnivoice_server.log"), "w",
+                      encoding="utf-8") as fh:
+                fh.write(
+                    "2026-09-21T21:34:47Z [WARNING] "
+                    "[omnivoice_server.services.inference] Generation "
+                    "returned no audio for text: '633'\n"
+                )
+            self.mgr._log_path = None
+            with mock.patch("ai_voice_studio.paths.logs_dir", return_value=tmp):
+                self.assertEqual(
+                    self.mgr._last_server_problem(),
+                    "Generation returned no audio for text: '633'",
+                )
+
+    def test_a_5xx_without_a_server_log_still_reports_the_body(self):
+        with mock.patch.object(
+            urllib.request, "urlopen",
+            self._fake_urlopen(
+                lambda i: (_ for _ in ()).throw(
+                    self._http_error(500, "Synthesis failed: out of memory"))
+            ),
+        ):
+            with self.assertRaises(OmniVoiceServerError) as ctx:
+                self._clone()
+        self.assertIn("out of memory", str(ctx.exception))
 
 
 class EmbeddedWorkerParityTest(unittest.TestCase):

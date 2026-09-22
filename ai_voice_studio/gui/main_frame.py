@@ -3,7 +3,7 @@
 Menu bar with mnemonics and accelerators:
 * File    -> New Project (Ctrl+Shift+N), Open Project, Recent Projects, Exit
 * Edit    -> Resume Recording, Restart Project, Restart All Recording,
-             Start Selected Recording, Remove Project
+             Start Selected Recording, Remove Project, Show project folder
 * Tools   -> Record (Ctrl+Shift+R), Settings (Ctrl+,)
 * Help    -> Read Me, User Guide, About
 
@@ -24,6 +24,7 @@ from .. import __version__, project
 from ..settings import Settings
 from ..tts.models import ModelStore
 from .a11y import finalize_accessibility, update_accessible_name
+from .dialogs import open_folder
 from .new_project_wizard import NewProjectWizard
 from .recording_dialog import RecordingDialog
 from .settings_dialog import SettingsDialog
@@ -47,6 +48,7 @@ ID_RESTART_PROJECT = wx.NewIdRef()
 ID_RESTART_ALL = wx.NewIdRef()
 ID_RESTART_SELECTED = wx.NewIdRef()
 ID_REMOVE_PROJECT = wx.NewIdRef()
+ID_SHOW_PROJECT_FOLDER = wx.NewIdRef()
 
 
 class MainFrame(wx.Frame):
@@ -88,6 +90,7 @@ class MainFrame(wx.Frame):
         edit_menu.Append(ID_RESTART_SELECTED, "Start &Selected Recording...")
         edit_menu.AppendSeparator()
         edit_menu.Append(ID_REMOVE_PROJECT, "&Remove Project...")
+        edit_menu.Append(ID_SHOW_PROJECT_FOLDER, "Show project &folder")
         menubar.Append(edit_menu, "&Edit")
 
         tools_menu = wx.Menu()
@@ -124,6 +127,8 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, lambda _: self._restart_all(), id=ID_RESTART_ALL)
         self.Bind(wx.EVT_MENU, lambda _: self._restart_selected(), id=ID_RESTART_SELECTED)
         self.Bind(wx.EVT_MENU, lambda _: self._remove_project(), id=ID_REMOVE_PROJECT)
+        self.Bind(wx.EVT_MENU, lambda _: self._show_project_folder(),
+                  id=ID_SHOW_PROJECT_FOLDER)
         self.Bind(wx.EVT_MENU, lambda _: self.Close(), id=wx.ID_EXIT)
         self.Bind(wx.EVT_MENU_OPEN, lambda _: self._rebuild_recent())
 
@@ -237,15 +242,18 @@ class MainFrame(wx.Frame):
         self.recent_list.Bind(wx.EVT_KEY_DOWN, self._on_recent_key)
         self.recent_list.Bind(wx.EVT_CONTEXT_MENU, self._on_recent_context_menu)
 
-        self.remove_btn = wx.Button(panel, label="Remove selected project")
+        # Alt+R removes the project selected in the list below.
+        self.remove_btn = wx.Button(panel, label="&Remove selected project")
         self.remove_btn.SetName("Remove selected project")
         self.remove_btn.SetToolTip("Delete the selected project and all its recordings permanently")
         self.remove_btn.Bind(wx.EVT_BUTTON, lambda _: self._remove_project())
         sizer.Add(self.remove_btn, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 4)
         sizer.Add(
-            wx.StaticText(panel, label="Right-click a project for more actions "
-                                       "(resume, restart, remove) - also in the "
-                                       "Edit menu."),
+            wx.StaticText(panel, label="Right-click a project (or press the "
+                                       "application-menu key) for more actions "
+                                       "(resume, restart, remove, show the "
+                                       "project folder) - also in the Edit "
+                                       "menu."),
             0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8,
         )
 
@@ -351,12 +359,14 @@ class MainFrame(wx.Frame):
         return recent
 
     def _on_recent_context_menu(self, evt):
+        # Right-click carries a position; the keyboard application-menu key
+        # (and Shift+F10) does not, and then the already-selected project is
+        # the one the menu acts on.
         pos = evt.GetPosition()
-        if pos == wx.DefaultPosition:
-            pos = wx.GetMousePosition()
-        item = self.recent_list.HitTest(self.recent_list.ScreenToClient(pos))
-        if item != wx.NOT_FOUND:
-            self.recent_list.SetSelection(item)
+        if pos != wx.DefaultPosition:
+            item = self.recent_list.HitTest(self.recent_list.ScreenToClient(pos))
+            if item != wx.NOT_FOUND:
+                self.recent_list.SetSelection(item)
         menu = wx.Menu()
         for label, handler in (
             ("Resume Recording", self._resume_recording),
@@ -365,6 +375,7 @@ class MainFrame(wx.Frame):
             ("Start Selected Recording...", self._restart_selected),
             (None, None),
             ("Remove Project...", self._remove_project),
+            ("Show project folder", self._show_project_folder),
         ):
             if label is None:
                 menu.AppendSeparator()
@@ -374,6 +385,21 @@ class MainFrame(wx.Frame):
             menu.Bind(wx.EVT_MENU, lambda _, h=handler: h(), id=item_id.GetId())
         self.recent_list.PopupMenu(menu)
         menu.Destroy()
+
+    def _show_project_folder(self):
+        """Open the selected project's folder in the OS file manager."""
+        recent = self._require_selected()
+        if not recent:
+            return
+        folder = recent["path"]
+        if not os.path.isdir(folder):
+            wx.MessageBox(
+                f"The project folder no longer exists:\n{folder}",
+                "Show project folder", style=wx.OK | wx.ICON_WARNING,
+            )
+            return
+        open_folder(folder)
+        self.SetStatusText(f"Opened {folder}")
 
     # --------------------------------------------------- project lifecycle
     def _resume_recording(self):
@@ -748,10 +774,15 @@ class _StartRecordingDialog(wx.Dialog):
     def _fill_combo(self):
         """(Re)fill the combo box for the selected sidebar mode."""
         self.combo.Clear()
+        # The combo's accessible name is the row label itself (minus its
+        # colon), so what a screen reader announces is exactly the sentence
+        # on screen - speech input can then use the visible wording, and the
+        # two can never drift apart.
         if self.file_radio.GetValue():
             self.choice_label.SetLabel(
                 "Choose which recorded file to record again:")
-            update_accessible_name(self.combo, "Recorded audio files")
+            update_accessible_name(
+                self.combo, "Choose which recorded file to record again")
             self.combo.SetToolTip(
                 "Audio files that are already recorded in this project")
             items = [(entry["file"], entry["position"])
@@ -759,7 +790,8 @@ class _StartRecordingDialog(wx.Dialog):
         else:
             self.choice_label.SetLabel(
                 "Choose which file to record by file break:")
-            update_accessible_name(self.combo, "Project file breaks")
+            update_accessible_name(
+                self.combo, "Choose which file to record by file break")
             self.combo.SetToolTip(
                 "Every file break of the project, recorded or not")
             items = [(entry["title"], entry["position"])
