@@ -5,8 +5,12 @@ The application is audited by ``tools/a11y_audit.py`` (screen-reader names),
 ``tools/a11y_mnemonics.py`` (access keys).  Those tools are run by hand; the
 checks below turn the parts that must not regress into build-time failures:
 
-* the access keys the user asked for (Alt+P preview, Alt+R start recording,
-  Alt+R remove selected, Alt+D download selected),
+* the access keys the user asked for (Alt+P preview, Alt+S start recording,
+  Alt+D download selected), and that the Download and remove page's Remove
+  button deliberately carries none,
+* Alt+R no longer starts a recording: the main window's Edit menu entry
+  (&Resume Recording) owns that key, which is what made the key move the
+  focus instead of starting a run,
 * no two *visible* buttons in one window claim the same Alt+key - Windows
   would fire only the first of them and the other would be unreachable,
 * the mnemonic marker never leaks into an accessible name (Windows strips
@@ -36,6 +40,7 @@ from a11y_mnemonics import access_key  # noqa: E402
 
 from ai_voice_studio import project  # noqa: E402
 from ai_voice_studio.constants import MODE_PAGE_WITH_H1  # noqa: E402
+from ai_voice_studio.gui import access_keys  # noqa: E402
 from ai_voice_studio.gui.accept_dialog import AcceptanceDialog  # noqa: E402
 from ai_voice_studio.gui.main_frame import (  # noqa: E402
     MainFrame,
@@ -149,17 +154,36 @@ class _AppMixin(unittest.TestCase):
             )
         self.assertGreaterEqual(checked, 4)
 
-    def test_alt_r_starts_recording(self):
+    def test_alt_s_starts_recording(self):
         dlg = self._recording_window()
-        self.assertEqual(access_key(dlg.start_btn.GetLabel()), "r")
+        self.assertEqual(access_key(dlg.start_btn.GetLabel()), "s")
+        self.assertIn("Start recording", dlg.start_btn.GetLabel())
 
-    def test_alt_r_removes_the_selected_item_and_alt_d_downloads_it(self):
+    def test_alt_d_downloads_and_remove_carries_no_access_key(self):
         dlg = self._settings()
         panel = dlg.download_panel
-        self.assertEqual(access_key(panel.remove_btn.GetLabel()), "r")
         self.assertEqual(access_key(panel.download_btn.GetLabel()), "d")
+        # Remove has no Alt key on purpose: the key looked available but was
+        # not dependable, and a key that does nothing is worse than none.
+        self.assertIsNone(access_key(panel.remove_btn.GetLabel()),
+                          "the Remove button must advertise no access key")
+        self.assertNotIn(
+            panel.remove_btn.GetLabel(),
+            [entry.label for entry in access_keys.access_keys(panel)],
+            "no Alt+letter may resolve to the Remove button",
+        )
+        # The main window's own red button cannot use Alt+R: in a frame the
+        # menu bar answers first (&Resume Recording), so the key would open a
+        # menu instead of removing anything.  Its letter must be one no menu
+        # item claims - that is what the gesture audit checks for every window.
         frame = self._main_frame()
-        self.assertEqual(access_key(frame.remove_btn.GetLabel()), "r")
+        letter = access_key(frame.remove_btn.GetLabel())
+        self.assertIsNotNone(letter)
+        self.assertFalse(
+            access_keys.menu_claims(frame, letter),
+            f"Alt+{letter.upper()} on the welcome remove button is shadowed by "
+            "a menu item, so the label advertises a key that cannot reach it",
+        )
 
     # -------------------------------------------------- no duplicate keys
     def test_no_two_visible_buttons_share_an_access_key(self):
@@ -231,7 +255,7 @@ class _AppMixin(unittest.TestCase):
         self.assertEqual(dlg.combo.GetName(),
                          "Choose which file to record by file break")
 
-    # ------------------------------------------------- Alt+R really starts
+    # ------------------------------------------------- Alt+S really starts
     def _start_counting_window(self) -> tuple[RecordingDialog, dict]:
         """A recording window whose recording body only counts calls.
 
@@ -244,37 +268,48 @@ class _AppMixin(unittest.TestCase):
         dlg._begin_recording = lambda: calls.__setitem__("n", calls["n"] + 1)
         return dlg, calls
 
-    def test_alt_r_hook_starts_the_recording(self):
-        """Alt+R reaches the start handler even without the mnemonic path.
+    def test_alt_s_hook_starts_the_recording(self):
+        """Alt+S reaches the start handler even without the mnemonic path.
 
         The button's own mnemonic is answered by Windows; this handler is
         the independent path that survives a keyboard layout or a window
-        state where Windows does not match 'Start &recording'.
+        state where Windows does not match '&Start recording'.
         """
+        dlg, calls = self._start_counting_window()
+        evt = wx.KeyEvent(wx.wxEVT_CHAR_HOOK)
+        evt.SetAltDown(True)
+        evt.SetKeyCode(ord("S"))
+        evt.SetRawKeyFlags(0x1F << 16)
+        dlg._on_char_hook(evt)
+        self.assertEqual(calls["n"], 1)
+        self.assertFalse(evt.GetSkipped(), "the access key must be consumed")
+
+    def test_alt_s_is_recognised_from_an_untranslated_key_event(self):
+        """wx 3.3.3 can hand Alt+letter over with key code 0."""
+        dlg, calls = self._start_counting_window()
+        evt = wx.KeyEvent(wx.wxEVT_CHAR_HOOK)
+        evt.SetAltDown(True)
+        evt.SetKeyCode(0)
+        evt.SetRawKeyFlags(0x1F << 16)  # the S key's scan code
+        dlg._on_char_hook(evt)
+        self.assertEqual(calls["n"], 1)
+
+    def test_the_old_alt_r_no_longer_starts_a_recording(self):
+        """Alt+R belongs to Edit > Resume Recording, not to this window."""
         dlg, calls = self._start_counting_window()
         evt = wx.KeyEvent(wx.wxEVT_CHAR_HOOK)
         evt.SetAltDown(True)
         evt.SetKeyCode(ord("R"))
         evt.SetRawKeyFlags(0x13 << 16)
         dlg._on_char_hook(evt)
-        self.assertEqual(calls["n"], 1)
-        self.assertFalse(evt.GetSkipped(), "the access key must be consumed")
-
-    def test_alt_r_is_recognised_from_an_untranslated_key_event(self):
-        """wx 3.3.3 can hand Alt+letter over with key code 0."""
-        dlg, calls = self._start_counting_window()
-        evt = wx.KeyEvent(wx.wxEVT_CHAR_HOOK)
-        evt.SetAltDown(True)
-        evt.SetKeyCode(0)
-        evt.SetRawKeyFlags(0x13 << 16)  # the R key's scan code
-        dlg._on_char_hook(evt)
-        self.assertEqual(calls["n"], 1)
+        self.assertEqual(calls["n"], 0)
+        self.assertTrue(evt.GetSkipped(), "Alt+R must be passed on")
 
     def test_the_hook_ignores_every_other_key(self):
         dlg, calls = self._start_counting_window()
         others = [
-            ("plain R", False, False, ord("R"), 0x13 << 16),
-            ("Ctrl+Alt+R (AltGr)", True, True, ord("R"), 0x13 << 16),
+            ("plain S", False, False, ord("S"), 0x1F << 16),
+            ("Ctrl+Alt+S (AltGr)", True, True, ord("S"), 0x1F << 16),
             ("Alt+X", True, False, ord("X"), 0x2D << 16),
             ("Alt with no letter", True, False, 0, 0x38 << 16),
         ]
@@ -289,7 +324,7 @@ class _AppMixin(unittest.TestCase):
             self.assertTrue(evt.GetSkipped(), f"{name} must be passed on")
 
     def test_one_keystroke_cannot_start_two_runs(self):
-        """Alt+R fires the mnemonic *and* the hook; only one may start."""
+        """Alt+S fires the mnemonic *and* the hook; only one may start."""
         dlg, calls = self._start_counting_window()
         dlg._on_start(None)   # the Windows mnemonic path
         dlg._on_start(None)   # and the CHAR_HOOK path for the same keystroke
@@ -304,7 +339,7 @@ class _AppMixin(unittest.TestCase):
         dlg.start_btn.Disable()
         evt = wx.KeyEvent(wx.wxEVT_CHAR_HOOK)
         evt.SetAltDown(True)
-        evt.SetKeyCode(ord("R"))
+        evt.SetKeyCode(ord("S"))
         dlg._on_char_hook(evt)
         self.assertEqual(calls["n"], 0)
 
@@ -327,8 +362,8 @@ class _AppMixin(unittest.TestCase):
 
     # ------------------------------------------------- the real Windows path
     @unittest.skipUnless(sys.platform == "win32", "Windows key messages")
-    def test_alt_r_reaches_the_start_handler_through_windows(self):
-        """Drive the real Alt+R messages: WM_SYSKEYDOWN + WM_SYSCHAR.
+    def test_alt_s_reaches_the_start_handler_through_windows(self):
+        """Drive the real Alt+S messages: WM_SYSKEYDOWN + WM_SYSCHAR.
 
         This is the path the user's keyboard takes (the mnemonic is answered
         by the Windows dialog manager, which fires on both messages), and it
@@ -342,7 +377,7 @@ class _AppMixin(unittest.TestCase):
 
         user32 = ctypes.windll.user32
         ALT = 1 << 29
-        scan = 0x13
+        scan = 0x1F
         try:
             hwnd = wx.Window.FindFocus().GetHandle()
         except Exception:  # noqa: BLE001
@@ -351,10 +386,10 @@ class _AppMixin(unittest.TestCase):
         state = {"posted": False}
 
         def post_and_stop():
-            user32.PostMessageW(hwnd, 0x0104, 0x52, 1 | (scan << 16) | ALT)
-            user32.PostMessageW(hwnd, 0x0106, ord("r"),
+            user32.PostMessageW(hwnd, 0x0104, 0x53, 1 | (scan << 16) | ALT)
+            user32.PostMessageW(hwnd, 0x0106, ord("s"),
                                 1 | (scan << 16) | ALT | (1 << 31))
-            user32.PostMessageW(hwnd, 0x0105, 0x52,
+            user32.PostMessageW(hwnd, 0x0105, 0x53,
                                 1 | (scan << 16) | ALT | (1 << 30) | (1 << 31))
             state["posted"] = True
             wx.CallLater(700, self.app.ExitMainLoop)

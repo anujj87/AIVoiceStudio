@@ -20,7 +20,7 @@
 <body>
 
 <h1>AI Voice Studio &mdash; User Guide</h1>
-<p>Developed by <strong>Anuj Sharma</strong>. Application version <strong>2026.3.3</strong>.
+<p>Developed by <strong>Anuj Sharma</strong>. Application version <strong>2026.3.6</strong>.
 This guide explains installation, the first-launch terms of use, the first
 recording, every Settings category, voice cloning with the Voice Lab engines,
 punctuation, the compute back-ends, licences and how to solve common problems.
@@ -279,7 +279,7 @@ and a project remembers the compute option it was recorded with.</p>
 <h2 id="shortcuts">Keyboard shortcuts</h2>
 <table>
   <tr><th>Shortcut</th><th>Action</th></tr>
-  <tr><td>Ctrl+Shift+N</td><td>New Project</td></tr>
+  <tr><td>Ctrl+Shift+N</td><td>New Project (same as the welcome panel's <strong>Create New Project</strong> button)</td></tr>
   <tr><td>Ctrl+Shift+R</td><td>Record (open most recent project)</td></tr>
   <tr><td>Ctrl+,</td><td>Settings</td></tr>
   <tr><td>F1</td><td>Open the bundled book (Help menu)</td></tr>
@@ -288,6 +288,32 @@ and a project remembers the compute option it was recorded with.</p>
   <tr><td>Ctrl+Tab / Ctrl+Shift+Tab</td><td>Next / previous Settings category</td></tr>
   <tr><td>Ctrl+S</td><td>Apply settings</td></tr>
 </table>
+
+<h3>Access keys (Alt + letter)</h3>
+<p>Access keys are printed on the buttons themselves: hold <strong>Alt</strong> and press the
+underlined letter. They work whatever control has the focus, in every window.</p>
+<table>
+  <tr><th>Access key</th><th>Action</th></tr>
+  <tr><td>Alt+P</td><td>Preview the selected voice (Available TTS, Recording settings, Punctuation, the OmniVoice voice library and the Voice Clone panel)</td></tr>
+  <tr><td>Alt+D</td><td>Download the variant selected in <strong>Settings &rarr; Download and remove</strong></td></tr>
+  <tr><td>Alt+S</td><td>Start (or resume) recording &mdash; Recording window</td></tr>
+  <tr><td>Alt+J</td><td>Remove the selected project &mdash; main window</td></tr>
+</table>
+<p><strong>Remove selected variant</strong> deliberately has no access key: an R there
+would be the key a user reaches for, and it cannot be made dependable in every
+window, so the button carries no access key at all and is reached with
+<strong>Tab</strong> and <strong>Enter</strong> instead.</p>
+<p><strong>Ctrl+Shift+N</strong> is owned by the welcome panel's <strong>Create New
+Project</strong> button, not by the File menu: the key presses that button, exactly
+as a mouse click does.</p>
+<p>In the main window the menu bar keeps its own letters (<strong>Alt+R</strong> is
+<em>Edit &rarr; Resume Recording</em>, <strong>Alt+N</strong> is <em>File &rarr; New Project</em>),
+which is why the welcome panel's remove button uses Alt+J.</p>
+<p>If an access key lands on a button that cannot be used yet &mdash; <strong>Alt+D</strong>
+on a model that is already downloaded, for example &mdash; the window beeps and says
+why in its own status line instead of doing nothing.</p>
+<p>The <strong>Download and remove</strong> page opens on a model that is already downloaded,
+so Remove is ready the moment the page appears.</p>
 
 <h2 id="developermode">Developer Mode</h2>
 <p>Enable Developer Mode in <strong>Settings &rarr; General &rarr; Enable Developer Mode</strong> to unlock advanced features:</p>

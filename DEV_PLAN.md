@@ -3,11 +3,30 @@
 Milestones map to the implementation order. Each phase ends with something runnable/verifiable.
 Status is tracked at the top; check boxes are updated as phases complete.
 
-Current release: **2026.3.3** (`constants.APP_VERSION`;
+Current release: **2026.3.6** (`constants.APP_VERSION`;
 `TERMS_VERSION` stays 2026.3.1 because the terms text did not change, so an
 upgrade does not ask the user to accept them again; `installer_common.iss`).
 Test suite: unit, GUI smoke, engine-environment, book, documentation and
-accessibility guards. Installer: `dist\AI-Voice-Studio-v-2026-3-3-Setup-x64.exe`.
+accessibility guards. Installer: `dist\AI-Voice-Studio-v-2026-3-6-Setup-x64.exe`.
+
+2026.3.6 settles two gestures the user reported. **Remove selected variant** no
+longer carries an Alt+R access key at all (a key that looks available and then
+does nothing is worse than none; the button stays on Tab and Enter).
+**Ctrl+Shift+N** is now owned solely by the welcome panel's *Create New
+Project* button: the File-menu item carries no accelerator and the frame's key
+handler sends the button its own click event, so gesture and mouse click cannot
+diverge. While fixing it, the frame's key handler was measured against real
+keystrokes and now confirms Ctrl/Shift against the physical keyboard, because
+wx 3.3.3 can deliver a Shift+letter combination with the modifier bits missing
+("Ctrl+Shift+N does nothing" was reproduced exactly that way).
+
+2026.3.5 makes the keyboard gestures dependable: one shared access-key handler
+(`gui/access_keys.py`) activates buttons in every window whatever has the focus,
+explains a key whose target is disabled instead of doing nothing, and runs one
+action per keystroke (Windows answers a mnemonic twice per press). The Download
+and remove page opens on a downloaded model, removal reports what it did, the
+main window's button keys no longer collide with the menu bar, and
+`tools/a11y_gestures.py` audits every window's keys, shadows and accelerators.
 
 ## Phase 0 — Research & specification ✅
 - [x] Study [bookworm](https://github.com/blindpandas/bookworm) and other accessible readers

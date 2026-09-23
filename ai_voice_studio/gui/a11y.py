@@ -98,7 +98,16 @@ def finalize_accessibility(container: wx.Window) -> None:
     ``wx.Accessible`` (e.g. settings panels) are left untouched, and
     buttons / static text are skipped because MSAA already exposes their
     visible text as the name.
+
+    Every window that finishes this step also gets the application's own
+    access-key handling (``access_keys.install``).  Windows answers a
+    button's ``&`` mnemonic along one narrow path that can silently miss
+    (see ``access_keys``), so the window-level hook is what makes Alt+D,
+    Alt+R, Alt+P and friends dependable here.
     """
+    from . import access_keys  # noqa: PLC0415 - circular import at module load
+
+    access_keys.install(container)
     def walk(win: wx.Window) -> None:
         if not isinstance(win, _SKIP_TYPES):
             if win.GetAccessible() is None:

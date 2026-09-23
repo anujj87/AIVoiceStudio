@@ -264,7 +264,7 @@ when the addon is enabled. No system-wide pip install is needed.</p>
 <!-- ================================================================ -->
 <h2 id="environments">Python Environments: Addons vs. TTS Engines</h2>
 
-<p>Since version 2026.3.3 the application does not have one Python environment: it
+<p>The application does not have one Python environment for everything: it
 creates <strong>one virtual environment per pip-installed TTS engine</strong>. This
 matters when you write an addon, because your code may be imported into the
 application while the engine it uses runs somewhere else.</p>

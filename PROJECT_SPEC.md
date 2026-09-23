@@ -221,6 +221,13 @@ whose terms text changed:
 - Focus lands on the first control when a dialog opens; Tab order follows reading order.
 - All status messages are written to a status bar (announced by screen readers) and to logs.
 - No modal dead-ends: long operations run in worker threads with a cancellable progress dialog.
+- **Access keys** (`&` in a label, e.g. `&Preview`, `&Remove selected variant`, `&Start
+  recording`): one letter per action per window, never shadowed by a menu item (a frame
+  answers its menu bar first, so `&X` in the main window would be unreachable), and never
+  silent - a key that lands on a disabled control beeps and says why in the window's own
+  status line (`access_keys.install` + `show_access_key_hint`). Windows answers a mnemonic on
+  both messages of one key press, so handlers that start something call `access_keys.once()`;
+  `tools/a11y_gestures.py` audits keys, shadows and accelerators for every window.
 
 ### 3.3 Hardware support
 

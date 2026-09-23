@@ -251,7 +251,7 @@ self.log_text.SetName(f"Log file {filename}: showing last 200 of 1500 lines")
 <h3>Current Shortcuts</h3>
 <table>
 <tr><th>Shortcut</th><th>Menu</th><th>Action</th></tr>
-<tr><td>Ctrl+Shift+N</td><td>File</td><td>New Project</td></tr>
+<tr><td>Ctrl+Shift+N</td><td>Welcome panel</td><td>Create New Project (the File-menu item intentionally carries no accelerator)</td></tr>
 <tr><td>Ctrl+Shift+R</td><td>Tools</td><td>Record</td></tr>
 <tr><td>Ctrl+,</td><td>Tools</td><td>Settings</td></tr>
 <tr><td>F1</td><td>Help</td><td>Python &amp; wxPython Book</td></tr>
@@ -260,6 +260,31 @@ self.log_text.SetName(f"Log file {filename}: showing last 200 of 1500 lines")
 <strong>Alt</strong> opens the menu bar, the mnemonic letter opens the menu
 (<code>&amp;Edit</code>, <code>Start &amp;Selected Recording...</code>) and the
 arrow keys move between items.</p>
+
+<h3>Access keys</h3>
+<ul>
+  <li><strong>One access key per action, per window.</strong> Two visible controls may not
+      share a letter: Windows activates the first and the other becomes unreachable. The
+      menus obey the same rule &mdash; three items in the Help menu used to answer to
+      Alt+A.</li>
+  <li><strong>No access key may be shadowed by a menu.</strong> A frame answers its menu bar
+      before any child control, so a button labelled <code>&amp;X</code> in the main window
+      would never receive Alt+X; only <code>tools/a11y_gestures.py</code> can see this, and
+      it fails the build check when it appears.</li>
+  <li><strong>An access key must say something when it cannot act.</strong> A disabled button
+      answers with a beep and a sentence in the window's own status line
+      (<code>show_access_key_hint</code>), never with silence.</li>
+  <li><strong>One keystroke, one action.</strong> Windows answers a mnemonic on both
+      <code>WM_SYSKEYDOWN</code> and the <code>WM_SYSCHAR</code> derived from it, and a
+      window's own key hook may see the key as well; handlers call
+      <code>access_keys.once()</code> so a button runs its action exactly once per
+      press.</li>
+  <li><strong>Access keys do not depend on the focus.</strong> The window resolves the letter
+      among the controls that are visible and enabled, so the key works from a combo box, a
+      list or a button alike. AltGr (Ctrl+Alt) is never an access key.</li>
+</ul>
+<p>The access keys in use are listed in the <em>Keyboard shortcuts</em> chapter of the User
+Guide.</p>
 
 <!-- ================================================================ -->
 <h2 id="groups">Radio Groups and Dependent Controls</h2>

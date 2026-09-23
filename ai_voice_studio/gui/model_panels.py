@@ -21,7 +21,7 @@ from ..tts.downloader import (
     ModelDownloader,
 )
 from ..tts.models import ModelStore
-from . import dialogs, language_choice
+from . import access_keys, dialogs, language_choice
 from .a11y import add_labeled, finalize_accessibility
 from .events import (
     DownloadFinishedEvent,
@@ -33,7 +33,7 @@ from .events import (
 log = logging.getLogger(__name__)
 
 
-class _ManagerPanel(wx.Panel):
+class _ManagerPanel(access_keys.AccessKeyHints, wx.Panel):
     """Base for the model-manager panels used as Settings categories.
 
     These panels act immediately (they manage downloads, lists and cloned
@@ -138,11 +138,15 @@ class DownloadPanel(_ManagerPanel):
         sizer.Add(self.progress_label, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 6)
 
         btns = wx.BoxSizer(wx.HORIZONTAL)
-        # Access keys: Alt+D downloads, Alt+R removes (the visible label
-        # keeps the & as the Windows mnemonic marker; screen readers hear
-        # the name without it).
+        # Access key: Alt+D downloads (the visible label keeps the & as the
+        # Windows mnemonic marker; screen readers hear the name without it).
+        # Remove deliberately carries *no* access key: it was the key this
+        # page advertised and the one users pressed, yet it could not be made
+        # to act reliably in every state (a disabled button, a key press
+        # answered twice), so the key is gone rather than left looking
+        # available - the button is reached with Tab, Enter and Space.
         self.download_btn = wx.Button(self, label="&Download selected variant")
-        self.remove_btn = wx.Button(self, label="&Remove selected variant")
+        self.remove_btn = wx.Button(self, label="Remove selected variant")
         self.cancel_btn = wx.Button(self, label="Cancel download")
         self.cancel_btn.Disable()
         self.download_btn.SetName("Download selected variant")
@@ -213,14 +217,75 @@ class DownloadPanel(_ManagerPanel):
         tts_id, lang_code, _ = self._selected()
         tts = catalog.find_tts(tts_id) if tts_id else None
         populate_variants(self.variant_combo, tts, lang_code or "")
+        self._preselect_installed_variant(tts_id, lang_code)
         self._refresh_buttons()
+
+    def on_activated(self):
+        """Open on a downloaded model when there is one.
+
+        The category is called "Download and remove", so the reason to be
+        here is usually a model that is already on disk: opening on the first
+        engine of the catalog, with Remove disabled, is a poor landing place.  Anything installed moves the three cascades onto
+        it.
+        """
+        super().on_activated()
+        installed = self.store.installed_variants()
+        if not installed:
+            return
+        wanted = installed[0]
+        for index in range(self.tts_combo.GetCount()):
+            if self.tts_combo.GetClientData(index) == wanted["tts"]:
+                self.tts_combo.SetSelection(index)
+                break
+        else:
+            return
+        self._on_tts(None)
+        for index in range(self.lang_combo.GetCount()):
+            if self.lang_combo.GetClientData(index) == wanted["language"]:
+                self.lang_combo.SetSelection(index)
+                break
+        else:
+            return
+        self._on_lang(None)
+        for index in range(self.variant_combo.GetCount()):
+            if self.variant_combo.GetClientData(index) == wanted["variant"]:
+                self.variant_combo.SetSelection(index)
+                log.info("Download and remove: opening on the downloaded model "
+                         "%s / %s / %s", wanted["tts"], wanted["language"],
+                         wanted["variant"])
+                break
+        self._refresh_buttons()
+
+    def _preselect_installed_variant(self, tts_id, lang_code) -> None:
+        """Start on a variant that is already downloaded, when there is one.
+
+        The Variant box opens on "Download all variants", which has no single
+        model behind it - so the Remove button starts disabled until the user
+        picks a variant by hand.  Landing on an installed variant instead
+        makes both buttons truthful the moment the category is opened
+        (removing it is what a user who opened this page is most often there
+        for).
+        """
+        if not tts_id or not lang_code:
+            return
+        for index in range(self.variant_combo.GetCount()):
+            variant_id = self.variant_combo.GetClientData(index)
+            if variant_id and variant_id != "__all__" and self.store.is_variant_installed(
+                tts_id, lang_code, variant_id
+            ):
+                self.variant_combo.SetSelection(index)
+                log.info("Download and remove: preselecting the downloaded "
+                         "variant %s / %s / %s", tts_id, lang_code, variant_id)
+                return
 
     def _refresh_buttons(self):
         tts_id, lang_code, variant_id = self._selected()
         if not all((tts_id, lang_code, variant_id)):
             self.download_btn.Disable()
             self.remove_btn.Disable()
+            self._explain_buttons("Select a TTS engine, a language and a variant first.")
             return
+        busy = self._thread is not None
         if variant_id == "__all__":
             # "Download all variants": enabled until every variant is present.
             tts = catalog.find_tts(tts_id)
@@ -230,17 +295,63 @@ class DownloadPanel(_ManagerPanel):
                 v for v in variants
                 if not self.store.is_variant_installed(tts_id, lang_code, v)
             ]
-            self.download_btn.Enable(bool(missing) and self._thread is None)
+            self.download_btn.Enable(bool(missing) and not busy)
             self.remove_btn.Disable()
+            self._explain_buttons(
+                "\"Download all variants\" is a download action - choose one "
+                "variant to remove a single downloaded model."
+            )
             return
         installed = self.store.is_variant_installed(tts_id, lang_code, variant_id)
-        self.download_btn.Enable(not installed and self._thread is None)
-        self.remove_btn.Enable(installed and self._thread is None)
+        self.download_btn.Enable(not installed and not busy)
+        self.remove_btn.Enable(installed and not busy)
+        self._explain_buttons(
+            None if installed else
+            f"{tts_id} / {lang_code} / {variant_id} is not downloaded yet, so "
+            "there is nothing to remove."
+        )
+
+    def _explain_buttons(self, remove_reason: str | None) -> None:
+        """Put the reason a button cannot act into its tooltip.
+
+        A disabled button and a key that answers to it look identical from
+        the keyboard (nothing happens), so the reason is kept on the button
+        where a mouse user sees it and a screen reader can read it.
+        """
+        self.remove_btn.SetToolTip(
+            "Remove the selected downloaded model" if remove_reason is None
+            else f"Remove selected variant - unavailable: {remove_reason}"
+        )
+
+    def access_key_hint(self, entry) -> str:
+        """Why Alt+D cannot act on the current selection.
+
+        ``access_keys`` calls this when an access key lands on a disabled
+        button; without it the key would silently do nothing at all, which is
+        the behaviour this panel is being fixed for.  Only Download carries
+        an access key (see ``__init__``), so this is the only case left.
+        """
+        tts_id, lang_code, variant_id = self._selected()
+        if entry.control is self.download_btn:
+            return (f"Alt+D: {tts_id} / {lang_code} / {variant_id} is already "
+                    "downloaded - use the Remove selected variant button to "
+                    "delete it instead.")
+        return super().access_key_hint(entry)
+
+    def _say(self, message: str) -> None:
+        """Put ``message`` on the panel's status line and in the log."""
+        self.progress_label.SetLabel(message)
+        log.info("Download and remove: %s", message)
 
     # -- actions ------------------------------------------------------------
-    def _on_download(self, _):
+    def _on_download(self, evt=None):
+        # Alt+D reaches this handler on both messages of one keystroke (see
+        # access_keys.once), so the guard keeps one press to one download.
+        if not access_keys.once(evt if evt is not None else self.download_btn):
+            return
         tts_id, lang_code, variant_id = self._selected()
         if not all((tts_id, lang_code, variant_id)):
+            self._say("Select a TTS engine, a language and a variant first.")
             return
         if variant_id == "__all__":
             tts = catalog.find_tts(tts_id)
@@ -248,6 +359,7 @@ class DownloadPanel(_ManagerPanel):
             variants = [v["id"] for v in (lang.get("variants", []) if lang else [])]
         else:
             variants = [variant_id]
+        log.info("Downloading %s / %s / %s", tts_id, lang_code, variants)
         self._cancel_event = threading.Event()
         self.download_btn.Disable()
         self.remove_btn.Disable()
@@ -301,22 +413,66 @@ class DownloadPanel(_ManagerPanel):
         if self.on_models_changed:
             self.on_models_changed()
 
-    def _on_remove(self, _):
+    def _on_remove(self, evt=None):
+        """Remove the selected model, saying what happened either way.
+
+        Every exit reports: an unusable selection, a model that is not
+        downloaded, a cancelled confirmation, a failure on disk (a locked
+        file, a read-only folder) and - the case that used to look like
+        success - a removal whose files were left behind.  A key or a click
+        that appears to do nothing is indistinguishable from a bug,        which is what this panel was reported as.
+        """
+        if not access_keys.once(evt if evt is not None else self.remove_btn):
+            return
         tts_id, lang_code, variant_id = self._selected()
         if not all((tts_id, lang_code, variant_id)):
+            self._say("Select a TTS engine, a language and a variant first.")
             return
         name = f"{tts_id} / {lang_code} / {variant_id}"
+        if variant_id == "__all__":
+            self._say("\"Download all variants\" cannot be removed - choose one "
+                      "variant in the Variant box first.")
+            return
+        if not self.store.is_variant_installed(tts_id, lang_code, variant_id):
+            self._say(f"Nothing to remove: {name} is not downloaded.")
+            return
+        info = self.store.variant_info(tts_id, lang_code, variant_id) or {}
+        folder = info.get("dir") or ""
         if wx.MessageBox(
             f"Remove the downloaded voice \"{name}\"? Its files will be deleted "
             "from your computer.",
             "Remove voice",
             style=wx.YES_NO | wx.ICON_QUESTION,
-        ) == wx.YES:
+        ) != wx.YES:
+            self._say(f"Kept {name}.")
+            return
+        log.info("Removing the downloaded model %s", name)
+        try:
             self.downloader.remove_variant(tts_id, lang_code, variant_id)
-            self.progress_label.SetLabel(f"Removed {name}.")
+        except OSError as exc:
+            log.exception("Could not remove %s", name)
+            self._say(f"Could not remove {name}: {exc}")
+            dialogs.notify_engine_error(
+                self, "Could not remove the model",
+                f"{name} could not be deleted:\n\n{exc}\n\nClose anything using "
+                "it (a running engine, an open folder) and try again.",
+            )
             self._refresh_buttons()
-            if self.on_models_changed:
-                self.on_models_changed()
+            return
+        self._refresh_buttons()
+        if self.on_models_changed:
+            self.on_models_changed()
+        leftovers = []
+        if folder and os.path.isdir(folder):
+            leftovers = os.listdir(folder)
+        if leftovers:
+            log.warning("Removed %s from the model list, %d file(s) left in %s",
+                        name, len(leftovers), folder)
+            self._say(f"Removed {name} from the list, but {len(leftovers)} file(s) "
+                      f"could not be deleted (they may be in use). They are in "
+                      f"{folder}.")
+        else:
+            self._say(f"Removed {name}.")
 
 
 # ---------------------------------------------------------------------------
@@ -665,7 +821,11 @@ class AvailablePanel(_ManagerPanel):
                 f"Folder: {voice.get('dir', '')}"
             )
 
-    def _on_preview(self, _):
+    def _on_preview(self, evt=None):
+        # One Alt+P press reaches this handler more than once (see
+        # access_keys.once): the guard keeps it to one preview.
+        if not access_keys.once(evt if evt is not None else self.preview_btn):
+            return
         voice = self.selected_voice()
         if not voice:
             wx.MessageBox("Select a voice first.", "Preview", style=wx.OK | wx.ICON_INFORMATION)

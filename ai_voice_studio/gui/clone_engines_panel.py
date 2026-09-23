@@ -33,7 +33,7 @@ from ..tts.models import ModelStore
 from ..voicelab import engines as voice_lab
 from ..voicelab import options as voice_options
 from .a11y import add_labeled, finalize_accessibility
-from . import dialogs
+from . import access_keys, dialogs
 from .voicelab_options_dialog import tune_options as voice_options_tune
 
 log = logging.getLogger(__name__)
@@ -43,7 +43,7 @@ log = logging.getLogger(__name__)
 _VOICE_PROBE_ENGINES = {"f5tts"}
 
 
-class VoiceClonePanel(wx.Panel):
+class VoiceClonePanel(access_keys.AccessKeyHints, wx.Panel):
     """Settings category: clone a voice with a CPU-first engine."""
 
     title = "Voice Clone"
@@ -894,7 +894,11 @@ class VoiceClonePanel(wx.Panel):
             self.preview_status.SetLabel(f"Deleted '{name}'.")
 
     # ------------------------------------------------------- preview
-    def _on_preview(self, _evt):
+    def _on_preview(self, evt=None):
+        # One Alt+P press reaches this handler more than once (see
+        # access_keys.once): the guard keeps it to one preview.
+        if not access_keys.once(evt if evt is not None else self.preview_btn):
+            return
         voice = self._selected_voice()
         if not voice:
             return

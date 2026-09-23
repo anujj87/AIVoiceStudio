@@ -1,11 +1,18 @@
 """Main window (SPEC 3.2, 3.5, 3.6).
 
 Menu bar with mnemonics and accelerators:
-* File    -> New Project (Ctrl+Shift+N), Open Project, Recent Projects, Exit
+* File    -> New Project, Open Project, Recent Projects, Exit
 * Edit    -> Resume Recording, Restart Project, Restart All Recording,
              Start Selected Recording, Remove Project, Show project folder
 * Tools   -> Record (Ctrl+Shift+R), Settings (Ctrl+,)
 * Help    -> Read Me, User Guide, About
+
+Ctrl+Shift+N belongs to the welcome panel's *Create New Project* button (not
+to the File menu): pressing it sends that button its own click event, so the
+gesture and the mouse click run one and the same code path.  Ctrl+Shift+R
+(Record) and Ctrl+, (Settings) stay with the Tools-menu items.  The frame's
+own key handler routes all three, because the menu bar's accelerator parsing
+proves unreliable for Shift+letter combinations on this wx build.
 
 The welcome panel offers the same actions with large labelled buttons and a
 recent-projects list that screen readers can navigate with arrow keys. The
@@ -18,6 +25,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
+
 import wx
 
 from .. import __version__, project
@@ -31,6 +39,29 @@ from .settings_dialog import SettingsDialog
 from .theme import apply_theme
 
 log = logging.getLogger(__name__)
+
+#: Windows virtual keys and scan codes the frame's key handler needs.
+_VK_CONTROL, _VK_SHIFT, _VK_N, _VK_R = 0x11, 0x10, 0x4E, 0x52
+_SCAN_N, _SCAN_R = 0x31, 0x13
+
+
+def _physical_key_down(vk: int) -> bool:
+    """True while the key ``vk`` is physically held (Windows only).
+
+    wx can deliver a Shift+letter combination with the modifier bits missing
+    from the event, which would make the shortcut unrecognisable; the real
+    keyboard is the only authority left.  False everywhere else, where the
+    event's own modifiers are trusted.
+    """
+    if sys.platform != "win32":
+        return False
+    try:
+        import ctypes  # noqa: PLC0415 - Windows-only check
+
+        return bool(ctypes.windll.user32.GetKeyState(vk) & 0x8000)
+    except Exception:  # noqa: BLE001 - a key handler must never raise
+        return False
+
 
 ID_NEW_PROJECT = wx.NewIdRef()
 ID_OPEN_PROJECT = wx.NewIdRef()
@@ -75,7 +106,11 @@ class MainFrame(wx.Frame):
         menubar = wx.MenuBar()
 
         file_menu = wx.Menu()
-        file_menu.Append(ID_NEW_PROJECT, "&New Project\tCtrl+Shift+N")
+        # No \t accelerator here on purpose: Ctrl+Shift+N is bound to the
+        # welcome panel's Create New Project button (see _build_welcome and
+        # _on_global_char_hook), so the menu item must not claim the same
+        # gesture a second time.
+        file_menu.Append(ID_NEW_PROJECT, "&New Project")
         file_menu.Append(ID_OPEN_PROJECT, "&Open Project...")
         self._recent_menu = wx.Menu()
         file_menu.AppendSubMenu(self._recent_menu, "&Recent Projects")
@@ -83,13 +118,18 @@ class MainFrame(wx.Frame):
         file_menu.Append(wx.ID_EXIT, "E&xit")
         menubar.Append(file_menu, "&File")
 
+        # One access key per item inside a menu: Windows fires only the first
+        # item that matches a letter, so "&Resume Recording" and a second
+        # "&Restart/R&emove..." would leave the later ones unreachable by
+        # keyboard.  The markers below are unique within this menu (R, P, A,
+        # S, M, F) while the visible text is unchanged.
         edit_menu = wx.Menu()
         edit_menu.Append(ID_RESUME_RECORDING, "&Resume Recording")
-        edit_menu.Append(ID_RESTART_PROJECT, "&Restart Project...")
+        edit_menu.Append(ID_RESTART_PROJECT, "Restart &Project...")
         edit_menu.Append(ID_RESTART_ALL, "Restart &All Recording")
         edit_menu.Append(ID_RESTART_SELECTED, "Start &Selected Recording...")
         edit_menu.AppendSeparator()
-        edit_menu.Append(ID_REMOVE_PROJECT, "&Remove Project...")
+        edit_menu.Append(ID_REMOVE_PROJECT, "Re&move Project...")
         edit_menu.Append(ID_SHOW_PROJECT_FOLDER, "Show project &folder")
         menubar.Append(edit_menu, "&Edit")
 
@@ -98,15 +138,19 @@ class MainFrame(wx.Frame):
         tools_menu.Append(ID_SETTINGS, "&Settings...\tCtrl+,")
         menubar.Append(tools_menu, "&Tools")
 
+        # Unique access keys inside each menu (R, U, A, C, B, T, S): three
+        # items in this menu used to answer to Alt+A, so opening Help and
+        # pressing A always chose the first one and the others were
+        # unreachable from the keyboard.
         help_menu = wx.Menu()
         help_menu.Append(ID_README, "&Read Me")
         help_menu.Append(ID_USER_GUIDE, "&User Guide")
         help_menu.Append(ID_ADDON_GUIDE, "&Addon Development Guide")
-        help_menu.Append(ID_ACCESSIBILITY_GUIDE, "&Accessibility Guidelines")
+        help_menu.Append(ID_ACCESSIBILITY_GUIDE, "Ac&cessibility Guidelines")
         help_menu.AppendSeparator()
         help_menu.Append(ID_PYTHON_BOOK, "Python & wxPython Book	F1")
         help_menu.Append(ID_THIRD_PARTY_LICENSES, "&Third-Party Licences")
-        help_menu.Append(ID_ABOUT, "&About AI Voice Studio")
+        help_menu.Append(ID_ABOUT, "About AI Voice &Studio")
         menubar.Append(help_menu, "&Help")
 
         self.SetMenuBar(menubar)
@@ -132,30 +176,39 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, lambda _: self.Close(), id=wx.ID_EXIT)
         self.Bind(wx.EVT_MENU_OPEN, lambda _: self._rebuild_recent())
 
-        # Frame-level accelerator table for the three global shortcuts.
-        # These fire the same menu IDs, but do not depend on the menu
-        # bar's own accelerator parsing, which can be unreliable for
-        # Shift+letter combos on some wx builds.
+        # Frame-level accelerator table for the two shortcuts that belong to
+        # a menu item.  These fire the same menu IDs, but do not depend on
+        # the menu bar's own accelerator parsing, which can be unreliable for
+        # Shift+letter combos on some wx builds.  Ctrl+Shift+N is *not* here:
+        # it is the Create New Project button's gesture, routed by the char
+        # hook below.
         self.SetAcceleratorTable(wx.AcceleratorTable([
-            (wx.ACCEL_CTRL | wx.ACCEL_SHIFT, ord("N"), ID_NEW_PROJECT),
             (wx.ACCEL_CTRL | wx.ACCEL_SHIFT, ord("R"), ID_RECORD),
             (wx.ACCEL_CTRL, ord(","), ID_SETTINGS),
         ]))
 
-        # Belt-and-braces: a char hook catches the same shortcuts even when
-        # the accelerator table / menu accelerator parsing misses them
-        # (observed on wx 3.3.3 msw for Ctrl+Shift+letter).  Only fires when
-        # no modal dialog is open, so it never duplicates the dialog's own
-        # handling and never swallows ordinary typing.
+        # Belt-and-braces: a char hook catches the shortcuts even when the
+        # accelerator table / menu accelerator parsing misses them (observed
+        # on wx 3.3.3 msw for Ctrl+Shift+letter) - and it is the *only* route
+        # Ctrl+Shift+N has, since it belongs to the welcome button.  Only
+        # fires when no modal dialog is open, so it never duplicates the
+        # dialog's own handling and never swallows ordinary typing.
         self.Bind(wx.EVT_CHAR_HOOK, self._on_global_char_hook)
 
     def _on_global_char_hook(self, evt: wx.KeyEvent) -> None:
         """Global keyboard hook for the three main shortcuts.
 
         wx's menu accelerators proved unreliable for Ctrl+Shift+letter on
-        this wx build, so the hook routes the keys itself.  It only acts
-        when the frame itself is active (no modal dialog owns the keys) and
-        passes every other key through untouched.
+        this wx build, so the hook routes the keys itself.  Ctrl+Shift+N is
+        handed to the welcome panel's Create New Project button - that button
+        owns the gesture, and there is no other binding for it anywhere.
+
+        Measured with a real keystroke on wx 3.3.3 msw: a Shift+letter
+        combination can arrive as key code 0 *and* with the modifier bits
+        missing from the event, so the modifiers are confirmed against the
+        physical keyboard and the held letter is identified by the event's
+        scan code or, failing that, by the key state itself.  Every other key
+        is passed straight on.
         """
         key = evt.GetKeyCode()
         mods = evt.GetModifiers()
@@ -164,39 +217,43 @@ class MainFrame(wx.Frame):
         if wx.IsBusy():
             evt.Skip()
             return
-        # wx 3.3.3 msw translates letter+Ctrl+Shift to keycode 0 (raw 255),
-        # which is why neither the menu accelerators nor the accelerator
-        # table can match Ctrl+Shift+N / Ctrl+Shift+R on this build.  For
-        # those untranslated events, identify the held letter via the event
-        # scan code first, then Win32 GetKeyState as a fallback.
-        if sys.platform == "win32" and ctrl and shift and key in (0, ord("N"), ord("n"), ord("R"), ord("r")):
+        ctrl = ctrl or _physical_key_down(_VK_CONTROL)
+        shift = shift or _physical_key_down(_VK_SHIFT)
+        if ctrl and shift and key in (0, ord("N"), ord("n"), ord("R"), ord("r")):
             scan = 0
             try:
                 scan = (evt.GetRawKeyFlags() >> 16) & 0xFF
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001 - raw flags are not always there
                 pass
-            import ctypes  # noqa: PLC0415
-            user32 = ctypes.windll.user32
-            def _held(vk: int) -> bool:
-                return bool(user32.GetKeyState(vk) & 0x8000)
-            is_n = key in (ord("N"), ord("n")) or scan == 0x31 or _held(0x4E)
-            is_r = key in (ord("R"), ord("r")) or scan == 0x13 or _held(0x52)
+            is_n = (key in (ord("N"), ord("n")) or scan == _SCAN_N
+                    or _physical_key_down(_VK_N))
+            is_r = (key in (ord("R"), ord("r")) or scan == _SCAN_R
+                    or _physical_key_down(_VK_R))
             if is_n:
-                self._new_project()
+                self._press_new_project_button()
                 return
             if is_r:
                 self._record()
                 return
-        if ctrl and shift and key in (ord("N"), ord("n")):
-            self._new_project()
-            return
-        if ctrl and shift and key in (ord("R"), ord("r")):
-            self._record()
-            return
         if ctrl and key in (ord(","),):
             self._settings()
             return
         evt.Skip()
+
+    def _press_new_project_button(self) -> None:
+        """Do exactly what clicking the welcome panel's button does.
+
+        Ctrl+Shift+N is that button's gesture: the key sends the button its
+        own click event rather than calling the action directly, so the two
+        ways into the New Project wizard cannot drift apart.
+        """
+        button = getattr(self, "new_project_btn", None)
+        if button is None:  # pragma: no cover - the panel is always built
+            self._new_project()
+            return
+        event = wx.CommandEvent(wx.EVT_BUTTON.typeId, button.GetId())
+        event.SetEventObject(button)
+        button.GetEventHandler().ProcessEvent(event)
 
     def _build_welcome(self):
         panel = wx.Panel(self)
@@ -221,7 +278,8 @@ class MainFrame(wx.Frame):
 
         for label, handler, tip in (
             ("Create New Project", self._new_project,
-             "Open the New Project wizard to create a project from a document"),
+             "Open the New Project wizard to create a project from a document"
+             " (Ctrl+Shift+N)"),
             ("Record (open a project)", self._record,
              "Open the most recent project for recording"),
             ("Settings (download voices)", self._settings,
@@ -231,6 +289,11 @@ class MainFrame(wx.Frame):
             btn.SetName(label)
             btn.SetToolTip(tip)
             btn.Bind(wx.EVT_BUTTON, lambda _, h=handler: h())
+            if label == "Create New Project":
+                # Ctrl+Shift+N activates this very button; keeping the
+                # reference lets the frame's key handler press it instead of
+                # calling the action behind it (see _press_new_project_button).
+                self.new_project_btn = btn
             sizer.Add(btn, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
 
         sizer.Add(wx.StaticText(panel, label="Recent projects:"), 0, wx.ALL, 8)
@@ -242,10 +305,16 @@ class MainFrame(wx.Frame):
         self.recent_list.Bind(wx.EVT_KEY_DOWN, self._on_recent_key)
         self.recent_list.Bind(wx.EVT_CONTEXT_MENU, self._on_recent_context_menu)
 
-        # Alt+R removes the project selected in the list below.
-        self.remove_btn = wx.Button(panel, label="&Remove selected project")
+        # Alt+J removes the project selected in the list below.  It must not
+        # be Alt+R: the menu bar answers Alt+R first in a frame (&Resume
+        # Recording, and &Recent Projects in the File menu), so an R here
+        # would be a key that looks available and never reaches this button.
+        self.remove_btn = wx.Button(panel, label="Remove selected pro&ject")
         self.remove_btn.SetName("Remove selected project")
-        self.remove_btn.SetToolTip("Delete the selected project and all its recordings permanently")
+        self.remove_btn.SetToolTip(
+            "Delete the selected project and all its recordings permanently "
+            "(Alt+J)"
+        )
         self.remove_btn.Bind(wx.EVT_BUTTON, lambda _: self._remove_project())
         sizer.Add(self.remove_btn, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 4)
         sizer.Add(

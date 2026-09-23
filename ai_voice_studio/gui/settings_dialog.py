@@ -78,7 +78,7 @@ from .events import (
     EVT_DOWNLOAD_FINISHED,
     EVT_DOWNLOAD_PROGRESS,
 )
-from . import dialogs, language_choice
+from . import access_keys, dialogs, language_choice
 from .clone_engines_panel import VoiceClonePanel
 from .model_panels import AvailablePanel, DownloadPanel
 from .theme import apply_theme
@@ -96,7 +96,7 @@ _THEME_CHOICES = [
 _PIP_STATUS_CACHE: dict = {}
 
 
-class _SettingsPanel(wx.Panel):
+class _SettingsPanel(access_keys.AccessKeyHints, wx.Panel):
     """Base class for a settings category (NVDA ``SettingsPanel`` pattern).
 
     Mirrors NVDA's ``SettingsPanel`` interface:
@@ -129,6 +129,10 @@ class _SettingsPanel(wx.Panel):
         Return False to block saving.
         """
         return True
+
+    # Access-key feedback (access_key_hint / show_access_key_hint) comes from
+    # the AccessKeyHints mixin below, so every settings category can explain a
+    # disabled access key the same way.
 
     # -- background voice discovery ---------------------------------------
     def _on_voices_ready(self, _voices=None):
@@ -1047,7 +1051,11 @@ class _RecordingSettingsPanel(_SettingsPanel):
             self.settings.set("recording.pitch", values["pitch"])
             self.settings.set("recording.volume", values["volume"])
 
-    def _on_preview(self, _):
+    def _on_preview(self, evt=None):
+        # One Alt+P press reaches this handler more than once (see
+        # access_keys.once): the guard keeps it to one preview.
+        if not access_keys.once(evt if evt is not None else self.preview_btn):
+            return
         voice = self.selected_voice()
         if not voice:
             wx.MessageBox(
@@ -1394,7 +1402,11 @@ class _PunctuationPanel(_SettingsPanel):
         self.settings.set("recording.punctuation", self.selected())
 
     # -- preview ------------------------------------------------------------
-    def _on_preview(self, _):
+    def _on_preview(self, evt=None):
+        # One Alt+P press reaches this handler more than once (see
+        # access_keys.once): the guard keeps it to one preview.
+        if not access_keys.once(evt if evt is not None else self.preview_btn):
+            return
         voice = self.selected_voice()
         if not voice:
             wx.MessageBox("Select a voice first.", "Preview",
@@ -1958,6 +1970,13 @@ class _OmniVoiceEnginesPanel(_SettingsPanel):
             else:
                 btn.Disable()
 
+    def access_key_hint(self, entry) -> str:
+        """Why Alt+P cannot act here (the shared access_keys fallback)."""
+        if entry.control is self.preview_btn and self._selected_library_voice() is None:
+            return ("Alt+P: select a voice in \"My OmniVoice voices\" first - "
+                    "Preview is unavailable until a voice is selected.")
+        return super().access_key_hint(entry)
+
     def _on_engine_change(self, _evt):
         from ..omnivoice import voice_store  # noqa: PLC0415
 
@@ -2108,7 +2127,11 @@ class _OmniVoiceEnginesPanel(_SettingsPanel):
             self.lib_status.SetLabel(f"Deleted '{voice['name']}'.")
 
     # -------------------------------------------------------------- preview
-    def _on_preview(self, _evt):
+    def _on_preview(self, evt=None):
+        # One Alt+P press reaches this handler more than once (see
+        # access_keys.once): the guard keeps it to one preview.
+        if not access_keys.once(evt if evt is not None else self.preview_btn):
+            return
         from ..omnivoice import voice_store  # noqa: PLC0415
 
         voice = self._selected_library_voice()

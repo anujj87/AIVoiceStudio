@@ -723,12 +723,12 @@ class MainFrameTest(_AppMixin):
             for expected in ("Read Me", "User Guide", "Third-Party Licences",
                              "About AI Voice Studio"):
                 self.assertIn(expected, help_labels)
-            # Shortcuts live in the menu labels (single registration; no
-            # duplicate frame-level accelerator table that could double-fire
-            # with wxMSW's menu accelerators).
+            # Ctrl+Shift+N is the welcome panel's Create New Project button's
+            # gesture, owned by that button's own click path - so the File
+            # menu item must not advertise the same key a second time.
             new_item = [i for i in menubar.GetMenu(0).GetMenuItems()
                         if i.GetItemLabelText() == "New Project"][0]
-            self.assertIn("Ctrl+Shift+N", new_item.GetItemLabel())
+            self.assertNotIn("Ctrl+Shift+N", new_item.GetItemLabel())
             # "Show project folder" is the last Edit-menu action.
             self.assertEqual(labels[-1], "Show project folder")
         finally:

@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import logging
 import os
-import sys
 import threading
 import time
 import wx
@@ -41,7 +40,7 @@ from ..settings import Settings
 from ..tts import catalog, windows_tts
 from ..util import sanitize_filename
 from ..tts.models import ModelStore
-from . import dialogs, language_choice
+from . import access_keys, dialogs, language_choice
 from .a11y import (
     add_labeled,
     finalize_accessibility,
@@ -273,9 +272,12 @@ class RecordingDialog(wx.Dialog):
 
         # -- controls --------------------------------------------------------
         btns = wx.BoxSizer(wx.HORIZONTAL)
-        # Alt+R starts (or resumes) recording: the letters so far underline
-        # the R of "recording".
-        self.start_btn = wx.Button(self, label="Start &recording")
+        # Alt+S starts (or resumes) recording: the S of "Start" carries the
+        # access key.  Alt+R was used before and is deliberately gone - the
+        # main window's Edit menu entry (&Resume Recording) also owns Alt+R,
+        # and in the recording window that made the key move the focus back
+        # to the text preview instead of starting a run.
+        self.start_btn = wx.Button(self, label="&Start recording")
         self.pause_btn = wx.Button(self, label="Pause")
         self.resume_btn = wx.Button(self, label="Resume")
         self.stop_btn = wx.Button(self, label="Stop")
@@ -341,12 +343,12 @@ class RecordingDialog(wx.Dialog):
         self.voice_combo.Bind(wx.EVT_COMBOBOX, self._on_voice_change)
         self.omni_btn.Bind(wx.EVT_BUTTON, self._on_omni_options)
         self.engine_options_btn.Bind(wx.EVT_BUTTON, self._on_engine_options)
-        # Alt+R also reaches this handler: the button's own mnemonic (Start
-        # &recording) is answered by the Windows dialog manager, and that path
-        # can miss (a keyboard layout whose Alt+R produces a character that
-        # matches no mnemonic, or a modifier state Windows does not translate
-        # into the letter).  _on_start() de-duplicates the two paths, so one
-        # keystroke still starts exactly one run.
+        # Alt+S also reaches this handler: the button's own mnemonic
+        # (&Start recording) is answered by the Windows dialog manager, and
+        # that path can miss (a keyboard layout whose Alt+S produces a
+        # character that matches no mnemonic, or a modifier state Windows
+        # does not translate into the letter).  _on_start() de-duplicates the
+        # two paths, so one keystroke still starts exactly one run.
         self.Bind(wx.EVT_CHAR_HOOK, self._on_char_hook)
         self.Bind(wx.EVT_CLOSE, self._on_close)
         self.Bind(EVT_SYNTH_STATUS, self._on_synth_status)
@@ -356,47 +358,33 @@ class RecordingDialog(wx.Dialog):
 
     # access keys -----------------------------------------------------------
     def _on_char_hook(self, evt: wx.KeyEvent) -> None:
-        """Access key: Alt+R starts (or resumes) recording.
+        """Access key: Alt+S starts (or resumes) recording.
 
-        ``Start &recording`` underlines the R and is enough while Windows
+        ``&Start recording`` underlines the S and is enough while Windows
         matches the key against the label.  This handler is the independent
         path for the cases where that does not happen (and the reason the
         shortcut works with any keyboard layout): the key is matched on the
-        letter itself.  Both paths end in _on_start(), which de-duplicates
-        them, so one keystroke starts one run.
+        letter itself, by ``access_keys.alt_letter``.  Both paths end in
+        _on_start(), which de-duplicates them, and ``access_keys.claim``
+        keeps this handler and the window's own access-key hook from both
+        acting on the same keystroke.
         """
-        if self.start_btn.IsEnabled() and self._alt_r_pressed(evt):
-            log.info("Alt+R: starting the recording (access key)")
-            self._on_start(None)
+        if self.start_btn.IsEnabled() and self._alt_s_pressed(evt):
+            if access_keys.claim(self, "s") and access_keys.once(self.start_btn):
+                log.info("Alt+S: starting the recording (access key)")
+                self._on_start(None)
             return
         evt.Skip()
 
     @staticmethod
-    def _alt_r_pressed(evt: wx.KeyEvent) -> bool:
-        """True when the event is Alt+R, whatever the keyboard layout.
+    def _alt_s_pressed(evt: wx.KeyEvent) -> bool:
+        """True when the event is Alt+S, whatever the keyboard layout.
 
         AltGr arrives as Ctrl+Alt, so a Ctrl modifier means it is not the
-        access key.  wx can also hand an Alt+letter combination over as an
-        untranslated key (key code 0) on this build, which is why the raw
-        scan code and, as a last resort, the physical key state are consulted
-        before giving up.
+        access key; the letter itself is resolved by the shared helper, which
+        also copes with the wx builds that hand Alt+letter over untranslated.
         """
-        if not evt.AltDown() or evt.ControlDown():
-            return False
-        key = evt.GetKeyCode()
-        if key in (ord("R"), ord("r")):
-            return True
-        if key != 0 or sys.platform != "win32":
-            return False
-        try:
-            scan = (evt.GetRawKeyFlags() >> 16) & 0xFF
-        except Exception:  # noqa: BLE001 - raw flags are not always available
-            scan = 0
-        if scan == 0x13:  # the R key's scan code
-            return True
-        import ctypes  # noqa: PLC0415
-
-        return bool(ctypes.windll.user32.GetKeyState(0x52) & 0x8000)
+        return access_keys.alt_letter(evt) == "s"
 
     def _selected_compute(self) -> str:
         """Return the selected compute mode key (with 'auto' resolved).
@@ -1152,7 +1140,7 @@ class RecordingDialog(wx.Dialog):
                 pass
 
     # One keystroke, one run ------------------------------------------------
-    # Alt+R can arrive twice for a single keystroke: the Windows dialog
+    # Alt+S can arrive twice for a single keystroke: the Windows dialog
     # manager answers the button's mnemonic and the CHAR_HOOK above sees the
     # key as well.  Both land here, so the second activation of the very same
     # keystroke is ignored.  The window is far shorter than any human repeat
@@ -1161,7 +1149,7 @@ class RecordingDialog(wx.Dialog):
     _START_DEDUPE_SECONDS = 0.4
 
     def _on_start(self, event):
-        """Start (or resume) recording - the Start button and Alt+R."""
+        """Start (or resume) recording - the Start button and Alt+S."""
         now = time.monotonic()
         if (now - self._start_requested_at) < self._START_DEDUPE_SECONDS:
             return
