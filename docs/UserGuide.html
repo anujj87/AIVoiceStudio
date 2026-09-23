@@ -20,7 +20,7 @@
 <body>
 
 <h1>AI Voice Studio &mdash; User Guide</h1>
-<p>Developed by <strong>Anuj Sharma</strong>. Application version <strong>2026.3.6</strong>.
+<p>Developed by <strong>Anuj Sharma</strong>. Application version <strong>2026.3.7</strong>.
 This guide explains installation, the first-launch terms of use, the first
 recording, every Settings category, voice cloning with the Voice Lab engines,
 punctuation, the compute back-ends, licences and how to solve common problems.
@@ -40,6 +40,7 @@ Narrator).</p>
   <li><a href="#cloning">Voice cloning &mdash; the Voice Lab engines</a></li>
   <li><a href="#punctuation">Punctuation modes</a></li>
   <li><a href="#compute">Compute &mdash; choosing CPU or GPU</a></li>
+  <li><a href="#updates">Updating to a newer version</a></li>
   <li><a href="#shortcuts">Keyboard shortcuts</a></li>
   <li><a href="#developermode">Developer Mode</a></li>
   <li><a href="#addons">Addon System</a></li>
@@ -49,7 +50,7 @@ Narrator).</p>
 
 <h2 id="installation">Installation</h2>
 <ol>
-  <li>Run <code>AI-Voice-Studio-v-2026-3-1-Setup-x64.exe</code> and follow the installer.</li>
+  <li>Run <code>AI-Voice-Studio-v-2026-3-7-Setup-x64.exe</code> and follow the installer. (With winget, <code>winget install AnujSharma.AIVoiceStudio</code> does the same thing.)</li>
   <li>Choose whether to install for all users or only for you.</li>
   <li>When asked, choose whether to create a desktop icon and whether to launch the application after setup.</li>
   <li>Read the licence page &mdash; it lists the third-party components the application bundles. The same information is available after installation from <strong>Help &rarr; Third-Party Licences</strong>.</li>
@@ -276,6 +277,51 @@ and a project remembers the compute option it was recorded with.</p>
       keep one core free instead; a single-core machine uses its one core.</li>
 </ul>
 
+<h2 id="updates">Updating to a newer version</h2>
+<p>AI Voice Studio is published on GitHub. The application can tell you when a
+newer version exists and download the installer for you &mdash; it never installs
+anything without asking.</p>
+<h3>Check now</h3>
+<p>Choose <strong>Help &rarr; Check for updates</strong> (access key <strong>Alt+D</strong>), or press
+<strong>Check for updates now</strong> in <strong>Settings &rarr; General &rarr; Updates</strong>. The
+application asks GitHub for the latest release and answers either way:</p>
+<ul>
+  <li>If a newer version exists, a dialog shows the installed version, the new
+      version, and the release notes, with three buttons: <strong>Download and
+      install</strong>, <strong>Open release page</strong> and <strong>Remind me later</strong>.</li>
+  <li>If the version you have is the newest, it says so.</li>
+  <li>If GitHub cannot be reached, it says why instead of failing silently.</li>
+</ul>
+<h3>Downloading and installing</h3>
+<p><strong>Download and install</strong> fetches the installer for this Windows version into
+a temporary folder, with the same resumable download and progress window the
+voice downloads use, and a <strong>Cancel</strong> button. When it has finished, you are
+asked whether to install now; if you agree, the installer starts and the
+application closes so its files can be replaced. If you choose <em>Install
+later</em>, the downloaded file stays where the message tells you.</p>
+<p>The download always comes from this project's own release page
+(<code>github.com/anujj87/AIVoiceStudio/releases</code>), and the release notes are
+shown before anything is downloaded, so you can read what is changing first.</p>
+<h3>Automatic checks</h3>
+<p>By default the application looks for a newer release once a day when it
+starts. When one is found, the same dialog appears; when there is nothing new,
+the check is silent. Turn it off in <strong>Settings &rarr; General &rarr;
+Updates &rarr; Check for updates automatically when the application starts</strong>.</p>
+<p>The dialog's <strong>Do not remind me about this version again</strong> check box mutes
+one specific version &mdash; you will be told again when a later one is released.</p>
+<h3>Installing with winget</h3>
+<p>AI Voice Studio follows the Windows Package Manager standard. Once the
+package is in the winget repository these work from any terminal:</p>
+<ul>
+  <li><code>winget install AnujSharma.AIVoiceStudio</code> &mdash; install it.</li>
+  <li><code>winget upgrade AnujSharma.AIVoiceStudio</code> &mdash; update it in place.</li>
+  <li><code>winget uninstall AnujSharma.AIVoiceStudio</code> &mdash; remove it.</li>
+</ul>
+<p>The same installer serves winget, the built-in update check and a manual
+download, and it installs per user by default, so no administrator password is
+needed. The manifests winget uses are generated from this release and live in
+the repository's <code>winget</code> folder.</p>
+
 <h2 id="shortcuts">Keyboard shortcuts</h2>
 <table>
   <tr><th>Shortcut</th><th>Action</th></tr>
@@ -297,6 +343,8 @@ underlined letter. They work whatever control has the focus, in every window.</p
   <tr><td>Alt+P</td><td>Preview the selected voice (Available TTS, Recording settings, Punctuation, the OmniVoice voice library and the Voice Clone panel)</td></tr>
   <tr><td>Alt+D</td><td>Download the variant selected in <strong>Settings &rarr; Download and remove</strong></td></tr>
   <tr><td>Alt+S</td><td>Start (or resume) recording &mdash; Recording window</td></tr>
+  <tr><td>Alt+D</td><td>Check for updates &mdash; Help menu</td></tr>
+  <tr><td>Alt+N</td><td>Check for updates now &mdash; Settings &rarr; General</td></tr>
   <tr><td>Alt+J</td><td>Remove the selected project &mdash; main window</td></tr>
 </table>
 <p><strong>Remove selected variant</strong> deliberately has no access key: an R there
@@ -347,6 +395,7 @@ so Remove is ready the moment the page appears.</p>
   <tr><td>Accessibility Guidelines</td><td>The accessibility rules every control in the app follows.</td></tr>
   <tr><td>Python &amp; wxPython Book (F1)</td><td>The bundled book: 82 chapters and 3 appendices from basic Python to rebuilding this application, including the Voice Lab, per-engine environments, compute choice and this release's features.</td></tr>
   <tr><td>Third-Party Licences</td><td><code>THIRD-PARTY-LICENSES.html</code> &mdash; every bundled component, its licence type and the full licence text where reproduction is permitted.</td></tr>
+  <tr><td>Check for updates (Alt+D)</td><td>Asks GitHub for the newest release; if there is one, offers to download and install it. See <a href="#updates">Updating to a newer version</a>.</td></tr>
   <tr><td>About AI Voice Studio</td><td>Version and author information.</td></tr>
 </table>
 
@@ -410,6 +459,21 @@ settings were lost.</p>
 <p>Menu shortcuts (Ctrl+Shift+N and similar) work from the main window. While a
 modal dialog such as Settings or the Recording window is open, they are
 intentionally inactive; close the dialog first.</p>
+
+<h3>&ldquo;Check for updates&rdquo; cannot reach GitHub</h3>
+<p>The check needs an internet connection to <code>api.github.com</code>. It reports the
+reason instead of failing silently: a proxy, a firewall, or no connection at
+all. Nothing else in the application depends on it &mdash; you can also download
+the installer from the release page directly. If the check found an update but
+the download stopped, the part that was already fetched is reused when you try
+again, because the download is resumable.</p>
+
+<h3>A new version is available but the update dialog did not appear</h3>
+<p>The automatic check runs once a day and only speaks when it finds something
+newer. Open <strong>Help &rarr; Check for updates</strong> at any time to look again. If a
+release was published while you had the application open, the next start picks
+it up; the collected check date is stored in
+<code>%APPDATA%\AIVoiceStudio\settings.json</code>.</p>
 
 <h3>Where are my files?</h3>
 <ul>

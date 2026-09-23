@@ -73,6 +73,7 @@ ID_ADDON_GUIDE = wx.NewIdRef()
 ID_ACCESSIBILITY_GUIDE = wx.NewIdRef()
 ID_PYTHON_BOOK = wx.NewIdRef()
 ID_THIRD_PARTY_LICENSES = wx.NewIdRef()
+ID_CHECK_UPDATES = wx.NewIdRef()
 ID_ABOUT = wx.NewIdRef()
 ID_RESUME_RECORDING = wx.NewIdRef()
 ID_RESTART_PROJECT = wx.NewIdRef()
@@ -150,6 +151,8 @@ class MainFrame(wx.Frame):
         help_menu.AppendSeparator()
         help_menu.Append(ID_PYTHON_BOOK, "Python & wxPython Book	F1")
         help_menu.Append(ID_THIRD_PARTY_LICENSES, "&Third-Party Licences")
+        help_menu.AppendSeparator()
+        help_menu.Append(ID_CHECK_UPDATES, "Check for Up&dates...")
         help_menu.Append(ID_ABOUT, "About AI Voice &Studio")
         menubar.Append(help_menu, "&Help")
 
@@ -165,6 +168,7 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, lambda _: self._accessibility_guide(), id=ID_ACCESSIBILITY_GUIDE)
         self.Bind(wx.EVT_MENU, lambda _: self._python_book(), id=ID_PYTHON_BOOK)
         self.Bind(wx.EVT_MENU, lambda _: self._third_party_licences(), id=ID_THIRD_PARTY_LICENSES)
+        self.Bind(wx.EVT_MENU, lambda _: self._check_updates(), id=ID_CHECK_UPDATES)
         self.Bind(wx.EVT_MENU, lambda _: self._about(), id=ID_ABOUT)
         self.Bind(wx.EVT_MENU, lambda _: self._resume_recording(), id=ID_RESUME_RECORDING)
         self.Bind(wx.EVT_MENU, lambda _: self._restart_project(), id=ID_RESTART_PROJECT)
@@ -651,6 +655,12 @@ class MainFrame(wx.Frame):
 
     def _third_party_licences(self):
         self._open_doc("THIRD-PARTY-LICENSES.html", "Third-Party Licences - AI Voice Studio")
+
+    def _check_updates(self):
+        """Help ▸ Check for updates: ask GitHub for the latest release."""
+        from .update_dialog import check_for_updates_interactive  # noqa: PLC0415
+
+        check_for_updates_interactive(self, self.settings)
 
     def _python_book(self):
         """Open the Python & wxPython book in the default browser."""

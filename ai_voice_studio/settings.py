@@ -73,6 +73,15 @@ _DEFAULTS: Dict[str, Any] = {
     },
     # list of recent projects: [{"name": str, "path": str, "opened": iso}]
     "recent_projects": [],
+    # update checks against the project's GitHub releases
+    "updates": {
+        # look for a newer release once a day when the application starts
+        "auto_check": True,
+        # ISO timestamp of the last successful check (throttles the auto check)
+        "last_check": "",
+        # a version the user asked never to be reminded about again
+        "skip_version": "",
+    },
     # addon management
     "addons_enabled": {},
     # Voice Clone (Voice Lab) engines: last engine and the device they run on

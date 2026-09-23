@@ -23,6 +23,9 @@ from unittest import mock
 import wx
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from wx_test_app import get_app  # noqa: E402
 
 from ai_voice_studio import project, venv_packages  # noqa: E402
 from ai_voice_studio.constants import MODE_PAGE_WITH_H1  # noqa: E402
@@ -38,7 +41,7 @@ from ai_voice_studio.tts.models import ModelStore  # noqa: E402
 class _AppMixin(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.app = wx.App(False)
+        cls.app = get_app()
         cls.frame = wx.Frame(None)
 
     @classmethod

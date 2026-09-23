@@ -139,6 +139,22 @@ def _require_terms_acceptance(settings: Settings) -> bool:
     return accepted
 
 
+def _schedule_update_check(frame, settings: Settings) -> None:
+    """Start the once-a-day background update check (never fatal).
+
+    It lives here rather than in ``MainFrame`` so that building the frame
+    (tests, tools) never touches the network: only a real start of the
+    application checks for a newer release.  ``Help ▸ Check for updates``
+    does the same check on demand.
+    """
+    try:
+        from ai_voice_studio.gui.update_dialog import schedule_auto_check
+
+        schedule_auto_check(frame, settings)
+    except Exception as exc:  # noqa: BLE001 - a check must never block startup
+        logging.getLogger("main").warning("Update check could not start: %s", exc)
+
+
 def main() -> int:
     # First, do basic startup logging to determine developer mode
     settings = Settings()
@@ -174,6 +190,7 @@ def main() -> int:
     frame = MainFrame(None, settings, store)
     apply_theme(frame, settings.theme)
     frame.Show()
+    _schedule_update_check(frame, settings)
     result = app.MainLoop()
     log.info("AI Voice Studio exiting with code %s", result)
     return result or 0

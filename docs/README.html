@@ -18,7 +18,7 @@
 <body>
 
 <h1>AI Voice Studio</h1>
-<p>Developed by <strong>Anuj Sharma</strong> &mdash; version 2026.3.6 &mdash; licence: GPL-3.0.</p>
+<p>Developed by <strong>Anuj Sharma</strong> &mdash; version 2026.3.7 &mdash; licence: GPL-3.0.</p>
 
 <p>AI Voice Studio converts documents (PDF, TXT, DOC/DOCX, HTML, Markdown and
 clipboard text) into spoken audio files using free, offline neural voices. It is
@@ -37,6 +37,8 @@ screen readers such as NVDA, JAWS and Narrator.</p>
   <li><strong>GPU acceleration for every engine that supports it</strong> &mdash; a per-category Compute combo chooses CPU or GPU, the whole NVIDIA card is used on GPU, and an optional ONNX GPU runtime (about 1.8&nbsp;GB) covers the built-in engines; only an NVIDIA driver is required.</li>
   <li><strong>Terms of use on first launch</strong> &mdash; a dialog states the conditions of use (voice-cloning rights, illegal use, commercial licences, system voices, no warranty) and the application starts only after you accept; acceptance is remembered per version.</li>
   <li><strong>Screen-reader friendly</strong> &mdash; real MSAA accessible names on every control, NVDA-style settings dialog, keyboard shortcuts throughout.</li>
+  <li><strong>Updates itself on request</strong> &mdash; <em>Help &rarr; Check for updates</em> asks GitHub for the newest release and, if there is one, shows what changed and downloads the installer for this Windows version; an automatic check runs once a day and can be switched off in Settings &rarr; General.</li>
+  <li><strong>winget-compatible</strong> &mdash; the release ships the manifests the Windows Package Manager needs, so <code>winget install AnujSharma.AIVoiceStudio</code> and <code>winget upgrade AnujSharma.AIVoiceStudio</code> use exactly the same installer.</li>
 </ul>
 
 <h2>Quick start</h2>
@@ -59,6 +61,7 @@ screen readers such as NVDA, JAWS and Narrator.</p>
   <tr><td>Ctrl+Tab / Ctrl+Shift+Tab</td><td>Switch Settings category (wrapping)</td></tr>
   <tr><td>Enter</td><td>Activate the default button (OK in dialogs and wizards)</td></tr>
   <tr><td>Ctrl+S</td><td>Apply settings without closing the dialog</td></tr>
+  <tr><td>Alt+D</td><td>Check for updates (Help menu)</td></tr>
 </table>
 
 <h2>Computing back-ends</h2>
@@ -167,6 +170,9 @@ starting the application. Acceptance is stored in
   <tr><td><code>book/index.html</code></td><td>The bundled book (F1): 82 chapters and 3 appendices from basic Python to rebuilding this application.</td></tr>
   <tr><td><code>THIRD-PARTY-LICENSES.html</code></td><td>Every bundled component, its licence and the full licence text where permitted.</td></tr>
 </table>
+<p>The repository also carries the <code>winget</code> folder: the generated
+package manifests and the instructions for publishing a release to the
+Windows Package Manager.</p>
 
 <h2>Licences</h2>
 <p>The application is <strong>GPL-3.0</strong>. The engines and models keep

@@ -34,9 +34,11 @@ import wx
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, ROOT)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 
 from a11y_mnemonics import access_key  # noqa: E402
+from wx_test_app import get_app  # noqa: E402
 
 from ai_voice_studio import project  # noqa: E402
 from ai_voice_studio.constants import MODE_PAGE_WITH_H1  # noqa: E402
@@ -97,7 +99,7 @@ def _buttons(window: wx.Window) -> list:
 class _AppMixin(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.app = wx.App(False)
+        cls.app = get_app()
         cls.frame = wx.Frame(None)
 
     @classmethod
@@ -383,18 +385,36 @@ class _AppMixin(unittest.TestCase):
         except Exception:  # noqa: BLE001
             hwnd = dlg.GetHandle()
 
-        state = {"posted": False}
+        state = {"posted": False, "polls": 0}
 
-        def post_and_stop():
+        def post_keys():
             user32.PostMessageW(hwnd, 0x0104, 0x53, 1 | (scan << 16) | ALT)
             user32.PostMessageW(hwnd, 0x0106, ord("s"),
                                 1 | (scan << 16) | ALT | (1 << 31))
             user32.PostMessageW(hwnd, 0x0105, 0x53,
                                 1 | (scan << 16) | ALT | (1 << 30) | (1 << 31))
             state["posted"] = True
-            wx.CallLater(700, self.app.ExitMainLoop)
+            wx.CallLater(50, check_done)
 
-        wx.CallLater(400, post_and_stop)
+        def check_done():
+            """Wait for the message to be handled, then let a second pass
+            settle, so a *duplicate* activation would still be counted.
+
+            Fixed sleeps made this test flaky on a busy machine: the message
+            can take longer than any constant to be delivered, and the test
+            then reported "no recording started".  Polling until the handler
+            really ran removes the guess.
+            """
+            if calls["n"] > 0:
+                wx.CallLater(400, self.app.ExitMainLoop)
+                return
+            state["polls"] += 1
+            if state["polls"] >= 60:  # about three seconds, then give up
+                self.app.ExitMainLoop()
+                return
+            wx.CallLater(50, check_done)
+
+        wx.CallLater(200, post_keys)
         watchdog = wx.CallLater(8000, self.app.ExitMainLoop)  # never hang
         try:
             self.app.MainLoop()

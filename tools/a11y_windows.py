@@ -121,6 +121,24 @@ def iter_windows():
     yield "First-launch terms dialog", _laid_out(terms)
     terms.Destroy()
 
+    # -- Update available dialog ------------------------------------------
+    from ai_voice_studio import updates
+    from ai_voice_studio.gui.update_dialog import UpdateAvailableDialog
+
+    update_dlg = UpdateAvailableDialog(
+        None,
+        updates.evaluate_release({
+            "tag_name": "v2099.1.1",
+            "name": "AI Voice Studio 2099.1.1",
+            "body": "A newer release, with release notes to read.",
+            "html_url": updates.RELEASES_PAGE,
+            "assets": [],
+        }),
+    )
+    update_dlg.Show()
+    yield "Update available dialog", _laid_out(update_dlg)
+    update_dlg.Destroy()
+
     # -- Main window (welcome panel) --------------------------------------
     from ai_voice_studio.gui.main_frame import MainFrame
 

@@ -634,6 +634,37 @@ class _GeneralPanel(_SettingsPanel):
             ),
             0, wx.ALL, 6,
         )
+
+        sizer.Add(wx.StaticText(self, label="Updates"), 0, wx.ALL, 6)
+        self.update_auto_cb = wx.CheckBox(
+            self,
+            label="Check for updates automatically when the application starts",
+        )
+        self.update_auto_cb.SetName("Check for updates automatically")
+        self.update_auto_cb.SetValue(bool(settings.get("updates.auto_check", True)))
+        self.update_auto_cb.SetToolTip(
+            "Once a day the application asks GitHub whether a newer version "
+            "has been released. Nothing is ever downloaded or installed "
+            "without asking you first."
+        )
+        sizer.Add(self.update_auto_cb, 0, wx.LEFT | wx.RIGHT, 6)
+        self.update_now_btn = wx.Button(self, label="Check for updates &now")
+        self.update_now_btn.SetName("Check for updates now")
+        self.update_now_btn.SetToolTip(
+            "Ask GitHub for the newest release right now"
+        )
+        self.update_now_btn.Bind(wx.EVT_BUTTON, self._on_check_updates_now)
+        update_row = wx.BoxSizer(wx.HORIZONTAL)
+        update_row.Add(self.update_now_btn, 0, wx.ALL, 6)
+        sizer.Add(update_row, 0, wx.EXPAND)
+        sizer.Add(
+            wx.StaticText(
+                self,
+                label="Updates are downloaded from the project's GitHub releases "
+                      "page, and only after you agree.",
+            ),
+            0, wx.ALL, 6,
+        )
         self.SetSizer(sizer)
         self.theme_combo.Bind(wx.EVT_COMBOBOX, self._on_theme)
 
@@ -662,6 +693,12 @@ class _GeneralPanel(_SettingsPanel):
             if dlg.ShowModal() == wx.ID_OK:
                 ctrl.SetValue(dlg.GetPath())
 
+    def _on_check_updates_now(self, _evt=None):
+        """Run a check straight from Settings (Help has the same action)."""
+        from .update_dialog import check_for_updates_interactive  # noqa: PLC0415
+
+        check_for_updates_interactive(self, self.settings)
+
     def _on_theme(self, _):
         apply_theme(self, self.selected())
 
@@ -674,6 +711,7 @@ class _GeneralPanel(_SettingsPanel):
         self.settings.set("paths.recordings_dir", self.recordings_ctrl.GetValue().strip())
         self.settings.set("paths.models_dir", self.models_ctrl.GetValue().strip())
         self.settings.set("developer_mode", self.dev_mode_cb.GetValue())
+        self.settings.set("updates.auto_check", self.update_auto_cb.GetValue())
 
 
 # ---------------------------------------------------------------------------

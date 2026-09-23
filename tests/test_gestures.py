@@ -38,9 +38,11 @@ import wx
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, ROOT)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 
 import a11y_gestures  # noqa: E402
+from wx_test_app import get_app  # noqa: E402
 
 from ai_voice_studio import project  # noqa: E402
 from ai_voice_studio.constants import MODE_PAGE_WITH_H1  # noqa: E402
@@ -90,7 +92,7 @@ class _GestureCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.app = wx.App(False)
+        cls.app = get_app()
         cls.parent = wx.Frame(None)
 
     @classmethod

@@ -7,7 +7,7 @@ that run locally through **ONNX Runtime** — no cloud, no account, full privacy
 Built with **Python + wxPython** and designed to be **fully accessible with
 screen readers** (NVDA, JAWS, Narrator).
 
-Version **2026.3.6** — ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
+Version **2026.3.7** — ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
 
 ---
 
@@ -91,7 +91,17 @@ Version **2026.3.6** — ![License](https://img.shields.io/badge/license-GPL--3.
   accessible name; menu bar with mnemonics; OK/Cancel/Apply dialogs;
   check boxes for single choices, combo boxes for multi choices, radio buttons
   for small single-choice sets.
-- **Theme**: System default / Light / Dark.- Installer (32-bit and 64-bit): **"Install for all users / for me only"** choice
+- **Theme**: System default / Light / Dark.
+- **Updates** — **Help → Check for updates** (`Alt+D`) asks GitHub for the
+  newest release and, when there is one, shows the release notes and
+  downloads the installer for this Windows version; the download is
+  resumable and can be cancelled. A check also runs once a day at start-up
+  and can be switched off in **Settings → General → Updates**.
+- **winget** — the release ships the package manifests the Windows Package
+  Manager needs (`winget/`), so `winget install AnujSharma.AIVoiceStudio`
+  and `winget upgrade AnujSharma.AIVoiceStudio` use exactly the same
+  installer, with the same silent switches (`/VERYSILENT`).
+- Installer (32-bit and 64-bit): **"Install for all users / for me only"** choice
   (defaults to per-user, **no admin rights needed**), install location, Start
   Menu folder choice, optional desktop icon, readme, launch-after-setup.
 
@@ -280,9 +290,26 @@ All of these ship with the installer (`docs\`) and are in the **Help** menu:
 | `AccessibilityGuide.html` | The accessibility rules the UI follows |
 | `THIRD-PARTY-LICENSES.html` | Every bundled component with its licence and full text |
 | `book/index.html` (F1) | The bundled book: 82 chapters and 3 appendices from basic Python to rebuilding this application, including the Voice Lab, per-engine environments, compute choice and the terms dialog |
+| `winget/README.md` | The winget package: what the manifests mean and how a release is published to the Windows Package Manager |
 
 `PROJECT_SPEC.md` is the specification behind the implementation and
 `DEV_PLAN.md` tracks the phases.
+
+## Updates and winget
+
+Release 2026.3.7 adds an update checker and the winget packaging standard.
+
+- `ai_voice_studio/updates.py` reads the latest release from
+  `api.github.com/repos/anujj87/AIVoiceStudio/releases/latest`, compares it
+  with `constants.APP_VERSION` and picks the installer for this
+  architecture. Nothing is downloaded or installed without the user asking.
+- `ai_voice_studio/gui/update_dialog.py` owns the dialogs: the quiet daily
+  check, the *Check for updates* answer, and the download-and-install flow.
+- `winget/manifests/a/AnujSharma/AIVoiceStudio/<version>/` holds the three
+  generated winget manifests; `tools/make_winget.py` writes them (with the
+  SHA256 of the built installer) and `tools/winget_validate.py` checks them
+  against winget's rules. `tests/test_winget.py` runs that checker in the
+  suite.
 
 ## Packaging
 

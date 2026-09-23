@@ -5,10 +5,14 @@
 [Setup]
 AppId={{D9B4E3A0-7A1E-4E8B-9C2F-AIVOICESTUDIO01}
 AppName=AI Voice Studio
-AppVersion=2026.3.6
+AppVersion=2026.3.7
 AppPublisher=Anuj Sharma
+; The three ARP links winget and "Apps and features" read back.  They must
+; agree with the locale manifest (winget/PackageUrl, PublisherSupportUrl,
+; ReleaseNotesUrl) for the package to be recognisable as the same product.
 AppPublisherURL=https://github.com/anujj87
-AppSupportURL=https://github.com/
+AppSupportURL=https://github.com/anujj87/AIVoiceStudio/issues
+AppUpdatesURL=https://github.com/anujj87/AIVoiceStudio/releases
 DefaultDirName={autopf}\AI Voice Studio
 DefaultGroupName=AI Voice Studio
 ; "Install for all users / for me only" radio button on the directory page.
@@ -22,16 +26,16 @@ LicenseFile=..\LICENSE
 Compression=lzma2
 SolidCompression=yes
 OutputDir=..\dist
-OutputBaseFilename=AI-Voice-Studio-v-2026-3-6-Setup-{#MyAppArch}
+OutputBaseFilename=AI-Voice-Studio-v-2026-3-7-Setup-{#MyAppArch}
 UninstallDisplayName=AI Voice Studio
 UninstallDisplayIcon={app}\AI-Voice-Studio.exe
 WizardStyle=modern
 DisableProgramGroupPage=no
-VersionInfoVersion=2026.3.6
+VersionInfoVersion=2026.3.7
 VersionInfoCompany=Anuj Sharma
 VersionInfoDescription=AI Voice Studio installer
 VersionInfoProductName=AI Voice Studio
-VersionInfoProductVersion=2026.3.6
+VersionInfoProductVersion=2026.3.7
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
