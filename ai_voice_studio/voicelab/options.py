@@ -816,10 +816,12 @@ def max_seconds_note(engine_id: str) -> str:
                 "pretrained weights (~1.5-2 GB) and the reference recording "
                 "is prepared once, then reused for every later segment.")
     if engine_id == "kitten_tts_2":
-        return ("Kitten TTS 2.0 runs on the GPU: the first run downloads its "
-                "1.7B weights (~950 MB, or ~470 MB with the emb4 packing). "
-                "Only this computer's own measured speed can add the CPU to "
-                "the device list.")
+        return ("Kitten TTS 2.0 runs on the CPU or the GPU: the first run "
+                "downloads its 1.7B weights (~950 MB, or ~470 MB with the "
+                "emb4 packing). A CPU run is given every core this computer "
+                "allows, but the engine's PyTorch path is the one upstream "
+                "calls demo-only, so it is the slower device; the GPU is the "
+                "fast one.")
     return ""
 
 

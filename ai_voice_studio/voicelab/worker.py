@@ -371,6 +371,25 @@ def _limit_cpu(torch, threads):
     return True
 
 
+def _no_grad():
+    """A context in which PyTorch builds no autograd graph.
+
+    ``_maximize_cuda`` switches the autograd engine off for a GPU run, but a
+    CPU run had never done the same: an engine that does not disable it itself
+    then pays the graph bookkeeping on every one of the thousands of tokens an
+    autoregressive model writes.  This is the CPU half of that setting; a
+    missing PyTorch (or one without the API) simply runs the call as it was.
+    """
+    try:
+        import torch
+    except Exception:
+        return contextlib.nullcontext()
+    try:
+        return torch.no_grad()
+    except Exception:
+        return contextlib.nullcontext()
+
+
 def _apply_compute_settings(device, threads=None):
     """Apply the compute back-end the user chose, inside the worker process."""
     try:
@@ -2862,11 +2881,12 @@ class KittenTts2Backend(Backend):
     the clip is *both* the voice and its transcript - the package transcribes
     one it is not given.
 
-    It is offered on the GPU by default (its own documentation puts a CPU run
-    at roughly 2-3 times slower than real time), and the application adds the
-    CPU to the device list once a measurement on *this* computer says it is
-    fast enough; the card is therefore only required when the GPU is what was
-    asked for.
+    Both devices are the engine's own: its documentation says it runs on a CPU
+    out of the box (about 6 GB of RAM) and on a CUDA card, with ``device``
+    passed explicitly here so a run never lands on the wrong one.  A CPU run is
+    given the machine's cores before the model loads, and generation runs
+    without an autograd graph; the PyTorch path is the one upstream calls
+    demo-only, so the card remains the fast device.
 
     The model is loaded on first use rather than when the worker starts, so
     answering "which voices are usable?" never costs a 1.7B load.
@@ -2889,20 +2909,47 @@ class KittenTts2Backend(Backend):
         raw = self.request.get("options") or {}
         return raw if isinstance(raw, dict) else {}
 
+    def _configure_cpu_threads(self):
+        """Give a CPU run the machine's cores before the model is loaded.
+
+        The application sends the share of the CPU a run may use with every
+        request (``ai_voice_studio.compute.cpu_threads``), and applies it
+        before the backend is built.  A request that carries no figure - a
+        probe from an older build, a hand-written one - would otherwise leave
+        PyTorch on its own default, so every core but one is used instead: a
+        CPU run of this engine is never single-threaded by accident.
+        """
+        try:
+            import torch
+        except Exception:
+            return
+        try:
+            value = int(self.request.get("threads") or 0)
+        except (TypeError, ValueError):
+            value = 0
+        if value <= 0:
+            try:
+                value = max(1, int(os.cpu_count() or 1) - 1)
+            except Exception:
+                value = 1
+        _limit_cpu(torch, value)
+
     def _load(self):
         """Load the selected weights once per worker process."""
         if self._model is not None:
             return self._model
-        if str(self.device).lower() == "cuda":
+        on_card = str(self.device).lower() == "cuda"
+        if on_card:
             _cuda_or_error("Kitten TTS 2.0", "kittenml")
+        else:
+            # Threads must be set before the first forward pass, not after.
+            self._configure_cpu_threads()
         try:
             from kittenml import KittenTTS
         except Exception as exc:
             raise _load_error("kittenml", "Kitten TTS 2.0", exc) from exc
         options = self._options()
-        kwargs = {
-            "device": "cuda" if str(self.device).lower() == "cuda" else "cpu"
-        }
+        kwargs = {"device": "cuda" if on_card else "cpu"}
         weights = str(options.get("weights") or "").strip()
         if weights:
             kwargs["weights"] = weights
@@ -2960,7 +3007,20 @@ class KittenTts2Backend(Backend):
         kwargs["normalize"] = bool(normalize)
         self.report.mark("normalize")
         kwargs.update(self.option_kwargs(model.generate))
-        with _quiet():
+        # Reproducibility the way the engine documents it: ``seed`` is one of
+        # its ``advanced`` options (an unknown top-level keyword raises), and
+        # the worker's global Torch seeding alone does not reach its sampler.
+        seed = self._options().get("seed")
+        if seed is not None:
+            params = _signature(model.generate)
+            if params is not None and "advanced" in params.parameters:
+                advanced = dict(kwargs.get("advanced") or {})
+                advanced["seed"] = int(seed)
+                kwargs["advanced"] = advanced
+                self.report.mark("seed")
+        # No autograd graph: this is a forward-only pass, and on the CPU the
+        # bookkeeping is a real cost per token (see ``_no_grad``).
+        with _quiet(), _no_grad():
             audio = model.generate(text, **kwargs)
         return audio, self.sample_rate, False
 

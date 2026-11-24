@@ -89,17 +89,20 @@ class RegistryTest(unittest.TestCase):
             self.assertTrue(voice_lab.packages(engine_id), engine_id)
 
     def test_the_transformer_engines_are_gpu_only(self):
-        """Chatterbox, Qwen3-TTS, VibeVoice, MOSS-TTS, GPT-SoVITS, Indic
-        Parler-TTS and Kitten TTS 2.0 are too slow on a CPU to offer it."""
+        """Chatterbox, Qwen3-TTS, VibeVoice, MOSS-TTS, GPT-SoVITS and Indic
+        Parler-TTS are too slow on a CPU to offer it."""
         for engine_id in ("chatterbox", "qwen3tts", "vibevoice", "moss_tts",
-                          "gptsovits", "indic_parler", "kitten_tts_2"):
+                          "gptsovits", "indic_parler"):
             self.assertTrue(voice_lab.gpu_only(engine_id), engine_id)
             self.assertFalse(voice_lab.cpu_supported(engine_id), engine_id)
             for device, _label in voicelab.device_options(engine_id):
                 self.assertEqual(device, "cuda", engine_id)
-        # The F5-TTS-based engines and KokoClone are CPU-first: F5-TTS and the
-        # Kokoro ONNX model it speaks through are small enough to run there.
-        for engine_id in ("pocket_tts", "f5tts", "kokoclone"):
+        # The F5-TTS-based engines, KokoClone and Kitten TTS 2.0 are offered on
+        # the CPU as well: F5-TTS and the Kokoro ONNX model it speaks through
+        # are small enough to run there, and KittenTTS 2 documents a CPU run
+        # (about 6 GB of RAM) as a mode of its own, even though its PyTorch
+        # path is the slower one.
+        for engine_id in ("pocket_tts", "f5tts", "kokoclone", "kitten_tts_2"):
             self.assertFalse(voice_lab.gpu_only(engine_id), engine_id)
             self.assertTrue(voice_lab.cpu_supported(engine_id), engine_id)
 
@@ -1273,16 +1276,16 @@ class SpeedBenchmarkTest(unittest.TestCase):
         The request builder resolves a GPU-only engine's "cpu" to the GPU, so
         that a stored CPU choice cannot start the very run a declaration (or an
         earlier measurement) ruled out.  For a *probe* that resolution is
-        backwards: Kitten TTS 2.0's "CPU" figure was the card's, so its CPU
-        could only ever be offered when the GPU was fast - and it was recorded
-        as a CPU figure in Settings.
+        backwards: the "CPU" figure would be the card's, so the CPU could only
+        ever be offered when the GPU was fast - and it was recorded as a CPU
+        figure in Settings.
         """
         from ai_voice_studio.voicelab import benchmark
 
-        self.assertTrue(voice_lab.gpu_only("kitten_tts_2"))
+        self.assertTrue(voice_lab.gpu_only("chatterbox"))
         with mock.patch.object(voicelab, "has_cuda", return_value=True), \
                 self._patched([self._ok(0.9, device_used="cpu")]):
-            benchmark.probe("kitten_tts_2", "cpu", voice_entry=self.voice)
+            benchmark.probe("chatterbox", "cpu", voice_entry=self.voice)
         self.assertEqual(self.workers[0].device, "cpu")
         self.assertEqual(self.workers[0].requests[0]["device"], "cpu")
 

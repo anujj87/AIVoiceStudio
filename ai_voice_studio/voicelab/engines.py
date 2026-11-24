@@ -1471,17 +1471,20 @@ ENGINES: tuple[dict[str, Any], ...] = (
         "homepage": "https://github.com/KittenML/KittenTTS",
         "size_hint": (
             "~950 MB of 1.7B weights (or ~470 MB with the emb4 packing), "
-            "downloaded on first use, plus PyTorch"
+            "downloaded on first use, plus PyTorch; about 6 GB of RAM for a "
+            "CPU run"
         ),
-        # The GPU is what the 1.7B model is offered on by default: its own
-        # documentation puts a CPU run at roughly 2-3 times slower than real
-        # time, which is above the limit the application calls usable (see
-        # ``voicelab.CPU_RTF_LIMIT``).  The CPU entry appears in the device list
-        # once "Measure speed" has shown *this* computer runs it fast enough -
-        # which is what turns the declaration into a decision (the README's
-        # "runs realtime on a CPU" is its CPython-free llama.cpp fork, not this
-        # package).
-        "devices": "gpu",
+        # Both devices are real for this engine.  Its own documentation says
+        # the model "runs on CPU out of the box - ``device`` is auto-detected"
+        # and asks for about 6 GB of RAM, so the CPU is a mode it has, not a
+        # fallback this application invented: it is declared here and the
+        # worker passes ``device="cpu"`` to the package.  The package's
+        # PyTorch path is the one its documentation calls demo-only, so a CPU
+        # run is slower than real time; the application's measured-speed rule
+        # (``voicelab.cpu_allowed``) still keeps the CPU out of the device list
+        # when a benchmark on *this* computer says it is slower than
+        # ``CPU_RTF_LIMIT`` and an NVIDIA card is there to use instead.
+        "devices": "cpu+gpu",
         "voice_cloning": True,
         # This engine reads expression markup in the text it is given: a leading
         # ``[emotion]`` tag, inline ``<event>`` tags and ``(((emphasis)))`` spans
@@ -1504,8 +1507,8 @@ ENGINES: tuple[dict[str, Any], ...] = (
             "after a language - plus voice cloning from a 5-30 second sample, "
             "and optional [emotion] tags, <event> tags and (((emphasis))). Its "
             "weights download from Hugging Face on first use and need no "
-            "account. Needs an NVIDIA GPU; run Measure speed to have the CPU "
-            "offered too if this computer is fast enough for it."
+            "account. Runs on an NVIDIA GPU or on the CPU (about 6 GB of "
+            "RAM); Measure speed shows what this computer manages on each."
         ),
         "languages": _kitten2_languages(),
     },

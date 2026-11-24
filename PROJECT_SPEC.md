@@ -119,7 +119,11 @@ seen to use - and the plan the application settles on follows from it: one copy 
 12 GB card (a second fits the card but not the budget a recording leaves after its 1.5 GB
 reserve), two on a 16 GB card, three from 24 GB up.  `tests/test_kitten_tts2.py` keeps the
 declared figure tied to these runs, and `tests/test_measure_engine_vram.py` holds the
-tool's arithmetic to account.
+tool's arithmetic to account.  The CPU is a device of the engine's own as well: KittenML
+documents a CPU run out of the box (about 6 GB of RAM), so both devices are declared and a
+CPU run is given the machine's cores before the model loads, with generation run without an
+autograd graph.  The measured-speed rule still applies - a benchmark slower than the limit
+keeps the CPU out of the device list while an NVIDIA card is there to use instead.
 
 **Two faults of the engines' own dependencies were found by running them, and both are
 fixed in the install plan rather than left as a note to the user.** `parler-tts`

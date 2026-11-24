@@ -102,6 +102,26 @@ class LanguageChoiceHelperTest(_AppMixin):
         self.assertEqual(language_choice.selected_code(combo),
                          language_choice.AUTO_KEY)
 
+    def test_an_ordinary_cascade_after_the_bulk_fill_reads_its_own_values(self):
+        """A non-OmniVoice engine reuses the same box, item by item.
+
+        The Recording window fills the Language box with Auto + 646 languages
+        for OmniVoice, then -- when an ONNX engine (Supertonic 3, Piper, ...)
+        is selected -- refills it with that engine's own catalog languages.
+        The bulk fill's values must not leak into the second list: reading
+        them back as "auto" left Variant and Voice empty for every engine
+        except the OmniVoice ones.
+        """
+        combo = self._combo()
+        language_choice.fill(combo, "hi")
+        combo.Clear()
+        for code, label in (("en", "English"), ("de", "German")):
+            combo.Append(label, code)
+        combo.SetSelection(0)
+        self.assertEqual(language_choice.code_at(combo, 0), "en")
+        self.assertEqual(language_choice.code_at(combo, 1), "de")
+        self.assertEqual(language_choice.selected_code(combo), "en")
+
 
 class OmniVoiceRecordingLanguageTest(_AppMixin):
     """The Recording window's Language box for the OmniVoice engines."""

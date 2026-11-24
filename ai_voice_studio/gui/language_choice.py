@@ -49,9 +49,12 @@ OMNIVOICE_ENGINES = frozenset(spec.ENGINE_IDS)
 #: How many languages the box offers besides Auto (``languages.COUNT``).
 COUNT = languages.COUNT
 
-#: The attribute :func:`set_pairs` leaves on a combo box with the values that
-#: belong to its items (wx has no bulk "append with client data" call).
+#: The attributes :func:`set_pairs` leaves on a combo box with the values and
+#: the labels of its items (wx has no bulk "append with client data" call).
+#: The labels are kept so :func:`code_at` can tell a box that still holds the
+#: bulk fill from one that was refilled item by item afterwards.
 _CODES_ATTR = "_aivs_codes"
+_LABELS_ATTR = "_aivs_code_labels"
 
 
 def is_omnivoice(tts_id: str | None) -> bool:
@@ -98,16 +101,27 @@ def set_pairs(combo: wx.ComboBox, items: Sequence[tuple[str, str]]) -> None:
     pairs_list = list(items)
     setattr(combo, _CODES_ATTR, [value for _label, value in pairs_list])
     list_labels = [item for item, _value in pairs_list]
+    setattr(combo, _LABELS_ATTR, list_labels)
     if list_labels:
         combo.AppendItems(list_labels)
 
 
 def code_at(combo: wx.ComboBox, index: int) -> Any:
-    """The value of the item at ``index`` (parallel list, else client data)."""
+    """The value of the item at ``index`` (parallel list, else client data).
+
+    The parallel list only describes the box while it still holds the bulk
+    fill: the Recording window refills the same box item by item when an
+    ordinary (non-OmniVoice) engine lists its own catalog languages, and
+    reading the stale list then returned ``"auto"`` for every entry - the
+    engine's variants and voices came out empty.
+    """
     if index < 0 or index >= combo.GetCount():
         return None
     codes = getattr(combo, _CODES_ATTR, None)
-    if codes is not None and index < len(codes):
+    stored = getattr(combo, _LABELS_ATTR, None)
+    if (codes is not None and stored is not None
+            and index < len(codes) and index < len(stored)
+            and combo.GetString(index) == stored[index]):
         return codes[index]
     return combo.GetClientData(index)
 

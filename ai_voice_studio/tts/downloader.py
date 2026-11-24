@@ -39,6 +39,14 @@ class DownloadError(Exception):
     """Raised on download failure."""
 
 
+def _remove_file(path: str) -> None:
+    """Delete a partial download, ignoring a lock or an already-gone file."""
+    try:
+        os.remove(path)
+    except OSError:
+        log.debug("Could not remove %s", path, exc_info=True)
+
+
 def download_file(
     url: str,
     dest_dir: str,
@@ -53,34 +61,61 @@ def download_file(
     dest = os.path.join(dest_dir, filename)
     part = dest + ".part"
 
-    headers = {}
-    downloaded = 0
-    if os.path.exists(part):
-        downloaded = os.path.getsize(part)
-        headers["Range"] = f"bytes={downloaded}-"
+    downloaded = os.path.getsize(part) if os.path.exists(part) else 0
 
     session = requests.Session()
     try:
-        resp = session.get(
-            url,
-            headers=headers,
-            timeout=DOWNLOAD_TIMEOUT,
-            stream=True,
-        )
-        resp.raise_for_status()
+        # At most two attempts: the second one starts from byte 0 when the
+        # bytes already on disk cannot be resumed.
+        for _attempt in (0, 1):
+            headers = {"Range": f"bytes={downloaded}-"} if downloaded else {}
+            resp = session.get(
+                url,
+                headers=headers,
+                timeout=DOWNLOAD_TIMEOUT,
+                stream=True,
+            )
+            try:
+                if downloaded and resp.status_code == 416:
+                    # Requested Range Not Satisfiable: the file the server has
+                    # now is shorter than the bytes already downloaded.  A
+                    # gyan.dev release URL does exactly this when the build
+                    # behind it is replaced (ffmpeg-9.0 -> ffmpeg-9.1), and
+                    # its stale ``.part`` used to fail the whole install with
+                    # a 416.  Drop the partial file and fetch from the start.
+                    log.info("Restarting %s: the server no longer serves byte %d",
+                             filename, downloaded)
+                    _remove_file(part)
+                    downloaded = 0
+                    continue
+                resp.raise_for_status()
+                if downloaded and resp.status_code != 206:
+                    # The server ignored the Range request and sent the whole
+                    # file: appending it to the old bytes would corrupt it.
+                    log.info("Restarting %s: the server ignored the Range request",
+                             filename)
+                    _remove_file(part)
+                    downloaded = 0
+                    continue
 
-        total = int(resp.headers.get("Content-Length", 0)) + downloaded
-        mode = "ab" if downloaded > 0 else "wb"
+                total = int(resp.headers.get("Content-Length", 0)) + downloaded
+                mode = "ab" if downloaded > 0 else "wb"
 
-        with open(part, mode) as fh:
-            for chunk in resp.iter_content(chunk_size=DOWNLOAD_CHUNK):
-                if cancel_event and cancel_event.is_set():
-                    raise DownloadCancelled()
-                if chunk:
-                    fh.write(chunk)
-                    downloaded += len(chunk)
-                    if progress:
-                        progress(filename, downloaded, total)
+                with open(part, mode) as fh:
+                    for chunk in resp.iter_content(chunk_size=DOWNLOAD_CHUNK):
+                        if cancel_event and cancel_event.is_set():
+                            raise DownloadCancelled()
+                        if chunk:
+                            fh.write(chunk)
+                            downloaded += len(chunk)
+                            if progress:
+                                progress(filename, downloaded, total)
+                break
+            finally:
+                resp.close()
+        else:
+            raise DownloadError(
+                f"Failed to download {url}: the server refused every request")
     except requests.RequestException as exc:
         raise DownloadError(f"Failed to download {url}: {exc}") from exc
     finally:

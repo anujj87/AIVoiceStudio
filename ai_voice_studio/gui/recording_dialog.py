@@ -102,10 +102,6 @@ _COMPUTE_LABELS = {
 # Hybrid) require CUDA GPU.  The Voice Lab engines (Pocket TTS, F5-TTS)
 # run on the CPU and on the GPU, so their compute combo offers the CPU and -
 # when a GPU is detected - the GPU as well.
-_ONNX_TTS_ENGINES = {
-    "piper", "kokoro", "kitten", "matcha", "pocket", "supertonic",
-    "sapi5", "windows_core",
-}
 _OMNIVOICE_ENGINES = {"omnivoice", "omnivoice_server"}
 
 
@@ -652,7 +648,14 @@ class RecordingDialog(wx.Dialog):
             if is_omni:
                 if engine in _OMNIVOICE_ENGINES or v.get("custom_omni"):
                     self._voices.append(v)
-            elif engine in _ONNX_TTS_ENGINES or _is_voicelab_engine(engine):
+            elif engine not in _OMNIVOICE_ENGINES:
+                # Every other engine is a local one (Piper's "vits" frontend,
+                # the Chinese VITS voices, Kokoro, Kitten, Matcha, Supertonic,
+                # the Windows system voices) or a Voice Lab engine.  The test
+                # is negative on purpose: a voice entry's ``engine`` is its
+                # runtime kind, not its catalog id ("vits" for Piper), so
+                # matching it against a list of engine ids dropped every
+                # Piper voice and left Language, Variant and Voice empty.
                 self._voices.append(v)
         if not self._voices:
             for combo in (self.lang_combo, self.variant_combo, self.voice_combo):

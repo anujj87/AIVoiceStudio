@@ -18,8 +18,8 @@ What these tests hold down, in the order they would break:
 * the request a voice builds and the arguments that reach the engine, checked
   against a fake package rather than a real one (no 1.7B checkpoint is
   downloaded to run a test);
-* the device policy: the GPU is what the engine is offered on, and only a
-  measurement on this computer can add the CPU.
+* the device policy: both devices are the engine's own (it runs on a CPU out
+  of the box), while a measured-slow CPU still steps aside for the card.
 """
 
 from __future__ import annotations
@@ -242,40 +242,50 @@ class VoicesTest(unittest.TestCase):
 
 
 class DevicePolicyTest(unittest.TestCase):
-    """The GPU is the engine; the CPU has to earn its place."""
+    """Both devices are the engine's own; a slow CPU still steps aside."""
 
     def setUp(self):
         self.addCleanup(voicelab.clear_cpu_rtf)
         voicelab.clear_cpu_rtf()
 
-    def test_the_engine_is_gpu_only_until_it_is_measured(self):
-        self.assertTrue(voice_lab.gpu_only(ENGINE))
-        self.assertFalse(voice_lab.cpu_supported(ENGINE))
+    def test_the_cpu_is_a_mode_the_engine_really_has(self):
+        """Its documentation runs it on a CPU out of the box."""
+        self.assertFalse(voice_lab.gpu_only(ENGINE))
+        self.assertTrue(voice_lab.cpu_supported(ENGINE))
+        self.assertTrue(voice_lab.gpu_supported(ENGINE))
         with mock.patch.object(voicelab, "has_cuda", return_value=True):
             self.assertEqual(
                 [value for value, _label in voicelab.device_options(ENGINE)],
-                ["cuda"],
+                ["cpu", "cuda", "auto"],
             )
-            self.assertEqual(voicelab.resolve_device("cpu", ENGINE), "cuda")
+            self.assertEqual(voicelab.resolve_device("cpu", ENGINE), "cpu")
         self.assertIsNone(voicelab.cpu_verdict(ENGINE))
 
     def test_a_measured_fast_cpu_is_offered_as_well(self):
         voicelab.set_cpu_rtf(ENGINE, 1.5)
         with mock.patch.object(voicelab, "has_cuda", return_value=True):
             values = [value for value, _label in voicelab.device_options(ENGINE)]
-            self.assertEqual(values, ["cuda", "cpu"])
+            self.assertEqual(values, ["cpu", "cuda", "auto"])
             self.assertEqual(voicelab.resolve_device("cpu", ENGINE), "cpu")
             labels = dict(voicelab.device_options(ENGINE))
         self.assertIn("measured 1.50x real time", labels["cpu"])
 
     def test_a_measured_slow_cpu_stays_out_when_a_card_is_present(self):
+        """The measurement, not the declaration, is what removes the CPU."""
         voicelab.set_cpu_rtf(ENGINE, 3.4)
         with mock.patch.object(voicelab, "has_cuda", return_value=True):
             self.assertEqual(
                 [value for value, _label in voicelab.device_options(ENGINE)],
-                ["cuda"],
+                ["cuda", "auto"],
             )
             self.assertEqual(voicelab.resolve_device("cpu", ENGINE), "cuda")
+        # Without a card the CPU is the only device there is, so it stays.
+        with mock.patch.object(voicelab, "has_cuda", return_value=False):
+            self.assertEqual(
+                [value for value, _label in voicelab.device_options(ENGINE)],
+                ["cpu"],
+            )
+            self.assertEqual(voicelab.resolve_device("cpu", ENGINE), "cpu")
 
     def test_the_gpu_wheels_come_from_the_cuda_index(self):
         self.assertEqual(tuple(voice_lab.cuda_packages(ENGINE)),
@@ -444,9 +454,9 @@ class GpuPlanTest(unittest.TestCase):
                 mock.patch("ai_voice_studio.compute.free_vram_mb",
                            return_value=self.RTX_3060_FREE):
             self.assertEqual(planned_workers(entry, "cuda", total=6), 1)
-        # A GPU-only engine sent to the CPU by a stored setting still runs on
-        # the card (it has no CPU mode), so the plan has to answer for the card.
-        self.assertEqual(self._plan(24576, device="cpu"), (3, "instances"))
+        # The engine has a CPU mode of its own now, so a CPU run really is the
+        # CPU: one segment at a time, using every core it is given.
+        self.assertEqual(self._plan(24576, device="cpu"), (1, "solo"))
 
     def test_a_machine_without_a_card_speaks_one_segment_at_a_time(self):
         """No driver to ask means no plan: the single copy it always was."""
@@ -702,6 +712,77 @@ class BackendTest(unittest.TestCase):
                 _fake_kittenml(seen):
             backend.synthesize("Hello.", {"voice": "Bella"})
         guard.assert_not_called()
+
+    def test_a_cpu_run_gets_the_threads_the_application_allowed(self):
+        """The thread pool is set before the model is loaded, not after."""
+        worker = _load_worker()
+        calls = []
+        torch = types.ModuleType("torch")
+        torch.set_num_threads = lambda value: calls.append(("threads", value))
+        torch.set_num_interop_threads = lambda value: calls.append(
+            ("interop", value)
+        )
+        seen = []
+        request = {"voice": "Bella", "threads": 6}
+        backend = self._backend(worker, request)
+        with mock.patch.dict(sys.modules, {"torch": torch}), \
+                _fake_kittenml(seen):
+            backend.synthesize("Hello.", request)
+        self.assertEqual(calls[0], ("threads", 6))
+        self.assertEqual(calls[1], ("interop", 3))
+
+    def test_a_cpu_run_without_a_thread_count_uses_every_core_but_one(self):
+        worker = _load_worker()
+        calls = []
+        torch = types.ModuleType("torch")
+
+        def set_num_threads(value):
+            calls.append(value)
+
+        torch.set_num_threads = set_num_threads
+        torch.set_num_interop_threads = lambda value: None
+        seen = []
+        request = {"voice": "Bella"}
+        backend = self._backend(worker, request)
+        with mock.patch.dict(sys.modules, {"torch": torch}), \
+                mock.patch.object(worker.os, "cpu_count", return_value=9), \
+                _fake_kittenml(seen):
+            backend.synthesize("Hello.", request)
+        self.assertEqual(calls, [8])
+
+    def test_a_seed_reaches_the_engine_the_way_its_docs_document(self):
+        """``seed`` is an ``advanced`` option, not a top-level keyword."""
+        worker = _load_worker()
+        seen = []
+
+        @contextlib.contextmanager
+        def fake():
+            module = types.ModuleType("kittenml")
+
+            class KittenTTS:
+                def __init__(self, model_name, **kwargs):
+                    seen.append(("load", model_name, kwargs))
+
+                def generate(self, text, voice=None, reference=None,
+                             reference_text=None, preset="stable",
+                             max_new_tokens=1000, normalize=True,
+                             advanced=None):
+                    seen.append(("generate", text, {
+                        "voice": voice, "preset": preset,
+                        "normalize": normalize, "advanced": advanced,
+                    }))
+                    return np.zeros(2400, dtype=np.float32)
+
+            module.KittenTTS = KittenTTS
+            with mock.patch.dict(sys.modules, {"kittenml": module}):
+                yield module
+
+        request = {"voice": "Bella", "options": {"seed": 1234}}
+        backend = self._backend(worker, request)
+        with fake():
+            backend.synthesize("Hello.", request)
+        self.assertEqual(seen[1][2]["advanced"], {"seed": 1234})
+        self.assertIn("seed", backend.report.applied)
 
     def test_a_missing_package_names_the_engine_and_the_panel(self):
         worker = _load_worker()
