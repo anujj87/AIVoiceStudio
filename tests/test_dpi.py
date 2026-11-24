@@ -42,6 +42,40 @@ from ai_voice_studio.tts.models import ModelStore
 SCALES = (1.0, 1.5, 2.0)
 
 
+def _largest_window(parent: wx.Window | None = None) -> tuple[int, int]:
+    """The biggest a top-level window can actually become on this machine.
+
+    Windows will not grow a window past the display's tracking size, so a
+    dialog asked for 1640x1120 on a 1400x840 CI screen comes back at
+    1400x840.  The limit is measured rather than assumed, so ``min(wanted,
+    limit)`` is exact both on a large monitor (where nothing is capped) and
+    on a small one.
+    """
+    probe = wx.Dialog(parent, size=(100, 100))
+    try:
+        probe.SetSize((100_000, 100_000))
+        return tuple(probe.GetSize())
+    finally:
+        probe.Destroy()
+
+
+def _within_display(size: tuple[int, int], window: wx.Window) -> tuple[int, int]:
+    """``size``, reduced to what this machine's display will allow."""
+    limit = _largest_window(window.GetParent())
+    return (min(size[0], limit[0]), min(size[1], limit[1]))
+
+
+def _size_note(wanted: tuple[int, int], window: wx.Window) -> str:
+    """Context for a size mismatch: display, limit and the recorded DIPs."""
+    area = wx.Display(0).GetClientArea()
+    state = getattr(window, "_aivs_dpi_state", {}) or {}
+    return (f"wanted {wanted} at scale {dpi.scale_of(window)}; "
+            f"display {area.width}x{area.height}; "
+            f"largest window {_largest_window(window.GetParent())}; "
+            f"recorded DIP size {state.get('size')}, "
+            f"from content {state.get('size_from_content')}")
+
+
 class ScaleFactorTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -213,7 +247,11 @@ class GeometryTest(unittest.TestCase):
             dip_size = tuple(dip.GetSize())
         with dpi.at_scale(2.0):
             scaled = self._dialog()
-            self.assertEqual(tuple(scaled.GetSize()), (dip_size[0] * 2, dip_size[1] * 2))
+            self.assertEqual(tuple(scaled.GetSize()),
+                             _within_display((dip_size[0] * 2, dip_size[1] * 2),
+                                             scaled),
+                             _size_note((dip_size[0] * 2, dip_size[1] * 2),
+                                        scaled))
 
     def test_preparing_twice_does_not_compound(self):
         with dpi.at_scale(1.5):
@@ -249,8 +287,9 @@ class GeometryTest(unittest.TestCase):
         with dpi.at_scale(2.0):
             dpi.rescale(dlg)
 
-        self.assertEqual(tuple(dlg.GetSize()), (1600, 1200),
-                         "the resized window must keep its DIP size on the new display")
+        self.assertEqual(tuple(dlg.GetSize()), _within_display((1600, 1200), dlg),
+                         "the resized window must keep its DIP size on the new "
+                         "display: " + _size_note((1600, 1200), dlg))
 
     def test_a_control_the_app_asked_for_scales_its_size(self):
         """``wx.ListCtrl(size=(200, 10))`` carries that as its minimum size."""
@@ -394,7 +433,8 @@ class GeometryTest(unittest.TestCase):
         dlg.ProcessEvent(event)
 
         self.assertEqual(dpi.scale_of(dlg), 2.0)
-        self.assertEqual(tuple(dlg.GetSize()), (1640, 1120))
+        self.assertEqual(tuple(dlg.GetSize()), _within_display((1640, 1120), dlg),
+                         _size_note((1640, 1120), dlg))
         self.assertEqual(dlg.cat_list.GetMinSize(), (400, 20))
 
     def test_the_display_change_is_announced(self):

@@ -277,6 +277,11 @@ class _AppMixin(unittest.TestCase):
         every path into it.
         """
         dlg = self._recording_window()
+        # The dialog disables Start when the machine lists no voices at all
+        # (a CI runner has no Windows SAPI voices, so its list is empty).
+        # These tests are about the key path to an *enabled* button; the
+        # disabled case has its own test below.
+        dlg.start_btn.Enable()
         calls = {"n": 0}
         dlg._begin_recording = lambda: calls.__setitem__("n", calls["n"] + 1)
         return dlg, calls

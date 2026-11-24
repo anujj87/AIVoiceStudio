@@ -2012,8 +2012,13 @@ class PreviewComputeChoiceTest(_AppMixin):
             self.assertEqual(
                 settings.get(compute_choice.settings_key("punctuation")), "cuda"
             )
-        self.assertEqual(compute_choice.saved_choice(settings, "punctuation"),
-                         "cuda")
+            # Read back while the card is still there: saved_choice()
+            # re-validates the stored value against what this machine offers,
+            # so a stored "cuda" on a machine without the GPU deliberately
+            # reports "cpu" - that is the fallback, not the memory.
+            self.assertEqual(
+                compute_choice.saved_choice(settings, "punctuation"), "cuda"
+            )
         # ... and a category nobody touched keeps the CPU.
         self.assertEqual(compute_choice.saved_choice(settings, "recording_settings"),
                          "cpu")
@@ -2030,7 +2035,9 @@ class PreviewComputeChoiceTest(_AppMixin):
         self.addCleanup(setattr, compute.detect, "_cache", cached)
         with mock.patch("ai_voice_studio.compute.runtime.is_installed",
                         return_value=True), \
-                mock.patch.object(compute, "has_nvidia_gpu", return_value=True):
+                mock.patch.object(compute, "has_nvidia_gpu", return_value=True), \
+                mock.patch("ai_voice_studio.voicelab.has_cuda",
+                           return_value=True):
             compute.detect._cache = None  # type: ignore[attr-defined]
             self.assertEqual(compute_choice.provider_for_preview("cpu"), "cpu")
             self.assertEqual(compute_choice.provider_for_preview("cuda"), "cuda")
