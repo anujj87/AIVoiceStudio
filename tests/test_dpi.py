@@ -67,9 +67,18 @@ def _largest_window(parent: wx.Window | None = None) -> tuple[int, int]:
 
 
 def _within_display(size: tuple[int, int], window: wx.Window) -> tuple[int, int]:
-    """``size``, reduced to what this machine's display will allow."""
+    """What a top-level window really becomes: ``size``, capped and floored.
+
+    Both bounds come from the toolkit rather than from the conversion under
+    test: a window never grows past the desktop's tracking size, and wx keeps
+    it at least as large as its own content's minimum.  That is why a 200%
+    Settings window on a small desktop lands on its minimum (its content needs
+    1400x840) instead of on the desktop cap the request was reduced to.
+    """
     limit = _largest_window(window.GetParent())
-    return (min(size[0], limit[0]), min(size[1], limit[1]))
+    minimum = tuple(window.GetMinSize())
+    return (max(minimum[0], min(size[0], limit[0])),
+            max(minimum[1], min(size[1], limit[1])))
 
 
 def _size_note(wanted: tuple[int, int], window: wx.Window) -> str:
@@ -78,6 +87,7 @@ def _size_note(wanted: tuple[int, int], window: wx.Window) -> str:
     state = getattr(window, "_aivs_dpi_state", {}) or {}
     return (f"wanted {wanted} at scale {dpi.scale_of(window)}; "
             f"display {area.width}x{area.height}; "
+            f"minimum {tuple(window.GetMinSize())}; "
             f"largest window {_largest_window(window.GetParent())}; "
             f"recorded DIP size {state.get('size')}, "
             f"from content {state.get('size_from_content')}")
