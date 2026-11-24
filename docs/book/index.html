@@ -124,7 +124,7 @@
     <li><a href="chapters/ch75_dialogs_progress.html">Ch 75: Dialogs &amp; Progress</a></li>
   </ul>
 
-  <div class="part-header">Part X — Voice Lab &amp; the Current System</div>
+  <div class="part-header">Part X — Speech to Text, Voice Lab &amp; the Current System</div>
   <ul class="chapters">
     <li><a href="chapters/ch76_voicelab_engines.html">Ch 76: Voice Lab Engines</a></li>
     <li><a href="chapters/ch77_engine_environments.html">Ch 77: One Environment per Engine</a></li>
@@ -133,6 +133,22 @@
     <li><a href="chapters/ch80_start_selected_recording.html">Ch 80: Start Selected Recording</a></li>
     <li><a href="chapters/ch81_terms_dialog.html">Ch 81: First-Launch Terms Dialog</a></li>
     <li><a href="chapters/ch82_licensing.html">Ch 82: Licensing &amp; Compliance</a></li>
+    <li><a href="chapters/ch83_input_gestures.html">Ch 83: Configurable Input Gestures</a></li>
+    <li><a href="chapters/ch84_stt_catalog.html">Ch 84: A Second Catalog (Speech to Text)</a></li>
+    <li><a href="chapters/ch85_stt_environments.html">Ch 85: One Environment per Model</a></li>
+    <li><a href="chapters/ch86_stt_dialog.html">Ch 86: The Transcribe Dialog</a></li>
+    <li><a href="chapters/ch87_theme_studio.html">Ch 87: The Theme Studio</a></li>
+    <li><a href="chapters/ch88_update_checker.html">Ch 88: Checking for Updates</a></li>
+  </ul>
+
+  <div class="part-header">Part XI — Audio Description</div>
+  <ul class="chapters">
+    <li><a href="chapters/ch89_ad_overview.html">Ch 89: Narrating Video</a></li>
+    <li><a href="chapters/ch90_ad_catalog_envs.html">Ch 90: A Catalog of Describers</a></li>
+    <li><a href="chapters/ch91_ad_windows.html">Ch 91: Chunks, Windows &amp; Change</a></li>
+    <li><a href="chapters/ch92_ad_placement.html">Ch 92: Placement &amp; Extended AD</a></li>
+    <li><a href="chapters/ch93_ad_described_film.html">Ch 93: The Described Film</a></li>
+    <li><a href="chapters/ch94_ad_dialog.html">Ch 94: The Describe Window</a></li>
   </ul>
 
   <div class="part-header">Appendices</div>
@@ -162,9 +178,10 @@
   <hr>
   <p class="edition">
     Second Edition &bull; 2026 &bull; Python 3.13 &bull; wxPython 4.3<br>
-    Based on AI Voice Studio (AIVS) open-source project &bull; Version 2026.3.1<br>
-    Includes Part X: the Voice Lab engine subsystem, per-engine Python environments,<br>
-    the CPU/GPU compute choice, the audio I/O fallback and the licensing model
+    Based on AI Voice Studio (AIVS) open-source project &bull; Version 2027.1.0<br>
+    Includes Part X: the speech-to-text subsystem, the Voice Lab engine subsystem,<br>
+    per-model and per-engine Python environments, the CPU/GPU compute choice, the<br>
+    audio I/O fallback, the theme studio, the update checker and the licensing model
   </p>
 </div>
 
@@ -194,16 +211,17 @@
   <li><strong>Part VII — Testing &amp; Deployment</strong> (Chapters 61–66): Unit testing, mocking, PyInstaller, Inno Setup, and CI/CD.</li>
   <li><strong>Part VIII — Advanced Topics</strong> (Chapters 67–72): Managed runtime, subprocess architecture, logging, performance, and security.</li>
   <li><strong>Part IX — Second Edition Additions</strong> (Chapters 73–75): Playlist generation, DAISY 3 book building, and reusable dialogs and progress windows.</li>
-  <li><strong>Part X — Voice Lab &amp; the Current System</strong> (Chapters 76–82): The voice-clone engine subsystem, one Python environment per engine, the CPU/GPU compute choice, audio decoding without FFmpeg, out-of-order recording, the first-launch terms dialog, and licensing.</li>
+  <li><strong>Part X — Speech to Text, Voice Lab &amp; the Current System</strong> (Chapters 76–88): The speech-to-text subsystem (its catalog, one Python environment per model, the transcribe dialog and its output documents), the voice-clone engine subsystem, one Python environment per engine, the CPU/GPU compute choice, audio decoding without FFmpeg, out-of-order recording, the first-launch terms dialog, licensing, input gestures, the theme studio, and the update checker.</li>
 </ol>
 
 <div class="info">
-  <strong>About this edition.</strong> Parts I–IX teach Python, wxPython and every
-  third-party library this application uses. <strong>Part X</strong> is written against the
+  <strong>About this edition.</strong> Parts I–IX teach Python, wxPython and every  third-party library this application uses. <strong>Part X</strong> is written against the
   <em>current</em> code base and documents the subsystems that grew after the first
-  edition: the Voice Lab clone engines, one virtualenv per engine, the compute band
-  (CPU 80–95&nbsp;%, full GPU), the soundfile audio fallback, out-of-order recording for
-  long books, the terms dialog, and the licence inventory. Every code excerpt in Part X
+  edition: speech-to-text transcription (a second catalog, one virtualenv per model, the
+  worker subprocess and the output documents), the Voice Lab clone engines, one virtualenv
+  per engine, the compute band (CPU 80–95 &nbsp;%, full GPU), the soundfile audio fallback,
+  out-of-order recording for long books, the terms dialog, keyboard gestures, the theme
+  studio, the update checker and the licence inventory. Every code excerpt in Part X
   is taken from the shipped source and annotated line by line.
 </div>
 
@@ -216,12 +234,14 @@
 </p>
 <ul>
   <li>wxPython GUI with accessibility support (NVDA, JAWS, Narrator)</li>
-  <li>Multiple TTS engines (Piper, Kokoro, Matcha, Kitten, OmniVoice, SAPI5/Windows voices, plus the Voice Lab clone engines: Pocket TTS, Bark, F5-TTS)</li>
+  <li>Multiple TTS engines (Piper, Kokoro, Matcha, Kitten, OmniVoice, SAPI5/Windows voices, plus the Voice Lab clone engines: Pocket TTS, F5-TTS, KokoClone, Chatterbox, Qwen3-TTS, VibeVoice, MOSS-TTS, GPT-SoVITS)</li>
+  <li>Speech to text: Whisper, Qwen3-ASR, NVIDIA Canary-Qwen and Parakeet TDT, Moonshine, SpeechBrain, Voxtral and IBM Granite Speech, each in its own Python environment</li>
+  <li>Audio description: a vision-language model narrates what is on screen, and a run writes the description document, a spoken narration track and a described video with the source left untouched</li>
   <li>Document parsing (PDF, DOCX, HTML, Markdown, EPUB)</li>
   <li>Background threading for non-blocking synthesis</li>
   <li>Virtual environment management and addon architecture</li>
   <li>PyInstaller packaging and Inno Setup installers</li>
-  <li>370+ unit tests with comprehensive coverage</li>
+  <li>A thousand-plus unit tests with comprehensive coverage, plus accessibility, gesture and packaging audits</li>
 </ul>
 
 <h3>Prerequisites</h3>

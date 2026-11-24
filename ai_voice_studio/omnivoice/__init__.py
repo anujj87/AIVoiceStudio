@@ -46,10 +46,10 @@ import os
 import subprocess
 import sys
 import threading
-from typing import Dict, Optional
 
 import numpy as np
 
+from .. import hf_access
 from .. import omnivoice_quality as quality
 
 log = logging.getLogger(__name__)
@@ -62,7 +62,6 @@ _SAMPLE_RATE = 24000  # OmniVoice output sample rate
 #: environment; every other TTS engine gets an environment of its own, so a
 #: conflicting PyTorch/transformers release can never break it.
 ENGINE_ID = "omnivoice"
-
 
 # ---------------------------------------------------------------------------
 # Embedded worker source (standalone script, no ai_voice_studio imports).
@@ -86,7 +85,6 @@ import json
 import sys
 import numpy as np
 
-
 def _resample_speed(samples, speed):
     """Approximate ``speed`` by linear resampling (pitch changes slightly)."""
     if speed <= 0.01:
@@ -97,7 +95,6 @@ def _resample_speed(samples, speed):
     x_old = np.linspace(0.0, 1.0, len(samples), endpoint=False)
     x_new = np.linspace(0.0, 1.0, n_out, endpoint=False)
     return np.interp(x_new, x_old, samples).astype(np.int16)
-
 
 def _supported_kwargs(method, kwargs):
     if not kwargs:
@@ -117,7 +114,6 @@ def _supported_kwargs(method, kwargs):
             skipped.append(name)
     return supported, skipped
 
-
 def _language(value):
     if value is None:
         return None
@@ -125,7 +121,6 @@ def _language(value):
     if not text or text.lower() in ("auto", "automatic", "any"):
         return None
     return text
-
 
 def main():
     out = sys.stdout
@@ -269,11 +264,9 @@ def main():
 
     return 0
 
-
 if __name__ == "__main__":
     sys.exit(main())
 '''
-
 
 def _read_worker_source() -> str:
     """Return the worker script source.
@@ -290,10 +283,8 @@ def _read_worker_source() -> str:
     with open(worker_py, encoding="utf-8") as fh:
         return fh.read()
 
-
 class OmniVoiceError(Exception):
     """Raised when the OmniVoice engine is not installed or fails."""
-
 
 # ---------------------------------------------------------------------------
 # CUDA detection (lightweight -- does NOT import torch)
@@ -308,17 +299,17 @@ def has_nvidia_gpu() -> bool:
             ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
             capture_output=True, text=True, timeout=10,
             creationflags=flags,
+            check=False,
         )
         return result.returncode == 0 and bool(result.stdout.strip())
-    except Exception:  # noqa: BLE001
+    except Exception:
         return False
-
 
 def is_available() -> bool:
     """True when the ``omnivoice_triton`` package is importable from this
     engine's own virtualenv (checked by the worker subprocess)."""
     try:
-        from ..python_runtime import engine_runtime  # noqa: PLC0415
+        from ..python_runtime import engine_runtime
         rt = engine_runtime(ENGINE_ID)
         if not rt.is_created:
             return False
@@ -327,9 +318,8 @@ def is_available() -> bool:
             "print(importlib.metadata.version('omnivoice-triton'))"
         )
         return result.returncode == 0 and bool(result.stdout.strip())
-    except Exception:  # noqa: BLE001
+    except Exception:
         return False
-
 
 # ---------------------------------------------------------------------------
 # Worker request builder (pure, unit-testable)
@@ -339,24 +329,24 @@ def build_synthesize_request(
     text: str,
     mode: str = "triton",
     speed: float = 1.0,
-    language: Optional[str] = None,
-    num_step: Optional[int] = None,
-    guidance_scale: Optional[float] = None,
-    class_temperature: Optional[float] = None,
-    duration: Optional[float] = None,
-    seed: Optional[int] = None,
+    language: str | None = None,
+    num_step: int | None = None,
+    guidance_scale: float | None = None,
+    class_temperature: float | None = None,
+    duration: float | None = None,
+    seed: int | None = None,
     ref_audio: str = "",
     ref_text: str = "",
     instruct: str = "",
-) -> Dict:
+) -> dict:
     """Build the JSON request the app sends to the OmniVoice worker.
 
     The worker itself decides which parameters the installed runner supports,
     so this builder only ever includes values the caller explicitly set.
     """
-    from . import spec  # noqa: PLC0415
+    from . import spec
 
-    req: Dict = {
+    req: dict = {
         "cmd": "synthesize",
         "text": text,
         "mode": mode,
@@ -380,7 +370,6 @@ def build_synthesize_request(
     if instruct:
         req["instruct"] = instruct
     return req
-
 
 # ---------------------------------------------------------------------------
 # Worker subprocess management (mirrors clone/__init__.py CloneClient)
@@ -417,9 +406,11 @@ class OmniVoiceWorker:
         # In a frozen app, sys.executable is the .exe -- use the engine's
         # own environment's Python instead so it can find omnivoice-triton.
         if getattr(sys, "frozen", False):
-            from ..python_runtime import engine_runtime  # noqa: PLC0415
+            from ..python_runtime import engine_runtime
             rt = engine_runtime(ENGINE_ID)
-            worker_python = rt.python_exe
+            # An environment built by an earlier installation of the
+            # application runs on a Python that has gone; re-point it first.
+            worker_python = rt.usable_python_exe()
             # The worker.py source is inside PyInstaller's PYZ archive
             # and invisible to the venv Python.  Write it as a standalone
             # script so the venv Python can run it directly.
@@ -447,6 +438,9 @@ class OmniVoiceWorker:
             text=True,
             bufsize=1,
             creationflags=flags,
+            # The ~2 GB OmniVoice model is fetched from Hugging Face inside this
+            # process, so the environment carries the token when one is set.
+            env=hf_access.worker_environment(),
         )
         resp = self._request({"cmd": "ping"})
         if not resp.get("ok"):
@@ -460,20 +454,20 @@ class OmniVoiceWorker:
                 try:
                     self._proc.stdin.write(json.dumps({"cmd": "quit"}) + "\n")
                     self._proc.stdin.flush()
-                except Exception:  # noqa: BLE001
-                    pass
+                except Exception:
+                    log.debug("Ignoring a failure in OmniVoiceWorker.close", exc_info=True)
                 try:
                     self._proc.terminate()
                     self._proc.wait(timeout=5)
-                except Exception:  # noqa: BLE001
+                except Exception:
                     self._proc.kill()
                 self._proc = None
 
     def __del__(self) -> None:
         try:
             self.close()
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception:
+            log.debug("Ignoring a failure in OmniVoiceWorker.__del__", exc_info=True)
 
     # -- protocol -----------------------------------------------------------
 
@@ -514,13 +508,13 @@ class OmniVoiceWorker:
         ref_audio: str = "",
         ref_text: str = "",
         instruct: str = "",
-        language: Optional[str] = None,
-        num_step: Optional[int] = None,
-        num_steps: Optional[int] = None,  # legacy alias
-        guidance_scale: Optional[float] = None,
-        class_temperature: Optional[float] = None,
-        duration: Optional[float] = None,
-        seed: Optional[int] = None,
+        language: str | None = None,
+        num_step: int | None = None,
+        num_steps: int | None = None,  # legacy alias
+        guidance_scale: float | None = None,
+        class_temperature: float | None = None,
+        duration: float | None = None,
+        seed: int | None = None,
     ) -> np.ndarray:
         """Synthesize text; returns int16 samples at 24 kHz.
 
@@ -585,7 +579,6 @@ class OmniVoiceWorker:
         samples = np.frombuffer(raw, dtype=np.int16).copy()
         return samples
 
-
 # ---------------------------------------------------------------------------
 # Engine wrapper (drops into the app's get_engine interface)
 # ---------------------------------------------------------------------------
@@ -613,7 +606,7 @@ class OmniVoiceEngine:
         drone_attempts: int = quality.DRONE_ATTEMPTS,
         repair_attempts: int = quality.DRONE_REPAIR_ATTEMPTS,
     ):
-        from . import spec  # noqa: PLC0415
+        from . import spec
 
         self.voice_entry = voice_entry
         variant = voice_entry.get("variant", "triton")
@@ -665,11 +658,11 @@ class OmniVoiceEngine:
         samples = self._synthesize_checked(text, float(speed))
         self._report_quality(samples)
         if pitch != 1.0:
-            from ..tts.engine import _shift_pitch  # noqa: PLC0415
+            from ..tts.engine import _shift_pitch
 
             samples = _shift_pitch(samples, pitch)
         if volume != 1.0:
-            from ..tts.engine import _apply_volume  # noqa: PLC0415
+            from ..tts.engine import _apply_volume
 
             samples = _apply_volume(samples, volume)
         return samples

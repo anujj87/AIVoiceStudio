@@ -410,9 +410,47 @@ and <code>tools/a11y_audit.py</code> launch the real dialogs and dump the MSAA
 tree, so every accName is verified against what NVDA actually sees — not what
 the source code hopes it sees.</div>
 
-<h2>34.6 Key Takeaways</h2>
+<h2>34.6 What Changed Again: Window Titles and the Executable's Version</h2>
+
+<p>Two Windows conventions answer “what is this window, and which program is
+it?” for a screen reader, and neither of them reads the application's About
+box:</p>
+
+<ul>
+  <li><strong>NVDA+T reports the title of the active window</strong>, and it
+      asks the window for its accessible name. wxWidgets gives every window a
+      name of its own making before the application names it — a frame answers
+      <code>GetName()</code> with <code>"frame"</code>, a dialog with
+      <code>"dialog"</code>, a list box with <code>"listBox"</code> — and
+      the walk above copied that leftover into the accName, so the main window
+      announced itself as <em>frame</em> and its real title was never heard. A
+      top-level window is now named by its title, read live (the describe
+      window renames itself to <code>"Audio description - &lt;film&gt;"</code>
+      as a project opens), and a control nobody named is left unnamed: an
+      accName of “check” or “panel” is worse than none at all.</li>
+  <li><strong>NVDA+Ctrl+V reports the application's name and version</strong>
+      from the running file's VERSIONINFO resource — <code>ProductName</code>
+      and <code>ProductVersion</code>. A PyInstaller build carries no such
+      resource of its own, so Windows answered nothing and NVDA said
+      “Application unknown, version not detected”.
+      <code>tools/make_version_info.py</code> builds the resource from
+      <code>constants.APP_VERSION</code> and
+      <code>packaging/ai_voice_studio.spec</code> hands it to the
+      <code>EXE</code> target, so the file says <em>AI Voice Studio
+      2027.1.0</em> whichever version the build carries.</li>
+</ul>
+
+<p>Both are held by the test suite rather than by habit:
+<code>tests/test_a11y_names.py</code> checks the window titles and sweeps every
+widget class the source instantiates against the list of names wx invents, so a
+new default (“colourpicker”, say) fails the build instead of being announced to
+a user; <code>tests/test_packaging.py</code> checks the version resource's
+fields, its four-number binary version and the built executable itself.</p>
+
+<h2>34.7 Key Takeaways</h2>
 <ul>
   <li><strong>SetName()</strong> alone is not enough for every control class — a real <code>wx.Accessible</code> guarantees the MSAA <code>accName</code></li>
+  <li>A window's accName is its title, never the class name wx left on it; the executable's own name and version live in its VERSIONINFO resource</li>
   <li>Runtime label changes need <code>NotifyEvent(wx.OBJ_CHANGE)</code> to be re-announced</li>
   <li><code>finalize_accessibility()</code> walks the whole tree so no control is missed</li>
   <li>Verify with tools (<code>probe_msaa.py</code>), not assumptions</li>

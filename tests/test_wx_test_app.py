@@ -28,7 +28,7 @@ ROOT = os.path.abspath(os.path.join(TESTS, ".."))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, TESTS)
 
-from wx_test_app import get_app  # noqa: E402
+from wx_test_app import get_app
 
 # The GUI modules that must share the application.
 SHARING_MODULES = (

@@ -100,6 +100,7 @@ class BookLayoutTest(unittest.TestCase):
             "ch80_start_selected_recording.html",
             "ch81_terms_dialog.html",
             "ch82_licensing.html",
+            "ch83_input_gestures.html",
         ):
             with self.subTest(chapter=name):
                 self.assertIn(name, self.chapter_names)

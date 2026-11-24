@@ -20,7 +20,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from ai_voice_studio.tts import windows_tts  # noqa: E402
+from ai_voice_studio.tts import windows_tts
 
 
 class _CacheMixin(unittest.TestCase):
@@ -134,7 +134,7 @@ class AddInstalledVoicesTest(_CacheMixin):
         seen: list = []
         with mock.patch.object(windows_tts, "is_available", return_value=True), \
                 mock.patch.object(windows_tts, "_enumerate", side_effect=fake_enumerate):
-            windows_tts.add_installed_voices([], lambda voices: seen.append(voices))
+            windows_tts.add_installed_voices([], seen.append)
             self.assertTrue(started.wait(10))
             release.set()
             for _ in range(100):

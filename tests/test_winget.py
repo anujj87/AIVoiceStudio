@@ -22,11 +22,11 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 
-import winget_manifests as wm  # noqa: E402
-import winget_validate  # noqa: E402
+import winget_manifests as wm
+import winget_validate
 
-from ai_voice_studio import __version__  # noqa: E402
-from ai_voice_studio.constants import APP_VERSION  # noqa: E402
+from ai_voice_studio import __version__
+from ai_voice_studio.constants import APP_VERSION
 
 INSTALLER_ISS = os.path.join(ROOT, "packaging", "installer_common.iss")
 FAKE_HASH = "A" * 64
@@ -89,6 +89,161 @@ class ManifestGeneratorTest(unittest.TestCase):
         problems = wm.validate(manifests, APP_VERSION)
         self.assertTrue(any("'License'" in problem for problem in problems))
 
+    def test_the_generator_does_not_repeat_the_package_version(self):
+        manifests = wm.build_all(
+            APP_VERSION, {"x64": FAKE_HASH}, release_date="2026-09-23",
+            release_notes="Hello.",
+        )
+        installer = manifests[f"{wm.PACKAGE_IDENTIFIER}.installer.yaml"]
+        entry = installer["Installers"][0]["AppsAndFeaturesEntries"][0]
+        # winget derives DisplayVersion from PackageVersion when it is absent,
+        # and winget-pkgs asks that an identical value not be repeated.
+        self.assertNotIn("DisplayVersion", entry)
+
+    def test_a_redundant_display_version_is_reported(self):
+        manifests = wm.build_all(APP_VERSION, {"x64": FAKE_HASH},
+                                 release_date="2026-09-23")
+        installer = manifests[f"{wm.PACKAGE_IDENTIFIER}.installer.yaml"]
+        installer["Installers"][0]["AppsAndFeaturesEntries"][0][
+            "DisplayVersion"] = APP_VERSION
+        problems = wm.validate(manifests, APP_VERSION)
+        self.assertTrue(any("DisplayVersion" in problem for problem in problems))
+
+
+class SchemaHeaderTest(unittest.TestCase):
+    """winget-pkgs wants a schema line first, and `winget validate` misses it."""
+
+    def test_every_kind_has_a_header_naming_the_manifest_version(self):
+        self.assertEqual(
+            sorted(wm.SCHEMA_HEADER),
+            ["defaultLocale", "installer", "version"],
+        )
+        for kind, header in wm.SCHEMA_HEADER.items():
+            with self.subTest(kind):
+                self.assertTrue(header.startswith("# yaml-language-server: $schema="))
+                self.assertIn(wm.MANIFEST_VERSION, header)
+                self.assertIn(kind, header)
+
+    def test_a_generated_file_starts_with_its_schema_line(self):
+        for name in wm.build_all(APP_VERSION, {"x64": FAKE_HASH}):
+            with self.subTest(name):
+                self.assertEqual(
+                    wm.file_header(name, APP_VERSION).splitlines()[0],
+                    wm.schema_header(name),
+                )
+
+    def test_the_shipped_files_start_with_their_schema_line(self):
+        folder = wm.manifest_dir(ROOT, APP_VERSION)
+        if not os.path.isdir(folder):
+            self.skipTest("no manifests generated yet")
+        self.assertEqual(winget_validate.header_problems(folder), [])
+
+
+class SilentSwitchTest(unittest.TestCase):
+    """Nothing in the package may wait for a click during an install.
+
+    The first submission to winget-pkgs wrote a bare ``/VERYSILENT``.  The
+    pipeline's installation step then failed with *"this application failed to
+    install without user input. Did you forget to add Silent or
+    SilentWithProgress switches?"*: declaring ``InstallerSwitches`` replaces
+    winget's Inno defaults, so the ``/SUPPRESSMSGBOXES`` that answers Inno's
+    startup prompt and the install-mode dialog was quietly dropped, and the
+    install sat waiting for a click that never came.
+
+    The fix was the flag set, and that is the guard here: the manifest has to
+    carry ``/SUPPRESSMSGBOXES`` in both silent modes, because the installer
+    keeps the "install for all users / install for me only" choice and so still
+    raises that dialog.  Measured on the published 2026.3.7 build, a bare
+    ``/VERYSILENT`` install never exits, while the same installer with
+    ``/SUPPRESSMSGBOXES`` installs unattended and exits 0 - and the winget-pkgs
+    installation test passes on exactly those published bytes.
+    """
+
+    def setUp(self):
+        self.manifests = wm.build_all(APP_VERSION, {"x64": FAKE_HASH},
+                                      release_date="2026-09-23")
+        self.installer = self.manifests[
+            f"{wm.PACKAGE_IDENTIFIER}.installer.yaml"]
+
+    def switches(self) -> dict:
+        return dict(self.installer["InstallerSwitches"])
+
+    def inno_script(self) -> str:
+        with open(INSTALLER_ISS, encoding="utf-8") as handle:
+            return handle.read()
+
+    def test_every_silent_mode_carries_the_required_flags(self):
+        switches = self.switches()
+        self.assertEqual(sorted(switches), ["Silent", "SilentWithProgress"])
+        for mode in ("Silent", "SilentWithProgress"):
+            with self.subTest(mode):
+                for flag in wm.REQUIRED_SILENT_FLAGS:
+                    self.assertIn(flag, switches[mode])
+
+    def test_the_two_modes_differ_in_how_much_they_show(self):
+        switches = self.switches()
+        self.assertIn("/VERYSILENT", switches["Silent"])
+        self.assertIn("/SILENT", switches["SilentWithProgress"])
+        self.assertNotIn("/VERYSILENT", switches["SilentWithProgress"])
+
+    def test_dropping_a_flag_is_reported(self):
+        self.installer["InstallerSwitches"]["Silent"] = "/VERYSILENT"
+        problems = wm.validate(self.manifests, APP_VERSION)
+        self.assertTrue(
+            any("/SUPPRESSMSGBOXES" in problem for problem in problems),
+            problems,
+        )
+
+    def test_the_inno_script_keeps_the_install_mode_choice(self):
+        r"""A person may still choose "for all users" or "for me only".
+
+        ``PrivilegesRequiredOverridesAllowed=dialog`` is kept deliberately: the
+        elevated all-users install is a supported way to run the application.
+        It is also why the manifest's switch set is not optional - the published
+        2026.3.7 asset, the bytes winget-pkgs actually downloads, raises that
+        dialog, and only ``/SUPPRESSMSGBOXES`` answers it unattended (Inno then
+        takes the choice marked recommended, which with
+        ``PrivilegesRequired=lowest`` is the per-user one, so the install still
+        lands in ``{autopf}`` = ``%LOCALAPPDATA%\Programs`` as ``Scope: user``
+        says).  Setup's "Do you wish to continue?" prompt is a separate, wholly
+        choiceless box and stays off via ``DisableStartupPrompt=yes``.
+        """
+        script = self.inno_script()
+        self.assertIn("DisableStartupPrompt=yes", script)
+        self.assertIn("PrivilegesRequired=lowest", script)
+        match = re.search(r"^PrivilegesRequiredOverridesAllowed=(.+)$", script,
+                          re.MULTILINE)
+        self.assertIsNotNone(
+            match,
+            "the install-mode choice is part of the product contract: do not "
+            "remove PrivilegesRequiredOverridesAllowed",
+        )
+        self.assertIn("dialog", match.group(1))
+
+    def test_the_installer_and_the_manifest_agree_on_the_scope(self):
+        """``PrivilegesRequired=lowest`` is what ``Scope: user`` describes.
+
+        An interactive install may still be elevated into ``Program Files`` by
+        the mode dialog, which registers a per-machine ARP entry; that is a
+        user's choice, and winget only models the default path.
+        """
+        script = self.inno_script()
+        self.assertIn("PrivilegesRequired=lowest", script)
+        self.assertNotIn("PrivilegesRequired=highest", script)
+        self.assertEqual(self.installer["Scope"], "user")
+
+    def test_the_shipped_manifest_is_silent_installable(self):
+        folder = wm.manifest_dir(ROOT, APP_VERSION)
+        if not os.path.isdir(folder):
+            self.skipTest("no manifests generated yet")
+        shipped = wm.load_manifests(folder)[
+            f"{wm.PACKAGE_IDENTIFIER}.installer.yaml"]
+        switches = shipped["InstallerSwitches"]
+        for mode in ("Silent", "SilentWithProgress"):
+            with self.subTest(mode):
+                for flag in wm.REQUIRED_SILENT_FLAGS:
+                    self.assertIn(flag, switches[mode])
+
 
 class YamlTest(unittest.TestCase):
     """The manifests are read back by our own reader, so it must be exact."""
@@ -115,14 +270,23 @@ class YamlTest(unittest.TestCase):
 
 
 class ManifestPresentTest(unittest.TestCase):
-    """A release must ship the manifests of the version it ships."""
+    """A *release* must ship the manifests of the version it ships.
+
+    A local build of an unreleased version leaves ``APP_VERSION`` on a version
+    whose manifests have not been generated yet - they are written with the
+    release (``tools/make_winget.py``), so that is reported as a skip, the same
+    way :class:`ShippedManifestTest` treats a version it has no manifests for,
+    and never as a failure.  The manifest folder that *is* in the tree is
+    guarded strictly by that class.
+    """
 
     def test_manifests_exist_for_this_version(self):
         folder = wm.manifest_dir(ROOT, APP_VERSION)
-        self.assertTrue(
-            os.path.isdir(folder),
-            "run tools/make_winget.py after building the installer",
-        )
+        if not os.path.isdir(folder):
+            self.skipTest(
+                f"no winget manifests for {APP_VERSION} yet: run "
+                "tools/make_winget.py when the version is released"
+            )
         manifests = wm.load_manifests(folder)
         for name in (f"{wm.PACKAGE_IDENTIFIER}.yaml",
                      f"{wm.PACKAGE_IDENTIFIER}.installer.yaml",
@@ -212,6 +376,31 @@ class ShippedManifestTest(unittest.TestCase):
                               re.MULTILINE | re.DOTALL)
         self.assertIsNotNone(run_block)
         self.assertIn("skipifsilent", run_block.group(1))
+
+
+class EveryShippedManifestTest(unittest.TestCase):
+    """Every folder in ``winget/manifests`` must use the current schema.
+
+    winget-pkgs retires manifest schema versions on a schedule and then refuses
+    the submission outright: 1.6.0 was rejected on the first 2026.3.7 attempt
+    and 1.12.0 on the third.  The classes above only look at the folder of
+    ``APP_VERSION``, so while 2026.3.7 sat in an open pull request under a
+    version that ``APP_VERSION`` had already moved past, nothing checked it and
+    it kept a retired schema until someone read the bot's comment.  This walks
+    every folder that is in the tree, so bumping ``MANIFEST_VERSION`` without
+    updating a shipped manifest fails here instead of upstream.
+    """
+
+    def test_every_shipped_folder_uses_the_current_manifest_version(self):
+        versions = winget_validate.published_versions(ROOT)
+        if not versions:
+            self.skipTest("no manifest folders in the repository")
+        for version in versions:
+            with self.subTest(version):
+                folder = wm.manifest_dir(ROOT, version)
+                self.assertEqual(winget_validate.header_problems(folder), [])
+                problems = wm.validate(wm.load_manifests(folder), version)
+                self.assertEqual(problems, [])
 
 
 if __name__ == "__main__":

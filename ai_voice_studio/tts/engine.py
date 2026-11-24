@@ -21,10 +21,10 @@ from __future__ import annotations
 import json
 import logging
 import os
+import queue
 import re
 import sys
 import threading
-from typing import Dict
 
 import numpy as np
 
@@ -34,13 +34,19 @@ from ..constants import (
     PUNCTUATION_MATH,
     PUNCTUATION_NONE,
 )
+from . import markup
 from .models import resolve_voice_files
 
 log = logging.getLogger(__name__)
 
+#: Supertonic's own quality knob: 5 (low) to 12 (high), 8 by default.  It is
+#: the number of flow-matching steps the model runs, so it trades a little
+#: speed for a little naturalness.
+SUPERTONIC_NUM_STEPS = 8
+
 _SHERPA = None  # lazy import
 _engine_lock = threading.RLock()
-_engine_cache: Dict[str, "TtsEngine"] = {}
+_engine_cache: dict[str, TtsEngine] = {}
 
 
 class EngineUnavailableError(Exception):
@@ -54,10 +60,10 @@ def default_num_threads() -> int:
     stays importable on a machine where the runtime is missing).
     """
     try:
-        from .. import compute  # noqa: PLC0415
+        from .. import compute
 
         return compute.cpu_threads()
-    except Exception:  # noqa: BLE001
+    except Exception:
         return 2
 
 
@@ -75,23 +81,23 @@ def _ensure_dll_search_path() -> None:
     if sys.platform != "win32":
         return
     try:
-        import importlib.util  # noqa: PLC0415
+        import importlib.util
 
         spec = importlib.util.find_spec("sherpa_onnx")
         if not spec or not spec.submodule_search_locations:
             return
-        lib = os.path.join(list(spec.submodule_search_locations)[0], "lib")
+        lib = os.path.join(next(iter(spec.submodule_search_locations)), "lib")
         if not os.path.isdir(lib):
             return
         if hasattr(os, "add_dll_directory"):
             try:
                 os.add_dll_directory(lib)  # type: ignore[attr-defined]
             except OSError:
-                pass
+                log.debug("Ignoring a failure in _ensure_dll_search_path", exc_info=True)
         path = os.environ.get("PATH", "")
         if lib not in path:
             os.environ["PATH"] = lib + os.pathsep + path
-    except Exception:  # noqa: BLE001
+    except Exception:
         log.debug("Could not set up sherpa-onnx DLL search path", exc_info=True)
 
 
@@ -99,10 +105,10 @@ def _activate_optional_runtimes() -> None:
     """Preload an optional downloaded runtime (GPU) so it shadows the
     bundled CPU runtime before sherpa-onnx is imported."""
     try:
-        from .. import runtime  # noqa: PLC0415
+        from .. import runtime
 
         runtime.activate()
-    except Exception:  # noqa: BLE001
+    except Exception:
         log.debug("Optional runtime activation failed", exc_info=True)
 
 
@@ -112,7 +118,7 @@ def _import_sherpa():
         try:
             _activate_optional_runtimes()
             _ensure_dll_search_path()
-            import sherpa_onnx  # noqa: PLC0415
+            import sherpa_onnx
 
             _SHERPA = sherpa_onnx
         except ImportError as exc:
@@ -124,35 +130,73 @@ def _import_sherpa():
     return _SHERPA
 
 
+def repair_voice_files(voice_entry: dict) -> bool:
+    """Put a voice back together before calling its files incomplete.
+
+    A voice can fail here with its files present and simply one folder too
+    high: builds up to 2027.1.0 extracted every archive of a variant into the
+    variant folder itself, where the last voice's files overwrote the earlier
+    ones, so ``<variant>/<voice>`` - the folder the engine reads - stayed
+    empty.  Those downloads keep their archives, and the voice is rebuilt from
+    its own archive once, without asking for a ~100 MB download that would land
+    in exactly the same place.  Returns ``True`` when a repair was made.
+    """
+    try:
+        from . import downloader
+
+        return bool(downloader.repair_voice_layout(voice_entry))
+    except Exception:
+        log.debug("Could not repair the files of %s", voice_entry.get("dir"), exc_info=True)
+        return False
+
+
 class TtsEngine:
     """Wraps one sherpa-onnx OfflineTts instance."""
 
-    def __init__(self, voice_entry: Dict, provider: str = "cpu", num_threads: int = 2):
+    def __init__(self, voice_entry: dict, provider: str = "cpu", num_threads: int = 2):
         self.voice_entry = voice_entry
         self.provider = provider
         self.files = resolve_voice_files(voice_entry)
+        engine = self.files.get("engine", "vits")
         required = ("model", "tokens")
-        if self.files.get("engine") == "matcha":
-            required = required + ("vocoder",)  # Matcha needs a neural vocoder
+        if engine == "matcha":
+            required = (*required, "vocoder")  # Matcha needs a neural vocoder
+        elif engine == "supertonic":
+            # Supertonic 3 has no model.onnx/tokens.txt: its four ONNX parts
+            # plus the two tokenizer tables and voice.bin are the model.
+            required = (
+                "duration_predictor", "text_encoder", "vector_estimator",
+                "vocoder", "tts_json", "unicode_indexer", "voice_style",
+            )
         missing = [k for k in required if not self.files.get(k)]
+        if missing and repair_voice_files(voice_entry):
+            # The files were there, in the wrong folder: read them again.
+            self.files = resolve_voice_files(voice_entry)
+            missing = [k for k in required if not self.files.get(k)]
         if missing:
             raise EngineUnavailableError(
                 "Model files are incomplete (missing " + ", ".join(missing) + "). "
                 "Re-download the voice from Settings."
             )
         sherpa = _import_sherpa()
+        self._sherpa = sherpa
+        # The language Supertonic speaks: the generation call takes it as an
+        # extra argument, and it is the catalog language of the voice entry.
+        self._lang = ""
+        if engine == "supertonic":
+            self._lang = str(voice_entry.get("language") or "en")
         cfg = self._build_config(sherpa, num_threads)
         try:
             self._tts = sherpa.OfflineTts(cfg)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise EngineUnavailableError(
                 f"Could not load the TTS model: {exc}. Try the CPU back-end."
             ) from exc
         self.sample_rate = 22050
         try:
             self.sample_rate = self._tts.sample_rate
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception:
+            log.debug("Ignoring a failure in TtsEngine.__init__", exc_info=True)
     # -- config ------------------------------------------------------------
     def _build_config(self, sherpa, num_threads: int):
         engine = self.files.get("engine", "vits")
@@ -182,6 +226,30 @@ class TtsEngine:
             model_cfg = sherpa.OfflineTtsModelConfig(
                 kitten=kitten, num_threads=num_threads, provider=self.provider
             )
+        elif engine == "supertonic":
+            # Supertonic 3 (Supertone): one multilingual model, 31 languages
+            # and 10 voice styles.  The provider is passed exactly like the
+            # other ONNX engines, so CPU and GPU (CUDA) both work here.
+            factory = getattr(sherpa, "OfflineTtsSupertonicModelConfig", None)
+            if factory is None:
+                raise EngineUnavailableError(
+                    "This build of the TTS runtime (sherpa-onnx "
+                    f"{getattr(sherpa, '__version__', 'older')}) cannot load "
+                    "Supertonic 3. Update sherpa-onnx to 1.13.6 or newer "
+                    "(pip install -U sherpa-onnx) and try again."
+                )
+            supertonic = factory(
+                duration_predictor=self.files["duration_predictor"],
+                text_encoder=self.files["text_encoder"],
+                vector_estimator=self.files["vector_estimator"],
+                vocoder=self.files["vocoder"],
+                tts_json=self.files["tts_json"],
+                unicode_indexer=self.files["unicode_indexer"],
+                voice_style=self.files["voice_style"],
+            )
+            model_cfg = sherpa.OfflineTtsModelConfig(
+                supertonic=supertonic, num_threads=num_threads, provider=self.provider
+            )
         elif engine == "matcha":
             matcha = sherpa.OfflineTtsMatchaModelConfig(
                 acoustic_model=self.files["model"],
@@ -207,6 +275,14 @@ class TtsEngine:
             model_cfg = sherpa.OfflineTtsModelConfig(
                 vits=vits, num_threads=num_threads, provider=self.provider
             )
+        # Sentence batching (``max_num_sentences``) is deliberately left at 1.
+        # The Kokoro implementation ignores every other value ("max_num_sentences
+        # (8) != 1 is ignored for Kokoro TTS models"), and the engines that do
+        # honour it gained nothing when measured (Kitten: 1.26x realtime at 1,
+        # 1.20-1.33x realtime at 2-8) because the per-sentence CPU front-end
+        # (normalisation, espeak-ng phonemisation, tokenisation) - not the card -
+        # is the bottleneck.  What fills the GPU is several segments in flight:
+        # see :class:`TtsEnginePool`.
         return sherpa.OfflineTtsConfig(model=model_cfg, rule_fsts="", max_num_sentences=1)
 
     # -- synthesis ---------------------------------------------------------
@@ -217,11 +293,21 @@ class TtsEngine:
         speed: float = 1.0,
         pitch: float = 1.0,
         volume: float = 1.0,
-    ) -> "np.ndarray":
+    ) -> np.ndarray:
         """Synthesize text; returns int16 samples at ``self.sample_rate``."""
         if not text.strip():
             raise ValueError("Nothing to synthesize")
-        audio = self._tts.generate(text=text, sid=int(sid), speed=float(speed))
+        if self._lang:
+            # A multilingual model is told which language to speak; the same
+            # call also carries the speaker and the speed.
+            gen = self._sherpa.GenerationConfig()
+            gen.sid = int(sid)
+            gen.speed = float(speed)
+            gen.num_steps = SUPERTONIC_NUM_STEPS
+            gen.extra["lang"] = self._lang
+            audio = self._tts.generate(text, gen)
+        else:
+            audio = self._tts.generate(text=text, sid=int(sid), speed=float(speed))
         samples = samples_to_int16(audio.samples)
         if pitch != 1.0:
             samples = _shift_pitch(samples, pitch)
@@ -230,7 +316,7 @@ class TtsEngine:
         return samples
 
 
-def samples_to_int16(raw) -> "np.ndarray":
+def samples_to_int16(raw) -> np.ndarray:
     """Convert raw TTS samples to int16 PCM.
 
     sherpa-onnx returns the generated audio as ``std::vector<float>`` samples
@@ -248,7 +334,7 @@ def samples_to_int16(raw) -> "np.ndarray":
 # Engine cache
 # ---------------------------------------------------------------------------
 def get_engine(
-    voice_entry: Dict,
+    voice_entry: dict,
     provider: str = "cpu",
     num_threads: int = 0,
 ):
@@ -259,47 +345,47 @@ def get_engine(
     # Windows system voices (SAPI5 / Windows Core) are synthesised by the
     # operating system through PowerShell, not by sherpa-onnx.
     if voice_entry.get("engine") in ("sapi5", "windows_core"):
-        from ..tts.windows_tts import WindowsVoiceEngine  # noqa: PLC0415
+        from ..tts.windows_tts import WindowsVoiceEngine
 
         try:
             return WindowsVoiceEngine(voice_entry)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise EngineUnavailableError(str(exc)) from exc
     # OmniVoice runs in a separate worker process through the
     # omnivoice-triton runtime; it requires an NVIDIA GPU.
     if voice_entry.get("engine") == "omnivoice":
-        from ..omnivoice import OmniVoiceEngine  # noqa: PLC0415
+        from ..omnivoice import OmniVoiceEngine
 
         try:
             return OmniVoiceEngine(voice_entry)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise EngineUnavailableError(str(exc)) from exc
     # OmniVoice Server runs as an HTTP server (OpenAI-compatible API).
     if voice_entry.get("engine") == "omnivoice_server":
-        from ..omnivoice_server import OmniVoiceServerEngine  # noqa: PLC0415
+        from ..omnivoice_server import OmniVoiceServerEngine
 
         try:
             return OmniVoiceServerEngine(voice_entry)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise EngineUnavailableError(str(exc)) from exc
-    # Voice Lab engines (Pocket TTS, Bark, F5-TTS) run through the
+    # Voice Lab engines (Pocket TTS, F5-TTS) run through the
     # managed virtualenv. They work on the CPU and use the GPU when the user
     # asked for it; ``provider`` carries that choice here.
     try:
-        from ..voicelab import engines as voicelab_engines  # noqa: PLC0415
+        from ..voicelab import engines as voicelab_engines
 
         is_voice_lab = voicelab_engines.is_engine(voice_entry.get("engine"))
-    except Exception:  # noqa: BLE001
+    except Exception:
         is_voice_lab = False
     if is_voice_lab:
-        from ..voicelab import VoicelabEngine  # noqa: PLC0415
+        from ..voicelab import VoicelabEngine
 
         try:
             return VoicelabEngine(
                 voice_entry,
                 device=voice_entry.get("device") or provider,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise EngineUnavailableError(str(exc)) from exc
     # sid is a per-call generate() argument, not part of the engine's
     # identity: multi-speaker models (e.g. Kokoro multi-lang with 53 speakers)
@@ -338,6 +424,158 @@ def get_engine(
             engine = TtsEngine(voice_entry, provider=provider, num_threads=num_threads)
             _engine_cache[key] = engine
         return engine
+
+
+def is_local_sherpa_engine(voice_entry: dict) -> bool:
+    """True when a local sherpa-onnx model does the speaking.
+
+    Windows system voices, OmniVoice (its own worker process / HTTP server) and
+    the Voice Lab engines bring their own runtime, where several engines at once
+    would mean several worker processes.  How many of those a Voice Lab engine
+    *may* run is decided by its own plan (see :func:`planned_workers`).
+    """
+    engine = voice_entry.get("engine", "vits")
+    if engine in ("sapi5", "windows_core", "omnivoice", "omnivoice_server"):
+        return False
+    try:
+        from ..voicelab import engines as voicelab_engines
+
+        return not voicelab_engines.is_engine(engine)
+    except Exception:
+        return True
+
+
+def planned_workers(
+    voice_entry: dict,
+    compute_choice: str = "cpu",
+    total: int | None = None,
+) -> int:
+    """How many segments a run of this voice may synthesize at the same time.
+
+    Where the number comes from depends on who speaks:
+
+    * a **local sherpa-onnx model** - :func:`compute.synthesis_workers`: a GPU
+      run keeps two to four segments in flight so the card is not left waiting
+      for the CPU to phonemise every sentence, a CPU run keeps one;
+    * a **Voice Lab engine that can fill a GPU** (Chatterbox, Qwen3-TTS,
+      VibeVoice) - what
+      its own plan affords on the card *now* (``voicelab.parallel_plan``):
+      several worker processes for an engine that speaks one text per call, or
+      several texts in one batched call for an engine whose own call takes a
+      list of them;
+    * anything else with a runtime of its own (OmniVoice, the Windows voices,
+      a Voice Lab engine on a CPU) - one, because each of those is a worker
+      process of its own.
+
+    The caller still *saves and reports* the segments in index order; only how
+    many are in flight changes.
+    """
+    if total is not None and int(total) <= 0:
+        return 1
+    if not is_local_sherpa_engine(voice_entry):
+        engine_id = str(voice_entry.get("engine") or "")
+        try:
+            from ..voicelab import engines as voicelab_engines
+
+            if voicelab_engines.is_engine(engine_id):
+                from ..voicelab import parallel_plan
+
+                # Deliberately without the variant: this is the same plan the
+                # engine's shared worker pool settles on (``voicelab.pool_for``
+                # is keyed by engine and device, not by voice), and the two
+                # must not disagree about how many segments are in flight.
+                slots, _mode = parallel_plan(
+                    engine_id, voice_entry.get("device") or compute_choice
+                )
+                return max(1, min(slots, int(total)) if total else slots)
+        except Exception:
+            return 1
+        return 1
+    from .. import compute
+
+    return compute.synthesis_workers(compute_choice, total=total)
+
+
+class TtsEnginePool:
+    """A few interchangeable engines, so several segments can be in flight.
+
+    sherpa-onnx prepares and runs **one sentence** per ``generate`` call, and
+    the Kokoro implementation ignores ``max_num_sentences``, so a single engine
+    leaves the card idle most of the time: it waits while the CPU normalises,
+    phonemises and tokenises the next sentence.  A pool keeps that CPU work of
+    one segment overlapped with the GPU work of another, which is what raises
+    utilisation and shortens the recording.  Every segment is still synthesised
+    by the same model with the same arguments, one sentence at a time, so the
+    audio is exactly what a single engine would have produced.
+    """
+
+    def __init__(
+        self,
+        voice_entry: dict,
+        provider: str = "cuda",
+        size: int = 2,
+        num_threads: int = 0,
+    ):
+        if not num_threads:
+            num_threads = default_num_threads()
+        self.provider = provider
+        self._free: queue.Queue[TtsEngine] = queue.Queue()
+        engines: list[TtsEngine] = []
+        try:
+            for _ in range(max(1, int(size))):
+                engines.append(
+                    TtsEngine(voice_entry, provider=provider, num_threads=num_threads)
+                )
+        except EngineUnavailableError:
+            # Out of video memory (or out of disk after a partial download):
+            # keep whatever did load rather than failing the whole recording.
+            if not engines:
+                raise
+            log.warning(
+                "Only %d of %d TTS engines could be loaded; continuing with %d",
+                len(engines), size, len(engines),
+            )
+        for engine in engines:
+            self._free.put(engine)
+        self.sample_rate = engines[0].sample_rate
+
+    @property
+    def size(self) -> int:
+        """How many engines this pool actually holds."""
+        return self._free.qsize()
+
+    def synthesize(
+        self,
+        text: str,
+        sid: int = 0,
+        speed: float = 1.0,
+        pitch: float = 1.0,
+        volume: float = 1.0,
+    ) -> np.ndarray:
+        """Synthesize on the first free engine (same signature as the engine)."""
+        engine = self._free.get()
+        try:
+            return engine.synthesize(
+                text, sid=sid, speed=speed, pitch=pitch, volume=volume
+            )
+        finally:
+            self._free.put(engine)
+
+
+def get_engine_pool(
+    voice_entry: dict,
+    provider: str = "cpu",
+    size: int = 2,
+    num_threads: int = 0,
+):
+    """An engine that can synthesize ``size`` segments at the same time.
+
+    ``size`` of 1 - or a voice that is not a local sherpa-onnx model - returns
+    the shared cached engine, so a pool is only ever created when it can help.
+    """
+    if size <= 1 or not is_local_sherpa_engine(voice_entry):
+        return get_engine(voice_entry, provider=provider, num_threads=num_threads)
+    return TtsEnginePool(voice_entry, provider=provider, size=size, num_threads=num_threads)
 
 
 def clear_engine_cache() -> None:
@@ -408,10 +646,28 @@ _PUNCT_WORDS = {
 }
 
 
-def process_punctuation(text: str, mode: str) -> str:
-    """Apply the selected punctuation mode (default/none/math/all)."""
+def process_punctuation(text: str, mode: str,
+                        engine_id: str | None = None) -> str:
+    """Apply the selected punctuation mode (default/none/math/all).
+
+    ``engine_id`` is the engine the text is destined for.  An engine that reads
+    expression markup - Kitten TTS 2.0's ``[emotion]`` tags, ``<event>`` tags
+    and ``(((emphasis)))`` spans - keeps them exactly as typed: the spans are
+    set aside before the mode runs and written back afterwards (*every* mode, so
+    neither the spoken-word expansion of ``all`` nor the symbol stripping of
+    ``none``/``math`` can reach them), because they are director's notes rather
+    than punctuation, and an engine conditions on them instead of speaking
+    them.  Without the engine - or for one that has no such markup - nothing
+    changes: the mode sees the whole text, as it always did.
+    """
     if mode == PUNCTUATION_DEFAULT:
         return text
+    text, spans = markup.protect_for(engine_id, text)
+    return markup.restore(_apply_punctuation_mode(text, mode), spans)
+
+
+def _apply_punctuation_mode(text: str, mode: str) -> str:
+    """The mode itself, with any expression markup already set aside."""
     if mode == PUNCTUATION_ALL:
         # Replace every punctuation mark with its spoken word so TTS engines
         # that cannot pronounce punctuation still read it correctly.
@@ -436,9 +692,9 @@ def process_punctuation(text: str, mode: str) -> str:
 # ---------------------------------------------------------------------------
 # Pitch / volume helpers (numpy, no extra deps)
 # ---------------------------------------------------------------------------
-def _resample(samples: "np.ndarray", factor: float) -> "np.ndarray":
+def _resample(samples: np.ndarray, factor: float) -> np.ndarray:
     """Linearly resample a 1-D int16 array by ``factor`` (>1 speeds up)."""
-    n_out = int(round(len(samples) * factor))
+    n_out = round(len(samples) * factor)
     if n_out == len(samples):
         return samples
     x_old = np.linspace(0.0, 1.0, len(samples), endpoint=False)
@@ -446,7 +702,7 @@ def _resample(samples: "np.ndarray", factor: float) -> "np.ndarray":
     return np.interp(x_new, x_old, samples).astype(np.int16)
 
 
-def _shift_pitch(samples: "np.ndarray", factor: float) -> "np.ndarray":
+def _shift_pitch(samples: np.ndarray, factor: float) -> np.ndarray:
     """Approximate pitch shift without changing duration.
 
     Resample up/down by ``factor`` (changes pitch) then time-stretch back to the
@@ -457,11 +713,11 @@ def _shift_pitch(samples: "np.ndarray", factor: float) -> "np.ndarray":
     try:
         shifted = _resample(samples, factor)
         return _resample(shifted, 1.0 / factor)
-    except Exception:  # noqa: BLE001
+    except Exception:
         return samples
 
 
-def _apply_volume(samples: "np.ndarray", volume: float) -> "np.ndarray":
+def _apply_volume(samples: np.ndarray, volume: float) -> np.ndarray:
     scaled = samples.astype(np.float64) * float(volume)
     np.clip(scaled, -32768, 32767, out=scaled)
     return scaled.astype(np.int16)
@@ -472,13 +728,13 @@ def _apply_volume(samples: "np.ndarray", volume: float) -> "np.ndarray":
 # ---------------------------------------------------------------------------
 def preview_synthesis(
     text: str,
-    voice_entry: Dict,
+    voice_entry: dict,
     provider: str = "cpu",
     speed: float = 1.0,
     pitch: float = 1.0,
     volume: float = 1.0,
     punctuation: str = PUNCTUATION_DEFAULT,
-) -> "np.ndarray":
+) -> np.ndarray:
     engine = get_engine(voice_entry, provider=provider)
-    text = process_punctuation(text, punctuation)
+    text = process_punctuation(text, punctuation, voice_entry.get("engine"))
     return engine.synthesize(text, sid=voice_entry.get("sid", 0), speed=speed, pitch=pitch, volume=volume)

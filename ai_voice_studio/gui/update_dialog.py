@@ -23,6 +23,7 @@ import wx
 
 from .. import updates
 from ..constants import APP_NAME, APP_VERSION
+from . import dpi
 from .a11y import finalize_accessibility, set_accessible_name
 from .dialogs import run_action_dialog
 from .progress import TaskProgressDialog
@@ -57,8 +58,8 @@ def auto_check_due(settings, now: _dt.datetime | None = None) -> bool:
     except ValueError:
         return True  # an unreadable timestamp must not disable checking
     if previous.tzinfo is None:
-        previous = previous.replace(tzinfo=_dt.timezone.utc)
-    now = now or _dt.datetime.now(_dt.timezone.utc)
+        previous = previous.replace(tzinfo=_dt.UTC)
+    now = now or _dt.datetime.now(_dt.UTC)
     return (now - previous).total_seconds() >= AUTO_CHECK_INTERVAL_SECONDS
 
 
@@ -67,7 +68,7 @@ def mark_checked(settings, now: _dt.datetime | None = None) -> None:
     if settings is None:
         return
     block = dict(_updates_settings(settings))
-    now = now or _dt.datetime.now(_dt.timezone.utc)
+    now = now or _dt.datetime.now(_dt.UTC)
     block["last_check"] = now.isoformat(timespec="seconds")
     settings.set("updates", block)
     settings.save()
@@ -162,6 +163,8 @@ class UpdateAvailableDialog(wx.Dialog):
         self.Fit()
         self.SetMinSize(self.GetSize())
         finalize_accessibility(self)
+        dpi.prepare(self)
+        dpi.follow(self)
         if parent is not None and parent.IsShown():
             self.CentreOnParent()
         else:
@@ -180,11 +183,11 @@ class UpdateAvailableDialog(wx.Dialog):
 # Downloading and running the installer
 # ---------------------------------------------------------------------------
 def _open_release_page(release: updates.ReleaseInfo) -> None:
-    import webbrowser  # noqa: PLC0415
+    import webbrowser
 
     try:
         webbrowser.open(release.page_url or updates.RELEASES_PAGE)
-    except Exception:  # noqa: BLE001 - opening a page must never raise
+    except Exception:
         log.debug("Could not open %s", release.page_url, exc_info=True)
 
 
@@ -250,7 +253,7 @@ def download_and_install(parent: wx.Window, release: updates.ReleaseInfo) -> Non
         _offer_install(parent, release, path)
 
     def worker() -> None:
-        from ..tts.downloader import DownloadCancelled  # noqa: PLC0415
+        from ..tts.downloader import DownloadCancelled
 
         try:
             path = updates.download_installer(release, progress=on_progress,
@@ -259,7 +262,7 @@ def download_and_install(parent: wx.Window, release: updates.ReleaseInfo) -> Non
             log.info("Update download cancelled by the user")
             wx.CallAfter(progress.finish)
             return
-        except Exception as exc:  # noqa: BLE001 - reported in the dialog
+        except Exception as exc:
             log.warning("Update download failed: %s", exc)
             wx.CallAfter(finished, None, str(exc))
             return
@@ -369,7 +372,7 @@ def schedule_auto_check(parent: wx.Window, settings) -> None:
     def landed(check: updates.UpdateCheck) -> None:
         try:
             _present(parent, settings, check, manual=False)
-        except Exception:  # noqa: BLE001 - a background check must never crash
+        except Exception:
             log.debug("Automatic update check presentation failed", exc_info=True)
 
     threading.Thread(target=worker, daemon=True, name="aivs-update-auto").start()

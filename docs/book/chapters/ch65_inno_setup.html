@@ -18,7 +18,7 @@
 <h1>Inno Setup Installers</h1>
 
 <div class="info">
-  <strong>Current implementation (2026.3.1).</strong> The scripts are shared through
+  <strong>Current implementation (2027.1.0).</strong> The scripts are shared through
   <code>installer_common.iss</code>, which the two architecture files include. The version
   strings (<code>AppVersion</code>, <code>VersionInfoVersion</code>,
   <code>VersionInfoProductVersion</code>) live there and must match
@@ -95,7 +95,8 @@ pyinstaller packaging/ai_voice_studio.spec
 <h2>65.2 Installer Features</h2>
 
 <ul>
-  <li><strong>"Install for all users"</strong> / <strong>"for me only"</strong> choice (no admin needed for per-user)</li>
+  <li><strong>Per-user by default</strong> (<code>PrivilegesRequired=lowest</code>) with Inno's <em>Select Setup Install Mode</em> dialog kept (<code>PrivilegesRequiredOverridesAllowed=dialog</code>), so an install for all users is still possible while "for me only" needs no admin; the winget manifest answers that dialog with <code>/SUPPRESSMSGBOXES</code>, so an unattended install takes the recommended per-user choice</li>
+  <li><code>DisableStartupPrompt=yes</code>, so an unattended install never stops on the "Do you wish to continue?" prompt</li>
   <li>Install location picker</li>
   <li>Start Menu folder choice</li>
   <li>Optional <strong>desktop icon</strong></li>

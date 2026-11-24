@@ -116,7 +116,7 @@ def main() -> int:
 
         if cmd == "ping":
             try:
-                from omnivoice_triton import create_runner  # noqa: PLC0415, F401
+                from omnivoice_triton import create_runner
                 respond({"ok": True, "engine": True})
             except ImportError as exc:
                 respond({
@@ -134,7 +134,7 @@ def main() -> int:
                 if runner is None:
                     # Lazy: first request pays the torch import + model download.
                     try:
-                        from omnivoice_triton import create_runner  # noqa: PLC0415
+                        from omnivoice_triton import create_runner
                     except ImportError as exc:
                         raise RuntimeError(
                             "OmniVoice engine not installed. "
@@ -232,7 +232,7 @@ def main() -> int:
 
                 wav_b64 = base64.b64encode(samples.tobytes()).decode("ascii")
                 time_s = result.get("time_s")
-                if time_s is None:
+                if time_s is None:  # noqa: SIM108 - kept readable, this path is frozen
                     time_ms = result.get("time_ms", 0)
                 else:
                     time_ms = int(round(float(time_s) * 1000.0))
@@ -246,7 +246,7 @@ def main() -> int:
                     "skipped": sorted(set(skipped)),
                     "warnings": warnings,
                 })
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 respond({"ok": False, "error": f"{type(exc).__name__}: {exc}"})
             continue
 

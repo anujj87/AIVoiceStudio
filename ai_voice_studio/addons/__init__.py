@@ -59,7 +59,7 @@ import logging
 import os
 import sys
 import threading
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .. import paths
 
@@ -87,7 +87,7 @@ def _parse_version(v: str) -> tuple:
 class AddonManifest:
     """Parsed manifest.json for an addon."""
 
-    def __init__(self, path: str, data: Dict[str, Any]):
+    def __init__(self, path: str, data: dict[str, Any]):
         self.path = path
         self.name: str = data.get("name", "Unnamed Addon")
         self.version: str = data.get("version", "0.0.0")
@@ -98,9 +98,9 @@ class AddonManifest:
         self.engine_id: str = data.get("engine_id", "")
         self.engine_name: str = data.get("engine_name", "")
         self.engine_entry_point: str = data.get("engine_entry_point", "")
-        self.dependencies: List[str] = data.get("dependencies", [])
-        self.voices: List[Dict[str, Any]] = data.get("voices", [])
-        self.provides: List[str] = data.get("provides", [])
+        self.dependencies: list[str] = data.get("dependencies", [])
+        self.voices: list[dict[str, Any]] = data.get("voices", [])
+        self.provides: list[str] = data.get("provides", [])
         self.enabled: bool = data.get("enabled", True)
         self._raw = data
 
@@ -112,7 +112,7 @@ class AddonManifest:
     def is_compatible(self) -> bool:
         return _parse_version(self.min_app_version) <= _parse_version(_MIN_APP_VERSION)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         d = dict(self._raw)
         d["enabled"] = self.enabled
         return d
@@ -130,14 +130,14 @@ class AddonManager:
 
     def __init__(self, addons_dir: str | None = None):
         self._dir = addons_dir or _addon_dir()
-        self._addons: Dict[str, AddonManifest] = {}
-        self._loaded_modules: Dict[str, Any] = {}
-        self._engines: Dict[str, Any] = {}
+        self._addons: dict[str, AddonManifest] = {}
+        self._loaded_modules: dict[str, Any] = {}
+        self._engines: dict[str, Any] = {}
         self._lock = threading.RLock()
 
     # -- discovery ----------------------------------------------------------
 
-    def discover(self) -> List[AddonManifest]:
+    def discover(self) -> list[AddonManifest]:
         """Scan the addons directory and load manifests."""
         self._addons.clear()
         if not os.path.isdir(self._dir):
@@ -147,7 +147,7 @@ class AddonManager:
             if not os.path.isfile(manifest_path):
                 continue
             try:
-                with open(manifest_path, "r", encoding="utf-8") as fh:
+                with open(manifest_path, encoding="utf-8") as fh:
                     data = json.load(fh)
                 manifest = AddonManifest(manifest_path, data)
                 if not manifest.is_compatible:
@@ -164,17 +164,15 @@ class AddonManager:
 
     # -- access -------------------------------------------------------------
 
-    def list_addons(self) -> List[AddonManifest]:
+    def list_addons(self) -> list[AddonManifest]:
         return list(self._addons.values())
 
-    def get_addon(self, name: str) -> AddonManifest | None:
-        return self._addons.get(name)
 
-    def get_engines(self) -> Dict[str, Any]:
+    def get_engines(self) -> dict[str, Any]:
         """Return loaded engine classes keyed by engine_id."""
         return dict(self._engines)
 
-    def get_all_voices(self) -> List[Dict[str, Any]]:
+    def get_all_voices(self) -> list[dict[str, Any]]:
         """Aggregate voices from all enabled addons."""
         voices = []
         for manifest in self._addons.values():
@@ -183,6 +181,11 @@ class AddonManager:
             for voice in manifest.voices:
                 entry = dict(voice)
                 entry["addon"] = manifest.name
+                # A voice that names no engine of its own is spoken by the
+                # addon's engine: the manifest declares that above the voice
+                # list, and ``register_addon_voices`` has to know which engine
+                # (and therefore which model folder layout) the voice uses.
+                entry["engine_id"] = entry.get("engine_id") or manifest.engine_id
                 # Resolve relative data_dir to absolute path
                 data_dir = entry.get("data_dir", "")
                 if data_dir and not os.path.isabs(data_dir):
@@ -339,7 +342,7 @@ class AddonManager:
             log.error("No manifest.json found in %s", source_dir)
             return False
         try:
-            with open(manifest_path, "r", encoding="utf-8") as fh:
+            with open(manifest_path, encoding="utf-8") as fh:
                 data = json.load(fh)
             name = data.get("name", "").strip()
             if not name:
@@ -397,8 +400,11 @@ def register_addon_voices(store) -> None:
     """
     manager = get_addon_manager()
     for voice in manager.get_all_voices():
-        name = voice.get("name", "addon_voice")
-        engine_id = voice.get("engine_id", "vits")
+        name = voice.get("name") or "addon_voice"
+        # An addon voice is spoken by its own engine, or - when the manifest and
+        # the voice both leave it open - by the built-in sherpa engine, which is
+        # what a voice that ships plain model files wants.
+        engine_id = voice.get("engine_id") or "vits"
         data_dir = voice.get("data_dir", "")
         if data_dir and os.path.isdir(data_dir):
             store.add_custom_voice(

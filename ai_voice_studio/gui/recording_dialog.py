@@ -13,14 +13,14 @@ import logging
 import os
 import threading
 import time
+
 import wx
 
-from .. import compute, project
+from .. import compute, project, venv_packages
 from ..audio import ffmpeg as ffmpeg_mod
 from ..constants import (
-    AUDIO_MODE_DESCRIPTIONS,
-    DAISY3_PACKAGE_FILE,
     DAISY3_OUTPUT_DIR_NAME,
+    DAISY3_PACKAGE_FILE,
     DAISY_NCC_FILE,
     DAISY_OUTPUT_DIR_NAME,
     FORMAT_WAV,
@@ -35,12 +35,11 @@ from ..constants import (
 )
 from ..documents.splitter import Segment
 from ..jobs.synthesizer import SynthesisWorker
-from .. import venv_packages
 from ..settings import Settings
 from ..tts import catalog, windows_tts
-from ..util import sanitize_filename
 from ..tts.models import ModelStore
-from . import access_keys, dialogs, language_choice
+from ..util import sanitize_filename
+from . import access_keys, announce, dialogs, dpi, language_choice
 from .a11y import (
     add_labeled,
     finalize_accessibility,
@@ -100,15 +99,26 @@ _COMPUTE_LABELS = {
 # TTS engines available for each compute mode.
 # Local engines (Piper, Kokoro, Kitten, the built-in Windows system voices,
 # etc.) work with CPU/GPU compute.  OmniVoice engines (Server, Triton,
-# Hybrid) require CUDA GPU.  The Voice Lab engines (Pocket TTS, Bark, F5-TTS)
+# Hybrid) require CUDA GPU.  The Voice Lab engines (Pocket TTS, F5-TTS)
 # run on the CPU and on the GPU, so their compute combo offers the CPU and -
 # when a GPU is detected - the GPU as well.
 _ONNX_TTS_ENGINES = {
-    "piper", "kokoro", "kitten", "matcha", "pocket",
+    "piper", "kokoro", "kitten", "matcha", "pocket", "supertonic",
     "sapi5", "windows_core",
 }
 _OMNIVOICE_ENGINES = {"omnivoice", "omnivoice_server"}
-_VOICE_LAB_ENGINES = {"pocket_tts", "bark", "f5tts"}
+
+
+def _is_voicelab_engine(tts_id) -> bool:
+    """True when ``tts_id`` is a Voice Lab (CPU/GPU) engine.
+
+    Asked of the engine registry rather than kept as a list of ids here, so a
+    new Voice Lab engine (KokoClone) is wired into the Recording window the
+    moment it is registered.
+    """
+    from ..voicelab import is_engine
+
+    return is_engine(tts_id)
 
 
 class RecordingDialog(wx.Dialog):
@@ -152,11 +162,13 @@ class RecordingDialog(wx.Dialog):
         self._update_progress()
         note = self._pending_note()
         if note:
-            self.status.SetLabel(note)
+            announce.status_text(self.status, note)
         # Announce the project name and focus the text preview.
         self.SetName(f"Recording: {self.data.get('name', '')}")
         # Real MSAA accNames for every labelled control.
         finalize_accessibility(self)
+        dpi.prepare(self)
+        dpi.follow(self)
         wx.CallAfter(self.text_preview.SetFocus)
 
     # ------------------------------------------------------------------ UI
@@ -394,10 +406,13 @@ class RecordingDialog(wx.Dialog):
         """
         sel = self.compute_combo.GetSelection()
         raw = self.compute_combo.GetClientData(sel) if sel >= 0 else "auto"
-        if self._selected_tts_id() in _VOICE_LAB_ENGINES:
-            from ..voicelab import resolve_device  # noqa: PLC0415
+        tts_id = self._selected_tts_id()
+        if _is_voicelab_engine(tts_id):
+            from ..voicelab import resolve_device
 
-            return resolve_device(raw)
+            # Per engine: one that only runs on the GPU resolves to it
+            # whatever the combo says.
+            return resolve_device(raw, tts_id)
         if raw == compute.COMPUTE_AUTO:
             return compute.resolve_compute(raw)
         return raw
@@ -451,14 +466,14 @@ class RecordingDialog(wx.Dialog):
         # agnostic, so register them under every installed OmniVoice engine
         # and they appear no matter which TTS version is selected.
         try:
-            from ..omnivoice import voice_store  # noqa: PLC0415
+            from ..omnivoice import voice_store
             if voice_store.omni_custom_voices(self.store):
                 installed = voice_store.engine_ids_installed()
                 self._all_voices.extend(
                     voice_store.consumer_entries(self.store, installed)
                 )
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception:
+            log.debug("Ignoring a failure in RecordingDialog._populate_voices", exc_info=True)
         # Inject pip-installed OmniVoice voices (not in artifact system)
         self._inject_omnivoice_voices()
         # Bind compute combo change to refresh the voice cascade (only once:
@@ -472,11 +487,11 @@ class RecordingDialog(wx.Dialog):
         """Add pip-installed engines' voices (OmniVoice, Voice Lab).
 
         OmniVoice voices come from the catalog; the Voice Lab engines (Pocket
-        TTS, Bark, F5-TTS) bring their own pre-made voices, which are listed
+        TTS, F5-TTS) bring their own pre-made voices, which are listed
         from their installed package.
         """
         try:
-            from ..voicelab import builtin_voice_entries  # noqa: PLC0415
+            from ..voicelab import builtin_voice_entries
 
             self._all_voices.extend(builtin_voice_entries())
             for tts_entry in catalog.get_tts_list():
@@ -514,8 +529,8 @@ class RecordingDialog(wx.Dialog):
                                     "requires_package": pkg,
                                 }
                             )
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception:
+            log.debug("Ignoring a failure in RecordingDialog._inject_omnivoice_voices", exc_info=True)
 
     def _on_compute_change(self, _):
         """Refresh the voice cascade when the compute back-end changes."""
@@ -526,16 +541,16 @@ class RecordingDialog(wx.Dialog):
         """The Windows voice enumeration finished (worker thread)."""
         try:
             wx.CallAfter(self._rebuild_voice_choices)
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception:
+            log.debug("Ignoring a failure in RecordingDialog._on_builtin_voices", exc_info=True)
 
     def _on_package_probe(self, package: str, engine: str | None = None):
         """A managed-venv probe finished; re-list the engines when present."""
         try:
             if venv_packages.version(package, engine=engine):
                 wx.CallAfter(self._rebuild_voice_choices)
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception:
+            log.debug("Ignoring a failure in RecordingDialog._on_package_probe", exc_info=True)
 
     def _remember_tts_selection(self) -> dict:
         voice = self._selected_voice()
@@ -567,7 +582,7 @@ class RecordingDialog(wx.Dialog):
                         self.compute_combo.SetSelection(index)
                         break
             self._update_omni_ui()
-        except Exception:  # noqa: BLE001
+        except Exception:
             log.debug("Could not rebuild the voice list", exc_info=True)
 
     def _populate_tts_engines(self):
@@ -585,9 +600,9 @@ class RecordingDialog(wx.Dialog):
                           self.variant_combo, self.voice_combo):
                 combo.Clear()
             self.start_btn.Disable()
-            self.status.SetLabel(
+            announce.status_text(self.status,
                 "No voices are installed. Download some from "
-                "Settings > Download and remove."
+                "Settings > Download and remove ONNX TTS."
             )
 
     def _compute_options_for_tts(self, tts_id: str | None):
@@ -598,10 +613,12 @@ class RecordingDialog(wx.Dialog):
         on the CPU and on the GPU (CPU always, GPU plus Auto when detected).
         """
         self.compute_combo.Clear()
-        if tts_id in _VOICE_LAB_ENGINES:
-            from ..voicelab import device_options  # noqa: PLC0415
+        if _is_voicelab_engine(tts_id):
+            from ..voicelab import device_options
 
-            for value, label in device_options():
+            # The engine's own devices: the GPU-only engines (Chatterbox,
+            # Qwen3-TTS, VibeVoice) offer the GPU alone.
+            for value, label in device_options(tts_id):
                 self.compute_combo.Append(label, value)
             # CPU first (the option that works everywhere) unless the user
             # already picked something else for this engine.
@@ -635,14 +652,13 @@ class RecordingDialog(wx.Dialog):
             if is_omni:
                 if engine in _OMNIVOICE_ENGINES or v.get("custom_omni"):
                     self._voices.append(v)
-            else:
-                if engine in _ONNX_TTS_ENGINES or engine in _VOICE_LAB_ENGINES:
-                    self._voices.append(v)
+            elif engine in _ONNX_TTS_ENGINES or _is_voicelab_engine(engine):
+                self._voices.append(v)
         if not self._voices:
             for combo in (self.lang_combo, self.variant_combo, self.voice_combo):
                 combo.Clear()
             self.start_btn.Disable()
-            self.status.SetLabel(
+            announce.status_text(self.status,
                 "No voices available for this TTS engine with the selected "
                 "compute back-end."
             )
@@ -787,11 +803,11 @@ class RecordingDialog(wx.Dialog):
             tts["omni"] = omni
 
     @staticmethod
-    def _omni_summary_text(omni: dict, engine: str | None = None) -> str:
+    def _omni_summary_text(omni: dict) -> str:
         """Short human summary of the stored per-project OmniVoice options."""
         if not omni:
             return ""
-        from ..omnivoice import languages, spec  # noqa: PLC0415
+        from ..omnivoice import languages
         mode = omni.get("mode", "auto")
         if mode == "clone":
             ref = omni.get("ref_audio") or ""
@@ -819,7 +835,7 @@ class RecordingDialog(wx.Dialog):
         """Show the OmniVoice options button only for OmniVoice engines and
         refresh its summary from the project's stored options.
 
-        Voice-library voices (created in Settings > OmniVoice engines) carry
+        Voice-library voices (created in Settings > Voice Clone) carry
         their own clone/design identity, so the per-project options button is
         hidden for them and the summary describes the library voice instead.
         """
@@ -859,7 +875,7 @@ class RecordingDialog(wx.Dialog):
 
     def _on_omni_options(self, _):
         """Open the full-feature OmniVoice options dialog for this project."""
-        from .omnivoice_options_dialog import OmniVoiceOptionsDialog  # noqa: PLC0415
+        from .omnivoice_options_dialog import OmniVoiceOptionsDialog
         tts_id = self._selected_tts_id()
         engine_label = "OmniVoice Server" if tts_id == "omnivoice_server" else "OmniVoice"
         dlg = OmniVoiceOptionsDialog(
@@ -875,13 +891,13 @@ class RecordingDialog(wx.Dialog):
         finally:
             dlg.Destroy()
         self._update_omni_ui()
-        self.status.SetLabel(
+        announce.status_text(self.status,
             "OmniVoice options saved for this project. Press Start recording."
         )
 
     # -- Voice Lab tuning options (per project, per engine) ------------------
     def _is_voicelab_selected(self) -> bool:
-        return self._selected_tts_id() in _VOICE_LAB_ENGINES
+        return _is_voicelab_engine(self._selected_tts_id())
 
     def _engine_options_for_engine(self) -> dict:
         """The tuning overrides this project stores for the selected engine."""
@@ -894,20 +910,20 @@ class RecordingDialog(wx.Dialog):
 
     def _engine_options_defaults(self) -> dict:
         """The tuning defaults saved in Settings > Voice Clone for the engine."""
-        from ..voicelab import options as tuning  # noqa: PLC0415
+        from ..voicelab import options as tuning
 
         tts_id = self._selected_tts_id()
-        if tts_id not in _VOICE_LAB_ENGINES:
+        if not _is_voicelab_engine(tts_id):
             return {}
         saved = self.settings.get(tuning.settings_key(tts_id), {})
         return saved if isinstance(saved, dict) else {}
 
     def _effective_engine_options(self) -> dict:
         """Project overrides, else the saved defaults, else nothing."""
-        from ..voicelab import options as tuning  # noqa: PLC0415
+        from ..voicelab import options as tuning
 
         tts_id = self._selected_tts_id()
-        if tts_id not in _VOICE_LAB_ENGINES:
+        if not _is_voicelab_engine(tts_id):
             return {}
         return tuning.resolve(
             tts_id, self._engine_options_for_engine(),
@@ -922,7 +938,7 @@ class RecordingDialog(wx.Dialog):
         self.engine_options_summary.Show(visible)
         if not visible:
             return
-        from ..voicelab import options as tuning  # noqa: PLC0415
+        from ..voicelab import options as tuning
 
         tts_id = self._selected_tts_id()
         values = self._effective_engine_options()
@@ -942,10 +958,10 @@ class RecordingDialog(wx.Dialog):
 
     def _on_engine_options(self, _):
         """Open the per-engine tuning dialog for this project."""
-        from .voicelab_options_dialog import VoiceLabOptionsDialog  # noqa: PLC0415
+        from .voicelab_options_dialog import VoiceLabOptionsDialog
 
         tts_id = self._selected_tts_id()
-        if tts_id not in _VOICE_LAB_ENGINES:
+        if not _is_voicelab_engine(tts_id):
             return
         dlg = VoiceLabOptionsDialog(
             self,
@@ -966,7 +982,7 @@ class RecordingDialog(wx.Dialog):
         else:
             tts.pop("engine_options", None)
         self._update_engine_options_ui()
-        self.status.SetLabel(
+        announce.status_text(self.status,
             "Engine tuning saved for this project. Press Start recording."
         )
 
@@ -1025,7 +1041,7 @@ class RecordingDialog(wx.Dialog):
         try:
             sel = self.format_combo.GetSelection()
             fmt = self.format_combo.GetClientData(sel) if sel >= 0 else None
-        except Exception:  # noqa: BLE001
+        except Exception:
             fmt = None
         ptype = self.data.get("project_type", "audio_playlist")
         if ptype in _DAISY_PROJECT_TYPES and fmt and fmt != FORMAT_WAV:
@@ -1118,7 +1134,7 @@ class RecordingDialog(wx.Dialog):
         # revert them to "pending" (which breaks DAISY builds and resume).
         try:
             fresh = project.load_project(self.project_dir)
-        except Exception:  # noqa: BLE001
+        except Exception:
             fresh = None
         if fresh is not None:
             fresh["tts"] = tts_data
@@ -1136,8 +1152,8 @@ class RecordingDialog(wx.Dialog):
                     "variant": voice.get("variant"),
                     "voice": voice.get("voice"),
                 })
-            except Exception:  # noqa: BLE001
-                pass
+            except Exception:
+                log.debug("Ignoring a failure in RecordingDialog._save_tts_to_project", exc_info=True)
 
     # One keystroke, one run ------------------------------------------------
     # Alt+S can arrive twice for a single keystroke: the Windows dialog
@@ -1156,12 +1172,12 @@ class RecordingDialog(wx.Dialog):
         self._start_requested_at = now
         try:
             self._begin_recording()
-        except Exception as exc:  # noqa: BLE001 - never fail silently
+        except Exception as exc:
             # A frozen window has nowhere to print a traceback, and a
             # shortcut that appears to do nothing is exactly what a swallowed
             # exception looks like.  Report it instead.
             log.exception("Starting the recording failed")
-            self.status.SetLabel(f"Could not start recording: {exc}")
+            announce.status_error(self.status, f"Could not start recording: {exc}")
             wx.MessageBox(
                 f"Could not start recording:\n\n{exc}",
                 "Recording", style=wx.OK | wx.ICON_ERROR,
@@ -1189,10 +1205,10 @@ class RecordingDialog(wx.Dialog):
 
         # Enrich the voice entry with this project's OmniVoice options
         # (cloning reference, design instructions, language hint, knobs).
-        # Voice-library voices (Settings > OmniVoice engines) carry their own
+        # Voice-library voices (Settings > Voice Clone) carry their own
         # identity, so the project's options never override them.
         if voice.get("engine") in _OMNIVOICE_ENGINES:
-            from ..omnivoice import spec  # noqa: PLC0415
+            from ..omnivoice import spec
 
             if voice.get("custom_omni"):
                 # A voice-library voice keeps its own clone/design identity;
@@ -1212,7 +1228,7 @@ class RecordingDialog(wx.Dialog):
                     if voice.get("custom_omni"):
                         wx.MessageBox(
                             "This voice library clone's sample audio is missing. "
-                            "Re-create the voice from Settings > OmniVoice engines.",
+                            "Re-create the voice from Settings > Voice Clone.",
                             "OmniVoice clone",
                             style=wx.OK | wx.ICON_INFORMATION,
                         )
@@ -1229,14 +1245,14 @@ class RecordingDialog(wx.Dialog):
                 )
         # Voice Lab engines: hand this project's tuning overrides (or the
         # Settings defaults for the engine) to the synthesis worker.
-        if voice.get("engine") in _VOICE_LAB_ENGINES:
-            from ..voicelab import options as tuning  # noqa: PLC0415
+        if _is_voicelab_engine(voice.get("engine")):
+            from ..voicelab import options as tuning
 
             values = self._effective_engine_options()
             voice = tuning.apply_to_voice(voice, values)
             for note in tuning.problems(voice.get("engine"), values,
                                         self._selected_compute()):
-                self.status.SetLabel(note)
+                announce.status_text(self.status, note)
 
         params = self._current_params()
         fmt = params["output_format"]
@@ -1252,7 +1268,7 @@ class RecordingDialog(wx.Dialog):
                     style=wx.YES_NO | wx.ICON_QUESTION,
                 )
                 if answer == wx.YES:
-                    self.status.SetLabel("Downloading FFmpeg...")
+                    announce.status_text(self.status, "Downloading FFmpeg...")
                     self.start_btn.Disable()
                     threading.Thread(target=self._download_ffmpeg_job, daemon=True).start()
                     return
@@ -1281,7 +1297,7 @@ class RecordingDialog(wx.Dialog):
             ffmpeg_exe=ffmpeg_exe,
             start_index=start_index,
             end_index=end_index,
-            on_segment_done=lambda idx, title, path: self._segment_done(idx, title, path),
+            on_segment_done=self._segment_done,
             on_all_done=lambda: wx.PostEvent(self, SynthFinishedEvent()),
             on_error=lambda msg: wx.PostEvent(self, SynthErrorEvent(msg)),
             cancel_event=self._cancel_event,
@@ -1292,11 +1308,11 @@ class RecordingDialog(wx.Dialog):
         self._show_progress_dialog()
         self._worker.start()
         if self._single_segment:
-            self.status.SetLabel(
+            announce.status_text(self.status,
                 f"Recording started (only segment {start_index + 1})."
             )
         else:
-            self.status.SetLabel(
+            announce.status_text(self.status,
                 f"Recording started (resuming from segment {start_index + 1})."
             )
         # In the log so that "the shortcut did nothing" can be told apart from
@@ -1308,7 +1324,7 @@ class RecordingDialog(wx.Dialog):
         try:
             ffmpeg_mod.download_ffmpeg()
             wx.CallAfter(self._ffmpeg_done, None)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             wx.CallAfter(self._ffmpeg_done, f"FFmpeg download failed: {exc}")
 
     def _ffmpeg_done(self, error):
@@ -1318,7 +1334,7 @@ class RecordingDialog(wx.Dialog):
                           style=wx.OK | wx.ICON_ERROR)
             self.format_combo.SetSelection(0)
             return
-        self.status.SetLabel("FFmpeg installed. Press Start recording again.")
+        announce.status_text(self.status, "FFmpeg installed. Press Start recording again.")
         wx.MessageBox("FFmpeg installed. Press Start recording again.",
                       "FFmpeg", style=wx.OK | wx.ICON_INFORMATION)
 
@@ -1362,7 +1378,7 @@ class RecordingDialog(wx.Dialog):
 
     # UI handlers -----------------------------------------------------------
     def _on_synth_status(self, evt: SynthStatusEvent):
-        self.status.SetLabel(evt.message)
+        announce.status_text(self.status, evt.message)
         if evt.message == "Stopped.":
             # Stop (not pause): the worker has finished; re-enable the
             # controls and close the progress dialog.
@@ -1376,7 +1392,7 @@ class RecordingDialog(wx.Dialog):
         total = len(self._segments)
         value = int(done * 100 / total) if total else 0
         self.gauge.SetValue(value)
-        self.status.SetLabel(f"Saved segment {done} of {total}: {evt.title}")
+        announce.status_text(self.status, f"Saved segment {done} of {total}: {evt.title}")
         self._update_progress_dialog(
             value=value,
             message=f"Saved segment {done} of {total}.",
@@ -1384,7 +1400,7 @@ class RecordingDialog(wx.Dialog):
 
     def _on_finished(self, _):
         self._set_running(False)
-        self.status.SetLabel("Recording complete.")
+        announce.status_text(self.status, "Recording complete.")
         self.gauge.SetValue(100)
         self._finish_progress_dialog()
         # Generate the DAISY/EPUB book structure if this is a DAISY project
@@ -1427,13 +1443,13 @@ class RecordingDialog(wx.Dialog):
             return
         try:
             fresh = project.load_project(self.project_dir)
-            from ..documents.playlist_builder import build_playlists  # noqa: PLC0415
+            from ..documents.playlist_builder import build_playlists
             self._playlist_files = build_playlists(
                 self.project_dir,
                 fresh.get("name", "playlist"),
                 fresh.get("segments", []),
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.warning("Playlist generation failed: %s", exc)
 
     def _daisy_summary(self) -> str:
@@ -1488,33 +1504,33 @@ class RecordingDialog(wx.Dialog):
                 pd.get("include_text", self.settings.get("daisy.include_text", True))
             )
             fmt = fresh.get("tts", {}).get("output_format", "wav")
-            common = dict(
-                output_dir=self.project_dir,
-                project_name=fresh.get("name", "Untitled"),
-                segments=fresh.get("segments", []),
-                audio_format=fmt,
-                language=lang,
-                publisher=publisher,
-                source_file=fresh.get("source_file", ""),
-                meta=meta,
-            )
+            common = {
+                "output_dir": self.project_dir,
+                "project_name": fresh.get("name", "Untitled"),
+                "segments": fresh.get("segments", []),
+                "audio_format": fmt,
+                "language": lang,
+                "publisher": publisher,
+                "source_file": fresh.get("source_file", ""),
+                "meta": meta,
+            }
             if ptype == "daisy3_audio_text":
-                from ..documents.daisy3_builder import build_daisy3_book  # noqa: PLC0415
+                from ..documents.daisy3_builder import build_daisy3_book
                 result = build_daisy3_book(**common)
             else:
-                from ..documents.daisy_builder import build_daisy_book  # noqa: PLC0415
+                from ..documents.daisy_builder import build_daisy_book
                 result = build_daisy_book(include_text=include_text, **common)
             if result:
                 self.export_daisy_btn.Enable()
             else:
                 log.warning("DAISY book not built: no completed segments on disk")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.warning("DAISY book generation failed: %s", exc)
 
     def _on_error(self, evt: SynthErrorEvent):
         self._set_running(False)
         self._finish_progress_dialog()
-        self.status.SetLabel(evt.message)
+        announce.status_text(self.status, evt.message)
         dialogs.notify_engine_error(self, "Recording error", evt.message)
 
     def _on_pause(self, _):
@@ -1522,7 +1538,7 @@ class RecordingDialog(wx.Dialog):
             self._worker.pause()
             self.pause_btn.Disable()
             self.resume_btn.Enable()
-            self.status.SetLabel("Paused. The current segment will finish, then "
+            announce.status_text(self.status, "Paused. The current segment will finish, then "
                                  "recording stops until you resume.")
             self._update_progress_dialog(message="Paused. The current segment will "
                                                  "finish, then recording stops.")
@@ -1532,13 +1548,13 @@ class RecordingDialog(wx.Dialog):
             self._worker.resume()
             self.resume_btn.Disable()
             self.pause_btn.Enable()
-            self.status.SetLabel("Resumed.")
+            announce.status_text(self.status, "Resumed.")
             self._update_progress_dialog(message="Resumed.")
 
     def _on_stop(self, _):
         if self._worker:
             self._worker.cancel()
-            self.status.SetLabel("Stopping after the current segment...")
+            announce.status_text(self.status, "Stopping after the current segment...")
             self._update_progress_dialog(
                 message="Stopping after the current segment..."
             )
@@ -1570,7 +1586,7 @@ class RecordingDialog(wx.Dialog):
         pending = project.first_pending_index(self.project_dir)
         if total:
             self.gauge.SetValue(int(pending * 100 / total))
-        self.status.SetLabel(
+        announce.status_text(self.status,
             f"Project has {total} segments; {pending} already saved. "
             "Press Start recording to continue."
         )
@@ -1602,7 +1618,7 @@ class RecordingDialog(wx.Dialog):
                 return
             zip_path = dlg.GetPath()
 
-        self.status.SetLabel("Creating DAISY ZIP archive...")
+        announce.status_text(self.status, "Creating DAISY ZIP archive...")
         self.export_daisy_btn.Disable()
         threading.Thread(
             target=self._export_daisy_job,
@@ -1614,23 +1630,23 @@ class RecordingDialog(wx.Dialog):
         """Background thread to build the ZIP."""
         try:
             if ptype == "daisy3_audio_text":
-                from ..documents.daisy3_builder import export_daisy3_zip  # noqa: PLC0415
+                from ..documents.daisy3_builder import export_daisy3_zip
                 result = export_daisy3_zip(self.project_dir, zip_path)
             else:
-                from ..documents.daisy_builder import export_daisy_zip  # noqa: PLC0415
+                from ..documents.daisy_builder import export_daisy_zip
                 result = export_daisy_zip(self.project_dir, zip_path)
             wx.CallAfter(self._export_daisy_done, None, result)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             wx.CallAfter(self._export_daisy_done, str(exc), None)
 
     def _export_daisy_done(self, error: str | None, path: str | None):
         self.export_daisy_btn.Enable()
         if error:
-            self.status.SetLabel("Export failed.")
+            announce.status_error(self.status, "Export failed.")
             wx.MessageBox(f"Export failed: {error}", "Export error",
                           style=wx.OK | wx.ICON_ERROR)
         else:
-            self.status.SetLabel("DAISY book exported.")
+            announce.status_text(self.status, "DAISY book exported.")
             wx.MessageBox(
                 f"DAISY book exported to:\n{path}",
                 "Export complete",

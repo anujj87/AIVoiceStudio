@@ -19,7 +19,7 @@ import os
 import re
 import threading
 import time
-from typing import Callable, Dict, List, Optional, Tuple
+from collections.abc import Callable
 
 log = logging.getLogger(__name__)
 
@@ -28,16 +28,16 @@ _CACHE_TTL = 300.0
 #: ``(env, package)`` -> (timestamp, version or None).  ``env`` is the
 #: *environment* id of a per-TTS virtualenv (engines that share one
 #: environment share the key), or ``""`` for the shared addon environment.
-_cache: Dict[Tuple[str, str], Tuple[float, Optional[str]]] = {}
-_loading: set[Tuple[str, str]] = set()
-_listeners: Dict[Tuple[str, str], List[Callable[[Optional[str]], None]]] = {}
+_cache: dict[tuple[str, str], tuple[float, str | None]] = {}
+_loading: set[tuple[str, str]] = set()
+_listeners: dict[tuple[str, str], list[Callable[[str | None], None]]] = {}
 _lock = threading.RLock()
 
 
 #: ``site-packages folder`` -> (timestamp, {normalized name: version}).  Read
 #: straight from the disk so the answer is available on the first question and
 #: survives an app restart.
-_disk_cache: Dict[str, Tuple[float, Dict[str, str]]] = {}
+_disk_cache: dict[str, tuple[float, dict[str, str]]] = {}
 
 
 def _normalize(name: str) -> str:
@@ -46,7 +46,7 @@ def _normalize(name: str) -> str:
     return "-".join(part for part in parts if part)
 
 
-def _disk_distributions(engine: Optional[str] = None) -> Dict[str, str]:
+def _disk_distributions(engine: str | None = None) -> dict[str, str]:
     """``{normalized distribution name: version}`` from an env's site-packages.
 
     A plain directory listing: no subprocess, no interpreter start-up, so this
@@ -55,12 +55,12 @@ def _disk_distributions(engine: Optional[str] = None) -> Dict[str, str]:
     removes a package.
     """
     try:
-        from .python_runtime import get_runtime  # noqa: PLC0415
+        from .python_runtime import get_runtime
 
         folders = get_runtime(engine).site_packages_dirs
-    except Exception:  # noqa: BLE001
+    except Exception:
         return {}
-    found: Dict[str, str] = {}
+    found: dict[str, str] = {}
     for folder in folders:
         try:
             stamp = os.path.getmtime(folder)
@@ -71,7 +71,7 @@ def _disk_distributions(engine: Optional[str] = None) -> Dict[str, str]:
         if entry is not None and entry[0] == stamp:
             found.update(entry[1])
             continue
-        listed: Dict[str, str] = {}
+        listed: dict[str, str] = {}
         try:
             for name in os.listdir(folder):
                 if not name.endswith(".dist-info"):
@@ -86,35 +86,35 @@ def _disk_distributions(engine: Optional[str] = None) -> Dict[str, str]:
     return found
 
 
-def _disk_version(package: str, engine: Optional[str] = None) -> Optional[str]:
+def _disk_version(package: str, engine: str | None = None) -> str | None:
     return _disk_distributions(engine).get(_normalize(package))
 
 
-def _env_exists(engine: Optional[str] = None) -> bool:
+def _env_exists(engine: str | None = None) -> bool:
     """True when the managed virtualenv has been created."""
     try:
-        from .python_runtime import get_runtime  # noqa: PLC0415
+        from .python_runtime import get_runtime
 
         return bool(get_runtime(engine).is_created)
-    except Exception:  # noqa: BLE001
+    except Exception:
         return False
 
 
-def _notify(key: Tuple[str, str], version: Optional[str]) -> None:
+def _notify(key: tuple[str, str], version: str | None) -> None:
     with _lock:
         listeners = _listeners.pop(key, [])
     for callback in listeners:
         try:
             callback(version)
-        except Exception:  # noqa: BLE001
+        except Exception:
             log.debug("Package probe listener failed", exc_info=True)
 
 
-def _job(key: Tuple[str, str]) -> None:
+def _job(key: tuple[str, str]) -> None:
     env, package = key
-    found: Optional[str] = None
+    found: str | None = None
     try:
-        from .python_runtime import get_runtime  # noqa: PLC0415
+        from .python_runtime import get_runtime
 
         runtime = get_runtime(env or None)
         if runtime.is_created:
@@ -126,7 +126,7 @@ def _job(key: Tuple[str, str]) -> None:
             text = (result.stdout or "").strip()
             if result.returncode == 0 and text:
                 found = text
-    except Exception:  # noqa: BLE001
+    except Exception:
         log.debug("Probe for %s failed", package, exc_info=True)
     with _lock:
         _cache[key] = (time.time(), found)
@@ -134,7 +134,7 @@ def _job(key: Tuple[str, str]) -> None:
     _notify(key, found)
 
 
-def _engine_key(engine: Optional[str]) -> str:
+def _engine_key(engine: str | None) -> str:
     """Cache key of an engine.
 
     Engines that share one virtualenv (the two OmniVoice ones) also share
@@ -143,21 +143,21 @@ def _engine_key(engine: Optional[str]) -> str:
     if not engine:
         return ""
     try:
-        from .python_runtime import environment_id  # noqa: PLC0415
+        from .python_runtime import environment_id
 
         return environment_id(engine)
-    except Exception:  # noqa: BLE001
+    except Exception:
         return engine
 
 
-def _key(package: str, engine: Optional[str]) -> Tuple[str, str]:
+def _key(package: str, engine: str | None) -> tuple[str, str]:
     return (_engine_key(engine), package)
 
 
 def request(
     package: str,
-    on_ready: Optional[Callable[[Optional[str]], None]] = None,
-    engine: Optional[str] = None,
+    on_ready: Callable[[str | None], None] | None = None,
+    engine: str | None = None,
 ) -> None:
     """Probe ``package`` once.
 
@@ -175,7 +175,7 @@ def request(
             _cache[key] = (time.time(), None)
         _notify(key, None)
         return
-    cached: Optional[str] = None
+    cached: str | None = None
     fresh = False
     with _lock:
         entry = _cache.get(key)
@@ -195,7 +195,7 @@ def request(
     ).start()
 
 
-def version(package: str, engine: Optional[str] = None) -> Optional[str]:
+def version(package: str, engine: str | None = None) -> str | None:
     """Installed version of ``package`` in the managed venv.
 
     Before the background probe has answered, the version is read straight
@@ -214,11 +214,11 @@ def version(package: str, engine: Optional[str] = None) -> Optional[str]:
     return entry[1]
 
 
-def installed(package: str, engine: Optional[str] = None) -> bool:
+def installed(package: str, engine: str | None = None) -> bool:
     return bool(version(package, engine))
 
 
-def package_present(package: str, engine: Optional[str] = None) -> bool:
+def package_present(package: str, engine: str | None = None) -> bool:
     """Synchronous, cache-free "is ``package`` in this environment?"
 
     Answers from ``site-packages`` on disk.  Used where the answer must be
@@ -235,10 +235,10 @@ def package_present(package: str, engine: Optional[str] = None) -> bool:
     # A bare module folder or single-file module also counts (dist-info can be
     # missing in a hand-patched environment).
     try:
-        from .python_runtime import get_runtime  # noqa: PLC0415
+        from .python_runtime import get_runtime
 
         folders = get_runtime(engine).site_packages_dirs
-    except Exception:  # noqa: BLE001
+    except Exception:
         return False
     stem = name.replace("-", "_")
     for folder in folders:
@@ -249,7 +249,7 @@ def package_present(package: str, engine: Optional[str] = None) -> bool:
     return False
 
 
-def is_known(package: str, engine: Optional[str] = None) -> bool:
+def is_known(package: str, engine: str | None = None) -> bool:
     """True when a fresh cached answer exists for ``package``.
 
     Callers use this to avoid attaching a listener that would fire
@@ -261,7 +261,7 @@ def is_known(package: str, engine: Optional[str] = None) -> bool:
     return entry is not None and (time.time() - entry[0]) < _CACHE_TTL
 
 
-def invalidate(*packages: str, engine: Optional[str] = None) -> None:
+def invalidate(*packages: str, engine: str | None = None) -> None:
     """Forget cached results (call after installing or removing a package).
 
     Without ``engine`` the shared environment's entries are dropped; with one,
@@ -282,7 +282,7 @@ def invalidate(*packages: str, engine: Optional[str] = None) -> None:
             _cache.pop(_key(package, None), None)
 
 
-def warm(packages: Optional[List[str]] = None) -> None:
+def warm(packages: list[str] | None = None) -> None:
     """Start background probes so the first panel that asks is already answered.
 
     The shared addon environment is probed for every catalog package (that is
@@ -294,13 +294,13 @@ def warm(packages: Optional[List[str]] = None) -> None:
     if packages is None:
         packages = []
         try:
-            from .tts import catalog  # noqa: PLC0415
+            from .tts import catalog
 
             for entry in catalog.get_tts_list():
                 package = entry.get("requires_package")
                 if package and package not in packages:
                     packages.append(package)
-        except Exception:  # noqa: BLE001
+        except Exception:
             log.debug("Could not list pip-installed engines", exc_info=True)
     for package in packages:
         request(package)

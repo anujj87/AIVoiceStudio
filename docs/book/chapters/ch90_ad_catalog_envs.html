@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 90: A Catalog of Describers - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part XI — Audio Description</div><ul class="chapters"><li><a href="ch89_ad_overview.html">Ch 89: Narrating Video</a></li><li><a href="ch90_ad_catalog_envs.html" class="active">Ch 90: A Catalog of Describers</a></li><li><a href="ch91_ad_windows.html">Ch 91: Chunks, Windows &amp; Change</a></li><li><a href="ch92_ad_placement.html">Ch 92: Placement &amp; Extended AD</a></li><li><a href="ch93_ad_described_film.html">Ch 93: The Described Film</a></li><li><a href="ch94_ad_dialog.html">Ch 94: The Describe Window</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 90</div>
+<h1>A Catalog of Describers, and One Environment per Model</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Describe a model catalogue that carries licences, sizes and costs</li>
+  <li>Separate a model's <em>environment</em> from a variant's <em>checkpoint</em></li>
+  <li>Build one Python environment per model and repair it when it is incomplete</li>
+  <li>Explain why a CUDA-only package turns Install into Repair</li>
+  <li>See why a model that runs its own modelling code decides part of its own
+      environment</li>
+  <li>Load a checkpoint larger than the graphics card without spilling to disk</li>
+</ul>
+
+<hr>
+
+<h2>90.1 The Catalogue Is Data</h2>
+
+<p><code>describe/catalog.py</code> is a table, not code: each model declares its
+id, name, licence, notes, whether it needs <code>trust_remote_code</code>,
+whether it can report timestamps and the pip packages its environment needs.
+Each <em>variant</em> adds one checkpoint:</p>
+
+<pre>_variant(
+    "4b", "Qwen3-VL-4B",
+    size_gb=8.0, vram_gb=7.0, fit="gpu", cpu_ok=True,
+    gpu_cost=40.0, cpu_cost=180.0,
+    hf="Qwen/Qwen3-VL-4B-Instruct",
+),</pre>
+
+<p><code>size_gb</code> is the download; <code>vram_gb</code> is what the
+checkpoint wants in video memory; <code>gpu_cost</code> and
+<code>cpu_cost</code> are seconds of compute per minute of video at the
+catalogue's reference frame rate, and the estimator scales them by the frame
+rate the user chose. Everything the Settings table, the wizard's state labels
+and the run's decisions need comes from this one description, which is why
+adding a model is a data change and not a code change.</p>
+
+<h2>90.2 Environment and Checkpoint Are Two Things</h2>
+
+<p>The most confusable thing about this feature is that <em>installing a
+model</em> and <em>downloading a variant</em> are different operations with
+different lifetimes:</p>
+
+<table>
+  <thead><tr><th></th><th>Model environment</th><th>Variant checkpoint</th></tr></thead>
+  <tbody>
+    <tr><td>What it is</td><td>a Python virtualenv with PyTorch,
+        <code>transformers</code> and the model's own packages</td>
+        <td>the weights of one size of that model</td></tr>
+    <tr><td>Shared by</td><td>every variant of the model</td>
+        <td>nothing &mdash; it belongs to one variant</td></tr>
+    <tr><td>Where</td><td><code>describe_envs\&lt;model id&gt;</code></td>
+        <td>the Hugging Face cache</td></tr>
+    <tr><td>Removed by</td><td><em>Remove model environment</em></td>
+        <td><em>Remove variant download</em></td></tr>
+  </tbody>
+</table>
+
+<div class="note">
+<strong>Why this matters in the UI.</strong> An earlier build of that screen
+looked at the model, saw an environment, and treated the whole model as
+installed &mdash; so after downloading Qwen3-VL 4B every other Qwen3-VL variant
+appeared to be undownloadable. The panel now renders one Install/Repair button
+for the environment and one Download/Remove button <em>per variant</em>, with a
+Status column, and <code>engine.variant_state_label()</code> answers the question
+a row is really asking.
+</div>
+
+<pre>def variant_state_label(model_id: str, variant: str) -> str:
+    variant = variant or catalog.default_variant(model_id)
+    if not catalog.hf_model(model_id, variant):
+        return "No download for this choice"
+    if not environments.is_installed(model_id):
+        return "Install the model first"
+    if variant_downloaded(model_id, variant):
+        return "Downloaded"
+    size = catalog.variant_size_gb(model_id, variant)
+    if weights.is_partly_downloaded(variant_repo(model_id, variant)):
+        return (f"Partly downloaded - about {size:.1f} GB in all; download it "
+                "again to continue where it stopped")
+    return f"Not downloaded (about {size:.1f} GB)"</pre>
+
+<p>"Partly downloaded" is a state of its own because it is what a cancelled or
+failed fetch leaves behind: the files are on disk, the checkpoint cannot be
+loaded, and the download that would finish it is still available. Calling that
+"not downloaded" sends the user looking for gigabytes that are already
+there.</p>
+
+<h2>90.3 Building the Environment</h2>
+
+<p><code>describe/environments.py</code> has the same shape as the
+speech-to-text one: a plan of pip packages, a virtualenv created under
+<code>%APPDATA%\AIVoiceStudio\describe_envs</code>, and a
+<code>worker_script()</code>/<code>runtime()</code> pair the engine uses to start
+the worker. Two details carry weight:</p>
+
+<ul>
+  <li><strong>CUDA-only packages.</strong> A package needed only for a GPU run is
+      declared separately and installed on a machine with an NVIDIA card.
+      Whisper needed cuBLAS this way in the speech-to-text half; here it is
+      <code>bitsandbytes</code>, the 4-bit quantiser. When such a package is
+      missing from an environment that already exists, <em>Install</em> becomes
+      <em>Repair model environment</em> and names what is missing.</li>
+  <li><strong>Declared packages, not just the back-end.</strong>
+      <code>environments.is_installed()</code> proves the back-end imports, which
+      is a narrower question than &ldquo;is this environment complete&rdquo;.
+      <code>missing_packages()</code> asks the wider one - every package the
+      catalogue declares for that model, against the environment's own
+      <code>site-packages</code> - and the same <em>Repair</em> rule covers it.
+      That is what makes a requirement discovered late (90.5) repairable in an
+      environment that already exists, rather than only in a new one.</li>
+  <li><strong>A missing runtime, said out loud.</strong>
+      <code>engine.gpu_runtime_missing()</code> reports the CUDA wheel an
+      environment lacks, so the Settings panel can explain a GPU run that would
+      otherwise fall back to the CPU silently.</li>
+</ul>
+
+<h2>90.4 A Model Bigger Than the Card</h2>
+
+<p>The hardest failure this feature produced was not an error message. It was
+exit code <code>0xC0000005</code>, an access violation, and a dialog that blamed
+a warning about Windows symlinks printed three lines above the crash. The cause
+was <code>device_map="auto"</code>, which offloads part of an oversized model to
+the <em>disk</em>. A model on the disk is a set of <em>meta</em> tensors, and the
+forward pass over them kills the process.</p>
+
+<p>The loader therefore places the model explicitly &mdash; never on the disk
+&mdash; and asks for 4 bits when the weights cannot fit:</p>
+
+<pre>card = _gpu_total_gib(torch_module)
+size = float(request.get("model_size_gb") or 0.0)
+budget = max(1.0, card - _GPU_HEADROOM_GIB)
+too_big = bool(size) and size &gt; budget
+quantized, why = _quantized_config(torch_module)
+
+attempts = []
+if too_big and quantized is not None:
+    attempts.append((quantized, (
+        f"This model is about {size:.1f} GB of weights and this card holds "
+        f"{card:.1f} GB, so it was loaded in 4-bit."
+    )))
+else:
+    attempts.append((None, ""))
+    if quantized is not None:
+        attempts.append((quantized, (
+            "The model did not fit this card at full precision, so it was "
+            "loaded in 4-bit."
+        )))</pre>
+
+<p>The placement handed to <code>from_pretrained</code> is <code>{"": 0}</code>
+&mdash; everything on card 0 &mdash; and only a model that can be run neither way
+is refused, with its own reason. Gemma&nbsp;3 12B is about 24&nbsp;GB of weights
+and runs on a 12&nbsp;GB card in 4-bit form (roughly a quarter of that) with room
+to generate; the only cost is that the environment must have
+<code>bitsandbytes</code>, which is exactly what <em>Repair</em> is for.</p>
+
+<div class="tip">
+<strong>Refuse, do not crash.</strong> A process that dies prints nothing, so
+its exit code is the only fact available. <code>engine._crash_note()</code> turns
+<code>0xC0000005</code> into "the model's process stopped (exit code 3221225477:
+an access violation) before it produced a description. The usual cause is that
+the chosen model did not fit in this machine's video memory and system memory; a
+smaller variant &hellip; runs instead."
+</div>
+
+<h2>90.5 When the Model's Own Code Chooses the Environment</h2>
+
+<p>One entry in the catalogue runs the checkpoint's <em>own</em> Python:
+MiniCPM-o 2.6 ships <code>trust_remote_code</code>, so <code>transformers</code>
+downloads its modelling, processing and utility files and executes them. Those
+files import libraries no other describing model needs, and the first real
+failure this caused arrived as a sentence from the library, not from us:</p>
+
+<pre>Could not load the model: This modeling file requires the following packages
+that were not found in your environment: torchaudio. Run `pip install torchaudio`</pre>
+
+<p>That message is accurate and useless at once: the user of an installed
+application has no environment to <code>pip install</code> into, and the
+instruction names the first missing package rather than the last. Two things
+follow from it.</p>
+
+<p>There is a second half to that fix, and it is the half the message asks for:
+<em>Repair</em> has to be reachable. An environment built before those two
+packages were declared still reports itself <em>installed</em> - it has
+<code>transformers</code>, the back-end the probe looks for - so the panel would
+offer only <em>Remove model environment</em>, and the way back to a working model
+would be a fresh multi-gigabyte PyTorch install. <code>missing_packages()</code>
+compares the catalogue's declared packages against that environment's own
+<code>site-packages</code>, and a non-empty answer turns <em>Install</em> into
+<em>Repair</em> and names the packages in the status line.</p>
+
+<p><strong>A remote-code model's requirements belong in its catalogue entry.</strong>
+<code>transformers</code> refuses to load <code>processing_minicpmo.py</code>
+without <code>torchaudio</code>, and <code>modeling_minicpmo.py</code> pulls
+<code>utils.py</code>, which imports <code>librosa</code> - so both are declared
+packages, and the Install/Repair button becomes the answer to the library's own
+suggestion. One of them carries the other: <code>librosa</code> requires
+<code>soxr</code>, and from <code>transformers</code> 5 on,
+<code>transformers.audio_utils</code> imports <code>soxr</code> whenever
+<code>librosa</code> is importable. Half an install (librosa without soxr)
+breaks <code>import transformers</code> itself, which is why the pair must be
+installed together and why declaring <code>librosa</code> is the whole fix.</p>
+
+<p><strong>A model written for one library release needs that release.</strong>
+MiniCPM-o 2.6's code imports <code>WHISPER_ATTENTION_CLASSES</code> from
+<code>transformers.models.whisper</code>, and that name is a boundary rather than
+a detail: <code>4.52.0</code> still defines it and <code>4.53.0</code> removed it,
+so the entry pins <code>transformers&lt;4.53</code> and lets pip resolve the
+newest member of the series. Two failures are on record for wanting the
+boundary - <code>5.19.0</code> and <code>4.57.6</code> both fail on that one import
+line, which is why the pin could not simply be &ldquo;below five&rdquo;.</p>
+
+<p>The exact release the model card names - <code>4.44.2</code>, which is also
+what the checkpoint's own <code>config.json</code> records as
+<code>transformers_version</code> - is deliberately <em>not</em> what the pin
+asks for: 4.44.2 requires <code>tokenizers&lt;0.20</code>, whose newest Windows
+wheel is <code>cp312</code>, so an environment on Python 3.13 (and PyTorch 2.11)
+cannot have it without a Rust toolchain to build the wheel. Pinning to the
+newest release that still defines the name is what satisfies both constraints -
+the same shape as the NeMo speech-to-text pin in
+<a href="ch84_stt_catalog.html">Chapter 84</a>.</p>
+
+<div class="tip">
+<strong>The pin is only safe because of 90.2.</strong> A package pin is
+dangerous in a shared environment and free in a private one. Because every
+describing model has a virtualenv of its own, a <code>transformers&lt;4.53</code>
+entry cannot reach a TTS engine, a speech-to-text model or another describer -
+and the test suite asserts that no <em>other</em> catalogue entry carries the
+pin, so a copy-paste cannot quietly spread it.
+</div>
+
+<pre>_REMOTE_CODE_TRANSFORMERS = "transformers&lt;4.53"
+
+"pip_packages": [_REMOTE_CODE_TRANSFORMERS, "torch", "torchvision",
+                 "torchaudio", "accelerate", "pillow", "numpy",
+                 "librosa", "soundfile"],</pre>
+
+<p><code>torchaudio</code> is one of <code>_CUDA_PACKAGES</code>, so on a machine
+with an NVIDIA card it is installed from the same PyTorch wheel index as
+<code>torch</code> and <code>torchvision</code> - a CUDA <code>torch</code>
+beside a PyPI (CPU-only on Windows) <code>torchaudio</code> is a runtime crash,
+not a warning. On a machine with no card the whole list installs from PyPI in
+one step, and the CUDA-only quantiser is left out altogether.</p>
+
+<h2>90.6 Exercises</h2>
+<ol>
+  <li>Add a variant to a model in the catalogue, and list every screen that
+      changes without any code being touched.</li>
+  <li>Why does the estimate scale a variant's cost by the frame rate but not by
+      the number of descriptions?</li>
+  <li>The quantiser is a CUDA-only package. What should happen on a machine with
+      no NVIDIA card whose system memory is smaller than the checkpoint?</li>
+  <li>A new <code>trust_remote_code</code> model is added to the catalogue and a
+      run fails on an import inside its modelling file. Where does the fix
+      belong, and what would you check before writing it?</li>
+</ol>
+
+<h2>Key Takeaways</h2>
+<ul>
+  <li>Catalogue models as data: licences, sizes, devices and costs.</li>
+  <li>An environment and a checkpoint are separate things; keep them separate in
+      the UI and in the vocabulary.</li>
+  <li>Never let a loader spill to the disk. Place explicitly, quantise when it is
+      needed, and refuse with a reason when neither works.</li>
+  <li>A library's "run <code>pip install X</code>" is a bug report about your
+      catalogue when the model runs its own code: declare the package, in the
+      right environment, with the library release the model was written for.</li>
+  <li>Turn an exit code into a sentence: a killed process leaves nothing else.</li>
+</ul>
+
+</div>
+</div>
+</body>
+</html>

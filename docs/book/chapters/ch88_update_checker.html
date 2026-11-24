@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 88: Checking for Updates - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part X — Speech to Text, Voice Lab &amp; the Current System</div><ul class="chapters"><li><a href="ch76_voicelab_engines.html">Ch 76: Voice Lab Engines</a></li><li><a href="ch77_engine_environments.html">Ch 77: One Environment per Engine</a></li><li><a href="ch78_compute_choice.html">Ch 78: Compute Choice</a></li><li><a href="ch79_audio_io_shim.html">Ch 79: Audio I/O Without FFmpeg</a></li><li><a href="ch80_start_selected_recording.html">Ch 80: Start Selected Recording</a></li><li><a href="ch81_terms_dialog.html">Ch 81: First-Launch Terms</a></li><li><a href="ch82_licensing.html">Ch 82: Licensing &amp; Compliance</a></li><li><a href="ch83_input_gestures.html">Ch 83: Input Gestures</a></li><li><a href="ch84_stt_catalog.html">Ch 84: A Second Catalog</a></li><li><a href="ch85_stt_environments.html">Ch 85: One Environment per Model</a></li><li><a href="ch86_stt_dialog.html">Ch 86: The Transcribe Dialog</a></li><li><a href="ch87_theme_studio.html">Ch 87: The Theme Studio</a></li><li><a href="ch88_update_checker.html" class="active">Ch 88: Checking for Updates</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 88</div>
+<h1>Checking for Updates: A Pure Decision and a Network Side Effect</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Split a network feature into a pure decision function and an I/O function</li>
+  <li>Compare version strings that carry a <code>v</code> prefix or a suffix</li>
+  <li>Pick the installer for the running architecture from a release's assets</li>
+  <li>Design a check that stays quiet unless it has something to say</li>
+  <li>Reuse an existing resumable download instead of writing a second one</li>
+  <li>Publish the same installer to winget without changing the code</li>
+</ul>
+
+<hr>
+
+<h2>88.1 Two Ways In, One Truth</h2>
+
+<p>There are two entry points and they behave differently on purpose:</p>
+
+<ul>
+  <li><strong>A quiet automatic check at start-up</strong>, at most once a day
+      (<code>settings["updates"]["auto_check"]</code>). It speaks only when a
+      newer version exists <em>and</em> the user has not muted that exact
+      version. A failure is silent &mdash; an offline laptop must not see an
+      error box on every launch.</li>
+  <li><strong>Help &rarr; Check for updates</strong> (<code>Alt+D</code>), which
+      always answers: a newer version with its release notes, &ldquo;you already
+      have the newest version&rdquo;, or a plain reason when GitHub cannot be
+      reached.</li>
+</ul>
+
+<p>The single source of truth is the repository's latest release:</p>
+
+<pre><code>LATEST_RELEASE_API = "https://api.github.com/repos/anujj87/AIVoiceStudio/releases/latest"</code></pre>
+
+<div class="info">
+<strong>The user asked, so the user is told.</strong> A background check that
+reports a network failure trains people to ignore it; a menu item that leaves the
+question unanswered is broken. Same feature, two contracts &mdash; and the
+difference lives in the dialog layer, not in the networking code.
+</div>
+
+<h2>88.2 The Decision Is a Pure Function</h2>
+
+<p>The interesting part of an update check is not the HTTP request; it is the
+decision. So the decision takes the JSON payload as an argument and touches
+nothing:</p>
+
+<pre><code>def evaluate_release(payload: dict, current: str = APP_VERSION) -&gt; UpdateCheck:
+    """Decide from a GitHub ``releases/latest`` payload whether to offer an update.
+
+    A draft release is ignored; a prerelease is offered like any other
+    release because this project publishes its installers exactly that way.
+    """
+    if not isinstance(payload, dict):
+        return UpdateCheck(current=current, error="Unexpected release data from GitHub.")
+    if payload.get("draft"):
+        return UpdateCheck(current=current, latest=None, available=False)
+    ...
+    return UpdateCheck(current=current, latest=release,
+                       available=is_newer(version, current))
+</code></pre>
+
+<p>That shape is what makes the version rules <em>testable without a network</em>:
+the test suite feeds hand-written payloads to <code>evaluate_release()</code> and
+checks the decision, including the awkward cases &mdash; a draft release, a
+release whose tag has no digits, a release that is older than the running
+build.</p>
+
+<h2>88.3 Comparing Versions Without a Date Library</h2>
+
+<p>A release tag may be <code>v2026.3.7</code>, <code>2026.3.7</code>, or
+<code>2026.3.7-beta</code>. Rather than parse a version scheme, the project takes
+the leading numeric run(s) and pads them:</p>
+
+<pre><code>def parse_version(text: str) -&gt; tuple:
+    """Turn ``"v2026.3.7"`` / ``"2026.3.7-beta"`` into ``(2026, 3, 7)``.
+
+    Only the leading numeric run(s) are used, so a release tag may carry a
+    ``v`` prefix or a suffix without breaking the comparison.  A tag with no
+    digits at all yields ``()`` and simply never compares as newer.
+    """
+    numbers: list[int] = []
+    current = ""
+    for char in str(text or ""):
+        if char.isdigit():
+            current += char
+        elif char == "." and current:
+            numbers.append(int(current))
+            current = ""
+        elif current:
+            break
+    if current:
+        numbers.append(int(current))
+    return tuple(numbers)
+
+
+def is_newer(remote: str, local: str = APP_VERSION) -&gt; bool:
+    """True when ``remote`` names a strictly newer version than ``local``."""
+    remote_parts = parse_version(remote)
+    if not remote_parts:
+        return False
+    return _pad(remote_parts) &gt; _pad(parse_version(local))
+</code></pre>
+
+<p>Padding matters: without it <code>(2026, 3)</code> would compare greater than
+<code>(2026, 3, 7)</code> on a tuple of different lengths, and a truncated tag
+would be read as a newer release. The rule is deliberately conservative &mdash;
+a tag with no digits never counts as newer, so a mistyped release name can never
+downgrade or upgrade anybody by accident.</p>
+
+<h2>88.4 Picking the Installer for This Machine</h2>
+
+<p>A release carries several assets, and the right one depends on the running
+interpreter's width:</p>
+
+<pre><code>ASSET_MARKERS = {"x64": "setup-x64", "x86": "setup-x86"}
+
+class ReleaseInfo:
+    def asset_for_arch(self, arch: str) -&gt; Optional[ReleaseAsset]:
+        marker = ASSET_MARKERS.get(arch, ASSET_MARKERS["x64"])
+        for asset in self.assets:
+            if marker in asset.name.lower():
+                return asset
+        return None
+
+def current_arch() -&gt; str:
+    """``"x64"`` or ``"x86"`` for the *running* interpreter."""
+    return "x64" if struct.calcsize("P") * 8 == 64 else "x86"
+</code></pre>
+
+<p>Using the interpreter's own pointer size, rather than the operating system's,
+is the honest answer: it is the binary that is running and therefore the binary
+that must be replaced. The same architecture choice drives the download in
+<code>tools/make_winget.py</code> and the installer build.</p>
+
+<h2>88.5 Errors That Are Answers</h2>
+
+<p>The check never raises to its caller. Failures become a value:</p>
+
+<pre><code>def check_for_update(current: str = APP_VERSION, timeout: int = DOWNLOAD_TIMEOUT) -&gt; UpdateCheck:
+    """Look for a newer release. Never raises: a failure is reported in the result."""
+    try:
+        payload = fetch_latest_release(timeout=timeout)
+    except UpdateError as exc:
+        return UpdateCheck(current=current, error=str(exc))
+    except Exception as exc:  # noqa: BLE001 - a check must never break the app
+        log.debug("Update check failed", exc_info=True)
+        return UpdateCheck(current=current, error=f"Could not check for updates: {exc}")
+    return evaluate_release(payload, current)
+</code></pre>
+
+<p>This is the same discipline Chapter 84 used for a missing model: make the
+ordinary unhappy path a <em>state</em>, not an exception. An exception that
+escapes a start-up check is a crash before the user has done anything; an
+<code>UpdateCheck</code> with an <code>error</code> string is a sentence in a
+dialog. Note also the broad <code>except Exception</code> with a comment saying
+why &mdash; the one place where catching everything is correct is the place whose
+whole job is to not break the application.</p>
+
+<h2>88.6 Downloading Without Writing a Downloader</h2>
+
+<p>The application already has a resumable, cancellable transfer for model
+files: Range requests and <code>.part</code> files, built in Chapter 49. The
+update reuses it rather than growing a second one, which means an interrupted
+2&nbsp;GB installer download resumes exactly like an interrupted voice download.</p>
+
+<pre><code>def launch_installer(path: str, silent: bool = False) -&gt; None:
+    """Start the downloaded installer (and let go of it).
+
+    ``silent`` runs Inno Setup with ``/SILENT`` (a progress window, no
+    questions); it is the same switch winget uses.
+    """
+    args = [path]
+    if silent:
+        args += ["/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART"]
+    if os.name == "nt" and not silent:
+        os.startfile(path)      # a normal double-click: the familiar wizard
+    else:
+        subprocess.Popen(args)
+</code></pre>
+
+<div class="tip">
+<strong>The installer is per-user by default.</strong> Because
+<code>PrivilegesRequired=lowest</code> and
+<code>PrivilegesRequiredOverridesAllowed=dialog</code> are set, an update
+started from inside the application needs no administrator rights: Inno takes the
+recommended choice when it is not answered. A user who originally installed for
+all users is found by the same <code>AppId</code> and updated in place.
+</div>
+
+<h2>88.7 The Same Installer, in winget</h2>
+
+<p>winget is a second door to the same room, not a second build. The repository
+ships three generated manifests under
+<code>winget/manifests/a/AnujSharma/AIVoiceStudio/&lt;version&gt;/</code>:</p>
+
+<table>
+  <thead>
+    <tr><th>File</th><th>Holds</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>...AIVoiceStudio.yaml</code></td><td>the package identity and its version</td></tr>
+    <tr><td><code>...installer.yaml</code></td><td>the <em>versioned</em> download URL, the <strong>SHA256</strong> of those exact bytes, the silent switches, the installer type</td></tr>
+    <tr><td><code>...locale.en-US.yaml</code></td><td>the display name, publisher and description</td></tr>
+  </tbody>
+</table>
+
+<pre><code># tools/make_winget.py   - the manifests are derived, not typed
+# tools/winget_validate.py - checked against winget's own rules
+# tests/test_winget.py    - runs that validator inside the suite
+</code></pre>
+
+<p>The generation pipeline is the point. The manifests take the version from
+<code>constants.APP_VERSION</code>, the tag from the release, and the SHA256 from
+the <em>built</em> installer &mdash; so the hash describes bytes that actually
+exist. <code>winget_validate.py</code> checks the result against the rules the
+Windows Package Manager will apply, and the test suite runs it, so a manifest
+that would be rejected fails the build instead of the PR.</p>
+
+<div class="note">
+<strong>An asset's bytes are permanent.</strong> Once a version is in winget, its
+installing file's hash is pinned forever in a manifest that lives in another
+repository. Re-uploading rebuilt bytes over the same release, or deleting the
+release, breaks that pinned version for everyone who has not installed it yet.
+The safe rule is the one the build follows: <strong>build once, generate the
+manifests from those bytes, never touch that release again, and publish the next
+version as a new release.</strong> The project's own tests cross-check the version
+across <code>README.md</code>, the manifests and the installer for the same
+reason.
+</div>
+
+<h2>88.8 Exercises</h2>
+<ol>
+  <li>Add a "skip this version" that is remembered per version (not a single
+      global mute). Which function changes, and what does the settings block look
+      like?</li>
+  <li>The release notes are GitHub-flavoured Markdown. Write the smallest
+      renderer that shows them readably in the dialog, or argue for a plain-text
+      rendering.</li>
+  <li>Make the update check use a conditional request (<code>If-None-Match</code>)
+      so a daily check costs nothing when nothing changed.</li>
+</ol>
+
+<h2>Key Takeaways</h2>
+<ul>
+  <li>Put the decision in a pure function and the network in a thin one; then the
+      rules are testable without a connection.</li>
+  <li>Parse versions conservatively: a tag that is not a version is never newer.</li>
+  <li>Answer the user when they ask, stay silent when they did not.</li>
+  <li>Reuse the download transfer you already have; a second implementation is a
+      second set of bugs.</li>
+  <li>Generate packaging manifests from the artifact, validate them in the test
+      suite, and never rewrite the bytes a released manifest points at.</li>
+</ul>
+
+</div>
+</div>
+</body>
+</html>

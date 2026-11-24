@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import json
 import os
 import shutil
 import sys
@@ -41,17 +42,48 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 
-import a11y_gestures  # noqa: E402
-from wx_test_app import get_app  # noqa: E402
+import a11y_gestures
+from wx_test_app import get_app
 
-from ai_voice_studio import project  # noqa: E402
-from ai_voice_studio.constants import MODE_PAGE_WITH_H1  # noqa: E402
-from ai_voice_studio.gui import access_keys  # noqa: E402
-from ai_voice_studio.gui.main_frame import MainFrame  # noqa: E402
-from ai_voice_studio.gui.recording_dialog import RecordingDialog  # noqa: E402
-from ai_voice_studio.gui.settings_dialog import SettingsDialog  # noqa: E402
-from ai_voice_studio.settings import Settings  # noqa: E402
-from ai_voice_studio.tts.models import ModelStore  # noqa: E402
+from ai_voice_studio import project
+from ai_voice_studio.constants import MODE_PAGE_WITH_H1
+from ai_voice_studio.gui import access_keys
+from ai_voice_studio.gui.main_frame import MainFrame
+from ai_voice_studio.gui.recording_dialog import RecordingDialog
+from ai_voice_studio.gui.settings_dialog import SettingsDialog
+from ai_voice_studio.settings import Settings
+from ai_voice_studio.tts import catalog
+from ai_voice_studio.tts.models import ModelStore
+
+
+def write_voice_files(tts_id: str, lang_code: str, variant_id: str,
+                      model_dir: str) -> None:
+    """Put the files the engine reads in front of every voice of a variant.
+
+    A variant that is installed completely is the one state in which the
+    Download button has nothing left to do; anything less - a voice folder
+    without a model, a model folder with nothing in it - is a variant that can
+    still be completed, and the panel offers it.
+    """
+    tts = catalog.find_tts(tts_id)
+    variant = catalog.find_variant(tts, lang_code, variant_id)
+    for voice in variant.get("voices", []):
+        folder = os.path.join(model_dir, voice["id"]) if voice.get("artifact") else model_dir
+        os.makedirs(folder, exist_ok=True)
+        for name in ("model.onnx", "tokens.txt", "voices.bin"):
+            open(os.path.join(folder, name), "w", encoding="utf-8").close()
+
+
+def _temp_settings() -> Settings:
+    """A throwaway settings store - never the user's own settings file.
+
+    ``Settings()`` with no path reads the real
+    ``%APPDATA%\\AIVoiceStudio\\settings.json``: the panel then shows the
+    machine's own bindings instead of the defaults these tests describe, and
+    a save would overwrite them.  Each test gets its own file.
+    """
+    return Settings(path=os.path.join(tempfile.mkdtemp(prefix="aivs_settings_"),
+                                      "settings.json"))
 
 
 def _char_hook_event(key: str, *, alt: bool = False, ctrl: bool = False,
@@ -99,6 +131,17 @@ class _GestureCase(unittest.TestCase):
     def tearDownClass(cls):
         cls.parent.Destroy()
 
+    def setUp(self):
+        # Downloads go to the store's own models folder, which is derived from
+        # the application data directory (it does not have to be the folder the
+        # state file names), so a test that starts one must never land in the
+        # user's own model library.
+        home = tempfile.mkdtemp(prefix="aivs_gestures_home_")
+        self.addCleanup(shutil.rmtree, home, True)
+        patcher = mock.patch("ai_voice_studio.paths.user_data_dir", return_value=home)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     # -- windows -----------------------------------------------------------
     def _fresh_store(self) -> tuple[ModelStore, str]:
         folder = tempfile.mkdtemp(prefix="aivs_gestures_")
@@ -108,7 +151,7 @@ class _GestureCase(unittest.TestCase):
     def _settings(self, store: ModelStore | None = None) -> SettingsDialog:
         if store is None:
             store, _ = self._fresh_store()
-        dlg = SettingsDialog(self.parent, Settings(), store)
+        dlg = SettingsDialog(self.parent, _temp_settings(), store)
         self.addCleanup(dlg.Destroy)
         dlg.SetSize((1000, 900))
         # Shown on purpose: a control inside a hidden window is invisible to
@@ -127,10 +170,15 @@ class _GestureCase(unittest.TestCase):
         wx.Yield()
         return dlg, dlg._panels[index]
 
-    def _install_first_variant(self, panel, store: ModelStore, folder: str):
+    def _install_first_variant(self, panel, store: ModelStore, folder: str,
+                               complete: bool = False):
         """Mark one real variant of the panel's first engine as downloaded.
 
-        Returns ``(tts_id, lang_code, variant_id, model_dir)``.
+        ``complete=False`` records the variant without putting any voice on
+        disk - the state a download that stopped after its first voice used to
+        leave behind.  ``complete=True`` writes the files the engine reads for
+        every voice of that variant.  Returns
+        ``(tts_id, lang_code, variant_id, model_dir)``.
         """
         tts_id = panel.tts_combo.GetClientData(0)
         lang_index = 0
@@ -146,6 +194,8 @@ class _GestureCase(unittest.TestCase):
         model_dir = os.path.join(folder, "model")
         os.makedirs(model_dir, exist_ok=True)
         store.mark_installed(tts_id, lang_code, variant_id, model_dir)
+        if complete:
+            write_voice_files(tts_id, lang_code, variant_id, model_dir)
         return tts_id, lang_code, variant_id, model_dir
 
     def _main_frame(self) -> MainFrame:
@@ -168,7 +218,7 @@ class _GestureCase(unittest.TestCase):
             [{"index": 1, "title": "One", "text": "Hello."}],
         )
         store, _ = self._fresh_store()
-        dlg = RecordingDialog(self.parent, folder, Settings(), store)
+        dlg = RecordingDialog(self.parent, folder, _temp_settings(), store)
         self.addCleanup(dlg.Destroy)
         dlg.SetSize((900, 800))
         dlg.Show()
@@ -179,8 +229,8 @@ class _GestureCase(unittest.TestCase):
     def test_the_download_category_preselects_a_downloaded_variant(self):
         """Opening the page on "Download all variants" left Alt+R dead."""
         store, folder = self._fresh_store()
-        dlg, panel = self._download_panel(store)
-        tts_id, lang_code, variant_id, model_dir = self._install_first_variant(
+        _dlg, panel = self._download_panel(store)
+        _tts_id, _lang_code, variant_id, _model_dir = self._install_first_variant(
             panel, store, folder)
         panel.tts_combo.SetSelection(0)
         panel._on_tts(None)                       # repopulates the cascades
@@ -197,7 +247,7 @@ class _GestureCase(unittest.TestCase):
         """Opening the page on an engine that was never downloaded leaves
         Remove disabled, so the first Alt+R does nothing at all."""
         store, folder = self._fresh_store()
-        dlg, panel = self._download_panel(store)
+        _dlg, panel = self._download_panel(store)
         tts_id = panel.tts_combo.GetClientData(0)
         lang_code = panel.lang_combo.GetClientData(0)
         variant_id = next(
@@ -215,8 +265,8 @@ class _GestureCase(unittest.TestCase):
     def test_removing_the_preselected_variant_says_what_happened(self):
         """The removal reports itself and leaves the panel consistent."""
         store, folder = self._fresh_store()
-        dlg, panel = self._download_panel(store)
-        tts_id, lang_code, variant_id, model_dir = self._install_first_variant(
+        _dlg, panel = self._download_panel(store)
+        tts_id, lang_code, variant_id, _model_dir = self._install_first_variant(
             panel, store, folder)
         panel._on_tts(None)
         removed = []
@@ -229,11 +279,50 @@ class _GestureCase(unittest.TestCase):
                       panel.progress_label.GetLabel())
 
     # -- 2. the disabled target -------------------------------------------
+    def test_a_variant_missing_some_voices_can_be_completed(self):
+        """A variant marked downloaded without all of its voices stays fixable.
+
+        The download of *piper / en_US / medium* once stopped after its first
+        voice and still marked the folder complete, so the Download button was
+        disabled and the other seven voices could not be fetched without
+        removing the one that worked.
+        """
+        store, folder = self._fresh_store()
+        _dlg, panel = self._download_panel(store)
+        tts_id, lang_code, variant_id, _model_dir = self._install_first_variant(
+            panel, store, folder)
+        panel._on_tts(None)
+        self.assertTrue(panel.download_btn.IsEnabled(),
+                        "the missing voices must be downloadable")
+        self.assertTrue(panel.remove_btn.IsEnabled())
+        self.assertIn("still missing", panel.download_btn.GetToolTipText())
+        started = []
+        panel._download_job = lambda *a: started.append(a)
+        panel._on_download(None)
+        if panel._thread is not None:
+            panel._thread.join(10)
+        self.assertEqual(started, [(tts_id, lang_code, [variant_id])])
+
+    def test_download_all_variants_also_offers_to_finish_an_incomplete_one(self):
+        """The same dead end one level up: "all variants" must stay live while
+        a variant of that language is installed without all of its voices."""
+        store, folder = self._fresh_store()
+        _dlg, panel = self._download_panel(store)
+        _tts_id, _lang_code, _variant_id, _model_dir = self._install_first_variant(
+            panel, store, folder)
+        for index in range(panel.variant_combo.GetCount()):
+            if panel.variant_combo.GetClientData(index) == "__all__":
+                panel.variant_combo.SetSelection(index)
+                break
+        panel._refresh_buttons()
+        self.assertTrue(panel.download_btn.IsEnabled())
+        self.assertIn("finish every variant", panel.download_btn.GetToolTipText())
+
     def test_a_disabled_target_explains_itself_instead_of_nothing(self):
         """Alt+D on an already-downloaded model must say why it cannot act."""
         store, folder = self._fresh_store()
-        dlg, panel = self._download_panel(store)
-        self._install_first_variant(panel, store, folder)
+        _dlg, panel = self._download_panel(store)
+        self._install_first_variant(panel, store, folder, complete=True)
         panel._on_tts(None)                 # lands on the downloaded variant
         self.assertFalse(panel.download_btn.IsEnabled())
         started = []
@@ -249,8 +338,8 @@ class _GestureCase(unittest.TestCase):
     def test_a_disabled_target_is_inert_for_the_next_message_too(self):
         """Two messages of one press must not give two explanations."""
         store, folder = self._fresh_store()
-        dlg, panel = self._download_panel(store)
-        self._install_first_variant(panel, store, folder)
+        _dlg, panel = self._download_panel(store)
+        self._install_first_variant(panel, store, folder, complete=True)
         panel._on_tts(None)
         hints = []
         panel.show_access_key_hint = lambda entry: hints.append(entry.key)
@@ -271,7 +360,7 @@ class _GestureCase(unittest.TestCase):
         produces, so without the shared guard the user gets two downloads
         from one key stroke.
         """
-        store, folder = self._fresh_store()
+        store, _folder = self._fresh_store()
         dlg, panel = self._download_panel(store)
         panel._refresh_buttons()
         self.assertTrue(panel.download_btn.IsEnabled())
@@ -295,8 +384,8 @@ class _GestureCase(unittest.TestCase):
 
     def test_the_dispatcher_does_not_act_twice_for_one_key(self):
         """The window hook may run for both messages of one press."""
-        store, folder = self._fresh_store()
-        dlg, panel = self._download_panel(store)
+        store, _folder = self._fresh_store()
+        _dlg, panel = self._download_panel(store)
         panel._refresh_buttons()
         started = []
         panel._download_job = lambda *a: started.append(a)
@@ -308,7 +397,7 @@ class _GestureCase(unittest.TestCase):
     def test_a_mouse_click_is_never_de_duplicated(self):
         """The guard exists for Alt-driven activations only."""
         store, folder = self._fresh_store()
-        dlg, panel = self._download_panel(store)
+        _dlg, panel = self._download_panel(store)
         self._install_first_variant(panel, store, folder)
         panel._on_tts(None)
         with mock.patch.object(access_keys, "alt_is_down", lambda: False):
@@ -323,8 +412,8 @@ class _GestureCase(unittest.TestCase):
 
     def test_altgr_and_other_modifiers_are_not_access_keys(self):
         """Ctrl+Alt is AltGr - it types characters, it does not press buttons."""
-        store, folder = self._fresh_store()
-        dlg, panel = self._download_panel(store)
+        store, _folder = self._fresh_store()
+        _dlg, panel = self._download_panel(store)
         panel._refresh_buttons()
         started = []
         panel._download_job = lambda *a: started.append(a)
@@ -405,14 +494,156 @@ class _GestureCase(unittest.TestCase):
         """One owner: the menu item must not claim the button's gesture."""
         frame = self._main_frame()
         bar = frame.GetMenuBar()
-        item = [i for i in bar.GetMenu(0).GetMenuItems()
-                if i.GetItemLabelText() == "New Project"][0]
+        item = next(i for i in bar.GetMenu(0).GetMenuItems()
+                if i.GetItemLabelText() == "New Project")
         self.assertNotIn("Ctrl+Shift+N", item.GetItemLabel())
 
     def test_the_welcome_button_owns_the_ctrl_shift_n_gesture(self):
         """The gesture is discoverable where it belongs: on the button."""
         frame = self._main_frame()
         self.assertIn("Ctrl+Shift+N", frame.new_project_btn.GetToolTipText())
+
+    # -- 5b. the Settings Apply gesture -----------------------------------
+    def _apply_dialog(self, parent=None) -> SettingsDialog:
+        """A Settings dialog whose settings file lives in a temp folder.
+
+        Apply writes to disk, so the real user settings must never be touched.
+        """
+        folder = tempfile.mkdtemp(prefix="aivs_gestures_")
+        self.addCleanup(shutil.rmtree, folder, True)
+        store, _ = self._fresh_store()
+        settings = Settings(path=os.path.join(folder, "settings.json"))
+        dlg = SettingsDialog(parent or self.parent, settings, store)
+        self.addCleanup(dlg.Destroy)
+        dlg.SetSize((1000, 900))
+        # Shown on purpose: the access-key resolver skips controls inside a
+        # hidden window, exactly as Windows does.
+        dlg.Show()
+        self.addCleanup(dlg.Hide)
+        return dlg
+
+    def test_apply_button_alt_a_and_ctrl_s_run_the_one_apply_path(self):
+        """Apply, its Alt+A access key and Ctrl+S must all apply.
+
+        Ctrl+S used to be recognised only through ``GetUnicodeKey() == 'S'``;
+        Windows delivers Ctrl+S with a Unicode key of 0 or of the control
+        character 0x13, so the accelerator silently did nothing.
+        """
+        dlg = self._apply_dialog()
+        calls = {"n": 0}
+        real = dlg._apply_now
+
+        def counted():
+            calls["n"] += 1
+            return real()
+
+        dlg._apply_now = counted
+        # 1. the Apply button itself
+        dlg.ProcessEvent(wx.CommandEvent(
+            wx.wxEVT_COMMAND_BUTTON_CLICKED, wx.ID_APPLY))
+        self.assertEqual(calls["n"], 1, "the Apply button must apply")
+        # 2. its Alt+A access key, resolved the way the window does it
+        self.assertEqual(access_keys.mnemonic("&Apply"), "a")
+        self.assertTrue(access_keys.handle_key(
+            dlg, _char_hook_event("A", alt=True, scan=0x1E)),
+            "Alt+A must reach the Apply button")
+        self.assertEqual(calls["n"], 2, "Alt+A must apply")
+        # 3. Ctrl+S, for every shape Windows hands the key over in
+        for unicode_key in (None, 0x13):
+            evt = _char_hook_event("S", ctrl=True)
+            if unicode_key is not None:
+                evt.SetUnicodeKey(unicode_key)
+            dlg.GetEventHandler().ProcessEvent(evt)
+        self.assertEqual(calls["n"], 4, "Ctrl+S must apply")
+
+    def test_ctrl_s_actually_saves_the_settings(self):
+        """The accelerator must reach the disk, not just a handler."""
+        dlg = self._apply_dialog()
+        appearance = dlg.appearance_panel
+        target = next(
+            i for i in range(appearance.theme_combo.GetCount())
+            if appearance.theme_combo.GetClientData(i) != dlg.settings.theme
+        )
+        appearance.theme_combo.SetSelection(target)
+        chosen = appearance.theme_combo.GetClientData(target)
+        evt = _char_hook_event("S", ctrl=True)
+        evt.SetUnicodeKey(0x13)  # what Windows really sends for Ctrl+S
+        dlg.GetEventHandler().ProcessEvent(evt)
+        self.assertEqual(dlg.settings.theme, chosen)
+        with open(dlg.settings._path, encoding="utf-8") as fh:
+            saved = json.load(fh)
+        self.assertEqual(saved.get("theme"), chosen,
+                         "Ctrl+S must write the choice to settings.json")
+
+    def test_altgr_is_not_the_apply_gesture(self):
+        """AltGr arrives as Ctrl+Alt+letter and must keep typing its glyph."""
+        dlg = self._apply_dialog()
+        calls = []
+        dlg._apply_now = lambda: calls.append("apply")
+        evt = _char_hook_event("S", ctrl=True, alt=True)
+        dlg.GetEventHandler().ProcessEvent(evt)
+        self.assertEqual(calls, [], "Ctrl+Alt+S must not apply settings")
+        self.assertTrue(evt.GetSkipped(), "Ctrl+Alt+S must be passed on")
+
+    def test_apply_repaints_the_owner_window_immediately(self):
+        """Apply is visible at once, not only after the dialog closes."""
+        from ai_voice_studio.gui import theme as theme_module
+
+        owner = wx.Frame(None)
+        self.addCleanup(owner.Destroy)
+        dlg = self._apply_dialog(owner)
+        appearance = dlg.appearance_panel
+        target = next(
+            i for i in range(appearance.theme_combo.GetCount())
+            if appearance.theme_combo.GetClientData(i) != dlg.settings.theme
+        )
+        appearance.theme_combo.SetSelection(target)
+        chosen = appearance.theme_combo.GetClientData(target)
+        dlg._apply_now()
+        expected = theme_module.resolve_palette(chosen, dlg.settings)["bg"]
+        self.assertEqual(owner.GetBackgroundColour(),
+                         wx.Colour(expected),
+                         "the owner window must take the new theme at once")
+
+    def test_apply_then_close_keeps_the_change_without_pressing_ok(self):
+        """The user report: press Apply, close the panel, the change was gone.
+
+        Apply (its Alt+A access key, Ctrl+S, the Apply button) and an applied
+        keyboard gesture already write settings.json, so Cancel / the window's
+        X button must fall back to *that* state instead of the one the dialog
+        opened with.  Only edits made after the last Apply and never applied
+        are still discarded.
+        """
+        dlg = self._apply_dialog()
+        appearance = dlg.appearance_panel
+        target = next(
+            i for i in range(appearance.theme_combo.GetCount())
+            if appearance.theme_combo.GetClientData(i) != dlg.settings.theme
+        )
+        appearance.theme_combo.SetSelection(target)
+        chosen = appearance.theme_combo.GetClientData(target)
+        # A keyboard gesture rebound and applied in the same go.
+        dlg.input_gestures_panel.gesture_map.add("help.about", "kb:alt+j")
+        self.assertTrue(dlg._apply_now(), "Apply must succeed")
+        # An edit made after the apply and never applied stays in flight...
+        dlg.settings.set("developer_mode", True)
+        with mock.patch.object(dlg, "EndModal") as end:
+            dlg._on_cancel(None)  # what the X button and Cancel both run
+        end.assert_called_once_with(wx.ID_CANCEL)
+        # ...so it is discarded, while both applied changes survive.
+        self.assertEqual(
+            dlg.settings.theme, chosen,
+            "an applied change must survive closing the settings panel",
+        )
+        self.assertIn(
+            "kb:alt+j",
+            dlg.settings.get("gestures.bindings", {}).get("help.about", []),
+            "an applied gesture must survive closing the settings panel",
+        )
+        self.assertFalse(
+            dlg.settings.get("developer_mode"),
+            "a change that was never applied is still discarded",
+        )
 
     # -- 6. the audit itself ----------------------------------------------
     def test_the_gesture_audit_reports_a_shared_access_key(self):

@@ -1,0 +1,77 @@
+name: CI
+
+# Windows only: this is a wxPython desktop application whose test suite drives
+# real windows, reads a Windows VERSIONINFO resource back out of a built EXE and
+# validates winget manifests written for Windows installers.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      # The linter is pinned so the rule set the source's `# noqa:` comments
+      # were written against cannot drift under the project's feet: the config
+      # lives in pyproject.toml ([tool.ruff]).
+      - name: Install ruff
+        run: python -m pip install --disable-pip-version-check "ruff==0.17.1"
+
+      - name: Check the lint baseline
+        run: python -m ruff check .
+
+  tests:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install the core dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install pytest
+
+      # The non-GUI suite: two minutes of behaviour tests covering the
+      # document pipeline, the catalogs, the environment management, the
+      # announcement layer and the packaging metadata.  The GUI smoke module
+      # drives real wx windows and needs FFmpeg for the audio-description
+      # wizard, so it runs in its own job.
+      - name: Run the non-GUI test suite
+        run: python -m pytest tests -q --ignore=tests/test_gui_smoke.py
+
+  gui-smoke:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install the core dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install pytest
+
+      - name: Install FFmpeg
+        run: choco install ffmpeg --no-progress -y
+
+      - name: Run the GUI smoke suite
+        run: python -m pytest tests/test_gui_smoke.py -q

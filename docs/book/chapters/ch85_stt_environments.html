@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 85: One Environment per Model - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part X — Speech to Text, Voice Lab &amp; the Current System</div><ul class="chapters"><li><a href="ch76_voicelab_engines.html">Ch 76: Voice Lab Engines</a></li><li><a href="ch77_engine_environments.html">Ch 77: One Environment per Engine</a></li><li><a href="ch78_compute_choice.html">Ch 78: Compute Choice</a></li><li><a href="ch79_audio_io_shim.html">Ch 79: Audio I/O Without FFmpeg</a></li><li><a href="ch80_start_selected_recording.html">Ch 80: Start Selected Recording</a></li><li><a href="ch81_terms_dialog.html">Ch 81: First-Launch Terms</a></li><li><a href="ch82_licensing.html">Ch 82: Licensing &amp; Compliance</a></li><li><a href="ch83_input_gestures.html">Ch 83: Input Gestures</a></li><li><a href="ch84_stt_catalog.html">Ch 84: A Second Catalog</a></li><li><a href="ch85_stt_environments.html" class="active">Ch 85: One Environment per Model</a></li><li><a href="ch86_stt_dialog.html">Ch 86: The Transcribe Dialog</a></li><li><a href="ch87_theme_studio.html">Ch 87: The Theme Studio</a></li><li><a href="ch88_update_checker.html">Ch 88: Checking for Updates</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 85</div>
+<h1>One Python Environment per Model: Isolation as a Product Decision</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Decide when isolation is worth gigabytes, and prove the decision with a dependency conflict</li>
+  <li>Probe an environment by reading <code>site-packages</code> on disk instead of running pip</li>
+  <li>Split an install plan into a CUDA step and a plain-PyPI step</li>
+  <li>Drive a one-shot worker subprocess through request and response files</li>
+  <li>Turn a noisy stderr into the one line that is the actual cause of a failure</li>
+  <li>Explain a failure to the user in the words of the thing that failed</li>
+</ul>
+
+<hr>
+
+<h2>85.1 The Conflict That Forced the Design</h2>
+
+<p>Speech-recognition models look interchangeable from the dialog. Underneath,
+they are not: they are four completely different stacks whose transitive pins
+collide on every shared dependency.</p>
+
+<table>
+  <thead>
+    <tr><th>Model family</th><th>Needs</th><th>Conflicts with</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Whisper (faster-whisper)</td><td>CTranslate2, NumPy</td><td>Its CUDA runtime is a wheel, not a pip dependency</td></tr>
+    <tr><td>Qwen3-ASR, Voxtral, Granite, Moonshine</td><td>transformers + a specific PyTorch</td><td>Each other, whenever their PyTorch pins differ</td></tr>
+    <tr><td>NeMo (Canary-Qwen, Parakeet)</td><td>nemo_toolkit, protobuf, its own PyTorch</td><td>transformers 5 &mdash; NeMo 3.0 crashes on it</td></tr>
+    <tr><td>SpeechBrain</td><td>speechbrain, torchaudio</td><td>Anything that pins torchaudio elsewhere</td></tr>
+  </tbody>
+</table>
+
+<p>Two of these cannot even be built on the same <code>protobuf</code>. Sharing
+one <code>site-packages</code> directory between them would mean installing a new
+model could silently break a model that used to work &mdash; the worst kind of
+bug, because nothing in the new install looks wrong. So the project repeats the
+decision it already made for the Voice Lab engines: <strong>one environment per
+model</strong>, under a sibling of the engine environments:</p>
+
+<pre><code>%APPDATA%\AIVoiceStudio\
+├── tts_envs\&lt;engine&gt;        # the Voice Lab engines
+├── stt_envs\&lt;model id&gt;     # one speech-recognition model each
+├── addon_env               # addons and the Developer tab
+└── settings.json
+</code></pre>
+
+<div class="info">
+<strong>Never the same folder as the TTS side.</strong> The two trees are
+deliberately separate. A model's environment is named after its catalog id
+(<code>stt_envs\qwen3_asr</code>), so an engine and a model can never be handed
+each other's <code>site-packages</code> by a naming collision.
+</div>
+
+<h2>85.2 The Install Plan</h2>
+
+<p>Installing is a small pipeline, and the order matters. On Windows the PyPI
+<code>torch</code> wheel is CPU-only, so a GPU machine must fetch PyTorch from the
+CUDA index <em>first</em>, before the rest of the requirements are resolved
+against it:</p>
+
+<pre><code>#: Packages that must come from the CUDA PyTorch wheel index on a GPU machine
+#: (PyPI's plain ``torch`` wheel is CPU-only on Windows).
+_CUDA_PACKAGES = {"torch", "torchaudio", "torchvision"}
+</code></pre>
+
+<p>The plan a model produces is therefore a <em>list of pip steps, each with its
+own index</em>: on a GPU machine the CUDA PyTorch packages go first from the
+PyTorch wheel index, and everything else &mdash; the rest of
+<code>pip_packages</code> plus the catalog's <code>cuda_packages</code> &mdash;
+follows in one PyPI step. On a CPU machine there is a single PyPI step and
+<code>cuda_packages</code> is simply never added, so a CPU user never downloads a
+runtime they cannot load. After pip finishes, the environment is asked to
+<strong>import the back-end once</strong>; a dependency combination that cannot
+load is reported in the install dialog rather than appearing later as a crash on
+the first transcription.</p>
+
+<pre><code>def install_plan(model_id: str) -&gt; List[Tuple[List[str], Optional[str]]]:
+    """The pip steps that install a model into its own environment."""
+    packages = list(catalog.pip_packages(model_id))
+    steps: List[Tuple[List[str], Optional[str]]] = []
+    if _has_cuda():
+        cuda = [p for p in packages if base_name(p) in _CUDA_PACKAGES]
+        if cuda:
+            steps.append((cuda, PYTORCH_CUDA_INDEX))
+            packages = [p for p in packages if base_name(p) not in _CUDA_PACKAGES]
+        packages.extend(catalog.cuda_packages(model_id))
+    if packages:
+        steps.append((packages, None))     # None means the ordinary PyPI index
+    return steps
+</code></pre>
+
+<div class="tip">
+<strong>Verification belongs at install time.</strong> A model can install
+"successfully" and still fail to import &mdash; a compiled extension built for a
+different Python, or a version pin that pip resolved in a way the author did not
+intend. Importing once, in the environment's own interpreter, turns that into one
+clear sentence at the moment the user is paying attention.
+</div>
+
+<h2>85.3 Probing Without a Subprocess</h2>
+
+<p>The Settings page shows what is installed. The obvious implementation &mdash;
+run <code>pip list</code> in the environment &mdash; would freeze the GUI on every
+repaint and shell out dozens of times. Instead the probe reads
+<code>site-packages</code> <strong>directly from disk</strong>: distribution
+metadata lives in a predictable place, so the installed versions are a directory
+read, cached and invalidated by the folder's timestamp.</p>
+
+<pre><code>#: name -> (timestamp, {normalized distribution name: version})
+_DISK_CACHE: Dict[str, Tuple[float, Dict[str, str]]] = {}
+_LOCK = threading.RLock()
+</code></pre>
+
+<p>The lock is there because the Settings page and a background install can both
+ask at once. The cache makes the check free after the first call; the timestamp
+makes it correct after an install, without a manual "refresh".</p>
+
+<h2>85.4 Running the Model in Its Own Interpreter</h2>
+
+<p>The application never imports a model's back-end. It writes a request file,
+starts the worker as a <strong>one-shot subprocess</strong> on the environment's
+own <code>python.exe</code>, and reads the answer back from a JSON file:</p>
+
+<pre><code>def _run_worker(model_id: str, request: Dict[str, Any], on_progress) -&gt; List[Dict[str, Any]]:
+    """Start the worker in the model's environment and read its JSON response."""
+    script = environments.worker_script()
+    python_exe = environments.runtime(model_id).python_exe
+    ...
+    tmpdir = tempfile.mkdtemp(prefix="aivs_stt_")
+    request_path = os.path.join(tmpdir, "request.json")
+    out_path = os.path.join(tmpdir, "response.json")
+    request = dict(request)
+    request["out"] = out_path
+    with open(request_path, "w", encoding="utf-8") as fh:
+        json.dump(request, fh, ensure_ascii=False)
+
+    result = subprocess.run(
+        [python_exe, script, request_path],
+        capture_output=True, text=True, creationflags=flags,
+    )
+    ...
+    with open(out_path, "r", encoding="utf-8") as fh:
+        response = json.load(fh)
+    return list(response.get("segments", []))
+</code></pre>
+
+<p>Three details are load-bearing:</p>
+
+<ol>
+  <li><strong>The answer comes from a file, not stdout.</strong> A model prints
+      progress bars, download notices, NeMo's info logs and PyTorch warnings to
+      the same stream. Parsing stdout would mean parsing all of that. A file the
+      worker writes at the end is unambiguous, and stdout stays available as the
+      diagnostic channel.</li>
+  <li><strong>One request per process.</strong> Loading a large model takes
+      seconds to minutes; if the process stayed alive between files, the
+      application would have to manage its lifetime, its memory and its
+      cancellation. A one-shot process gets all three from the operating system,
+      and the job's <em>Cancel</em> simply stops starting new ones.</li>
+  <li><strong><code>CREATE_NO_WINDOW</code> on Windows.</strong> Without it a
+      black console window flashes for every transcription.</li>
+</ol>
+
+<p>The request itself carries only what the catalog and the dialog decided:</p>
+
+<pre><code>request: Dict[str, Any] = {
+    "audio": audio_path,          # the file to transcribe
+    "backend": backend,           # faster_whisper / transformers / nemo / ...
+    "variant": variant,           # the checkpoint the user chose
+    "language": language,         # "auto" or an ISO code
+    "translate_to": translate_to, # "" or a target language
+    "accuracy": accuracy,         # fast / balanced / best -&gt; a beam size
+    "compute": _resolve_device(compute),   # "cpu" or "cuda"
+    "model": model_id,
+    "runner": catalog.runner_for(model_id, variant),  # pipeline / chat / ...
+    "timestamps": catalog.supports_timestamps(model_id),
+    "trust_remote_code": catalog.needs_remote_code(model_id),
+}
+</code></pre>
+
+<h2>85.5 Errors People Can Act On</h2>
+
+<p>When the worker fails, the only evidence is its stderr, and most of that
+stderr is not the reason. A model download prints a progress bar to the same
+stream a crash uses, so the <em>last</em> line of a killed worker is often a
+finished download rather than an exception.</p>
+
+<pre><code>#: Fragments that mark a line as a progress bar rather than a cause.
+_PROGRESS_MARKERS = ("%|", "it/s", "s/it", "B/s")
+
+#: Lines a back-end prints that are never the reason a run failed.
+_WARNING_MARKERS = (
+    "deprecated", "futurewarning", "userwarning", "deprecationwarning",
+    "warnings.warn", "[transformers]",
+)
+
+#: Log prefixes whose lines are routine chatter.
+_LOG_PREFIXES = ("[nemo ", "[torch", "w1002", "w1003", "a100")
+</code></pre>
+
+<p>Lines matching those patterns are dropped, and the remaining meaningful line
+becomes the message. Two final touches make the result honest:</p>
+
+<ul>
+  <li>when the process exited non-zero, the exit code is appended
+      (<em>"(the model's process exited with code -1073741819)"</em>) &mdash; a
+      Windows access violation and a Python exception need different fixes, and
+      the code is how you tell them apart;</li>
+  <li>when the model was never installed, the error is a
+      <code>BackendMissing</code> that <strong>names the environment and the
+      command</strong> rather than a bare traceback.</li>
+</ul>
+
+<pre><code>raise BackendMissing(
+    f"{entry['name']} has no Python environment of its own yet "
+    f"({environments.env_dir(model_id)}).\n\nOpen Settings > Manage "
+    "the STT and install this model there."
+)
+</code></pre>
+
+<div class="note">
+<strong>Distinguishing "not installed" from "it broke" is a product
+decision.</strong> Both are exceptions, but the first is a normal state of a
+fresh machine and the second is a bug. The dialog handles them differently: one
+offers to open Settings, the other shows the cause and an exit code. Collapsing
+them into one message would make the ordinary case look like a failure.
+</div>
+
+<h2>85.6 GPU Is a Driver, Not a Toolkit</h2>
+
+<p>A GPU run of any model here needs exactly one thing the user must supply: an
+NVIDIA driver. The CUDA build of PyTorch is installed <em>into the model's own
+environment</em>, so a transcription never waits for the optional sherpa-onnx GPU
+runtime used by the ONNX speech engines &mdash; the two features are independent
+from the user's point of view even though they share a card.</p>
+
+<p>Whisper is the exception that proves the rule, and its fix is the reason
+<code>cuda_packages</code> exists. Its CTranslate2 back-end dynamically loads
+<code>cublas64_12.dll</code>, which <code>faster-whisper</code> does not depend
+on. Without it the run does not crash &mdash; it quietly uses the CPU:</p>
+
+<pre><code>"cuda_packages": ["nvidia-cublas-cu12"],   # the wheel ships cuDNN itself
+</code></pre>
+
+<p>Because a silent fallback is worse than a loud failure, <em>Manage the STT</em>
+checks for the wheel and, when an existing environment predates it, names it and
+turns <strong>Install selected model</strong> into a repair.</p>
+
+<h2>85.7 Exercises</h2>
+<ol>
+  <li>Add a second worker protocol (say, JSON-lines on stdin) behind a flag.
+      Which parts of <code>_run_worker</code> stay the same?</li>
+  <li>Measure how long a directory-read probe takes for an environment with 300
+      distributions, and compare it with <code>pip list</code>.</li>
+  <li>A model needs <code>protobuf&gt;=5</code> and another needs
+      <code>protobuf&lt;4</code>. Write the two catalog entries and show that
+      neither install can disturb the other.</li>
+</ol>
+
+<h2>Key Takeaways</h2>
+<ul>
+  <li>Isolation costs disk, and buys the property that two models can never
+      break each other; for conflicting stacks that is a good trade.</li>
+  <li>Probe <code>site-packages</code> directly when a UI needs to know what is
+      installed &mdash; never shell out to pip on a paint event.</li>
+  <li>Install GPU packages first, and only on a machine that has the hardware.</li>
+  <li>A one-shot worker subprocess with file-based results is easier to cancel
+      and reason about than a long-lived server.</li>
+  <li>Filter stderr down to the real cause, keep the exit code, and say plainly
+      when the reason is "not installed yet".</li>
+</ul>
+
+</div>
+</div>
+</body>
+</html>

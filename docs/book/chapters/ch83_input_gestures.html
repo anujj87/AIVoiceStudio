@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 83: Configurable Input Gestures - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part X — Speech to Text, Voice Lab &amp; the Current System</div><ul class="chapters"><li><a href="ch76_voicelab_engines.html">Ch 76: Voice Lab Engines</a></li><li><a href="ch77_engine_environments.html">Ch 77: One Environment per Engine</a></li><li><a href="ch78_compute_choice.html">Ch 78: Compute Choice</a></li><li><a href="ch79_audio_io_shim.html">Ch 79: Audio I/O Without FFmpeg</a></li><li><a href="ch80_start_selected_recording.html">Ch 80: Start Selected Recording</a></li><li><a href="ch81_terms_dialog.html">Ch 81: First-Launch Terms</a></li><li><a href="ch82_licensing.html">Ch 82: Licensing &amp; Compliance</a></li><li><a href="ch83_input_gestures.html" class="active">Ch 83: Input Gestures</a></li><li><a href="ch84_stt_catalog.html">Ch 84: A Second Catalog</a></li><li><a href="ch85_stt_environments.html">Ch 85: One Environment per Model</a></li><li><a href="ch86_stt_dialog.html">Ch 86: The Transcribe Dialog</a></li><li><a href="ch87_theme_studio.html">Ch 87: The Theme Studio</a></li><li><a href="ch88_update_checker.html">Ch 88: Checking for Updates</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 83</div>
+<h1>Configurable Input Gestures: Learning from NVDA's Input Gestures Dialog</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Separate a <em>command</em> (what the user means) from a <em>gesture</em> (the key they press)</li>
+  <li>Normalize a key combination into a stable identifier so bindings can be compared</li>
+  <li>Layer defaults, locale and user overrides the way NVDA's <code>GlobalGestureMap</code> does</li>
+  <li>Report a key two commands both want instead of resolving it silently</li>
+  <li>Capture a key press into a gesture and refuse combinations that would shadow typing</li>
+  <li>Keep the model GUI-free so it can be unit tested without a window</li>
+</ul>
+
+<hr>
+
+<h2>83.1 The Problem with Hard-Coded Keys</h2>
+
+<p>Every keyboard shortcut written as a literal in an event handler is a promise
+the application cannot keep. A screen reader user may already use
+<strong>Ctrl+Shift+R</strong> for something else in their own workflow; a laptop
+keyboard may have no <strong>Insert</strong> key; a blind user's muscle memory
+from another program points at a different key entirely. NVDA solved this years
+ago with its <strong>Input Gestures</strong> dialog, and this chapter builds the
+same facility for AI Voice Studio.</p>
+
+<p>The central idea is a separation of concerns:</p>
+
+<ul>
+  <li>A <strong>command</strong> is what the user means — “Create a new project”.
+      It has an id, a category and a human-readable label.</li>
+  <li>A <strong>gesture</strong> is how they ask for it — a normalized key
+      combination such as <code>kb:control+shift+n</code>.</li>
+</ul>
+
+<p>A command ships with <em>default</em> gestures; the user may <em>replace</em>
+those defaults, and the replacement is what actually runs. Nothing in the event
+handlers mentions a key at all.</p>
+
+<h2>83.2 Normalizing a Gesture</h2>
+
+<p>A gesture identifier is a string: a source prefix (<code>kb</code> for
+keyboard, exactly NVDA's spelling), then a <code>+</code>-separated list of
+modifiers and one key. Normalization makes two spellings of the same key press
+compare equal:</p>
+
+<pre><code>def normalize(identifier: str) -&gt; str:
+    """Normalize a gesture to its canonical ``kb:&lt;mods+key&gt;`` form."""
+    text = str(identifier or "").strip()
+    if ":" in text:
+        source, _, body = text.partition(":")
+        source = source.strip().lower()
+    else:
+        source, body = SOURCE, text
+    parts = [chunk.strip().lower() for chunk in body.split("+") if chunk.strip()]
+    if not parts:
+        return ""
+    parts = [_ALIASES.get(part, part) for part in parts]
+    modifiers = [p for p in MODIFIER_ORDER if p in parts]
+    keys = [p for p in parts if p not in MODIFIER_ORDER]
+    if len(keys) != 1:
+        return ""            # a gesture ends in exactly one non-modifier key
+    return f"{SOURCE}:{'+'.join(modifiers + keys)}"
+</code></pre>
+
+<p>Three details matter. Modifiers are emitted in a <strong>fixed order</strong>
+(<code>control</code>, <code>alt</code>, <code>shift</code>, <code>windows</code>),
+so <code>shift+control+n</code> and <code>control+shift+n</code> are one gesture.
+Everything is <strong>lower-cased</strong>. And a small alias table accepts the
+spellings people actually type — <code>ctrl</code>, <code>win</code>,
+<code>esc</code>, <code>pgdn</code> — so a hand-edited settings file is not
+silently ignored.</p>
+
+<h2>83.3 The Command Catalog</h2>
+
+<p>Commands are declared once, as data:</p>
+
+<pre><code>@dataclass(frozen=True)
+class Command:
+    id: str
+    category: str
+    label: str
+    defaults: Tuple[str, ...] = field(default_factory=tuple)
+
+COMMANDS: Tuple[Command, ...] = (
+    Command("project.new", "Projects", "Create a new project",
+            ("kb:control+shift+n",)),
+    Command("project.open", "Projects", "Open a project...",
+            ("kb:control+o",)),
+    Command("project.resume", "Projects", "Resume the selected project"),
+    # ... Recording, Help and Application commands
+)
+</code></pre>
+
+<p>The categories (<em>Projects</em>, <em>Recording</em>, <em>Help</em>,
+<em>Application</em>) are what the dialog shows as the branches of its tree.
+<code>categories_present()</code> returns only the categories that actually hold
+a command, so a renamed category cannot leave an empty branch behind.</p>
+
+<h2>83.4 Layering Defaults and User Overrides</h2>
+
+<p><code>GestureMap</code> keeps the user's map — <code>{command id:
+[gesture, ...]}</code> — and answers for every command:</p>
+
+<pre><code>def bindings_for(self, command_id: str) -&gt; List[str]:
+    """The gestures that trigger ``command_id`` (user map first)."""
+    if command_id in self._user:
+        return list(self._user[command_id])
+    return self.defaults_for(command_id)
+</code></pre>
+
+<p>An entry in the user map <strong>replaces</strong> the defaults entirely,
+which is what makes an empty list mean “unbound” rather than “fall back”. That
+is deliberate: a user who removes the last key from a command means it, and the
+command must stop answering.</p>
+
+<div class="info">
+<strong>Why not merge the lists?</strong> NVDA's global map <em>appends</em> to
+the defaults, which is right when a locale adds a binding but wrong for a user
+who wants a key <em>gone</em>. A replacement model makes “unbind” expressible
+without a special case.
+</div>
+
+<h2>83.5 Conflicts Are Data, Not Errors</h2>
+
+<p>Two commands can end up asking for the same key: the user assigns
+<strong>Ctrl+Shift+N</strong> to <em>Open a project</em> without noticing the
+<em>New project</em> command already has it. The model does not guess. It
+reports:</p>
+
+<pre><code>def conflicts(self) -&gt; Dict[str, List[str]]:
+    """``{gesture: [command ids]}`` for every key claimed more than once."""
+    owners: Dict[str, List[str]] = {}
+    for entry in COMMANDS:
+        for gesture in self.bindings_for(entry.id):
+            owners.setdefault(gesture, [])
+            if entry.id not in owners[gesture]:
+                owners[gesture].append(entry.id)
+    return {gesture: ids for gesture, ids in owners.items() if len(ids) &gt; 1}
+</code></pre>
+
+<p>The dialog shows the conflict in its status line, and the dispatcher resolves
+it deterministically (the first declared command wins) so a key press never does
+two things at once. A test pins the shipped defaults to <em>no</em> conflicts, so
+a new command cannot quietly introduce one.</p>
+
+<h2>83.6 Capturing a Key Press</h2>
+
+<p>The capture dialog listens on its own char hook and turns the event into a
+gesture. Two rules keep the result sane:</p>
+
+<pre><code>def gesture_from_event(evt: wx.KeyEvent) -&gt; str:
+    code = evt.GetKeyCode()
+    if code in _GESTURE_MODIFIER_CODES:
+        return ""                       # a modifier alone is not a gesture
+    key = gesture_key_name(code)
+    if not key:
+        return ""
+    modifiers = []
+    if evt.ControlDown():
+        modifiers.append("control")
+    if evt.AltDown():
+        modifiers.append("alt")
+    if evt.ShiftDown():
+        modifiers.append("shift")
+    if getattr(evt, "MetaDown", lambda: False)():
+        modifiers.append("windows")
+    return gestures_model.normalize("+".join(modifiers + [key]))
+</code></pre>
+
+<p>Then <code>gesture_problem()</code> refuses a combination that would shadow
+ordinary typing: a gesture needs <strong>Ctrl</strong>, <strong>Alt</strong> or
+<strong>Windows</strong>, unless it is a named key such as a function key. A bare
+<strong>J</strong> is rejected with a sentence saying why, instead of silently
+stealing a letter.</p>
+
+<h2>83.7 Dispatching in the Main Window</h2>
+
+<p>The frame offers every key press to the configured gestures <em>before</em>
+its built-in shortcuts:</p>
+
+<pre><code>def _dispatch_gesture(self, evt: wx.KeyEvent) -&gt; bool:
+    """Run the command a configured gesture names; True when one matched."""
+    gesture = gesture_from_event(evt)
+    if not gesture:
+        return False
+    command_id = self._gestures.owner(gesture)
+    if not command_id:
+        return False
+    name = self._gesture_actions.get(command_id)
+    handler = getattr(self, name, None) if name else None
+    if handler is None:
+        return False
+    log.info("Input gesture %s -&gt; %s", gesture, command_id)
+    handler()
+    return True
+</code></pre>
+
+<p>The handler table maps a command id to the <em>name</em> of a method rather
+than a bound method, so a later override of that method is what actually runs —
+which is what makes the dispatcher testable and keeps one code path for a mouse
+click and a gesture.</p>
+
+<p>When the Settings window closes, the frame reloads the bindings, so a
+rebinding takes effect immediately without a restart.</p>
+
+<h2>83.8 The Settings Panel</h2>
+
+<p>Settings &rarr; <strong>Keyboard gestures</strong> follows NVDA's dialog layout:
+a tree of categories and commands, the selected command's gestures in a list
+below it, and three buttons — <strong>Add gesture…</strong>, <strong>Remove
+gesture</strong> and <strong>Restore defaults</strong>. A filter box narrows the
+tree, which matters when the command list grows.</p>
+
+<p>Adding a gesture that another command already owns asks first:</p>
+
+<pre><code>owner = self.gesture_map.owner(gesture)
+if owner and owner != command_id:
+    other = gestures_model.command(owner)
+    answer = wx.MessageBox(
+        f"{gestures_model.display_name(gesture)} is already assigned "
+        f"to \"{other.label}\".\n\n"
+        "Take it away from that command and give it to this one?",
+        "Input gesture already in use",
+        style=wx.YES_NO | wx.ICON_QUESTION,
+    )
+    if answer != wx.YES:
+        return
+    self.gesture_map.add(command_id, gesture, replace_owner=True)
+</code></pre>
+
+<p>The bindings are saved with the rest of the settings in
+<code>apply_to_settings()</code> under <code>gestures.bindings</code>, so they
+travel with the user's configuration and are reset with it.</p>
+
+<h2>83.9 Keeping the Model Testable</h2>
+
+<p><code>ai_voice_studio/gestures.py</code> imports nothing from wx. The whole
+model — normalization, the user map, conflicts, add/remove/reset — is exercised
+by <code>tests/test_gestures_model.py</code> without a window, and the GUI layer
+(capture, panel, dispatcher) by the smoke tests. That split is what lets the
+interesting rules be tested in milliseconds.</p>
+
+<h2>Exercises</h2>
+<ol>
+  <li>Add a <em>Braille display</em> source. What has to change in
+      <code>normalize()</code>, and what does the display name become?</li>
+  <li>Give a command two default gestures and confirm the conflict report stays
+      empty.</li>
+  <li>Export the user map to an ini file shaped like NVDA's
+      <code>gestures.ini</code> and load it back.</li>
+</ol>
+
+</div>
+</div>
+</body>
+</html>

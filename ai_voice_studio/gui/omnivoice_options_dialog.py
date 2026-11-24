@@ -26,11 +26,12 @@ window stores in ``project.json`` under ``tts.omni``.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 import wx
 
 from ..omnivoice import languages, spec
+from . import dpi
 from .a11y import add_labeled, finalize_accessibility
 
 _NONE = "(not set)"
@@ -58,7 +59,7 @@ class OmniVoiceOptionsDialog(wx.Dialog):
         self,
         parent,
         engine_label: str = "OmniVoice",
-        omni: Optional[Dict[str, Any]] = None,
+        omni: dict[str, Any] | None = None,
         project_name: str = "",
     ):
         super().__init__(
@@ -74,6 +75,8 @@ class OmniVoiceOptionsDialog(wx.Dialog):
         self._on_mode(None)
         # Real MSAA accNames for every labelled control.
         finalize_accessibility(self)
+        dpi.prepare(self)
+        dpi.follow(self)
         wx.CallAfter(self.mode_box.SetFocus)
 
     # ------------------------------------------------------------------ UI
@@ -103,7 +106,7 @@ class OmniVoiceOptionsDialog(wx.Dialog):
         design_grid.AddGrowableCol(1)
 
         # name -> combo (values are the canonical attribute strings)
-        self.attr_combos: Dict[str, wx.ComboBox] = {}
+        self.attr_combos: dict[str, wx.ComboBox] = {}
         attribute_rows = [
             ("Gender", "gender", ["male", "female"]),
             ("Age", "age", [
@@ -405,7 +408,7 @@ class OmniVoiceOptionsDialog(wx.Dialog):
         self.instruct_ctrl.SetValue(text)
 
     # -- state -------------------------------------------------------------
-    def _load(self, omni: Dict[str, Any]):
+    def _load(self, omni: dict[str, Any]):
         mode = omni.get("mode", "auto")
         mode_idx = next(
             (i for i, (key, _label) in enumerate(_MODE_CHOICES) if key == mode), 0
@@ -416,10 +419,10 @@ class OmniVoiceOptionsDialog(wx.Dialog):
         self.instruct_ctrl.SetValue(instruct)
         # Only pre-select combos whose values appear in the instruction text;
         # instructions typed by hand may not map cleanly back.
-        for key, combo in self.attr_combos.items():
+        for combo in self.attr_combos.values():
             combo.SetSelection(0)
         if instruct:
-            for key, combo in self.attr_combos.items():
+            for combo in self.attr_combos.values():
                 for i in range(1, combo.GetCount()):
                     value = combo.GetClientData(i)
                     if value and str(value) in instruct:
@@ -453,7 +456,7 @@ class OmniVoiceOptionsDialog(wx.Dialog):
         self.seed_ctrl.SetValue(str(seed) if seed is not None else "")
 
     # -- language picker ----------------------------------------------------
-    def _set_language(self, value: Optional[str]):
+    def _set_language(self, value: str | None):
         """Show a stored hint in the picker (auto / known / verbatim)."""
         normalised = languages.normalise(value)
         index = languages.selection_index(normalised)
@@ -469,7 +472,7 @@ class OmniVoiceOptionsDialog(wx.Dialog):
             self.language_combo.SetSelection(0)
             self.language_combo.SetValue(languages.AUTO_LABEL)
 
-    def selected_language(self) -> Optional[str]:
+    def selected_language(self) -> str | None:
         """The chosen language id, or ``None`` to let OmniVoice detect it.
 
         The text of the box decides: every list entry is ``"Name (id)"`` and
@@ -479,7 +482,7 @@ class OmniVoiceOptionsDialog(wx.Dialog):
         """
         return languages.normalise(self.language_combo.GetValue())
 
-    def get_omni(self) -> Dict[str, Any]:
+    def get_omni(self) -> dict[str, Any]:
         """Return the canonical ``omni`` dict the Recording window saves."""
         mode = _MODE_CHOICES[self.mode_box.GetSelection()][0]
 

@@ -9,7 +9,7 @@
 <body>
 <div class="book-container">
 <nav class="sidebar"><h2>📖 Contents</h2>
-<div class="part-header">Part X — Voice Lab &amp; the Current System</div><ul class="chapters"><li><a href="ch76_voicelab_engines.html">Ch 76: Voice Lab Engines</a></li><li><a href="ch77_engine_environments.html" class="active">Ch 77: One Environment per Engine</a></li><li><a href="ch78_compute_choice.html">Ch 78: Compute Choice</a></li><li><a href="ch79_audio_io_shim.html">Ch 79: Audio I/O Without FFmpeg</a></li><li><a href="ch80_start_selected_recording.html">Ch 80: Start Selected Recording</a></li><li><a href="ch81_terms_dialog.html">Ch 81: First-Launch Terms</a></li><li><a href="ch82_licensing.html">Ch 82: Licensing &amp; Compliance</a></li></ul>
+<div class="part-header">Part X — Speech to Text, Voice Lab &amp; the Current System</div><ul class="chapters"><li><a href="ch76_voicelab_engines.html">Ch 76: Voice Lab Engines</a></li><li><a href="ch77_engine_environments.html" class="active">Ch 77: One Environment per Engine</a></li><li><a href="ch78_compute_choice.html">Ch 78: Compute Choice</a></li><li><a href="ch79_audio_io_shim.html">Ch 79: Audio I/O Without FFmpeg</a></li><li><a href="ch80_start_selected_recording.html">Ch 80: Start Selected Recording</a></li><li><a href="ch81_terms_dialog.html">Ch 81: First-Launch Terms</a></li><li><a href="ch82_licensing.html">Ch 82: Licensing &amp; Compliance</a></li><li><a href="ch83_input_gestures.html">Ch 83: Input Gestures</a></li><li><a href="ch84_stt_catalog.html">Ch 84: A Second Catalog</a></li><li><a href="ch85_stt_environments.html">Ch 85: One Environment per Model</a></li><li><a href="ch86_stt_dialog.html">Ch 86: The Transcribe Dialog</a></li><li><a href="ch87_theme_studio.html">Ch 87: The Theme Studio</a></li><li><a href="ch88_update_checker.html">Ch 88: Checking for Updates</a></li></ul>
 </nav>
 <div class="main-content">
 
@@ -47,8 +47,11 @@ environment to <strong>one environment per engine</strong>. The layout is:</p>
 ├── addon_env\                 shared environment (addons, Developer tab)
 └── tts_envs\
     ├── pocket_tts\            Pocket TTS only
-    ├── bark\                  Bark + transformers + torch
     ├── f5tts\                 F5-TTS + torch + torchaudio
+    ├── kokoclone\             Kokoro ONNX + Kanade + torch
+    ├── chatterbox\            Chatterbox + its pinned torch
+    ├── qwen3tts\              Qwen3-TTS + its pinned transformers
+    ├── vibevoice\             VibeVoice + its pinned transformers
     └── omnivoice\             OmniVoice + OmniVoice Server (shared on purpose)</code></pre>
 
 <div class="info">
@@ -184,8 +187,8 @@ of steps:</p>
 
 _CUDA_PACKAGES = {
     "pocket_tts": ("torch",),
-    "bark": ("torch",),
     "f5tts": ("torch", "torchaudio"),
+    "chatterbox": ("torch==2.6.0", "torchaudio==2.6.0"),
 }
 
 
@@ -431,7 +434,7 @@ engine once, in its own environment, and reports what happens:</p>
 
 <pre><code>from ai_voice_studio import python_runtime, venv_packages
 
-for engine_id in ("pocket_tts", "bark", "f5tts"):
+for engine_id in ("pocket_tts", "f5tts", "chatterbox"):
     runtime = python_runtime.get_runtime(engine_id)
     print(f"{engine_id:12} env={runtime.env_dir}")
     print(f"{'':12} created={runtime.is_created}")
@@ -447,10 +450,11 @@ decision <code>CloneWorker._runtime</code> makes when it picks an interpreter.</
     <li>Why does <code>environment_id()</code> exist instead of every caller using
     <code>engine_id</code> directly? Give one concrete bug the current design prevents.</li>
     <li>Add a fourth entry to <code>SHARED_ENVIRONMENTS</code> that makes
-    <code>f5tts</code> use the <code>bark</code> environment. Predict which tests would
-    fail, then run the suite and compare.</li>
-    <li>Write a small script that prints <code>install_plan("bark")</code> on this
-    machine. Explain the output for a machine with an NVIDIA GPU and for one without.</li>
+    <code>f5tts</code> use the <code>pocket_tts</code> environment. Predict which
+    tests would fail, then run the suite and compare.</li>
+    <li>Write a small script that prints <code>install_plan("chatterbox")</code> on
+    this machine. Explain the output for a machine with an NVIDIA GPU and for one
+    without — and why the two steps are ordered the way they are.</li>
     <li>Time <code>venv_packages.version()</code> on a cold cache versus a warm one.
     Then explain why the cold path still answers correctly instead of returning
     <code>None</code>.</li>

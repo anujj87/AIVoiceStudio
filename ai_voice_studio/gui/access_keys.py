@@ -38,6 +38,8 @@ import time
 
 import wx
 
+from . import announce
+
 log = logging.getLogger(__name__)
 
 #: How long a claimed keystroke blocks a second activation, in seconds.
@@ -71,7 +73,7 @@ def mnemonic(label: str) -> str | None:
     half is searched.  ``&&`` is an escaped ampersand and introduces no
     access key, so it is skipped and the first single ``&`` wins.
     """
-    text = label.split("\t")[0]
+    text = label.split("\t", maxsplit=1)[0]
     index = 0
     while index < len(text):
         if text[index] == "&":
@@ -88,7 +90,7 @@ def mnemonic(label: str) -> str | None:
 class AccessKey:
     """One control, the letter its label underlines, and whether it can act."""
 
-    __slots__ = ("control", "label", "key", "enabled")
+    __slots__ = ("control", "enabled", "key", "label")
 
     def __init__(self, control: wx.Window, label: str, key: str, enabled: bool):
         self.control = control
@@ -239,12 +241,12 @@ def alt_letter(evt: wx.KeyEvent) -> str | None:
         return None
     try:
         scan = (evt.GetRawKeyFlags() >> 16) & 0xFF
-    except Exception:  # noqa: BLE001 - raw flags are not always available
+    except Exception:
         scan = 0
     for letter, code_of_letter in _SCAN_CODES.items():
         if code_of_letter == scan:
             return letter.lower()
-    import ctypes  # noqa: PLC0415 - Windows-only fallback
+    import ctypes
 
     user32 = ctypes.windll.user32
     for letter in _SCAN_CODES:
@@ -262,10 +264,10 @@ def alt_is_down() -> bool:
     if sys.platform != "win32":
         return False
     try:
-        import ctypes  # noqa: PLC0415 - Windows-only check
+        import ctypes
 
         return bool(ctypes.windll.user32.GetKeyState(_VK_MENU) & 0x8000)
-    except Exception:  # noqa: BLE001 - never let a key handler fail here
+    except Exception:
         return False
 
 
@@ -359,14 +361,14 @@ def _report_unavailable(window: wx.Window, entry: AccessKey) -> None:
              entry.key.upper(), entry.label)
     try:
         wx.Bell()
-    except Exception:  # noqa: BLE001 - a beep must never raise
-        pass
+    except Exception:
+        log.debug("Ignoring a failure in _report_unavailable", exc_info=True)
     sink = _hint_sink(entry.control)
     if sink is None or not hasattr(sink, "show_access_key_hint"):
         return
     try:
         sink.show_access_key_hint(entry)
-    except Exception:  # noqa: BLE001 - an explanation must never raise
+    except Exception:
         log.exception("Access key Alt+%s: show_access_key_hint failed",
                       entry.key.upper())
 
@@ -396,7 +398,7 @@ def activate(entry: AccessKey) -> None:
                 event.SetEventObject(control)
                 control.GetEventHandler().ProcessEvent(event)
                 return
-    except Exception:  # noqa: BLE001 - report, never crash the window
+    except Exception:
         log.exception("Access key Alt+%s: activating %r failed",
                       entry.key.upper(), entry.label)
     finally:
@@ -474,7 +476,12 @@ class AccessKeyHints:
         message = self.access_key_hint(entry)
         target = self.access_key_hint_target()
         if target is not None:
-            target.SetLabel(message)
+            # A key that does nothing has to *say* it did nothing: the hint
+            # goes to the status line and to the screen reader, because the
+            # listener who pressed the key is waiting for an answer.
+            announce.status_error(target, message)
+        else:
+            announce.announce_error(message)
         log.info("Access key hint: %s", message)
 
 
@@ -488,8 +495,22 @@ def describe(window: wx.Window) -> list[str]:
 
 
 __all__ = [
-    "AccessKey", "AccessKeyHints", "REPEAT_GUARD_SECONDS", "access_keys",
-    "activate", "alt_is_down", "alt_letter", "claim", "describe",
-    "enabled_receiver", "handle_key", "install", "menu_claims", "mnemonic",
-    "once", "receiver", "shown_on_screen", "top_level",
+    "REPEAT_GUARD_SECONDS",
+    "AccessKey",
+    "AccessKeyHints",
+    "access_keys",
+    "activate",
+    "alt_is_down",
+    "alt_letter",
+    "claim",
+    "describe",
+    "enabled_receiver",
+    "handle_key",
+    "install",
+    "menu_claims",
+    "mnemonic",
+    "once",
+    "receiver",
+    "shown_on_screen",
+    "top_level",
 ]

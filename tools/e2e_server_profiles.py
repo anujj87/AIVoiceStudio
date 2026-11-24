@@ -45,7 +45,7 @@ WATCHDOG_SECONDS = 560
 def _watchdog() -> None:
     print("\nWATCHDOG: e2e_server_profiles.py exceeded "
           f"{WATCHDOG_SECONDS}s, aborting.", flush=True)
-    os._exit(124)  # noqa: PLR2801 - hard exit is the point of a watchdog
+    os._exit(124)
 
 
 _watchdog_timer = threading.Timer(WATCHDOG_SECONDS, _watchdog)
@@ -84,12 +84,12 @@ REF_TEXT = "This is an end to end test of OmniVoice in AI Voice Studio."
 # ---------------------------------------------------------------------------
 # Import wx + the panel, then stub modal dialogs BEFORE anything runs
 # ---------------------------------------------------------------------------
-import wx  # noqa: E402
+import wx
 
 _modal_calls: list[tuple[str, str, int]] = []
 
 
-def _fake_message_box(message, caption="", style=wx.OK, **kwargs):  # noqa: ANN001
+def _fake_message_box(message, caption="", style=wx.OK, **kwargs):
     """Auto-answer every MessageBox so a headless run can never block."""
     _modal_calls.append((caption, message, style))
     log.info("MessageBox [%s]: %s", caption, message.splitlines()[0][:120])
@@ -98,9 +98,11 @@ def _fake_message_box(message, caption="", style=wx.OK, **kwargs):  # noqa: ANN0
 
 wx.MessageBox = _fake_message_box  # type: ignore[method-assign]
 
-from ai_voice_studio.gui import settings_dialog  # noqa: E402
-from ai_voice_studio.omnivoice_server import get_server_manager  # noqa: E402
-from ai_voice_studio.settings import Settings  # noqa: E402
+import contextlib
+
+from ai_voice_studio.gui import settings_dialog
+from ai_voice_studio.omnivoice_server import get_server_manager
+from ai_voice_studio.settings import Settings
 
 # ---------------------------------------------------------------------------
 # Harness: main thread runs the wx MainLoop; stages advance via CallAfter.
@@ -117,10 +119,8 @@ def _fail(msg: str) -> None:
 
 
 def _finish() -> None:
-    try:
+    with contextlib.suppress(Exception):
         _app.frame.Destroy()
-    except Exception:  # noqa: BLE001
-        pass
     wx.CallLater(150, _app.app.ExitMainLoop)
     _done.set()
 
@@ -129,7 +129,7 @@ class Harness:
     def __init__(self) -> None:
         self.app = wx.App(redirect=False)
         self.frame = wx.Frame(None, title="e2e omni server", size=(900, 760))
-        self.panel = settings_dialog._OmniVoiceServerPanel(  # noqa: SLF001
+        self.panel = settings_dialog._OmniVoiceServerPanel(
             self.frame, Settings(path=tmp_settings)
         )
         self.panel.host_ctrl.SetValue("127.0.0.1")
@@ -145,20 +145,20 @@ class Harness:
         ).start()
 
     @staticmethod
-    def _on_button(evt) -> None:  # noqa: ANN001
+    def _on_button(evt) -> None:
         btn = evt.GetEventObject()
         log.info("BUTTON CLICK: %s", getattr(btn, "GetLabel", lambda: "?")())
         evt.Skip()
 
     @staticmethod
-    def _drain_when_up(mgr) -> None:  # noqa: ANN001
+    def _drain_when_up(mgr) -> None:
         for _ in range(1200):  # poll up to ~120 s for the subprocess handle
-            proc = getattr(mgr, "_proc", None)  # noqa: SLF001
+            proc = getattr(mgr, "_proc", None)
             if proc is not None:
                 try:
                     for line in proc.stdout:
                         print(f"  [server] {line.rstrip()}", flush=True)
-                except Exception:  # noqa: BLE001
+                except Exception:
                     pass
                 return
             time.sleep(0.1)
@@ -176,7 +176,7 @@ class Harness:
                 if name != "_tick":
                     log.info(">> %s", name)
                 fn()
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 _fail(f"{getattr(fn, '__name__', '?')} raised: {exc}")
 
         if ms:
@@ -185,7 +185,7 @@ class Harness:
             wx.CallAfter(_safe)
 
     def poll_until(self, cond, deadline: float, what: str, on_ok,
-                   on_success=None, on_fail=None, interval: float = 0.2):  # noqa: ANN001
+                   on_success=None, on_fail=None, interval: float = 0.2):
         """Re-schedule itself until ``cond`` (checked on the main thread).
         ``on_success`` (if any) runs only after the condition succeeds.
         Note: the app replaces "saved."/"deleted." status labels with a
@@ -197,7 +197,7 @@ class Harness:
                 return
             try:
                 ok = cond()
-            except Exception:  # noqa: BLE001
+            except Exception:
                 ok = False
             if ok:
                 on_ok()
@@ -218,13 +218,13 @@ class Harness:
         mgr = get_server_manager(host="127.0.0.1", port=PORT)
         try:
             return [p["profile_id"] for p in mgr.list_profiles()]
-        except Exception:  # noqa: BLE001 - server mid-restart etc.
+        except Exception:
             return []
 
     # -- stages (each runs on the main thread) ------------------------------
     def stage_start(self) -> None:
         log.info("== Stage: start server (pressing 'Start server') ==")
-        self.panel._on_start(None)  # noqa: SLF001 - same handler the button binds
+        self.panel._on_start(None)
         self.poll_until(
             cond=lambda: "Server started at" in self.panel.status_label.GetLabel()
             or "Running at" in self.panel.status_label.GetLabel()
@@ -284,7 +284,7 @@ class Harness:
         self.panel.profile_id_ctrl.SetValue(profile_id)
         self.panel.profile_audio_ctrl.SetValue(REF_AUDIO)
         self.panel.profile_ref_text_ctrl.SetValue(REF_TEXT)
-        self.panel._on_add_profile(None)  # noqa: SLF001
+        self.panel._on_add_profile(None)
         self.poll_until(
             cond=lambda: self.profile_id in self._server_ids()
             or "Could not save" in self.panel.profiles_status.GetLabel(),
@@ -307,7 +307,7 @@ class Harness:
 
     def stage_list_after(self) -> None:
         log.info("== Stage: refresh list shows the new profile ==")
-        self.panel._on_refresh_profiles(None)  # noqa: SLF001
+        self.panel._on_refresh_profiles(None)
         self.poll_until(
             cond=lambda: self.panel.profile_list.GetItemCount() >= 1,
             deadline=time.monotonic() + 60.0,
@@ -339,7 +339,7 @@ class Harness:
         if self.panel.profile_list.GetFirstSelected() < 0:
             _fail("Could not select the profile row in the list")
             return
-        self.panel._on_delete_profile(None)  # noqa: SLF001 (stub answers YES)
+        self.panel._on_delete_profile(None)
         self.poll_until(
             cond=lambda: self.profile_id not in self._server_ids()
             or "Could not delete" in self.panel.profiles_status.GetLabel(),
@@ -362,7 +362,7 @@ class Harness:
 
     def stage_stop(self) -> None:
         log.info("== Stage: stop server ==")
-        self.panel._on_stop(None)  # noqa: SLF001
+        self.panel._on_stop(None)
         self.poll_until(
             cond=lambda: "Stopped" in self.panel.status_label.GetLabel()
             or "Error stopping" in self.panel.status_label.GetLabel(),
@@ -388,13 +388,13 @@ def main() -> None:
               flush=True)
         sys.exit(1)
 
-    global _app  # noqa: PLW0603
+    global _app
     _app = Harness()
 
     def _go():
         try:
             _app.stage_start()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             _fail(f"stage_start raised: {exc}")
 
     wx.CallAfter(_go)
@@ -406,13 +406,13 @@ def main() -> None:
         if mgr.is_running:
             mgr.stop()
             log.info("Server stopped during cleanup.")
-    except Exception:  # noqa: BLE001
+    except Exception:
         pass
 
     if _failure:
         print(f"\nE2E RESULT: FAIL - {_failure[0]}", flush=True)
         sys.exit(1)
-    print(f"\nE2E RESULT: PASS", flush=True)
+    print("\nE2E RESULT: PASS", flush=True)
     print(f"Profile manager on the Settings OmniVoice Server panel verified "
           f"end-to-end against a live server (port {PORT}).", flush=True)
     print(f"Modal dialogs auto-answered: {len(_modal_calls)}", flush=True)

@@ -1,6 +1,7 @@
 """Universal OmniVoice voice library.
 
-Users can create reusable voices in Settings -> OmniVoice engines:
+Users can create reusable voices in Settings -> Voice Clone (the OmniVoice
+half of that page):
 
 * **Voice clone**  - copy a short reference recording (3-15 seconds) plus an
   optional transcript into the library.
@@ -30,7 +31,8 @@ import logging
 import os
 import shutil
 import uuid
-from typing import Any, Dict, Iterable, List, Tuple
+from collections.abc import Iterable
+from typing import Any
 
 from .. import paths
 from ..tts import catalog
@@ -45,7 +47,7 @@ KIND_DESIGN = "omni_design"
 OMNI_KINDS = (KIND_CLONE, KIND_DESIGN)
 
 #: engine id -> (display name, pip package in the managed runtime).
-ENGINE_INFO: Dict[str, Tuple[str, str]] = {
+ENGINE_INFO: dict[str, tuple[str, str]] = {
     "omnivoice": ("OmniVoice", "omnivoice-triton"),
     "omnivoice_server": ("OmniVoice Server", "omnivoice-server"),
 }
@@ -53,13 +55,13 @@ ENGINE_INFO: Dict[str, Tuple[str, str]] = {
 #: Catalog voice-group variants each engine exposes.  A library voice is
 #: registered under every variant of its engine so it is visible no matter
 #: which variant the user has selected in a voice cascade.
-_CATALOG_VARIANTS: Dict[str, Tuple[str, ...]] = {
+_CATALOG_VARIANTS: dict[str, tuple[str, ...]] = {
     "omnivoice": ("triton", "hybrid"),
     "omnivoice_server": ("server", "server_clone"),
 }
 
 #: The variant used when the panel previews a voice through an engine.
-_DEFAULT_VARIANT: Dict[str, str] = {
+_DEFAULT_VARIANT: dict[str, str] = {
     "omnivoice": "triton",
     "omnivoice_server": "server",
 }
@@ -68,21 +70,21 @@ _DEFAULT_VARIANT: Dict[str, str] = {
 _LANGUAGE = "auto"
 
 
-def is_omni_custom(voice: Dict[str, Any]) -> bool:
+def is_omni_custom(voice: dict[str, Any]) -> bool:
     """True when ``voice`` is a ModelStore custom voice of this library."""
     return voice.get("kind") in OMNI_KINDS
 
 
-def omni_custom_voices(store) -> List[Dict[str, Any]]:
+def omni_custom_voices(store) -> list[dict[str, Any]]:
     """All library voices stored in ``store`` (both clone and design)."""
     return [v for v in store.custom_voices() if is_omni_custom(v)]
 
 
-def find_voice(store, name: str) -> Dict[str, Any] | None:
+def find_voice(store, name: str) -> dict[str, Any] | None:
     return next((v for v in omni_custom_voices(store) if v["name"] == name), None)
 
 
-def engine_ids_installed() -> List[str]:
+def engine_ids_installed() -> list[str]:
     """Return the OmniVoice engine ids whose pip package is installed.
 
     Each engine is probed in its *own* virtualenv first
@@ -92,11 +94,14 @@ def engine_ids_installed() -> List[str]:
     ``venv_packages`` probes, so this never blocks the GUI while the settings
     dialog is being built.  ``[]`` means "nothing installed or not known yet".
     """
-    from ..venv_packages import version  # noqa: PLC0415
+    # ``installed()`` is the predicate the rest of the GUI uses to decide
+    # whether an engine is present (it is ``bool(version(...))``), so the
+    # library ask it the same question instead of reading the version itself.
+    from ..venv_packages import installed as is_installed
 
-    installed: List[str] = []
+    installed: list[str] = []
     for engine_id, (_name, pkg) in ENGINE_INFO.items():
-        if version(pkg, engine=engine_id) or version(pkg):
+        if is_installed(pkg, engine=engine_id) or is_installed(pkg):
             installed.append(engine_id)
     return installed
 
@@ -126,7 +131,7 @@ def create_voice(
     ref_text: str = "",
     instruct: str = "",
     language: str | None = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Create a universal OmniVoice voice and register it in ``store``.
 
     ``mode`` is ``"clone"`` (a reference recording is copied into the voice
@@ -150,7 +155,7 @@ def create_voice(
     os.makedirs(folder, exist_ok=True)
 
     kind = KIND_CLONE if mode == "clone" else KIND_DESIGN
-    extra: Dict[str, Any] = {
+    extra: dict[str, Any] = {
         "engine": "omnivoice",
         "custom_omni": True,
         "mode": mode,
@@ -184,7 +189,7 @@ def create_voice(
     return entry
 
 
-def rename_voice(store, old_name: str, new_name: str) -> Dict[str, Any]:
+def rename_voice(store, old_name: str, new_name: str) -> dict[str, Any]:
     """Rename a library voice; the folder keeps its id-based name."""
     new_name = clean_name(new_name)
     if new_name == old_name:
@@ -208,7 +213,7 @@ def delete_voice(store, name: str) -> bool:
 # ---------------------------------------------------------------------------
 # Consumer voice entries (what the GUI cascades expect)
 # ---------------------------------------------------------------------------
-def _omni_for(voice: Dict[str, Any]) -> Dict[str, Any]:
+def _omni_for(voice: dict[str, Any]) -> dict[str, Any]:
     """The canonical per-voice ``omni`` dict the engines consume."""
     mode = voice.get("mode", "clone" if voice.get("kind") == KIND_CLONE else "design")
     sample = voice.get("sample") or voice.get("reference") or ""
@@ -224,10 +229,10 @@ def _omni_for(voice: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def entry_for_engine(
-    voice: Dict[str, Any],
+    voice: dict[str, Any],
     engine_id: str,
     variant: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """One consumer voice entry for ``voice`` under ``engine_id``/``variant``."""
     label, _ = ENGINE_INFO.get(engine_id, (engine_id, ""))
     tts = catalog.find_tts(engine_id)
@@ -260,7 +265,7 @@ def entry_for_engine(
 def consumer_entries(
     store,
     engine_ids: Iterable[str] | None = None,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Every library voice as consumer entries under the installed engines.
 
     The same voice is registered under *every* engine (and every catalog
@@ -269,7 +274,7 @@ def consumer_entries(
     """
     if engine_ids is None:
         engine_ids = engine_ids_installed()
-    entries: List[Dict[str, Any]] = []
+    entries: list[dict[str, Any]] = []
     for voice in omni_custom_voices(store):
         for engine_id in engine_ids:
             for variant in _CATALOG_VARIANTS.get(engine_id, ()):
@@ -278,15 +283,15 @@ def consumer_entries(
 
 
 def preview_entry(
-    voice: Dict[str, Any],
+    voice: dict[str, Any],
     engine_id: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """A single entry for previewing ``voice`` through ``engine_id``."""
     variant = _DEFAULT_VARIANT.get(engine_id, "triton")
     return entry_for_engine(voice, engine_id, variant)
 
 
-def describe(voice: Dict[str, Any]) -> str:
+def describe(voice: dict[str, Any]) -> str:
     """Short human summary of a library voice (for list tooltips/status)."""
     mode = voice.get("mode", "design")
     if mode == "clone":

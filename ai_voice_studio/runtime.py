@@ -28,7 +28,7 @@ import tarfile
 import threading
 import urllib.request
 import zipfile
-from typing import Callable, Dict, List, Optional
+from collections.abc import Callable
 
 from . import paths
 
@@ -41,10 +41,11 @@ DownloadCancelled = type("DownloadCancelled", (Exception,), {})
 DownloadError = type("DownloadError", (Exception,), {})
 
 def _load_dl():
-    global _downloader_loaded, DownloadCancelled, DownloadError  # noqa: PLW0603
+    global _downloader_loaded, DownloadCancelled, DownloadError
     if _downloader_loaded:
         return
-    from .tts.downloader import DownloadCancelled as _DC, DownloadError as _DE  # noqa: PLC0415
+    from .tts.downloader import DownloadCancelled as _DC
+    from .tts.downloader import DownloadError as _DE
     DownloadCancelled = _DC
     DownloadError = _DE
     _downloader_loaded = True
@@ -52,7 +53,7 @@ def _load_dl():
 def download_file(*a, **kw):
     """Lazy wrapper — imports the real download_file on first call."""
     _load_dl()
-    from .tts.downloader import download_file as _df  # noqa: PLC0415
+    from .tts.downloader import download_file as _df
     return _df(*a, **kw)
 
 ProgressCallback = Callable[[str, int, int], None]
@@ -76,7 +77,7 @@ _CUDA_TARBALL_FILES = (
 # NVIDIA redistributable wheels (win_amd64), pinned to the versions validated
 # with the CUDA build above. Each entry: (package, version, folder-in-wheel,
 # list of DLL names to install).
-_NVIDIA_WHEELS: List[tuple] = [
+_NVIDIA_WHEELS: list[tuple] = [
     (
         "nvidia-cudnn-cu12",
         "9.9.0.52",
@@ -127,9 +128,9 @@ def is_installed() -> bool:
     )
 
 
-def installed_version() -> Optional[str]:
+def installed_version() -> str | None:
     try:
-        with open(os.path.join(runtime_dir(), _MARKER), "r", encoding="utf-8") as fh:
+        with open(os.path.join(runtime_dir(), _MARKER), encoding="utf-8") as fh:
             return json.load(fh).get("version")
     except (OSError, json.JSONDecodeError):
         return None
@@ -148,7 +149,7 @@ def _wheel_url(package: str, version: str) -> str:
         for f in data.get("urls", []):
             if "win_amd64" in f.get("filename", ""):
                 return f["url"]
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.debug("Could not resolve %s %s: %s", package, version, exc)
     raise DownloadError(f"Could not resolve {package} {version} on PyPI")
 
@@ -158,9 +159,9 @@ def _download_and_extract(
     filename: str,
     cache_dir: str,
     dest_dir: str,
-    wanted: Dict[str, str],
-    progress: Optional[ProgressCallback],
-    cancel_event: Optional[threading.Event],
+    wanted: dict[str, str],
+    progress: ProgressCallback | None,
+    cancel_event: threading.Event | None,
 ) -> None:
     """Download one artifact and extract the requested members by name."""
     archive = download_file(
@@ -179,10 +180,10 @@ def _download_and_extract(
     try:
         os.remove(archive)
     except OSError:
-        pass
+        log.debug("Ignoring a failure in _download_and_extract", exc_info=True)
 
 
-def _extract_tarball(archive: str, dest_dir: str, wanted: Dict[str, str]) -> None:
+def _extract_tarball(archive: str, dest_dir: str, wanted: dict[str, str]) -> None:
     with tarfile.open(archive, "r:bz2") as tar:
         for member in tar.getmembers():
             if not member.isfile():
@@ -203,7 +204,7 @@ def _extract_tarball(archive: str, dest_dir: str, wanted: Dict[str, str]) -> Non
                 shutil.copyfileobj(src, fh)
 
 
-def _extract_zip(archive: str, dest_dir: str, wanted: Dict[str, str]) -> None:
+def _extract_zip(archive: str, dest_dir: str, wanted: dict[str, str]) -> None:
     with zipfile.ZipFile(archive) as zf:
         for info in zf.infolist():
             name = info.filename.replace("\\", "/")
@@ -215,8 +216,8 @@ def _extract_zip(archive: str, dest_dir: str, wanted: Dict[str, str]) -> None:
 
 
 def install(
-    progress: Optional[ProgressCallback] = None,
-    cancel_event: Optional[threading.Event] = None,
+    progress: ProgressCallback | None = None,
+    cancel_event: threading.Event | None = None,
 ) -> str:
     """Download and install the optional GPU runtime; returns its folder."""
     dest = runtime_dir()
@@ -267,7 +268,7 @@ def install(
             if os.path.isdir(cache) and not os.listdir(cache):
                 os.rmdir(cache)
         except OSError:
-            pass
+            log.debug("Ignoring a failure in install", exc_info=True)
     return dest
 
 
@@ -303,6 +304,6 @@ def activate() -> bool:
             os.environ["PATH"] = d + os.pathsep + path
         log.info("Activated optional GPU runtime from %s", d)
         return True
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.warning("Could not activate GPU runtime: %s", exc)
         return False

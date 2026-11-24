@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 94: The Audio Description Window - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part XI — Audio Description</div><ul class="chapters"><li><a href="ch89_ad_overview.html">Ch 89: Narrating Video</a></li><li><a href="ch90_ad_catalog_envs.html">Ch 90: A Catalog of Describers</a></li><li><a href="ch91_ad_windows.html">Ch 91: Chunks, Windows &amp; Change</a></li><li><a href="ch92_ad_placement.html">Ch 92: Placement &amp; Extended AD</a></li><li><a href="ch93_ad_described_film.html">Ch 93: The Described Film</a></li><li><a href="ch94_ad_dialog.html" class="active">Ch 94: The Describe Window</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 94</div>
+<h1>The Audio Description Window and Its Three Outputs</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Report what a project already decided instead of asking it again</li>
+  <li>Ask only what is decided at run time, and lock the choices that contradict</li>
+  <li>Build the narration voice as a TTS model &rarr; variant &rarr; voice cascade</li>
+  <li>Defer a missing FFmpeg into an offer to install it, off the GUI thread</li>
+  <li>Say what a run will write, and what it did write, without ambiguity</li>
+</ul>
+
+<hr>
+
+<h2>94.1 One Place per Decision</h2>
+
+<p>The New Project wizard collects the describing model, its variant, the device,
+the frame rate, the chunk length and the output format, and stores them in the
+project's own <code>describe</code> block. Duplicating those combos in the
+describe window &mdash; which an earlier build did &mdash; left two places to
+change the same setting and only one of them was the project's record.</p>
+
+<p>The window now <em>reports</em> them, with the state of the model and of the
+variant next to them, and asks only what is decided at run time:</p>
+
+<pre>Describer: Qwen3-VL - Qwen3-VL-4B (Downloaded)
+Run: GPU (CUDA) - 1 frame every 2 seconds - 2 minutes per chunk -
+     Description script (plain text)
+Chosen when this project was created (New Project wizard); change the model
+there, and install models in Settings > Manage the video describer.</pre>
+
+<h2>94.2 Placement, and Locking What Contradicts It</h2>
+
+<p><em>Placement</em> is a two-entry combo, and choosing one disables the other's
+controls rather than letting a combination that cannot be honoured sit on
+screen:</p>
+
+<ul>
+  <li>With <strong>extended</strong> placement, the gap-fitting checkbox is
+      cleared and disabled &mdash; pausing the film replaces the idea of fitting
+      into a pause &mdash; and its tool tip says so.</li>
+  <li>With <strong>extended</strong> placement, narrating is switched on and
+      locked, because extended audio description <em>is</em> spoken: the film is
+      stopped so the voice can be heard. With standard placement and no installed
+      voice, a remembered "yes" is cleared rather than left promising a file that
+      cannot be written.</li>
+</ul>
+
+<p><strong>Track priority</strong> is the one control that exists only because the
+two tracks are heard <em>together</em> in standard placement, so it sits beside
+Placement and before <em>Start audio description</em>, and it is switched off
+under extended placement with the reason in its tool tip. Four answers, listed
+from the gentlest answer to the film to the most forceful: <code>same</code>,
+<code>duck</code>, <code>higher25</code>, <code>higher50</code>. The list opens on
+its first entry, so a project that never chose one - written before any of these
+choices existed - is still mixed exactly as it was.
+<code>same</code> leaves both tracks at their own level. <code>duck</code> does
+not lower the film at
+all: the film's own soundtrack keeps its level and is dipped to a quarter of it
+while a description is <em>actually being spoken</em>, which makes it a gain that
+changes as the film plays rather than one gain for the whole film.
+<code>higher25</code> and
+<code>higher50</code> play the film's own soundtrack at 0.75 and 0.5 while the
+description keeps the level the narration settings gave it.</p>
+
+<pre>self.priority_combo = wx.ComboBox(self, style=wx.CB_READONLY,
+                                  name="Track priority")
+for value, label in AD_TRACK_PRIORITY_CHOICES:
+    self.priority_combo.Append(label, value)</pre>
+
+<p>The balance is a single FFmpeg <code>volume</code> stage on the film's input and
+nothing else &mdash; and the stage is emitted only when the film is actually being
+brought down, so a run that did not ask for this produces the graph it always
+did:</p>
+
+<pre>[0:a]aresample=44100,...,channel_layouts=stereo[rawfilm];
+[rawfilm]volume=0.75[film];
+[1:a]aresample=44100,...,channel_layouts=stereo[voice];
+[film][voice]amix=inputs=2:duration=first:normalize=0[outa]</pre>
+
+<p>The ducking is that same one stage with a gain that changes as the film plays:
+<code>volume</code> with <code>eval=frame</code>, one expression for the whole
+film, parsed once and evaluated once per audio frame.</p>
+
+<pre>[0:a]aresample=44100,...,channel_layouts=stereo[rawfilm];
+[rawfilm]volume='(1-0.75*min(1,clip((t-3.000)/0.06,0,1)-clip((t-5.000)/0.06,0,1)
+  +clip((t-8.000)/0.06,0,1)-clip((t-9.500)/0.06,0,1)))':eval=frame[film];
+[1:a]aresample=44100,...,channel_layouts=stereo[voice];
+[film][voice]amix=inputs=2:duration=first:normalize=0[outa]</pre>
+
+<p>Each spoken description contributes a trapezoid of its own - up over the first
+60&nbsp;ms of it, full depth while it is spoken, back down over the 60&nbsp;ms
+after it - and the trapezoids are summed and clamped to one, so the film is at its
+own level <em>between</em> descriptions and a quarter of it under them. The
+moments are not estimated: the narration track recorded where each description
+really landed as it was written, and two descriptions less than 0.4&nbsp;s apart
+are one dip rather than the film flapping between them. Measured with the FFmpeg
+the application itself downloads, on a film tone of &minus;30.1&nbsp;dB: the same
+&minus;30.1&nbsp;dB between descriptions and &minus;42.1&nbsp;dB while the voice
+speaks - a 12.0&nbsp;dB dip, the quarter of its own level the label promises -
+with the picture still copied rather than re-encoded.</p>
+
+<div class="note">
+<strong>Ducking is a refinement, never a reason to lose the film.</strong> The
+ducked mix is tried first, then the plain mix with both tracks as they are, and
+only then the narration on its own - which exists for a video with no soundtrack
+at all. A film long enough that the list of moments would not fit on one command
+line (about 480 descriptions, Windows allowing some 32,000 characters for the
+whole argv) is mixed exactly as it was before this choice existed, rather than
+failing to be written.
+</div>
+
+<div class="note">
+<strong>Only the film's track moves.</strong> Turning the description up instead
+would clip &mdash; full-scale speech already peaks at full scale &mdash; and it
+would change a level the user had already chosen by ear in Settings. The choice is
+remembered in the settings file, written into a new project by the wizard and kept
+in the run's own record (with <code>duck_level</code> when the film was dipped),
+so the described film, the script and the record agree about how the mix was made.
+</div>
+
+<h2>94.3 The Narration Cascade</h2>
+
+<p>The voice is chosen the way the Recording window chooses one &mdash; the TTS
+model, then one of its downloaded variants, then one of that variant's voices
+&mdash; so a machine with several engines behind the descriptions is not one flat
+list of unrelated voices:</p>
+
+<pre>def _populate_narration(self) -> None:
+    remembered = narration.resolve_voice(
+        self.voices, self.describe_settings.get("narration_voice") or {}
+    ) or (dict(self.voices[0]) if self.voices else {})
+    self.narration_model_combo.Clear()
+    for tts_id, label in self._narration_models():
+        self.narration_model_combo.Append(label, tts_id)</pre>
+
+<p><code>narration.resolve_voice()</code> loosens one field at a time, so a
+remembered voice that has since been removed falls back to the first voice of
+its engine and then to the first installed voice rather than leaving the combo
+empty. The audio format is the recording format from Settings, so a project's
+narration and its recordings sound and store the same way.</p>
+
+<p><strong>Speaking the descriptions is on by default on a machine that has a
+voice.</strong> It is what produces the narration track <em>and</em> the described
+video, and a run that quietly wrote one of the three outputs looked like a run
+that had failed at the other two. An explicit project choice &mdash; in either
+direction &mdash; is still the project's own.</p>
+
+<p><strong>How loud the description is spoken is chosen here too.</strong> A
+<em>Narration voice volume</em> slider sits directly under the voice combo,
+because it belongs to that voice, and it is the one narration level the describe
+window asks for on its own: <em>Track priority</em> moves the film's track, never
+the description, so a louder description was otherwise reachable only in
+Settings &gt; Recording settings. Its range and its value are the recording
+side's own (<code>VOLUME_MIN</code> to <code>VOLUME_MAX</code>, 1.00 meaning the
+voice as downloaded), the value is part of the row label's text so a screen
+reader reads the word and the number together, and the chosen level is written
+into the run's record as <code>tts.volume</code> and remembered in
+<code>describe.narration_volume</code> for the next project - exactly as the
+recording window's own Volume row behaves.</p>
+
+<h2>94.4 A Missing FFmpeg Is a Question, Not an Error</h2>
+
+<p>FFmpeg decodes the frames, reads the video's length and writes the described
+video, so a run without it cannot start. The application can install it into the
+user's folder, which is what the recording side already offers for MP3 and FLAC,
+so the describe window asks:</p>
+
+<pre>def _ensure_ffmpeg(self) -> bool:
+    if ffmpeg_mod.ensure_ffmpeg():
+        return True
+    answer = wx.MessageBox(
+        "Describing a video needs FFmpeg. It is not installed yet.\n\n"
+        "FFmpeg decodes the video so its frames can be described, reads how "
+        "long the video is, and writes the described video next to the "
+        "script.\n\nDownload FFmpeg now? It will be saved to your user folder "
+        "(AppData\\Roaming\\AIVoiceStudio\\ffmpeg) and installed for every part "
+        "of the application.",
+        "FFmpeg required", style=wx.YES_NO | wx.ICON_QUESTION)
+    if answer != wx.YES:
+        self.status.SetLabel("FFmpeg is required to describe a video and to "
+                             "write the described video.")
+        return False
+    self.start_btn.Disable()
+    self.status.SetLabel("Downloading FFmpeg...")
+    threading.Thread(target=self._download_ffmpeg_job, daemon=True).start()
+    return False</pre>
+
+<div class="note">
+<strong>Off the GUI thread, and the user presses Start again.</strong> The
+download runs on its own thread and the window is never frozen while it fetches;
+when it lands, the status line and a message box say "FFmpeg installed. Press
+Start audio description again." Declining only sets the status line &mdash; there
+is no half-started run to clean up.
+</div>
+
+<h2>94.5 Saying What Will Happen, and What Happened</h2>
+
+<p>Both halves matter, because the three outputs are easy to be surprised by. The
+estimate names the cadence and the count before anything starts:</p>
+
+<pre>Estimated time: about 12 min for 10 min of video, in 5 chunk(s) at
+0.5 frames per second (300 frames).
+Each one is described in pieces of about 20 seconds - 30 description(s) for
+this video - so a change in the picture is reported instead of being
+summarised away.
+Three files per video: the description script, the spoken narration track, and
+a described video - the original picture with the original sound and the
+description heard together. The source video is never changed.</pre>
+
+<p>...and the completion dialog lists what really landed, distinguishing the two
+shapes of described film:</p>
+
+<pre>Described video (the original picture and sound with the description over the
+pauses):
+  Lecture - described.mp4
+
+Spoken narration:
+  Lecture - narration.wav - 30 spoken description(s), 612 second(s)</pre>
+
+<p>Warnings are listed under their own heading: a voice that would not load, a
+described film that could not be written, a run whose dialogue never left a pause
+long enough. Each one is a sentence about what did <em>not</em> happen, because
+that is the information a user cannot get from the folder.</p>
+
+<h2>94.6 Closing Is Not Losing</h2>
+
+<p>The window starts a <code>DescribeJob</code> on a thread and marshals its
+callbacks onto the GUI thread with <code>wx.CallAfter</code>. Every finished
+window is reported as it happens, both to the gauge and to a read-only
+<em>chunk report</em>, which is what makes a long film legible while it runs. The
+job refreshes the description script on disk after every piece, so closing the
+window &mdash; or the application &mdash; keeps everything already described, and
+starting again continues from what is missing.</p>
+
+<h2>94.7 Exercises</h2>
+<ol>
+  <li>Add a "Description detail" combo to the wizard that sets the window length,
+      with the estimate updating as it changes.</li>
+  <li>The chunk report keeps the last 400 lines. Design a way to save the whole
+      report next to the project for a long run.</li>
+  <li>Make the completion dialog offer to play the described film in the user's
+      default player. What has to be true of the file first?</li>
+</ol>
+
+<h2>Key Takeaways</h2>
+<ul>
+  <li>Collect a setting in exactly one place; the run-time window reports the
+      project's decisions rather than repeating them.</li>
+  <li>Mutually exclusive choices disable each other, and the tool tip says why.</li>
+  <li>A missing dependency that the application can install is a question, not a
+      failure &mdash; asked off the GUI thread.</li>
+  <li>State the three outputs before the run and list them after it: a feature
+      that writes three files must never leave the user guessing which appeared.</li>
+</ul>
+
+</div>
+</div>
+</body>
+</html>

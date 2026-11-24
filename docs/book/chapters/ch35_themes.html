@@ -22,6 +22,8 @@
   <li>Implement Light/Dark/System theme support</li>
   <li>Apply colors to wxPython widgets</li>
   <li>See the AIVS theme manager</li>
+  <li>Extend a palette into many <em>predefined</em> themes with one code path</li>
+  <li>Let users build and save their own themes, and paint a wallpaper into the window's empty area only</li>
 </ul>
 
 <hr>
@@ -272,13 +274,112 @@ _lock = threading.Lock()
 
 <hr>
 
-<h2>35.3 Key Takeaways</h2>
+<h2>35.3 Current implementation: many themes from one palette</h2>
+<p class="chapter-source">The block in 35.1 shows the original three-theme
+manager. The current <code>gui/theme.py</code> keeps that behaviour and treats
+light, dark and system as three palettes among many, so the same
+<code>apply_theme()</code> walk paints every theme without a second code path.</p>
+<pre><code><span class="cm"># gui/theme.py - the original two palettes stay frozen ...</span>
+_LIGHT = {<span class="str">"bg"</span>: <span class="str">"#ffffff"</span>, <span class="str">"fg"</span>: <span class="str">"#1a1a1a"</span>, ...}
+_DARK = {<span class="str">"bg"</span>: <span class="str">"#1e1e1e"</span>, <span class="str">"fg"</span>: <span class="str">"#e8e8e8"</span>, ...}
+
+<span class="cm"># ... and ten predefined dark themes are built the same way.</span>
+THEME_PRESETS = (
+    _preset(<span class="str">"graphite_midnight"</span>, <span class="str">"Midnight Graphite"</span>,
+            <span class="str">"#16181c"</span>, <span class="str">"#e6e9ef"</span>, <span class="str">"#22262d"</span>, <span class="str">"#e6e9ef"</span>,
+            <span class="str">"#8ab4f8"</span>, <span class="str">"#ffffff"</span>, <span class="str">"gradient_v"</span>, <span class="str">"..."</span>),
+    <span class="cm"># Obsidian Gold, Deep Navy, Forest Pine, Plum Royale, Crimson</span>
+    <span class="cm"># Slate, Ocean Teal, Amber Dusk, Carbon Lime, Blue Steel</span>
+)
+
+<span class="kw">def</span> <span class="fn">resolve_palette</span>(theme, settings=<span class="kw">None</span>) -> Dict[<span class="kb">str</span>, <span class="kb">str</span>]:
+    <span class="str">"""The palette a theme id resolves to (built-in, preset or custom)."""</span>
+    <span class="kw">if</span> theme == THEME_SYSTEM:
+        theme = _resolve(theme)
+    <span class="kw">if</span> theme == THEME_DARK:
+        <span class="kw">return</span> <span class="fn">dict</span>(_DARK)
+    <span class="kw">if</span> theme == THEME_LIGHT:
+        <span class="kw">return</span> <span class="fn">dict</span>(_LIGHT)
+    preset = _PRESET_BY_ID.get(theme)
+    <span class="kw">if</span> preset <span class="kw">is not</span> <span class="kw">None</span>:
+        <span class="kw">return</span> <span class="fn">dict</span>(preset.colors)
+    record = <span class="fn">get_custom_theme</span>(settings, theme)
+    <span class="kw">if</span> record <span class="kw">is not</span> <span class="kw">None</span>:
+        <span class="kw">return</span> <span class="fn">palette_from_record</span>(record)
+    <span class="kw">return</span> <span class="fn">dict</span>(_DARK)  <span class="cm"># unknown ids stay legible</span>
+
+<span class="kw">def</span> <span class="fn">apply_theme</span>(top: wx.Window, theme: str, settings=<span class="kw">None</span>) -> <span class="kw">None</span>:
+    colors = <span class="fn">resolve_palette</span>(theme, settings)
+    <span class="cm"># ... the same tree walk as 35.1, with `colors` ...</span></code></pre>
+<p>Three ideas carry the whole feature:</p>
 <ul>
-  <li><strong>Three themes:</strong> Light, Dark, System (auto-detect OS preference)</li>
+  <li><strong>A palette is a dict</strong>, so a preset is just data. Adding a
+      theme means adding a <code>_preset(...)</code> row, not new rendering code.</li>
+  <li><strong>The four original keys are enough to paint the widgets</strong>
+      (<code>bg</code>, <code>fg</code>, <code>control_bg</code>,
+      <code>control_fg</code>); presets add <code>accent</code> and
+      <code>heading</code> for the wallpaper and the welcome title.</li>
+  <li><strong>Custom themes are records in the settings</strong>
+      (<code>custom_themes</code>), so a user can create any number of them and
+      they travel with the rest of the configuration.</li>
+</ul>
+
+<h2>35.4 Painting a wallpaper into the empty area</h2>
+<p>A wallpaper must not sit under the things the user clicks. The first cut
+painted the whole welcome screen and let the buttons draw on top of it, which
+put the pattern under the action bar and the recent projects list. The screen
+is therefore built as three sibling regions: a full-width <strong>action
+bar</strong> carrying the four main buttons, a left <strong>projects
+sidebar</strong> holding the recent-projects list behind a one-pixel
+<code>_DividerPanel</code> rule, and a <code>_WallpaperPanel</code> that takes
+everything left over. A panel holds no controls &mdash; only the descriptive
+paragraph, which the wallpaper hides &mdash; so nothing can ever be painted
+on top of it.</p>
+<pre><code><span class="cm"># _WallpaperPanel: the empty region of the welcome screen</span>
+<span class="kw">class</span> <span class="fn">_WallpaperPanel</span>(wx.Panel):
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, parent, settings):
+        <span class="fn">super</span>().__init__(parent)
+        self.settings = settings
+        self.<span class="fn">SetBackgroundStyle</span>(wx.BG_STYLE_PAINT)  <span class="cm"># no flicker</span>
+        self.<span class="fn">Bind</span>(wx.EVT_PAINT, self._on_paint)
+
+    <span class="kw">def</span> <span class="fn">_on_paint</span>(self, _evt):
+        dc = wx.<span class="fn">AutoBufferedPaintDC</span>(self)
+        theme = <span class="fn">current_theme</span>()
+        colors = <span class="fn">resolve_palette</span>(theme, self.settings)
+        record = <span class="fn">get_wallpaper</span>(self.settings, theme)
+        <span class="kw">if</span> record[<span class="str">"enabled"</span>]:
+            <span class="fn">paint_background</span>(dc, self.<span class="fn">GetClientSize</span>(), colors,
+                             <span class="fn">theme_pattern</span>(theme, self.settings),
+                             record[<span class="str">"image"</span>])
+        <span class="kw">else</span>:
+            <span class="fn">paint_background</span>(dc, self.<span class="fn">GetClientSize</span>(),
+                             colors, <span class="str">"solid"</span>, <span class="str">""</span>)</code></pre>
+<p>The sizer that assembles the screen is what guarantees the separation: the
+action bar is added with <code>wx.EXPAND</code> at proportion 0 (full width,
+buttons' height plus <code>_ACTION_BAR_PAD</code> above and below), the sidebar
+and divider at proportion 0, and the wallpaper panel at proportion 1 so it
+absorbs the rest. <code>_apply_welcome_mode()</code> then hides the description
+and the sidebar hint whenever a wallpaper is on, leaving the button labels and
+the project list untouched.</p>
+<p><code>paint_background()</code> offers ten styles &mdash; solid, vertical and
+horizontal gradients, diagonal, vignette, grid, dots, stripes, a corner glow
+and waves &mdash; and falls back to the solid colour if an image cannot be
+loaded. The theme studio dialog uses the same call for its live preview,
+painted on a small panel instead. Both the action bar and the sidebar keep the
+theme's plain background: they are ordinary panels, so the existing
+<code>_paint()</code> tree walk colours them, and the divider blends the
+background with the theme's heading colour so the rule stays visible on every
+theme.</p>
+
+<h2>35.5 Key Takeaways</h2>
+<ul>
+  <li><strong>Many themes:</strong> System, Light, Dark, ten predefined dark themes, and any number of custom ones</li>
   <li><strong>wx.SystemSettings.GetAppearance()</strong> detects dark mode on Windows 10/11</li>
   <li>Colors are applied by <strong>walking the widget tree</strong> and setting background/foreground</li>
   <li><strong>Buttons keep native look</strong> — only panels, text, and inputs are themed</li>
   <li>Theme state is stored in a <strong>thread-safe dict</strong> with locking</li>
+  <li>A theme is <strong>data, not code</strong>; a wallpaper gets a panel of its own, so it can never paint behind a control</li>
 </ul>
 
 <hr>

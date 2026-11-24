@@ -33,7 +33,8 @@ import tempfile
 import threading
 import time
 import wave
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from collections.abc import Callable
+from typing import Any
 
 import numpy as np
 
@@ -41,10 +42,10 @@ log = logging.getLogger(__name__)
 
 SAPI5 = "sapi5"
 WINDOWS_CORE = "windows_core"
-ENGINE_IDS: Tuple[str, ...] = (SAPI5, WINDOWS_CORE)
+ENGINE_IDS: tuple[str, ...] = (SAPI5, WINDOWS_CORE)
 
 #: Display names, kept in step with the catalog entries of the same id.
-ENGINE_NAMES: Dict[str, str] = {
+ENGINE_NAMES: dict[str, str] = {
     SAPI5: "SAPI5 (Windows voices)",
     WINDOWS_CORE: "Windows Core voices",
 }
@@ -53,9 +54,9 @@ ENGINE_NAMES: Dict[str, str] = {
 VARIANT = "installed"
 
 _CACHE_TTL = 300.0
-_cache: Dict[str, Tuple[float, List[Dict[str, str]]]] = {}
+_cache: dict[str, tuple[float, list[dict[str, str]]]] = {}
 _loading: set[str] = set()
-_listeners: Dict[str, List[Callable[[List[Dict[str, str]]], None]]] = {}
+_listeners: dict[str, list[Callable[[list[dict[str, str]]], None]]] = {}
 _lock = threading.RLock()
 
 _SYNTH_TIMEOUT = 180
@@ -69,10 +70,6 @@ def is_available() -> bool:
     return sys.platform == "win32"
 
 
-def is_system_engine(engine_id: str | None) -> bool:
-    return (engine_id or "") in ENGINE_IDS
-
-
 def _powershell() -> str:
     return shutil.which("powershell.exe") or shutil.which("powershell") or "powershell.exe"
 
@@ -84,7 +81,7 @@ def engine_name(engine_id: str) -> str:
 # ---------------------------------------------------------------------------
 # PowerShell helpers
 # ---------------------------------------------------------------------------
-_LIST_SCRIPT: Dict[str, str] = {
+_LIST_SCRIPT: dict[str, str] = {
     SAPI5: r"""
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 Add-Type -AssemblyName System.Speech
@@ -106,7 +103,7 @@ foreach ($v in [Windows.Media.SpeechSynthesis.SpeechSynthesizer]::AllVoices) {
 """,
 }
 
-_SYNTH_SCRIPT: Dict[str, str] = {
+_SYNTH_SCRIPT: dict[str, str] = {
     SAPI5: r"""
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 Add-Type -AssemblyName System.Speech
@@ -147,7 +144,7 @@ $synth.Dispose()
 
 
 def _run_powershell(script: str, env: dict | None = None, timeout: int = 60):
-    from ..util import run_tracked  # noqa: PLC0415
+    from ..util import run_tracked
 
     creationflags = 0
     if sys.platform == "win32":
@@ -167,12 +164,12 @@ def _run_powershell(script: str, env: dict | None = None, timeout: int = 60):
 # ---------------------------------------------------------------------------
 # Voice enumeration (cached, never blocking the caller)
 # ---------------------------------------------------------------------------
-def _enumerate(engine_id: str) -> List[Dict[str, str]]:
+def _enumerate(engine_id: str) -> list[dict[str, str]]:
     script = _LIST_SCRIPT.get(engine_id)
     if not script:
         return []
     result = _run_powershell(script, timeout=60)
-    voices: List[Dict[str, str]] = []
+    voices: list[dict[str, str]] = []
     for row in (result.stdout or "").splitlines():
         cells = [cell.strip() for cell in row.split("\t")]
         if len(cells) < 3 or not cells[0]:
@@ -182,20 +179,20 @@ def _enumerate(engine_id: str) -> List[Dict[str, str]]:
     return voices
 
 
-def _notify(engine_id: str, voices: List[Dict[str, str]]) -> None:
+def _notify(engine_id: str, voices: list[dict[str, str]]) -> None:
     with _lock:
         listeners = _listeners.pop(engine_id, [])
     for callback in listeners:
         try:
             callback(list(voices))
-        except Exception:  # noqa: BLE001
+        except Exception:
             log.debug("Windows voice listener failed", exc_info=True)
 
 
 def _load_job(engine_id: str) -> None:
     try:
         found = _enumerate(engine_id)
-    except Exception:  # noqa: BLE001
+    except Exception:
         log.debug("Could not enumerate %s voices", engine_id, exc_info=True)
         found = []
     with _lock:
@@ -217,7 +214,7 @@ def refresh(engine_id: str, on_ready=None, force: bool = False) -> None:
     if not is_available():
         _notify(engine_id, [])
         return
-    entries: Optional[List[Dict[str, str]]] = None
+    entries: list[dict[str, str]] | None = None
     with _lock:
         cached = _cache.get(engine_id)
         fresh = cached is not None and (time.time() - cached[0]) < _CACHE_TTL
@@ -242,7 +239,7 @@ def _is_fresh(engine_id: str) -> bool:
     return cached is not None and (time.time() - cached[0]) < _CACHE_TTL
 
 
-def voices(engine_id: str) -> List[Dict[str, str]]:
+def voices(engine_id: str) -> list[dict[str, str]]:
     """Cached voice descriptors; starts a background refresh when stale."""
     if not is_available():
         return []
@@ -256,17 +253,17 @@ def voices(engine_id: str) -> List[Dict[str, str]]:
     return list(cached[1])
 
 
-def voice_entries(engine_ids: Optional[Any] = None) -> List[Dict[str, Any]]:
+def voice_entries(engine_ids: Any | None = None) -> list[dict[str, Any]]:
     """Consumer voice entries (the shape the GUI cascades expect)."""
     ids = tuple(engine_ids) if engine_ids else ENGINE_IDS
-    entries: List[Dict[str, Any]] = []
+    entries: list[dict[str, Any]] = []
     for engine_id in ids:
         for index, voice in enumerate(voices(engine_id)):
             entries.append(_entry(engine_id, index, voice))
     return entries
 
 
-def _entry(engine_id: str, index: int, voice: Dict[str, str]) -> Dict[str, Any]:
+def _entry(engine_id: str, index: int, voice: dict[str, str]) -> dict[str, Any]:
     gender = (voice.get("gender") or "").strip()
     locale = (voice.get("language") or "").strip()
     label = voice.get("name") or voice.get("id") or f"Voice {index}"
@@ -288,7 +285,7 @@ def _entry(engine_id: str, index: int, voice: Dict[str, str]) -> Dict[str, Any]:
     }
 
 
-def add_installed_voices(target: List[Dict[str, Any]], on_ready=None) -> None:
+def add_installed_voices(target: list[dict[str, Any]], on_ready=None) -> None:
     """Append the built-in Windows voices to ``target`` (never blocking).
 
     ``on_ready`` is called (worker thread) when a fresh enumeration lands, so
@@ -309,7 +306,7 @@ def add_installed_voices(target: List[Dict[str, Any]], on_ready=None) -> None:
 # ---------------------------------------------------------------------------
 # WAV reading
 # ---------------------------------------------------------------------------
-def _read_wav(path: str) -> Tuple["np.ndarray", int]:
+def _read_wav(path: str) -> tuple[np.ndarray, int]:
     with wave.open(path, "rb") as wf:
         channels = wf.getnchannels()
         width = wf.getsampwidth()
@@ -320,7 +317,7 @@ def _read_wav(path: str) -> Tuple["np.ndarray", int]:
     if width == 2:
         samples = np.frombuffer(frames, dtype="<i2")
     elif width == 4:
-        from .engine import samples_to_int16  # noqa: PLC0415
+        from .engine import samples_to_int16
 
         samples = samples_to_int16(np.frombuffer(frames, dtype="<f4"))
     elif width == 1:
@@ -343,7 +340,7 @@ class WindowsVoiceEngine:
     rate Windows produced (SAPI5: usually 22050 Hz, Windows Core: 16000 Hz).
     """
 
-    def __init__(self, voice_entry: Dict[str, Any]):
+    def __init__(self, voice_entry: dict[str, Any]):
         self.engine = str(voice_entry.get("engine", ""))
         if self.engine not in ENGINE_IDS:
             raise ValueError(f"Unknown Windows voice engine '{self.engine}'.")
@@ -356,7 +353,7 @@ class WindowsVoiceEngine:
         self.sample_rate = 22050
 
     # -- helpers ------------------------------------------------------------
-    def _select_voice(self, available: List[Dict[str, str]]) -> str:
+    def _select_voice(self, available: list[dict[str, str]]) -> str:
         """Resolve the configured voice against a fresh enumeration."""
         if self.voice_id and any(v.get("id") == self.voice_id for v in available):
             return self.voice_id
@@ -383,7 +380,7 @@ class WindowsVoiceEngine:
             env["AIVS_VOICE"] = self._select_voice(voices(engine_id))
             # SAPI5 wants an integer -10..10, Windows Core a 0.5..6.0 float.
             env["AIVS_SAPI_RATE"] = str(
-                max(-10, min(10, int(round((speed - 1.0) * 10.0))))
+                max(-10, min(10, round((speed - 1.0) * 10.0)))
             )
             env["AIVS_SPEAKING_RATE"] = str(max(0.5, min(6.0, speed)))
             result = _run_powershell(script, env=env, timeout=_SYNTH_TIMEOUT)
@@ -391,20 +388,20 @@ class WindowsVoiceEngine:
             try:
                 os.remove(out_path)
             except OSError:
-                pass
+                log.debug("Ignoring a failure in WindowsVoiceEngine._speak_to_wav", exc_info=True)
             raise
         finally:
             try:
                 os.remove(text_path)
             except OSError:
-                pass
+                log.debug("Ignoring a failure in WindowsVoiceEngine._speak_to_wav", exc_info=True)
 
         ok = os.path.isfile(out_path) and os.path.getsize(out_path) > 0
         if result.returncode != 0 or not ok:
             try:
                 os.remove(out_path)
             except OSError:
-                pass
+                log.debug("Ignoring a failure in WindowsVoiceEngine._speak_to_wav", exc_info=True)
             detail = (result.stderr or result.stdout or "").strip().splitlines()
             reason = detail[-1] if detail else f"PowerShell exit code {result.returncode}"
             raise RuntimeError(
@@ -420,7 +417,7 @@ class WindowsVoiceEngine:
         speed: float = 1.0,
         pitch: float = 1.0,
         volume: float = 1.0,
-    ) -> "np.ndarray":
+    ) -> np.ndarray:
         if not text.strip():
             raise ValueError("Nothing to synthesize")
         out_path = self._speak_to_wav(text, speed)
@@ -430,10 +427,10 @@ class WindowsVoiceEngine:
             try:
                 os.remove(out_path)
             except OSError:
-                pass
+                log.debug("Ignoring a failure in WindowsVoiceEngine.synthesize", exc_info=True)
         self.sample_rate = rate
         if pitch != 1.0 or volume != 1.0:
-            from .engine import _apply_volume, _shift_pitch  # noqa: PLC0415
+            from .engine import _apply_volume, _shift_pitch
 
             if pitch != 1.0:
                 samples = _shift_pitch(samples, pitch)

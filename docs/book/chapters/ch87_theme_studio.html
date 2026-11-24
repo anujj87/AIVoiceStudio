@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 87: The Theme Studio - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part X — Speech to Text, Voice Lab &amp; the Current System</div><ul class="chapters"><li><a href="ch76_voicelab_engines.html">Ch 76: Voice Lab Engines</a></li><li><a href="ch77_engine_environments.html">Ch 77: One Environment per Engine</a></li><li><a href="ch78_compute_choice.html">Ch 78: Compute Choice</a></li><li><a href="ch79_audio_io_shim.html">Ch 79: Audio I/O Without FFmpeg</a></li><li><a href="ch80_start_selected_recording.html">Ch 80: Start Selected Recording</a></li><li><a href="ch81_terms_dialog.html">Ch 81: First-Launch Terms</a></li><li><a href="ch82_licensing.html">Ch 82: Licensing &amp; Compliance</a></li><li><a href="ch83_input_gestures.html">Ch 83: Input Gestures</a></li><li><a href="ch84_stt_catalog.html">Ch 84: A Second Catalog</a></li><li><a href="ch85_stt_environments.html">Ch 85: One Environment per Model</a></li><li><a href="ch86_stt_dialog.html">Ch 86: The Transcribe Dialog</a></li><li><a href="ch87_theme_studio.html" class="active">Ch 87: The Theme Studio</a></li><li><a href="ch88_update_checker.html">Ch 88: Checking for Updates</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 87</div>
+<h1>The Theme Studio: Making Appearance a User-Editable Data Model</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Model a look as a small palette plus a paint style, instead of dozens of hard-coded colours</li>
+  <li>Lay a user-created theme beside the built-in ones without a special case anywhere</li>
+  <li>Generate a stable, unique id from a name so two themes called &ldquo;Dark&rdquo; cannot collide</li>
+  <li>Give a live preview on every change without re-applying the theme to the whole application</li>
+  <li>Keep a wallpaper a per-theme record that survives editing and deletion</li>
+  <li>Do the whole thing on the GUI thread, in a dialog that a screen reader can drive</li>
+</ul>
+
+<hr>
+
+<h2>87.1 A Theme Is Six Colours and a Style</h2>
+
+<p>Chapter 35 built theming around a palette. The current implementation turns
+that palette into a declarative object, so a theme is <em>data</em> rather than a
+branch in a paint routine:</p>
+
+<pre><code>class ThemePreset:
+    """A predefined theme: a name, a palette and a signature wallpaper style."""
+
+    __slots__ = ("theme_id", "name", "colors", "pattern", "note")
+</code></pre>
+
+<p>The palette has exactly six keys, and every window in the application is
+painted from them:</p>
+
+<table>
+  <thead>
+    <tr><th>Key</th><th>Paints</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>bg</code></td><td>window and panel backgrounds</td></tr>
+    <tr><td><code>fg</code></td><td>ordinary text</td></tr>
+    <tr><td><code>control_bg</code></td><td>buttons, text boxes, list backgrounds</td></tr>
+    <tr><td><code>control_fg</code></td><td>text on those controls</td></tr>
+    <tr><td><code>accent</code></td><td>the painted pattern and highlights</td></tr>
+    <tr><td><code>heading</code></td><td>headings and emphasised labels</td></tr>
+  </tbody>
+</table>
+
+<p>Six is not an arbitrary number. It is the smallest set that keeps a dark theme
+<em>readable and consistent</em> &mdash; a control needs its own background and
+foreground or it inherits the window's and disappears &mdash; while staying small
+enough that a person can choose all of it from a form. Anything larger would be a
+colour picker with thirty entries and no way to keep them coherent.</p>
+
+<p>The style is chosen from a fixed list of painters:</p>
+
+<pre><code>PATTERNS: Tuple[Tuple[str, str], ...] = (
+    ("solid", "Solid colour"),
+    ("gradient_v", "Vertical gradient"),
+    ("gradient_h", "Horizontal gradient"),
+    ("diagonal", "Diagonal gradient"),
+    ("vignette", "Soft vignette"),
+    ("grid", "Grid"),
+    ("dots", "Dots"),
+    ("stripes", "Stripes"),
+    ("rays", "Corner glow"),
+    ("waves", "Waves"),
+)
+</code></pre>
+
+<p>Each id maps to a small drawing function (<code>_draw_grid</code>,
+<code>_draw_waves</code>&hellip;) that takes the device context, the size and the
+palette. Adding a style is adding one function and one row to this tuple &mdash;
+nothing else in the program changes.</p>
+
+<h2>87.2 Ten Predefined Themes, Built by One Helper</h2>
+
+<p>The predefined themes are declared with a constructor that keeps the six
+baseline keys in a fixed order, so a missing key is a visible bug rather than a
+silent fallback to black:</p>
+
+<pre><code>def _preset(theme_id, name, bg, fg, control_bg, control_fg,
+            accent, heading, pattern, note) -&gt; ThemePreset:
+    """Build a preset palette, keeping the four baseline keys first."""
+    return ThemePreset(
+        theme_id, name,
+        {"bg": bg, "fg": fg, "control_bg": control_bg,
+         "control_fg": control_fg, "accent": accent, "heading": heading},
+        pattern, note,
+    )
+</code></pre>
+
+<pre><code>THEME_PRESETS: Tuple[ThemePreset, ...] = (
+    _preset("graphite_midnight", "Midnight Graphite",
+            "#16181c", "#e6e9ef", "#22262d", "#e6e9ef", "#8ab4f8", "#ffffff",
+            "gradient_v", ...),
+    _preset("obsidian_gold", "Obsidian Gold", ...),
+    ...                                        # ten in all
+)
+</code></pre>
+
+<p>Every preset carries its own <em>signature</em> style, which is why ten dark
+themes do not feel like one theme in ten tints: Obsidian Gold uses a different
+pattern and a different accent from Forest Pine, and the painted look differs as
+much as the colours do.</p>
+
+<h2>87.3 User Themes Live in the Same List</h2>
+
+<p>A custom theme is a dictionary in the settings file. The important decision is
+that the rest of the application never knows the difference: it asks for the
+palette of a theme id, and <code>resolve_palette()</code> answers from one source
+or the other.</p>
+
+<pre><code>"custom_themes": [ { "id": "custom:ocean-noon", "name": "Ocean Noon",
+                      "bg": "#0b1c2c", "fg": "#e8f1f8", ... , "pattern": "waves",
+                      "note": "" } ]</code></pre>
+
+<p>The id is generated, not typed by the user, and mangling a name into a slug
+means a person may safely create, delete and re-create themes with the same name:</p>
+
+<pre><code>def new_theme_id(settings, name: str) -&gt; str:
+    """A unique ``custom:`` id derived from ``name``."""
+    slug = re.sub(r"[^a-z0-9]+", "-", (name or "theme").strip().lower()).strip("-")
+    slug = slug or "theme"
+    existing = {r.get("id") for r in custom_themes(settings)}
+    candidate = CUSTOM_PREFIX + slug
+    counter = 2
+    while candidate in existing:
+        candidate = f"{CUSTOM_PREFIX}{slug}-{counter}"
+        counter += 1
+    return candidate
+</code></pre>
+
+<p>Saving replaces by id and appends, so an <em>edit</em> and a <em>new
+theme</em> are the same operation:</p>
+
+<pre><code>def save_custom_theme(settings, record: Dict) -&gt; str:
+    """Store ``record`` (adding or replacing it); return its id."""
+    theme_id = record.get("id") or new_theme_id(settings, record.get("name", ""))
+    record = dict(record)
+    record["id"] = theme_id
+    records = [r for r in custom_themes(settings) if r.get("id") != theme_id]
+    records.append(record)
+    settings.set("custom_themes", records)
+    settings.save()
+    return theme_id
+</code></pre>
+
+<div class="info">
+<strong>Deleting a theme deletes its wallpaper with it.</strong> A wallpaper is
+stored per theme id, so a deleted theme's record would be orphaned data that
+grows forever and could be resurrected by a later theme that happens to reuse the
+slug. <code>delete_custom_theme()</code> removes both in one step &mdash; the same
+"clean up the side table" discipline Chapter 82 applied to licences.
+</div>
+
+<h2>87.4 The Studio Is a Form with a Live Preview</h2>
+
+<p><code>Settings &rarr; General &rarr; Create custom theme&hellip;</code> opens
+<code>gui/theme_studio.py</code>. Its structure is deliberately plain: a name
+box, six colour pickers, a pattern choice, optional wallpaper controls and a
+preview panel. Every picker's change handler repaints <strong>the preview
+only</strong>:</p>
+
+<pre><code>class ThemeStudioDialog(wx.Dialog):
+    """Custom theme creator (Settings -> General -> Create custom theme...)."""
+    _COLOUR_FIELDS = (("bg_picker", "bg", "Background"), ...)
+</code></pre>
+
+<p>Repainting the whole application on every colour change would be slow and, on
+a screen reader, disruptive. Repainting one panel is instant and gives the user
+the feedback they actually asked for. The theme is applied to the application
+only when the dialog is accepted.</p>
+
+<p>The preview also shows the <em>pattern</em>: because the pattern painters are
+the same functions the welcome screen uses (<code>paint_background()</code>), the
+preview cannot disagree with the real thing. That is a recurring theme of this
+book: make the preview and the product the same code path, and the preview stops
+being a promise.</p>
+
+<h2>87.5 Wallpapers: the Welcome Screen's Own Record</h2>
+
+<p>The welcome screen is a full-width action bar of the four main buttons above a
+left projects sidebar. The large area that remains is the only surface a
+wallpaper may paint &mdash; it never paints behind a button or the project list,
+because a busy background behind text is an accessibility problem, not a style
+choice.</p>
+
+<p>A wallpaper is stored per theme, with three fields:</p>
+
+<pre><code>"wallpapers": {
+    "graphite_midnight": {"enabled": true, "image": "C:\\pics\\dunes.jpg", "pattern": ""},
+    "custom:ocean-noon":  {"enabled": true, "image": "", "pattern": "waves"},
+}</code></pre>
+
+<ul>
+  <li><code>enabled</code> &mdash; shows or hides it without forgetting the choice;</li>
+  <li><code>image</code> &mdash; the user's own picture, aspect-filled; when the
+      file cannot be loaded the painter falls back to the pattern instead of
+      leaving a blank panel;</li>
+  <li><code>pattern</code> &mdash; an override of the theme's signature style, or
+      empty to use the theme's own.</li>
+</ul>
+
+<pre><code>def set_wallpaper(settings, theme, *, enabled=None, image=None, pattern=None):
+    """Update the wallpaper record for ``theme`` and persist it."""
+    record = dict(get_wallpaper(settings, theme))
+    ...
+    record["pattern"] = pattern if pattern in PATTERN_IDS else ""
+    wallpapers = dict(settings.get("wallpapers", {}) or {})
+    wallpapers[theme] = record
+    settings.set("wallpapers", wallpapers)
+    settings.save()
+</code></pre>
+
+<p>Note the validation: an unknown pattern id is stored as empty rather than
+saved and later ignored. Settings files are edited by hand, and a value that
+cannot be honoured should not be kept around to confuse the next reader.</p>
+
+<h2>87.6 Applying It, and Undoing It</h2>
+
+<p><code>apply_theme(top, theme, settings)</code> resolves the palette and paints
+<code>top</code> and every descendant, and <code>main.py</code> calls it at
+startup and after the Settings dialog closes. Because the current theme id is in
+the settings file, the look survives a restart; because the palette resolves from
+one function, the System default, the two built-ins, the ten presets and any
+number of user themes all take exactly the same path through the code.</p>
+
+<div class="note">
+<strong>Contrast is a test, not a taste.</strong> A theme whose background and
+text are too close makes the application unusable with a screen reader or with
+low vision. The theme tests check each palette's contrast and each pattern's
+legibility, so a new preset cannot ship unreadable &mdash; the same "turn a
+convention into a failing test" rule the book has used since Chapter 17.
+</div>
+
+<h2>87.7 Exercises</h2>
+<ol>
+  <li>Add a "high contrast" pattern that ignores the accent and draws only
+      <code>bg</code> and <code>fg</code>. Which contrast rule does it have to
+      satisfy?</li>
+  <li>Add theme <em>export and import</em> as a JSON file. What has to happen to
+      the wallpaper's image path when the file moves to another machine?</li>
+  <li>Make the studio offer "duplicate this theme" from the theme list. Which
+      existing function does that, and what does it need to change?</li>
+</ol>
+
+<h2>Key Takeaways</h2>
+<ul>
+  <li>Model appearance as data: six colours, a named style and a note, not
+      scattered literals.</li>
+  <li>Let user themes into the same resolution path as the built-ins; a special
+      case is a bug waiting to happen.</li>
+  <li>Generate ids from names, with a counter for collisions, so names stay
+      human and ids stay unique.</li>
+  <li>Repaint a preview, apply on accept &mdash; and make the preview call the
+      same painters as the real screen.</li>
+  <li>Keep a wallpaper a per-theme record, validated on write and removed with
+      its theme.</li>
+</ul>
+
+</div>
+</div>
+</body>
+</html>

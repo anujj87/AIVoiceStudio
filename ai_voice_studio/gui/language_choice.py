@@ -31,7 +31,8 @@ Three details keep the boxes consistent and quick:
 
 from __future__ import annotations
 
-from typing import Any, List, Optional, Sequence, Tuple
+from collections.abc import Sequence
+from typing import Any
 
 import wx
 
@@ -53,31 +54,31 @@ COUNT = languages.COUNT
 _CODES_ATTR = "_aivs_codes"
 
 
-def is_omnivoice(tts_id: Optional[str]) -> bool:
+def is_omnivoice(tts_id: str | None) -> bool:
     """True when ``tts_id`` names one of the OmniVoice engines."""
     return bool(tts_id) and str(tts_id) in OMNIVOICE_ENGINES
 
 
-def pairs() -> List[Tuple[str, str]]:
+def pairs() -> list[tuple[str, str]]:
     """``(label, value)`` for the OmniVoice language box: auto, then all 646."""
     return [(languages.AUTO_LABEL, AUTO_KEY)] + [
         (label, value) for label, value in languages.choices()[1:]
     ]
 
 
-def labels() -> List[str]:
+def labels() -> list[str]:
     """The 647 combo-box labels, without the values."""
     return [label for label, _value in pairs()]
 
 
-def label(value: Optional[str]) -> str:
+def label(value: str | None) -> str:
     """How a stored hint is shown in a summary (``"Hindi (hi)"``)."""
     if not value or str(value) == AUTO_KEY:
         return languages.AUTO_LABEL
     return languages.label(value)
 
 
-def hint_of(combo: wx.ComboBox) -> Optional[str]:
+def hint_of(combo: wx.ComboBox) -> str | None:
     """The language pinned in ``combo``, or ``None`` for auto.
 
     Works whether the box was filled by :func:`set_pairs` (values in the
@@ -86,7 +87,7 @@ def hint_of(combo: wx.ComboBox) -> Optional[str]:
     return languages.normalise(selected_code(combo))
 
 
-def set_pairs(combo: wx.ComboBox, items: Sequence[Tuple[str, str]]) -> None:
+def set_pairs(combo: wx.ComboBox, items: Sequence[tuple[str, str]]) -> None:
     """Fill a combo box from ``(label, value)`` pairs in one native call.
 
     The values are kept on the widget (:data:`_CODES_ATTR`) and read back with
@@ -116,7 +117,7 @@ def selected_code(combo: wx.ComboBox) -> Any:
     return code_at(combo, combo.GetSelection())
 
 
-def select(combo: wx.ComboBox, value: Optional[str]) -> int:
+def select(combo: wx.ComboBox, value: str | None) -> int:
     """Select the entry whose value matches ``value``; return its index.
 
     ``None`` (or the auto key) selects the first entry - Auto - which is also
@@ -134,7 +135,7 @@ def select(combo: wx.ComboBox, value: Optional[str]) -> int:
     return index
 
 
-def fill(combo: wx.ComboBox, hint: Optional[str] = None) -> None:
+def fill(combo: wx.ComboBox, hint: str | None = None) -> None:
     """Fill a Language box with Auto + all 646 languages, ``hint`` selected."""
     set_pairs(combo, pairs())
     select(combo, hint or AUTO_KEY)

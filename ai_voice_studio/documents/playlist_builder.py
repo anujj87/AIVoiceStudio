@@ -18,16 +18,16 @@ the audio was recorded in.
 from __future__ import annotations
 
 import os
-from typing import Any, Dict, List
+from typing import Any
 from xml.sax.saxutils import escape as _xml_escape
 
 
 def _quoted(value: str) -> str:
     """XML attribute value, always wrapped in double quotes."""
-    return '"%s"' % _xml_escape(value).replace('"', "&quot;")
+    return '"' + _xml_escape(value).replace('"', "&quot;") + '"'
 
 
-def _ready_entries(segments: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _ready_entries(segments: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Recorded segments (``status == "done"`` with a saved file), in order."""
     entries = [
         s for s in segments
@@ -37,26 +37,26 @@ def _ready_entries(segments: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return entries
 
 
-def _titles(entries: List[Dict[str, Any]]) -> List[str]:
+def _titles(entries: list[dict[str, Any]]) -> list[str]:
     return [str(s.get("title") or os.path.basename(s["saved"])) for s in entries]
 
 
-def _files(entries: List[Dict[str, Any]]) -> List[str]:
+def _files(entries: list[dict[str, Any]]) -> list[str]:
     return [os.path.basename(str(s["saved"])) for s in entries]
 
 
-def _write_m3u8(path: str, title: str, names: List[str], titles: List[str]) -> None:
+def _write_m3u8(path: str, title: str, names: list[str], titles: list[str]) -> None:
     lines = ["#EXTM3U", f"#PLAYLIST:{title}"]
-    for name, entry_title in zip(names, titles):
+    for name, entry_title in zip(names, titles, strict=False):
         lines.append(f"#EXTINF:-1,{entry_title}")
         lines.append(name)
     with open(path, "w", encoding="utf-8", newline="\n") as fh:
         fh.write("\n".join(lines) + "\n")
 
 
-def _write_pls(path: str, title: str, names: List[str], titles: List[str]) -> None:
+def _write_pls(path: str, title: str, names: list[str], titles: list[str]) -> None:
     lines = ["[playlist]"]
-    for i, (name, entry_title) in enumerate(zip(names, titles), start=1):
+    for i, (name, entry_title) in enumerate(zip(names, titles, strict=False), start=1):
         lines.append(f"File{i}={name}")
         lines.append(f"Title{i}={entry_title}")
         lines.append(f"Length{i}=-1")
@@ -66,7 +66,7 @@ def _write_pls(path: str, title: str, names: List[str], titles: List[str]) -> No
         fh.write("\n".join(lines) + "\n")
 
 
-def _write_wpl(path: str, title: str, names: List[str]) -> None:
+def _write_wpl(path: str, title: str, names: list[str]) -> None:
     # Windows Media Player playlist (SMIL).  Duration is unknown per entry;
     # WMP tolerates a duration of 0 and reads the real length from the file.
     body = "".join(
@@ -93,8 +93,8 @@ def _write_wpl(path: str, title: str, names: List[str]) -> None:
 def build_playlists(
     project_dir: str,
     project_name: str,
-    segments: List[Dict[str, Any]],
-) -> List[str]:
+    segments: list[dict[str, Any]],
+) -> list[str]:
     """Write the M3U8/PLS/WPL playlists into ``project_dir``.
 
     Returns the list of written file paths; empty when no segment has been
@@ -110,7 +110,7 @@ def build_playlists(
     names = _files(entries)
     titles = _titles(entries)
 
-    written: List[str] = []
+    written: list[str] = []
     m3u8_path = os.path.join(project_dir, safe + ".m3u8")
     _write_m3u8(m3u8_path, project_name, names, titles)
     written.append(m3u8_path)

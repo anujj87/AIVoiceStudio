@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 92: Placement, Gap Fitting and Extended Audio Description - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part XI — Audio Description</div><ul class="chapters"><li><a href="ch89_ad_overview.html">Ch 89: Narrating Video</a></li><li><a href="ch90_ad_catalog_envs.html">Ch 90: A Catalog of Describers</a></li><li><a href="ch91_ad_windows.html">Ch 91: Chunks, Windows &amp; Change</a></li><li><a href="ch92_ad_placement.html" class="active">Ch 92: Placement &amp; Extended AD</a></li><li><a href="ch93_ad_described_film.html">Ch 93: The Described Film</a></li><li><a href="ch94_ad_dialog.html">Ch 94: The Describe Window</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 92</div>
+<h1>Placement: Fitting the Pauses, or Stopping the Film</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Find the silences in a soundtrack and merge overlapping speech</li>
+  <li>Place each description into the earliest pause that can hold it in full</li>
+  <li>Decide when a description must be dropped rather than shortened over dialogue</li>
+  <li>Plan an extended description, where a description's length <em>is</em> its pause</li>
+  <li>Build the spoken track on the described film's own clock</li>
+</ul>
+
+<hr>
+
+<h2>92.1 Two Unhappy Alternatives</h2>
+
+<p>A description lands on top of dialogue or it waits. Those are the only two
+possibilities, and each has a cost:</p>
+
+<ul>
+  <li>Speaking over the dialogue is unacceptable &mdash; a blind viewer loses the
+      film's own words, which is worse than losing the description.</li>
+  <li>Waiting means there has to be somewhere to wait: a silence in the
+      soundtrack. A film whose dialogue never stops has none, and then every
+      description is either spoken over the actors or dropped.</li>
+</ul>
+
+<p>The feature implements both answers, and calls the choice <em>Placement</em>.
+This chapter is about the arithmetic on both sides of it, all of which lives in
+<code>pipeline.py</code> and <code>extended.py</code> and needs neither wx nor a
+model to test.</p>
+
+<h2>92.2 Finding the Pauses</h2>
+
+<p>The silence between the lines is not something the describer can see: it comes
+from speech to text, which reports when each phrase was spoken. Those intervals
+are then turned into a sorted list of true silences, with overlapping and
+touching phrases merged first, and anything shorter than the minimum left
+out:</p>
+
+<pre>def free_gaps(speech, duration, min_gap=AD_MIN_GAP_SECONDS):
+    span = _positive(duration)
+    intervals = []
+    for item in speech or []:
+        raw_start, raw_end = item.get("start"), item.get("end")
+        if raw_start is None or raw_end is None:
+            # A phrase with no timing tells us nothing about where the silence
+            # is, so it cannot carve a hole in the timeline.
+            continue
+        start = max(0.0, min(_positive(raw_start), span))
+        end = max(0.0, min(_positive(raw_end), span))
+        if end &gt; start:
+            intervals.append((start, end))
+    intervals.sort()
+    merged = []
+    for start, end in intervals:
+        if merged and start &lt;= merged[-1][1] + 1e-9:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+        else:
+            merged.append((start, end))
+    gaps = []
+    cursor = 0.0
+    for start, end in merged:
+        if start - cursor &gt;= _positive(min_gap):
+            gaps.append((round(cursor, 3), round(start, 3)))
+        cursor = max(cursor, end)
+    if span - cursor &gt;= _positive(min_gap):
+        gaps.append((round(cursor, 3), round(span, 3)))
+    return gaps</pre>
+
+<p>The minimum gap is 1.5 seconds by default, and the longest a single
+description may run is 12 seconds, so one long paragraph cannot demand a whole
+minute of a lecture and leave the listener with nothing but that paragraph.</p>
+
+<h2>92.3 Fitting a Description Into a Pause</h2>
+
+<p>"Can this pause hold it?" is judged against the description's <em>own</em>
+length, not against a fixed budget. A sentence that needs three seconds skips a
+two-second pause in favour of a slightly later one, instead of being chopped to a
+fragment merely because the fragment would fit. Only when no pause can hold the
+description in full does the code fall back to the earliest pause with any room
+and shorten there; and a description with room nowhere is <em>dropped</em>:</p>
+
+<pre>need = max(floor, min(speaking_seconds(text), ceiling))
+eligible = []
+for index, (gap_start, gap_end) in enumerate(gaps):
+    if index in used:
+        continue
+    if gap_end - wanted_at &lt; floor:      # the pause is already over
+        continue
+    starts_at = max(gap_start, wanted_at)  # never earlier than its own window
+    available = gap_end - starts_at
+    if available &lt; floor:
+        continue
+    eligible.append((index, starts_at, available))
+
+chosen = next((item for item in eligible if item[2] &gt;= need), None)
+if chosen is None and eligible:
+    chosen = eligible[0]
+if chosen is None:
+    dropped += 1
+    continue</pre>
+
+<p>The result is reported to the user, because "fewer descriptions than you
+expected" is exactly the kind of silence a feature should not keep: the run says
+how many descriptions did not fit any pause and were left out of the timed
+track.</p>
+
+<div class="note">
+<strong>Dropped, not truncated into dialogue.</strong> A shortened description
+that still fits the pause is spoken; one that cannot fit anywhere is left out of
+the narration rather than laid over the actors. The script still contains it
+&mdash; the text output is the description, the narration is the placement.
+</div>
+
+<h2>92.4 Stopping the Film</h2>
+
+<p>Extended audio description answers the wall-to-wall case by changing the
+film. The picture holds on the frame it had reached, the soundtrack is silent,
+the description is spoken, and the film goes on. A description's spoken length
+therefore <em>is</em> the length of the pause, which decides the order of work:
+speak first, measure, then plan.</p>
+
+<pre>def plan_extended(descriptions, duration=0.0, *, clip_seconds=None,
+                  padding=AD_PAUSE_PADDING, minimum=AD_MIN_PAUSE_SECONDS):
+    stops = []
+    cumulative = 0.0
+    previous = 0.0
+    for item in descriptions or []:
+        text = str(item.get("text", "")).strip()
+        if not text:
+            continue
+        wanted = _number(item.get("start"))
+        if span:
+            wanted = min(wanted, span)
+        video_time = max(previous, wanted)     # never wind the film backwards
+        hold = pause_seconds(text, measured, padding, minimum)
+        stops.append({"index": len(stops), "video_time": round(video_time, 3),
+                      "pause": hold,
+                      "extended_start": round(video_time + cumulative, 3),
+                      "text": text, "chunk": item.get("chunk")})
+        cumulative += hold
+        previous = video_time</pre>
+
+<p>Two rules keep the result playable. Stop times are made non-decreasing, so the
+film is never wound backwards even if a description is timed before the one
+before it; and a stop time is clamped into <code>[0, duration]</code>, so a
+description the model timed past the end of the film only stops it at the end.
+The hold itself is the measured spoken length plus a short breath
+(<code>AD_PAUSE_PADDING = 0.6</code>) with a floor of
+<code>AD_MIN_PAUSE_SECONDS = 0.8</code>, so a description is never clipped by the
+film restarting.</p>
+
+<h2>92.5 Two Clocks</h2>
+
+<p>Once the film stops, there are two timelines and confusing them puts the voice
+in the wrong place:</p>
+
+<ul>
+  <li>the <strong>original</strong> clock &mdash; a description belongs at the
+      moment of the film it describes; and</li>
+  <li>the <strong>extended</strong> clock &mdash; the same description is heard
+      at that moment plus everything the film has already waited for.</li>
+</ul>
+
+<p><code>extended.extended_segments()</code> moves the documents onto the
+extended clock (with the held time attached, so the script can say "picture held
+9.4 s"), and the spoken track is written on it too. That is why the extended
+narration file is named apart from a standard one:</p>
+
+<pre>NARRATION_SUFFIX = " - extended narration"   # in extended.py
+NARRATION_SUFFIX = " - narration"            # in narration.py</pre>
+
+<div class="tip">
+<strong>Order forced by the feature.</strong> In standard mode the descriptions
+are placed and then spoken; in extended mode they are spoken and then placed,
+because the pause is the sound. <code>DescribeJob._extended_source()</code> makes
+that order explicit: speak, plan, write the track, write the documents, render the
+film.
+</div>
+
+<h2>92.6 Exercises</h2>
+<ol>
+  <li>Change <code>fit_into_gaps()</code> to prefer the pause nearest the
+      description's own moment rather than the earliest one with room. What
+      breaks in the ordering guarantee?</li>
+  <li>The descriptions of a film are all dropped because the dialogue never
+      stops. What should the run suggest, and how does it know?</li>
+  <li>Add a per-description minimum pause of your own and explain the effect on a
+      film with many short descriptions.</li>
+</ol>
+
+<h2>Key Takeaways</h2>
+<ul>
+  <li>Find the silences from speech to text, merge what overlaps, and keep only
+      gaps worth speaking into.</li>
+  <li>Judge a pause against the whole description, and drop rather than cover
+      dialogue.</li>
+  <li>In extended mode, speak first and plan afterwards: the sound is the pause.</li>
+  <li>Keep the original clock and the extended clock apart, in the code and in
+      the file names.</li>
+</ul>
+
+</div>
+</div>
+</body>
+</html>

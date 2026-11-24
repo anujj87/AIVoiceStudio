@@ -282,7 +282,7 @@ class DirectReportingTest(unittest.TestCase):
     def test_short_takes_are_never_judged(self):
         # A one-word preview must not be "repaired" into nonsense.
         engine, worker = _engine(lambda i, text: _drone(0.4))
-        samples = engine.synthesize("Hi")
+        engine.synthesize("Hi")
         self.assertEqual(len(worker.requests), 1)
         self.assertEqual(engine.last_warnings, [])
 

@@ -10,7 +10,7 @@ from unittest import mock
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from ai_voice_studio import paths  # noqa: E402
+from ai_voice_studio import paths
 
 
 class _FakeSettings:

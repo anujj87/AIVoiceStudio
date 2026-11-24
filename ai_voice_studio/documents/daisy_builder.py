@@ -49,14 +49,14 @@ import subprocess
 import uuid
 import wave
 import zipfile
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from ..constants import (
+    DAISY_MASTER_SMIL_FILE,
     DAISY_NCC_FILE,
     DAISY_OUTPUT_DIR_NAME,
     DAISY_PACKAGE_FILE,
-    DAISY_MASTER_SMIL_FILE,
 )
 from ..util import sanitize_filename
 
@@ -90,13 +90,13 @@ _SMIL_LAYOUT = "    <layout>\n      <region id=\"txtView\" />\n    </layout>\n"
 def build_daisy_book(
     output_dir: str,
     project_name: str,
-    segments: List[Dict[str, Any]],
+    segments: list[dict[str, Any]],
     audio_format: str = "wav",
     include_text: bool = False,
     language: str = "en",
     publisher: str = "",
     source_file: str = "",
-    meta: Optional[Dict[str, str]] = None,
+    meta: dict[str, str] | None = None,
 ) -> str:
     """Build the complete DAISY 2.02 book structure.
 
@@ -149,7 +149,7 @@ def build_daisy_book(
     os.makedirs(daisy_dir, exist_ok=True)
 
     book_uid = "urn:uuid:" + str(uuid.uuid4())
-    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    now_iso = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     multimedia = "audioFullText" if include_text else "audioNcc"
 
     # 1. Stage recorded audio into DAISY/ under digit-only names and measure
@@ -159,7 +159,7 @@ def build_daisy_book(
     #    44.1 kHz MPEG-1 Layer III when needed: DAISY players decode that
     #    profile reliably, while the engines' native low-rate MPEG-2 LSF
     #    MP3s cut out in strict players (WAV/FLAC are copied as they are).
-    entries: List[Dict[str, Any]] = []
+    entries: list[dict[str, Any]] = []
     for i, seg in enumerate(ready, start=1):
         src = os.path.join(output_dir, os.path.basename(seg["saved"]))
         ext = (os.path.splitext(os.path.basename(seg["saved"]))[1] or
@@ -202,7 +202,7 @@ def build_daisy_book(
         _write_text_document(daisy_dir, entry, language, include_text)
 
     # 3. Per-segment content SMIL documents (SMIL 1.0).
-    smil_files: List[str] = []
+    smil_files: list[str] = []
     for entry in entries:
         smil_files.append(
             _write_smil(daisy_dir, entry, book_uid, project_name)
@@ -230,17 +230,17 @@ def build_daisy_book(
 # Synchronized text blocks
 # ---------------------------------------------------------------------------
 def _entry_blocks(
-    entry: Dict[str, Any],
+    entry: dict[str, Any],
     include_text: bool,
-    id_counter: List[int],
-) -> List[Dict[str, Any]]:
+    id_counter: list[int],
+) -> list[dict[str, Any]]:
     """Compute the synchronized text blocks of one segment.
 
     The first block is always the segment heading; when ``include_text`` is
     True every paragraph follows.  Ids (``txt_``/``par_``/``aud_``) are
     assigned from a book-wide counter so SMIL, text and NCC references agree.
     """
-    blocks: List[Dict[str, Any]] = []
+    blocks: list[dict[str, Any]] = []
 
     def add(html_id: str, text: str) -> None:
         id_counter[0] += 1
@@ -264,7 +264,7 @@ def _entry_blocks(
 # ---------------------------------------------------------------------------
 # Public API (continued)
 # ---------------------------------------------------------------------------
-def export_daisy_zip(project_dir: str, zip_path: str, book_folder: Optional[str] = None) -> str:
+def export_daisy_zip(project_dir: str, zip_path: str, book_folder: str | None = None) -> str:
     """Package the generated DAISY book into a distributable ZIP archive.
 
     The ZIP contains a single top-level folder (``book_folder``, defaulting to
@@ -315,7 +315,7 @@ def export_daisy_zip(project_dir: str, zip_path: str, book_folder: Optional[str]
 def _write_ncc(
     daisy_dir: str,
     title: str,
-    entries: List[Dict[str, Any]],
+    entries: list[dict[str, Any]],
     book_uid: str,
     now_iso: str,
     language: str,
@@ -323,7 +323,7 @@ def _write_ncc(
     source_file: str,
     multimedia: str,
     total_ms: int,
-    meta: Optional[Dict[str, str]] = None,
+    meta: dict[str, str] | None = None,
 ) -> str:
     """Write the Navigation Control Center (XHTML 1.0 + DAISY metadata)."""
     publisher = publisher.strip() or "AI Voice Studio"
@@ -420,7 +420,7 @@ def _write_ncc(
 # ---------------------------------------------------------------------------
 def _write_smil(
     daisy_dir: str,
-    entry: Dict[str, Any],
+    entry: dict[str, Any],
     book_uid: str,
     book_title: str,
 ) -> str:
@@ -461,10 +461,10 @@ def _write_smil(
     blocks = entry["blocks"]
     total_chars = sum(b["chars"] for b in blocks)
 
-    pars: List[str] = []
+    pars: list[str] = []
     elapsed = 0.0
     for idx, block in enumerate(blocks):
-        if idx == len(blocks) - 1:
+        if idx == len(blocks) - 1:  # noqa: SIM108 - the branch carries the reason
             # The final clip ends exactly at the measured duration.  ``dur``
             # is the real decodable length of the audio file (measured with
             # the wave module or FFmpeg), so a clip-end beyond it would be
@@ -516,7 +516,7 @@ def _write_smil(
 
 def _write_master_smil(
     daisy_dir: str,
-    entries: List[Dict[str, Any]],
+    entries: list[dict[str, Any]],
     book_uid: str,
     book_title: str,
 ) -> None:
@@ -556,7 +556,7 @@ def _write_master_smil(
 # ---------------------------------------------------------------------------
 def _write_text_document(
     daisy_dir: str,
-    entry: Dict[str, Any],
+    entry: dict[str, Any],
     language: str,
     include_text: bool,
 ) -> str:
@@ -582,13 +582,11 @@ def _write_text_document(
         doctype = _XHTML_DOCTYPE
         content_type = "text/html; charset=utf-8"
 
-    body_lines: List[str] = []
+    body_lines: list[str] = []
     for block in blocks:
         escaped = _escape_html(block["text"])
-        if include_text:
-            back = f'<a href="{smil_name}#{block["text_id"]}">{escaped}</a>'
-        else:
-            back = escaped
+        back = (f'<a href="{smil_name}#{block["text_id"]}">{escaped}</a>'
+                if include_text else escaped)
         tag = "h1" if block is blocks[0] else "p"
         body_lines.append(f'    <{tag} id="{block["html_id"]}">{back}</{tag}>')
 
@@ -617,13 +615,13 @@ def _write_text_document(
 def _write_opf(
     daisy_dir: str,
     title: str,
-    entries: List[Dict[str, Any]],
+    entries: list[dict[str, Any]],
     book_uid: str,
     now_iso: str,
     language: str,
     publisher: str,
     multimedia: str,
-    meta: Optional[Dict[str, str]] = None,
+    meta: dict[str, str] | None = None,
 ) -> None:
     """Write an OPF package file listing every component of the book."""
     publisher = publisher.strip() or "AI Voice Studio"
@@ -665,10 +663,16 @@ def _write_opf(
         optional_meta += (
             '\n    <meta name="ncc:narrator" content="'
             + _escape_html(narrator) + '" />')
-    if producer:
+    # The software is credited unless the user asked otherwise, exactly as the
+    # NCC file (``ncc:generator``) and the DAISY 3 package do - a book built by
+    # this application should say so in every package file it writes.
+    producers = [producer] if producer else []
+    if show_software and "AI Voice Studio" not in producers:
+        producers.append("AI Voice Studio")
+    for prod in producers:
         optional_meta += (
             '\n    <meta name="ncc:producer" content="'
-            + _escape_html(producer) + '" />')
+            + _escape_html(prod) + '" />')
 
     opf = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -698,11 +702,11 @@ def _write_opf(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-def _smil_name(entry: Dict[str, Any]) -> str:
+def _smil_name(entry: dict[str, Any]) -> str:
     return f"{entry['number']:04d}.smil"
 
 
-def _text_id(entry: Dict[str, Any]) -> str:
+def _text_id(entry: dict[str, Any]) -> str:
     """The SMIL ``<text>`` id of the segment's first (heading) block."""
     blocks = entry.get("blocks")
     if blocks:
@@ -718,17 +722,17 @@ def _stage_audio(src: str, dst: str, ext: str) -> None:
     MPEG-1 Layer III 44.1 kHz mono, the audio profile DAISY 2.02 and DAISY 3
     players decode reliably.  Every other file is copied unchanged.
     """
-    if os.path.isfile(src) and os.path.abspath(src) != os.path.abspath(dst):
-        shutil.copy2(src, dst)
-    elif not os.path.isfile(dst) and os.path.isfile(src):
+    same_file = os.path.abspath(src) == os.path.abspath(dst)
+    if (os.path.isfile(src) and not same_file) or (
+            not os.path.isfile(dst) and os.path.isfile(src)):
         shutil.copy2(src, dst)
     if ext == "mp3" and os.path.isfile(dst):
         try:
-            from ..audio.ffmpeg import needs_mp3_normalization, normalize_mp3_for_daisy  # noqa: PLC0415
+            from ..audio.ffmpeg import needs_mp3_normalization, normalize_mp3_for_daisy
 
             if needs_mp3_normalization(dst):
                 normalize_mp3_for_daisy(dst, dst)
-        except Exception:  # noqa: BLE001  # keep building with the original file
+        except Exception:  # keep building with the original file
             log.warning(
                 "DAISY staging: could not normalize %s (player-incompatible "
                 "MP3 left as is)", dst, exc_info=True)
@@ -742,11 +746,11 @@ def _audio_duration(path: str, ext: str) -> float:
                 frames = wf.getnframes()
                 rate = wf.getframerate()
                 return frames / rate if rate else 0.0
-        except Exception:  # noqa: BLE001
+        except Exception:
             return 0.0
     # MP3/FLAC: probe with FFmpeg if available.
     try:
-        from ..audio import ffmpeg as ffmpeg_mod  # noqa: PLC0415
+        from ..audio import ffmpeg as ffmpeg_mod
 
         exe = ffmpeg_mod.find_ffmpeg()
         if not exe:
@@ -757,13 +761,14 @@ def _audio_duration(path: str, ext: str) -> float:
             text=True,
             timeout=30,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            check=False,
         )
         match = re.search(r"Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)", result.stderr or "")
         if match:
             h, m, s = match.groups()
             return int(h) * 3600 + int(m) * 60 + float(s)
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception:
+        log.debug("Ignoring a failure in _audio_duration", exc_info=True)
     return 0.0
 
 

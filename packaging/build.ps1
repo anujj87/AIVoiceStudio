@@ -11,6 +11,9 @@
 #   powershell -ExecutionPolicy Bypass -File packaging\build.ps1 -Arch both
 #
 # Output: dist\AI-Voice-Studio-Setup-x64.exe / -x86.exe
+#
+# Install what was built (unattended, and without a POSIX shell eating the
+# switches) with:  powershell -ExecutionPolicy Bypass -File packaging\silent_install.ps1
 
 param(
     [ValidateSet("x64", "x86", "both")]
@@ -44,6 +47,35 @@ function Find-Iscc {
     return $null
 }
 
+# Every installer ships the bundled Python runtime (packaging\
+# stage_python_runtime.py), because the per-engine virtualenvs are created by
+# ``python -m venv`` - which needs a full interpreter, not the frozen EXE.  A
+# build that silently skipped the staging step used to still produce a setup,
+# and it installed an application that could not create a single environment.
+# So the pipeline checks the payload itself before Inno Setup bakes it in; the
+# staging script exits nonzero on the same conditions, and
+# installer_common.iss repeats the check for a direct iscc run.
+function Assert-BundledRuntime {
+    param([string]$DistArch)
+
+    $runtime = Join-Path $root "dist\AIVS-$DistArch\AI-Voice-Studio\python-runtime"
+    $missing = @()
+    foreach ($relative in @("python.exe", "Lib\venv\__init__.py", "Include\Python.h",
+                            "Lib\ensurepip")) {
+        if (-not (Test-Path (Join-Path $runtime $relative))) { $missing += $relative }
+    }
+    $libs = Join-Path $runtime "libs"
+    $lib = Get-ChildItem -Path $libs -Filter "python3*.lib" -ErrorAction SilentlyContinue
+    if (-not $lib) { $missing += "libs\python3*.lib" }
+    if ($missing.Count -gt 0) {
+        throw ("The installer would ship without a complete bundled Python runtime: " +
+               "$runtime is missing " + ($missing -join ", ") + ".  Engines cannot " +
+               "create their virtualenvs without it, and Triton cannot compile " +
+               "its helper without the headers.")
+    }
+    Write-Host "   bundled Python runtime verified: $runtime" -ForegroundColor DarkGray
+}
+
 function Build-Arch {
     param([string]$a, [string]$venv, [string]$iss)
 
@@ -58,6 +90,17 @@ function Build-Arch {
         & $py -m PyInstaller packaging\ai_voice_studio.spec --noconfirm `
             --distpath "dist\AIVS-$distArch" --workpath "build\pyinstaller-$a"
         if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed for $a" }
+
+        # Ship a full, portable Python next to the app so the per-engine and
+        # per-model virtualenvs can be built on a machine with no Python
+        # installed.  The build interpreter must be a full install (one that
+        # still has Lib\venv and Lib\ensurepip); every build ships this runtime,
+        # so a staging failure stops the build instead of producing a setup
+        # without Python.
+        Write-Host "== Staging the bundled Python runtime ==" -ForegroundColor Cyan
+        & $py packaging\stage_python_runtime.py --arch $a
+        if ($LASTEXITCODE -ne 0) { throw "Staging the Python runtime failed for $a" }
+        Assert-BundledRuntime $distArch
 
         Write-Host "== Compiling $a installer ==" -ForegroundColor Cyan
         $iscc = Find-Iscc

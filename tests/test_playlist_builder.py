@@ -9,7 +9,7 @@ import unittest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from ai_voice_studio.documents.playlist_builder import (  # noqa: E402
+from ai_voice_studio.documents.playlist_builder import (
     build_playlists,
 )
 

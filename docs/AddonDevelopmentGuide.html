@@ -273,7 +273,11 @@ application while the engine it uses runs somewhere else.</p>
 <tr><th>Environment</th><th>Used for</th><th>Contains</th></tr>
 <tr><td><code>addon_env</code></td><td>Your addon, the Developer category, the ONNX GPU runtime</td><td>Your <code>dependencies</code> list; the bundled sherpa-onnx runtime</td></tr>
 <tr><td><code>tts_envs\pocket_tts</code></td><td>Pocket TTS (Kyutai)</td><td>pocket-tts, soundfile, scipy</td></tr>
-<tr><td><code>tts_envs\bark</code></td><td>Bark (Suno AI)</td><td>transformers, torch, soundfile, scipy</td></tr>
+<tr><td><code>tts_envs\f5tts</code></td><td>F5-TTS</td><td>f5-tts, torch, torchaudio, soundfile</td></tr>
+<tr><td><code>tts_envs\chatterbox</code></td><td>Chatterbox (Resemble AI)</td><td>chatterbox-tts, torch, torchaudio, soundfile</td></tr>
+<tr><td><code>tts_envs\qwen3tts</code></td><td>Qwen3-TTS</td><td>qwen-tts, torch, torchaudio, soundfile</td></tr>
+<tr><td><code>tts_envs\vibevoice</code></td><td>VibeVoice</td><td>vibevoice (pinned source archive), torch, soundfile</td></tr>
+<tr><td><code>stt_envs\&lt;model id&gt;</code></td><td>One speech-to-text model each</td><td>faster-whisper / transformers / nemo_toolkit / speechbrain + torch</td></tr>
 <tr><td><code>tts_envs\f5tts</code></td><td>F5-TTS</td><td>f5-tts, torch, torchaudio, soundfile</td></tr>
 <tr><td><code>tts_envs\omnivoice</code></td><td>OmniVoice and OmniVoice Server (shared deliberately)</td><td>omnivoice-triton / omnivoice-server, torch, CUDA PyTorch</td></tr>
 </table>
@@ -671,7 +675,9 @@ short reference recordings. The cloned voice then appears in the Recording
 window alongside downloaded voices.</p>
 
 <p>The application's own cloning engines are the <strong>Voice Lab</strong> engines
-(Pocket TTS, Bark, F5-TTS, configured in Settings &rarr; Voice clone) plus
+(Pocket TTS, F5-TTS, KokoClone, Chatterbox, Qwen3-TTS, VibeVoice, MOSS-TTS,
+GPT-SoVITS, configured in
+Settings &rarr; Voice clone) plus
 OmniVoice; a cloner you register through an addon is offered in the same places, and
 the cloned voices it creates are stored in the model store just like the built-in
 ones.</p>
@@ -695,7 +701,8 @@ ones.</p>
 <h3>Registration</h3>
 <p>Set <code>"provides": ["voice_cloner"]</code> in your manifest and implement
 the cloner class. The Voice Clone tab in Settings will show your cloner
-alongside the built-in Voice Lab cloners (Pocket TTS, Bark, F5-TTS) and the OmniVoice
+alongside the built-in Voice Lab cloners (Pocket TTS, F5-TTS, KokoClone, ...)
+and the OmniVoice
 clone / voice-design modes.</p>
 
 <!-- ================================================================ -->
@@ -822,7 +829,8 @@ addon installation.</p>
   <li>Check which environment the package went into. Addon <code>dependencies</code> go to
       <code>addon_env</code>; each pip-installed TTS engine gets its own folder under
       <code>%APPDATA%\AIVoiceStudio\tts_envs\&lt;engine&gt;</code>. Installing torch for
-      Bark does not make it visible to your addon, and vice versa.</li>
+      PyTorch installed for F5-TTS does not make it visible to your addon, and vice
+      versa.</li>
   <li>If your engine needs a heavy dependency, run it in a worker subprocess started with
       that environment's interpreter instead of importing it in the application process.</li>
   <li>See <a href="#environments">Python Environments: Addons vs. TTS Engines</a>.</li>

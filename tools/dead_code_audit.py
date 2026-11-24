@@ -2,7 +2,6 @@
 
 import ast
 import os
-import sys
 
 ROOTS = ["ai_voice_studio", "main.py", "tests"]
 TERMINATORS = (ast.Return, ast.Raise, ast.Break, ast.Continue)
@@ -43,13 +42,12 @@ def main():
             files = [os.path.join(root, f) for f in os.listdir(root) if f.endswith(".py")]
         for path in files:
             try:
-                with open(path, "r", encoding="utf-8") as fh:
+                with open(path, encoding="utf-8") as fh:
                     tree = ast.parse(fh.read(), filename=path)
             except SyntaxError as exc:
                 print(f"{path}: SYNTAX ERROR {exc}")
                 found += 1
                 continue
-            before = found
             visit(tree, path)
             # Count hits printed for this file.
     print("Audit complete." if found == 0 else f"{found} issue(s) found.")

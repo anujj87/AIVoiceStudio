@@ -18,7 +18,7 @@
 <h1>TTS Engine Integration</h1>
 
 <div class="info">
-  <strong>Current implementation (2026.3.1).</strong> The sherpa-onnx wrapper described here is
+  <strong>Current implementation (2027.1.0).</strong> The sherpa-onnx wrapper described here is
   still the engine for the ONNX and built-in voices, and it now sits behind two more layers:
   <ul>
     <li><code>tts/engine.py</code> is reached through <code>tts/models.py</code>, which resolves
@@ -31,6 +31,13 @@
     <li>Reference audio for cloning is decoded without FFmpeg when TorchCodec cannot load
       (<a href="ch79_audio_io_shim.html">Chapter 79</a>), and the engine cache key includes the
       provider, so a compute change rebuilds the engine.</li>
+    <li><code>TtsEnginePool</code> / <code>get_engine_pool()</code> (2027.1.0) hold a few
+      interchangeable engines so a GPU run can keep several segments in flight: sherpa-onnx
+      prepares one sentence per call and the Kokoro implementation ignores
+      <code>max_num_sentences</code>, so a lone engine leaves the card waiting on the CPU.
+      A pool is only built for a local sherpa-onnx voice — a Windows voice, OmniVoice or a
+      Voice Lab engine runs in its own process and stays one at a time.
+      See <a href="ch56_synthesis_worker.html">Chapter 56</a>.</li>
   </ul>
 </div>
 

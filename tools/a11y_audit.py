@@ -34,8 +34,6 @@ import wx
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
-from ai_voice_studio.settings import Settings  # noqa: E402
-from ai_voice_studio.tts.models import ModelStore  # noqa: E402
 
 _DEFAULT_NAMES = {
     "", "text", "comboBox", "checkBox", "radioButton", "button",
@@ -94,19 +92,16 @@ def walk(win, out):
             name = (child.GetName() or "").strip()
             extra = ""
             label = ""
-            if isinstance(child, wx.Button) or isinstance(child, wx.ToggleButton):
+            if isinstance(child, (wx.Button, wx.ToggleButton)):
                 label = child.GetLabel()
-                if not name or name in _DEFAULT_NAMES:
-                    if label:
-                        # Windows usually derives a name from the button text,
-                        # but be explicit everywhere for consistency.
-                        extra += " [no explicit name; label={!r}]".format(label)
-                        name = label
+                if (not name or name in _DEFAULT_NAMES) and label:
+                    # Windows usually derives a name from the button text,
+                    # but be explicit everywhere for consistency.
+                    extra += f" [no explicit name; label={label!r}]"
+                    name = label
             line = f"{cls}| name={name!r}{extra}"
             flag = ""
-            if not name or name in _DEFAULT_NAMES:
-                flag = "  !DEFAULT"
-            elif name.startswith("staticText"):
+            if not name or name in _DEFAULT_NAMES or name.startswith("staticText"):
                 flag = "  !DEFAULT"
             if flag:
                 line += flag
@@ -139,8 +134,8 @@ def dup_check(rows):
     for name, lines in seen.items():
         if len(lines) > 1:
             print(f"  !DUP name {name!r} used by {len(lines)} controls:")
-            for l in lines[:6]:
-                print("      ", l)
+            for entry in lines[:6]:
+                print("      ", entry)
 
 
 def dump(title, win):
@@ -159,7 +154,7 @@ def dump(title, win):
 def main():
     from a11y_windows import iter_windows
 
-    app = wx.App(False)  # noqa: F841 - must stay referenced
+    app = wx.App(False)
     for title, window in iter_windows():
         dump(title, window)
 

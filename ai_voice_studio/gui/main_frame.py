@@ -14,8 +14,12 @@ gesture and the mouse click run one and the same code path.  Ctrl+Shift+R
 own key handler routes all three, because the menu bar's accelerator parsing
 proves unreliable for Shift+letter combinations on this wx build.
 
-The welcome panel offers the same actions with large labelled buttons and a
-recent-projects list that screen readers can navigate with arrow keys. The
+The welcome screen offers the same actions with large labelled buttons and a
+recent-projects list that screen readers can navigate with arrow keys.  It is
+laid out as three regions: a full-width action bar of those buttons, a
+project sidebar on the left holding the recent-projects list and separated by
+a one-pixel rule, and the large empty area that remains - the only region a
+wallpaper is ever painted into, so it never covers a button or the list.  The
 Edit-menu actions act on the project selected in the Recent projects list
 (right-click the list for the same actions).
 """
@@ -29,16 +33,138 @@ import sys
 import wx
 
 from .. import __version__, project
+from .. import gestures as gestures_model
+from ..constants import (
+    DEFAULT_PROJECT_BASE,
+    PROJECT_BASE_AD,
+    PROJECT_BASE_STT,
+    PROJECT_TYPE_AD,
+    PROJECT_TYPE_STT,
+)
 from ..settings import Settings
 from ..tts.models import ModelStore
+from . import announce, dpi
 from .a11y import finalize_accessibility, update_accessible_name
+from .describe_dialog import DescribeDialog
 from .dialogs import open_folder
 from .new_project_wizard import NewProjectWizard
 from .recording_dialog import RecordingDialog
-from .settings_dialog import SettingsDialog
-from .theme import apply_theme
+from .settings_dialog import SettingsDialog, gesture_from_event
+from .stt_dialog import STTTranscribeDialog
+from .theme import (
+    apply_theme,
+    current_theme,
+    get_wallpaper,
+    mix,
+    paint_background,
+    resolve_palette,
+    theme_pattern,
+)
 
 log = logging.getLogger(__name__)
+
+#: Smallest width of the welcome screen's project sidebar.  It is wide enough
+#: for the heading to sit on one line without clipping ("Welcome to AI Voice
+#: Studio" at 16pt bold measures ~280px) plus its margins.
+_SIDEBAR_MIN_WIDTH = 320
+#: The action bar is taller than the buttons it carries by this many pixels on
+#: each side - comfortably more than one millimetre at every supported DPI, so
+#: the row reads as a bar instead of buttons glued to the window edge.
+_ACTION_BAR_PAD = 10
+
+
+def _wrap_label(text: wx.StaticText, label: str, width: int) -> None:
+    """Word-wrap ``label`` into ``text`` so no line is wider than ``width``.
+
+    ``wx.StaticText.Wrap`` is not dependable here: on the first call for a
+    freshly laid-out control it silently does nothing, and it would leave the
+    problem invisible until the text hung off the panel edge.  Building the
+    lines against the control's own font metrics always works and always
+    produces the same result.
+    """
+    if width <= 0:
+        return
+    dc = wx.ClientDC(text)
+    dc.SetFont(text.GetFont())
+    lines: list[str] = []
+    current = ""
+    for word in label.split():
+        candidate = word if not current else f"{current} {word}"
+        if current and dc.GetTextExtent(candidate)[0] > width:
+            lines.append(current)
+            current = word
+        else:
+            current = candidate
+    if current:
+        lines.append(current)
+    wrapped = "\n".join(lines)
+    if text.GetLabel() != wrapped:
+        text.SetLabel(wrapped)
+        text.InvalidateBestSize()
+
+
+class _WallpaperPanel(wx.Panel):
+    """The *empty* region of the welcome screen.
+
+    That is the whole point of this panel: it holds no controls of its own,
+    so the theme's wallpaper (the user's image, aspect-filled, or one of the
+    built-in patterns) can fill it without ever painting behind a button or
+    the recent projects list - those live in sibling panels.  With no
+    wallpaper enabled it is painted in the theme's plain background colour,
+    the very colour it displayed before themes existed.
+    """
+
+    def __init__(self, parent, settings):
+        super().__init__(parent)
+        self.settings = settings
+        self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
+        self.Bind(wx.EVT_PAINT, self._on_paint)
+        self.Bind(wx.EVT_ERASE_BACKGROUND, lambda _evt: None)
+
+    def _on_paint(self, _evt) -> None:
+        dc = wx.AutoBufferedPaintDC(self)
+        width, height = self.GetClientSize()
+        theme = current_theme()
+        colors = resolve_palette(theme, self.settings)
+        record = get_wallpaper(self.settings, theme)
+        if record["enabled"]:
+            paint_background(
+                dc, (width, height), colors,
+                theme_pattern(theme, self.settings), record["image"],
+            )
+        else:
+            paint_background(dc, (width, height), colors, "solid", "")
+
+
+class _DividerPanel(wx.Panel):
+    """The one-pixel rule a sidebar draws along its inside edge.
+
+    ``wx.StaticLine`` keeps its own system colour, which disappears against a
+    dark theme.  This paints the theme background and then a line blended
+    between it and the theme's heading colour, so the separation stays visible
+    in every theme - including the light and dark built-ins.
+    """
+
+    def __init__(self, parent, settings):
+        super().__init__(parent, size=(1, -1))
+        self.settings = settings
+        self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
+        self.Bind(wx.EVT_PAINT, self._on_paint)
+        self.Bind(wx.EVT_ERASE_BACKGROUND, lambda _evt: None)
+
+    def _on_paint(self, _evt) -> None:
+        dc = wx.AutoBufferedPaintDC(self)
+        width, height = self.GetClientSize()
+        colors = resolve_palette(current_theme(), self.settings)
+        background = wx.Colour(colors.get("bg", "#000000"))
+        heading = (colors.get("heading") or colors.get("accent")
+                   or colors.get("fg") or "#ffffff")
+        dc.SetPen(wx.Pen(background))
+        dc.SetBrush(wx.Brush(background))
+        dc.DrawRectangle(0, 0, width, height)
+        dc.SetPen(wx.Pen(mix(colors.get("bg", "#000000"), heading, 0.5)))
+        x = max(0, width // 2)
+        dc.DrawLine(x, 0, x, height)
 
 #: Windows virtual keys and scan codes the frame's key handler needs.
 _VK_CONTROL, _VK_SHIFT, _VK_N, _VK_R = 0x11, 0x10, 0x4E, 0x52
@@ -56,10 +182,10 @@ def _physical_key_down(vk: int) -> bool:
     if sys.platform != "win32":
         return False
     try:
-        import ctypes  # noqa: PLC0415 - Windows-only check
+        import ctypes
 
         return bool(ctypes.windll.user32.GetKeyState(vk) & 0x8000)
-    except Exception:  # noqa: BLE001 - a key handler must never raise
+    except Exception:
         return False
 
 
@@ -81,6 +207,22 @@ ID_RESTART_ALL = wx.NewIdRef()
 ID_RESTART_SELECTED = wx.NewIdRef()
 ID_REMOVE_PROJECT = wx.NewIdRef()
 ID_SHOW_PROJECT_FOLDER = wx.NewIdRef()
+ID_WHATS_NEW = wx.NewIdRef()
+
+#: Edit-menu labels for an audio description project.  Every project has the
+#: same actions - resume, restart, start a chosen file - but an audio
+#: description project speaks about *descriptions*, not "recordings" or
+#: "files", so the same item ids answer with these labels instead (see
+#: :meth:`MainFrame._edit_label`).  The access keys stay unique inside the menu
+#: (R, P, A, S, M, F).
+_AD_EDIT_LABELS = {
+    ID_RESUME_RECORDING: "&Resume the project",
+    ID_RESTART_PROJECT: "Restart &Project...",
+    ID_RESTART_ALL: "Restart &All Descriptions",
+    ID_RESTART_SELECTED: "Start &Selected Descriptions...",
+    ID_REMOVE_PROJECT: "Re&move Project...",
+    ID_SHOW_PROJECT_FOLDER: "Show project &folder",
+}
 
 
 class MainFrame(wx.Frame):
@@ -92,7 +234,47 @@ class MainFrame(wx.Frame):
             store = ModelStore()
         self.settings = settings
         self.store = store
+        # The Hugging Face token is read by the model engines, which never see
+        # this window; handing them the live settings store means a token pasted
+        # into Settings > Hugging Face account is in force for the very next run.
+        from .. import hf_access
+
+        hf_access.use_settings(settings)
+        # Measured engine speeds (Settings > Voice Clone > 'Measure speed...')
+        # decide which devices are offered; load them once, before any dialog
+        # that lists them is built.
+        try:
+            from ..voicelab import benchmark
+
+            benchmark.load_verdicts(settings)
+        except Exception:
+            log.debug("Ignoring a failure in MainFrame.__init__", exc_info=True)
         self._recent_menu: wx.Menu | None = None
+        # The user's gesture overrides, loaded once and reloaded when the
+        # settings dialog closes (see _reload_gestures).
+        self._gestures = gestures_model.GestureMap(
+            self.settings.get("gestures.bindings", {}) or {}
+        )
+        # Command id -> the name of the method that runs it in this window
+        # (see gestures.COMMANDS).  Names rather than bound methods, so a
+        # later override of the method is what actually runs.
+        self._gesture_actions = {
+            "project.new": "_press_new_project_button",
+            "project.open": "_open_project",
+            "project.resume": "_resume_recording",
+            "project.restart": "_restart_project",
+            "project.restart_all": "_restart_all",
+            "project.start_selected": "_restart_selected",
+            "project.remove": "_remove_project",
+            "project.show_folder": "_show_project_folder",
+            "record.start": "_record",
+            "app.settings": "_settings",
+            "help.readme": "_readme",
+            "help.user_guide": "_user_guide",
+            "help.whats_new": "_whats_new",
+            "help.check_updates": "_check_updates",
+            "help.about": "_about",
+        }
 
         self._build_menu()
         self._build_welcome()
@@ -123,16 +305,41 @@ class MainFrame(wx.Frame):
         # item that matches a letter, so "&Resume Recording" and a second
         # "&Restart/R&emove..." would leave the later ones unreachable by
         # keyboard.  The markers below are unique within this menu (R, P, A,
-        # S, M, F) while the visible text is unchanged.
-        edit_menu = wx.Menu()
-        edit_menu.Append(ID_RESUME_RECORDING, "&Resume Recording")
-        edit_menu.Append(ID_RESTART_PROJECT, "Restart &Project...")
-        edit_menu.Append(ID_RESTART_ALL, "Restart &All Recording")
-        edit_menu.Append(ID_RESTART_SELECTED, "Start &Selected Recording...")
-        edit_menu.AppendSeparator()
-        edit_menu.Append(ID_REMOVE_PROJECT, "Re&move Project...")
-        edit_menu.Append(ID_SHOW_PROJECT_FOLDER, "Show project &folder")
-        menubar.Append(edit_menu, "&Edit")
+        # S, M, F).
+        #
+        # Each entry is ``(id, text-to-speech label, speech-to-text label)``.
+        # A recording project has "recordings"; a transcription project has
+        # "files" and an audio description project has "descriptions", so the
+        # menu's nature follows the selected project's base (see
+        # :meth:`_refresh_edit_menu`; the description labels live in
+        # ``_AD_EDIT_LABELS``).  ``None`` is a separator.
+        self._edit_items = [
+            (ID_RESUME_RECORDING, "&Resume the project", "&Resume the project"),
+            (ID_RESTART_PROJECT, "Restart &Project...",
+             "Restart &Project..."),
+            (ID_RESTART_ALL, "Restart &All Recording", "Restart &All Files"),
+            (ID_RESTART_SELECTED, "Start &Selected Recording...",
+             "Start &Selected Files..."),
+            (None, None, None),
+            (ID_REMOVE_PROJECT, "Re&move Project...", "Re&move Project..."),
+            (ID_SHOW_PROJECT_FOLDER, "Show project &folder",
+             "Show project &folder"),
+        ]
+        self._edit_handlers = {
+            ID_RESUME_RECORDING: self._resume_recording,
+            ID_RESTART_PROJECT: self._restart_project,
+            ID_RESTART_ALL: self._restart_all,
+            ID_RESTART_SELECTED: self._restart_selected,
+            ID_REMOVE_PROJECT: self._remove_project,
+            ID_SHOW_PROJECT_FOLDER: self._show_project_folder,
+        }
+        self._edit_menu = wx.Menu()
+        for item_id, tts_label, _stt_label in self._edit_items:
+            if item_id is None:
+                self._edit_menu.AppendSeparator()
+            else:
+                self._edit_menu.Append(item_id, tts_label)
+        menubar.Append(self._edit_menu, "&Edit")
 
         tools_menu = wx.Menu()
         tools_menu.Append(ID_RECORD, "&Record...\tCtrl+Shift+R")
@@ -151,6 +358,7 @@ class MainFrame(wx.Frame):
         help_menu.AppendSeparator()
         help_menu.Append(ID_PYTHON_BOOK, "Python & wxPython Book	F1")
         help_menu.Append(ID_THIRD_PARTY_LICENSES, "&Third-Party Licences")
+        help_menu.Append(ID_WHATS_NEW, "What's &New")
         help_menu.AppendSeparator()
         help_menu.Append(ID_CHECK_UPDATES, "Check for Up&dates...")
         help_menu.Append(ID_ABOUT, "About AI Voice &Studio")
@@ -168,6 +376,7 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, lambda _: self._accessibility_guide(), id=ID_ACCESSIBILITY_GUIDE)
         self.Bind(wx.EVT_MENU, lambda _: self._python_book(), id=ID_PYTHON_BOOK)
         self.Bind(wx.EVT_MENU, lambda _: self._third_party_licences(), id=ID_THIRD_PARTY_LICENSES)
+        self.Bind(wx.EVT_MENU, lambda _: self._whats_new(), id=ID_WHATS_NEW)
         self.Bind(wx.EVT_MENU, lambda _: self._check_updates(), id=ID_CHECK_UPDATES)
         self.Bind(wx.EVT_MENU, lambda _: self._about(), id=ID_ABOUT)
         self.Bind(wx.EVT_MENU, lambda _: self._resume_recording(), id=ID_RESUME_RECORDING)
@@ -178,7 +387,7 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, lambda _: self._show_project_folder(),
                   id=ID_SHOW_PROJECT_FOLDER)
         self.Bind(wx.EVT_MENU, lambda _: self.Close(), id=wx.ID_EXIT)
-        self.Bind(wx.EVT_MENU_OPEN, lambda _: self._rebuild_recent())
+        self.Bind(wx.EVT_MENU_OPEN, lambda _: self._on_menu_open())
 
         # Frame-level accelerator table for the two shortcuts that belong to
         # a menu item.  These fire the same menu IDs, but do not depend on
@@ -223,12 +432,17 @@ class MainFrame(wx.Frame):
             return
         ctrl = ctrl or _physical_key_down(_VK_CONTROL)
         shift = shift or _physical_key_down(_VK_SHIFT)
+        # A user-configured gesture (Settings > Keyboard gestures) runs before
+        # built-in shortcuts, so a rebinding can take over any command - and a
+        # gesture that matches is consumed here rather than falling through.
+        if self._dispatch_gesture(evt):
+            return
         if ctrl and shift and key in (0, ord("N"), ord("n"), ord("R"), ord("r")):
             scan = 0
             try:
                 scan = (evt.GetRawKeyFlags() >> 16) & 0xFF
-            except Exception:  # noqa: BLE001 - raw flags are not always there
-                pass
+            except Exception:
+                log.debug("Ignoring a failure in MainFrame._on_global_char_hook", exc_info=True)
             is_n = (key in (ord("N"), ord("n")) or scan == _SCAN_N
                     or _physical_key_down(_VK_N))
             is_r = (key in (ord("R"), ord("r")) or scan == _SCAN_R
@@ -243,6 +457,28 @@ class MainFrame(wx.Frame):
             self._settings()
             return
         evt.Skip()
+
+    def _dispatch_gesture(self, evt: wx.KeyEvent) -> bool:
+        """Run the command a configured gesture names; True when one matched."""
+        gesture = gesture_from_event(evt)
+        if not gesture:
+            return False
+        command_id = self._gestures.owner(gesture)
+        if not command_id:
+            return False
+        name = self._gesture_actions.get(command_id)
+        handler = getattr(self, name, None) if name else None
+        if handler is None:
+            return False
+        log.info("Input gesture %s -> %s", gesture, command_id)
+        handler()
+        return True
+
+    def _reload_gestures(self) -> None:
+        """Pick up gesture changes the settings dialog has just saved."""
+        self._gestures = gestures_model.GestureMap(
+            self.settings.get("gestures.bindings", {}) or {}
+        )
 
     def _press_new_project_button(self) -> None:
         """Do exactly what clicking the welcome panel's button does.
@@ -260,26 +496,26 @@ class MainFrame(wx.Frame):
         button.GetEventHandler().ProcessEvent(event)
 
     def _build_welcome(self):
+        # The welcome screen is three regions, each with its own background:
+        #
+        #   * an action bar spanning the full width, carrying the four main
+        #     buttons and only as tall as they are plus a little padding;
+        #   * a project sidebar on the left, holding the recent-projects list
+        #     and separated from the rest by a one-pixel rule;
+        #   * everything that is left over - the large empty area of the
+        #     window - which is where the wallpaper goes.
+        #
+        # The wallpaper deliberately has a panel of its own rather than being
+        # painted behind the whole screen: that is what keeps it off the
+        # buttons and off the recent projects list, whichever theme is in use.
         panel = wx.Panel(self)
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        title = wx.StaticText(panel, label="Welcome to AI Voice Studio")
-        title.SetFont(wx.Font(16, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
-        sizer.Add(title, 0, wx.ALL, 12)
-        sizer.Add(
-            wx.StaticText(panel, label="Convert documents into spoken audio "
-                                       "files with free, offline neural voices."),
-            0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 12,
-        )
+        self.welcome_panel = panel
+        outer = wx.BoxSizer(wx.VERTICAL)
 
-        sizer.Add(
-            wx.StaticText(panel, label="Start with a new project: choose a "
-                                       "document, choose how it is split, and "
-                                       "record it. Voices are downloaded once "
-                                       "from Settings and reused for all "
-                                       "projects."),
-            0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 12,
-        )
-
+        bar = wx.Panel(panel)
+        bar.SetName("Project actions")
+        self.action_bar = bar
+        bar_sizer = wx.BoxSizer(wx.HORIZONTAL)
         for label, handler, tip in (
             ("Create New Project", self._new_project,
              "Open the New Project wizard to create a project from a document"
@@ -289,7 +525,7 @@ class MainFrame(wx.Frame):
             ("Settings (download voices)", self._settings,
              "Open Settings to download voices and configure the application"),
         ):
-            btn = wx.Button(panel, label=label)
+            btn = wx.Button(bar, label=label)
             btn.SetName(label)
             btn.SetToolTip(tip)
             btn.Bind(wx.EVT_BUTTON, lambda _, h=handler: h())
@@ -298,46 +534,175 @@ class MainFrame(wx.Frame):
                 # reference lets the frame's key handler press it instead of
                 # calling the action behind it (see _press_new_project_button).
                 self.new_project_btn = btn
-            sizer.Add(btn, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+            bar_sizer.Add(btn, 0, wx.LEFT | wx.TOP | wx.BOTTOM, _ACTION_BAR_PAD)
 
-        sizer.Add(wx.StaticText(panel, label="Recent projects:"), 0, wx.ALL, 8)
-        self.recent_list = wx.ListBox(panel, style=wx.LB_SINGLE)
-        self.recent_list.SetName("Recent projects list")
-        self.recent_list.SetToolTip("Select a project and press Enter or double-click to open it")
-        sizer.Add(self.recent_list, 1, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
-        self.recent_list.Bind(wx.EVT_LISTBOX_DCLICK, lambda _: self._open_recent_selected())
-        self.recent_list.Bind(wx.EVT_KEY_DOWN, self._on_recent_key)
-        self.recent_list.Bind(wx.EVT_CONTEXT_MENU, self._on_recent_context_menu)
-
-        # Alt+J removes the project selected in the list below.  It must not
-        # be Alt+R: the menu bar answers Alt+R first in a frame (&Resume
+        # Alt+J removes the project selected in the list beside it.  It must
+        # not be Alt+R: the menu bar answers Alt+R first in a frame (&Resume
         # Recording, and &Recent Projects in the File menu), so an R here
         # would be a key that looks available and never reaches this button.
-        self.remove_btn = wx.Button(panel, label="Remove selected pro&ject")
+        self.remove_btn = wx.Button(bar, label="Remove selected pro&ject")
         self.remove_btn.SetName("Remove selected project")
         self.remove_btn.SetToolTip(
             "Delete the selected project and all its recordings permanently "
             "(Alt+J)"
         )
         self.remove_btn.Bind(wx.EVT_BUTTON, lambda _: self._remove_project())
-        sizer.Add(self.remove_btn, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 4)
-        sizer.Add(
-            wx.StaticText(panel, label="Right-click a project (or press the "
-                                       "application-menu key) for more actions "
-                                       "(resume, restart, remove, show the "
-                                       "project folder) - also in the Edit "
-                                       "menu."),
-            0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8,
-        )
+        bar_sizer.Add(self.remove_btn, 0, wx.ALL, _ACTION_BAR_PAD)
+        bar.SetSizer(bar_sizer)
+        outer.Add(bar, 0, wx.EXPAND)
 
-        panel.SetSizer(sizer)
+        lower = wx.BoxSizer(wx.HORIZONTAL)
+
+        sidebar = wx.Panel(panel)
+        sidebar.SetName("Projects")
+        sidebar.SetMinSize((_SIDEBAR_MIN_WIDTH, -1))
+        self.sidebar = sidebar
+        side_sizer = wx.BoxSizer(wx.VERTICAL)
+        self._welcome_title = wx.StaticText(sidebar, label="Welcome to AI Voice Studio")
+        self._welcome_title.SetFont(
+            wx.Font(16, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
+        )
+        side_sizer.Add(self._welcome_title, 0, wx.ALL, 12)
+        self._welcome_recent_label = wx.StaticText(sidebar, label="Recent projects:")
+        side_sizer.Add(self._welcome_recent_label, 0,
+                       wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+        self.recent_list = wx.ListBox(sidebar, style=wx.LB_SINGLE)
+        self.recent_list.SetName("Recent projects list")
+        self.recent_list.SetToolTip("Select a project and press Enter or double-click to open it")
+        side_sizer.Add(self.recent_list, 1,
+                       wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+        self.recent_list.Bind(wx.EVT_LISTBOX_DCLICK, lambda _: self._open_recent_selected())
+        self.recent_list.Bind(wx.EVT_KEY_DOWN, self._on_recent_key)
+        self.recent_list.Bind(wx.EVT_CONTEXT_MENU, self._on_recent_context_menu)
+
+        self._welcome_note_label = (
+            "Right-click a project (or press the application-menu key) for "
+            "more actions (resume, restart, remove, show the project folder) "
+            "- also in the Edit menu."
+        )
+        self._welcome_note = wx.StaticText(sidebar, label=self._welcome_note_label)
+        side_sizer.Add(self._welcome_note, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+        sidebar.SetSizer(side_sizer)
+        # The sidebar is narrow, so its long hint has to re-wrap to its width.
+        sidebar.Bind(wx.EVT_SIZE, self._on_sidebar_size)
+        lower.Add(sidebar, 0, wx.EXPAND)
+        lower.Add(_DividerPanel(panel, self.settings), 0, wx.EXPAND)
+
+        wallpaper = _WallpaperPanel(panel, self.settings)
+        self.wallpaper_panel = wallpaper
+        self._welcome_text_labels = [
+            "Convert documents into spoken audio files with free, offline "
+            "neural voices.",
+            "Start with a new project: choose a document, choose how it is "
+            "split, and record it. Voices are downloaded once from Settings "
+            "and reused for all projects.",
+        ]
+        self._welcome_texts = [
+            wx.StaticText(wallpaper, label=text)
+            for text in self._welcome_text_labels
+        ]
+        wall_sizer = wx.BoxSizer(wx.VERTICAL)
+        wall_sizer.Add(self._welcome_texts[0], 0, wx.ALL, 16)
+        wall_sizer.Add(self._welcome_texts[1], 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 16)
+        wallpaper.SetSizer(wall_sizer)
+        # The descriptive text shares the empty area, so it has to re-wrap
+        # whenever the wallpaper panel is resized.
+        wallpaper.Bind(wx.EVT_SIZE, self._on_wallpaper_size)
+        lower.Add(wallpaper, 1, wx.EXPAND)
+
+        outer.Add(lower, 1, wx.EXPAND)
+        panel.SetSizer(outer)
         self._refresh_recent_list()
         # Real MSAA accNames (e.g. the Recent projects list name).
         finalize_accessibility(self)
+        self._apply_welcome_mode()
+        # Scale-derived geometry and a live eye on the display: this is the
+        # window a user moves between monitors with different scaling.  Last,
+        # so the size that is scaled is the size the window settled on.
+        dpi.prepare(self)
+        dpi.follow(self)
+
+    def _on_wallpaper_size(self, event) -> None:
+        event.Skip()
+        self._wrap_welcome_texts()
+
+    def _wrap_welcome_texts(self) -> None:
+        """Re-wrap the descriptive text to the empty area's current width."""
+        panel = getattr(self, "wallpaper_panel", None)
+        if panel is None:
+            return
+        width = panel.GetClientSize().width - 32
+        if width < 80:
+            return
+        for text, label in zip(getattr(self, "_welcome_texts", []),
+                               getattr(self, "_welcome_text_labels", []), strict=False):
+            _wrap_label(text, label, width)
+
+    def _on_sidebar_size(self, event) -> None:
+        event.Skip()
+        self._wrap_sidebar_texts()
+
+    def _wrap_sidebar_texts(self) -> None:
+        """Re-wrap the sidebar's right-click hint to the sidebar width."""
+        sidebar = getattr(self, "sidebar", None)
+        note = getattr(self, "_welcome_note", None)
+        if sidebar is None or note is None:
+            return
+        width = sidebar.GetClientSize().width - 16
+        if width < 80:
+            return
+        _wrap_label(note, self._welcome_note_label, width)
+
+    def _apply_welcome_mode(self) -> None:
+        """Show or hide the descriptive text depending on the wallpaper.
+
+        The wallpaper only ever fills the empty region of the welcome screen
+        (the panel beside the project sidebar); the action bar, the sidebar and
+        the recent projects list keep the theme's plain colour.  That region is
+        where the two descriptive paragraphs live too, so a wallpaper steps
+        them aside; the title and the button labels stay put.
+        """
+        panel = getattr(self, "welcome_panel", None)
+        if panel is None:
+            return
+        record = get_wallpaper(self.settings, current_theme())
+        wallpaper = bool(record["enabled"])
+        for text in getattr(self, "_welcome_texts", []):
+            text.Show(not wallpaper)
+        note = getattr(self, "_welcome_note", None)
+        if note is not None:
+            note.Show(not wallpaper)
+        colors = resolve_palette(current_theme(), self.settings)
+        try:
+            self._welcome_title.SetForegroundColour(
+                wx.Colour(colors.get("heading", colors.get("fg", "#ffffff")))
+            )
+        except Exception:
+            log.debug("Ignoring a failure in MainFrame._apply_welcome_mode", exc_info=True)
+        panel.Layout()
+        # Wrapping changes a StaticText's height, so the layout runs again once
+        # the text has been re-flowed to its new width.
+        self._wrap_welcome_texts()
+        self._wrap_sidebar_texts()
+        panel.Layout()
+        panel.Refresh()
+        empty = getattr(self, "wallpaper_panel", None)
+        if empty is not None:
+            empty.Refresh()
 
     def _build_statusbar(self):
         self.CreateStatusBar(1)
         self.SetStatusText("Ready.")
+
+    def _set_status(self, message: str) -> None:
+        """Put ``message`` on the status bar and say it to the screen reader.
+
+        The status bar is announced on demand only, so a message that is
+        written here and never spoken is a message a blind user never hears
+        (SPEC 3.2: "all status messages are written to a status bar").
+        """
+        self.SetStatusText(message)
+        announce.announce(message, key="status")
 
     # ------------------------------------------------------------- actions
     def _new_project(self):
@@ -384,6 +749,20 @@ class MainFrame(wx.Frame):
 
     def _open_recording(self, project_folder: str, start_index: int | None = None,
                         single_segment: bool = False):
+        # A Speech-to-Text project is reopened in its own transcribe window and
+        # an Audio description project in its own describe window, never in the
+        # TTS Recording window (their segments carry no text to record).
+        if start_index is None and not single_segment:
+            try:
+                data = project.load_project(project_folder)
+            except (OSError, ValueError, KeyError):
+                data = {}
+            if data.get("project_type") == PROJECT_TYPE_STT:
+                self._open_transcribe(project_folder)
+                return
+            if data.get("project_type") == PROJECT_TYPE_AD:
+                self._open_describe(project_folder)
+                return
         try:
             dlg = RecordingDialog(
                 self, project_folder, self.settings, self.store,
@@ -397,11 +776,52 @@ class MainFrame(wx.Frame):
         dlg.Destroy()
         self._refresh_recent_list()
 
+    def _open_transcribe(self, project_folder: str, sources: list | None = None):
+        """Open the transcribe window, optionally for a subset of sources.
+
+        ``sources`` is the file list the Edit > Start Selected Files picker
+        chose; ``None`` transcribes every source of the project.
+        """
+        try:
+            dlg = STTTranscribeDialog(
+                self, project_folder, self.settings, self.store,
+                sources=sources,
+            )
+        except (OSError, ValueError, KeyError) as exc:
+            wx.MessageBox(f"Could not open the project: {exc}", "Open project",
+                          style=wx.OK | wx.ICON_ERROR)
+            return
+        dlg.ShowModal()
+        dlg.Destroy()
+        self._refresh_recent_list()
+
+    def _open_describe(self, project_folder: str, sources: list | None = None):
+        """Open the audio description window, optionally for a subset of videos.
+
+        ``sources`` is the file list the Edit > Start Selected Descriptions
+        picker chose; ``None`` describes every source of the project.
+        """
+        try:
+            dlg = DescribeDialog(
+                self, project_folder, self.settings, self.store,
+                sources=sources,
+            )
+        except (OSError, ValueError, KeyError) as exc:
+            wx.MessageBox(f"Could not open the project: {exc}", "Open project",
+                          style=wx.OK | wx.ICON_ERROR)
+            return
+        dlg.ShowModal()
+        dlg.Destroy()
+        self._refresh_recent_list()
+
     def _settings(self):
         dlg = SettingsDialog(self, self.settings, self.store)
         dlg.ShowModal()
         dlg.Destroy()
-        apply_theme(self, self.settings.theme)
+        apply_theme(self, self.settings.theme, self.settings)
+        self._apply_welcome_mode()
+        # Settings > Keyboard gestures may have rebound anything.
+        self._reload_gestures()
         self._refresh_recent_list()
 
     def _refresh_recent_list(self):
@@ -431,6 +851,53 @@ class MainFrame(wx.Frame):
             )
         return recent
 
+    def _on_menu_open(self) -> None:
+        """Refresh the menus that depend on the current selection/state."""
+        self._rebuild_recent()
+        self._refresh_edit_menu()
+
+    def _selected_project_base(self) -> str:
+        """The base of the selected recent project (``tts``, ``stt`` or ``ad``)."""
+        recent = self._selected_recent()
+        if not recent:
+            return DEFAULT_PROJECT_BASE
+        try:
+            data = project.load_project(recent["path"])
+        except (OSError, ValueError, KeyError):
+            return DEFAULT_PROJECT_BASE
+        if data.get("project_type") == PROJECT_TYPE_STT:
+            return PROJECT_BASE_STT
+        if data.get("project_type") == PROJECT_TYPE_AD:
+            return PROJECT_BASE_AD
+        return DEFAULT_PROJECT_BASE
+
+    @staticmethod
+    def _edit_label(entry, base: str) -> str:
+        """The Edit-menu text for one entry, given the selected project base.
+
+        The TTS and STT wording comes straight from the entry; an audio
+        description project has its own wording, keyed by the same item id, so
+        the menu keeps one entry list while speaking three ways.
+        """
+        item_id, tts_label, stt_label = entry
+        if base == PROJECT_BASE_AD:
+            return _AD_EDIT_LABELS.get(item_id, tts_label)
+        return stt_label if base == PROJECT_BASE_STT else tts_label
+
+    def _refresh_edit_menu(self) -> None:
+        """Re-label the Edit menu for the selected project's nature."""
+        menu = getattr(self, "_edit_menu", None)
+        if menu is None:
+            return
+        base = self._selected_project_base()
+        for entry in getattr(self, "_edit_items", []):
+            item_id = entry[0]
+            if item_id is None:
+                continue
+            item = menu.FindItemById(item_id)
+            if item is not None:
+                item.SetItemLabel(self._edit_label(entry, base))
+
     def _on_recent_context_menu(self, evt):
         # Right-click carries a position; the keyboard application-menu key
         # (and Shift+F10) does not, and then the already-selected project is
@@ -440,22 +907,17 @@ class MainFrame(wx.Frame):
             item = self.recent_list.HitTest(self.recent_list.ScreenToClient(pos))
             if item != wx.NOT_FOUND:
                 self.recent_list.SetSelection(item)
+        base = self._selected_project_base()
         menu = wx.Menu()
-        for label, handler in (
-            ("Resume Recording", self._resume_recording),
-            ("Restart Project...", self._restart_project),
-            ("Restart All Recording", self._restart_all),
-            ("Start Selected Recording...", self._restart_selected),
-            (None, None),
-            ("Remove Project...", self._remove_project),
-            ("Show project folder", self._show_project_folder),
-        ):
-            if label is None:
+        for entry in getattr(self, "_edit_items", []):
+            item_id = entry[0]
+            if item_id is None:
                 menu.AppendSeparator()
                 continue
-            item_id = wx.NewIdRef()
-            menu.Append(item_id, label)
-            menu.Bind(wx.EVT_MENU, lambda _, h=handler: h(), id=item_id.GetId())
+            new_id = wx.NewIdRef()
+            menu.Append(new_id, self._edit_label(entry, base))
+            handler = self._edit_handlers[item_id]
+            menu.Bind(wx.EVT_MENU, lambda _, h=handler: h(), id=new_id.GetId())
         self.recent_list.PopupMenu(menu)
         menu.Destroy()
 
@@ -472,7 +934,7 @@ class MainFrame(wx.Frame):
             )
             return
         open_folder(folder)
-        self.SetStatusText(f"Opened {folder}")
+        self._set_status(f"Opened {folder}")
 
     # --------------------------------------------------- project lifecycle
     def _resume_recording(self):
@@ -486,9 +948,9 @@ class MainFrame(wx.Frame):
             return
         if wx.MessageBox(
             f"Restart project '{recent['name']}'?\n\n"
-            "All recordings and project settings will be deleted; only the "
-            "project name is kept. You will choose a document and the audio "
-            "creation options again.",
+            "All recordings or transcribe files and project settings will be "
+            "deleted; only the project name is kept. You will choose a "
+            "document and the audio creation or transcribe options again.",
             "Restart project", style=wx.YES_NO | wx.ICON_QUESTION,
         ) != wx.YES:
             return
@@ -508,17 +970,38 @@ class MainFrame(wx.Frame):
         if not recent:
             return
         if wx.MessageBox(
-            f"Restart all recording for '{recent['name']}'?\n\n"
-            "All recorded audio files will be deleted and every segment will "
-            "be recorded again from the beginning.",
-            "Restart all recording", style=wx.YES_NO | wx.ICON_QUESTION,
+            f"Restart all recording or transcribe files for "
+            f"'{recent['name']}'?\n\n"
+            "All recorded or transcribe files will be deleted and every "
+            "segment will be recorded or transcribed again from the "
+            "beginning.",
+            "Restart all files", style=wx.YES_NO | wx.ICON_QUESTION,
         ) != wx.YES:
             return
         removed = project.reset_recordings(recent["path"])
-        self.SetStatusText(
-            f"Deleted {removed} audio file(s); recording starts from the beginning."
+        removed += self._clear_describe_outputs(recent["path"])
+        self._set_status(
+            f"Deleted {removed} file(s); the project starts from the beginning."
         )
         self._open_recording(recent["path"])
+
+    def _clear_describe_outputs(self, project_dir: str) -> int:
+        """Delete an audio description project's documents; returns how many.
+
+        *Restart all* means "throw away everything this project produced", so an
+        audio description project has to lose its scripts and subtitle tracks
+        too - otherwise the menu entry would claim a restart and leave the old
+        descriptions behind.  Any other project type is left untouched.
+        """
+        try:
+            data = project.load_project(project_dir)
+        except (OSError, ValueError, KeyError):
+            return 0
+        if data.get("project_type") != PROJECT_TYPE_AD:
+            return 0
+        from ..describe import output as describe_output
+
+        return describe_output.remove_outputs(project_dir, data)
 
     def _restart_selected(self):
         recent = self._require_selected()
@@ -529,6 +1012,15 @@ class MainFrame(wx.Frame):
         except (OSError, ValueError, KeyError) as exc:
             wx.MessageBox(f"Could not open the project: {exc}",
                           "Start selected recording", style=wx.OK | wx.ICON_ERROR)
+            return
+        # A transcription project holds transcribe files and an audio
+        # description project holds videos, not recordings, so each gets its
+        # own picker (see _StartTranscribeDialog and _StartDescribeDialog).
+        if data.get("project_type") == PROJECT_TYPE_STT:
+            self._restart_selected_stt(recent, data)
+            return
+        if data.get("project_type") == PROJECT_TYPE_AD:
+            self._restart_selected_ad(recent, data)
             return
         # Use the audio files actually on disk (not just segment metadata) so
         # "select an audio file" shows everything that was recorded.
@@ -568,6 +1060,78 @@ class MainFrame(wx.Frame):
             recent["path"], start_index=start_index, single_segment=only_selected,
         )
 
+    def _restart_selected_stt(self, recent: dict, data: dict) -> None:
+        """Start Selected Files for a speech-to-text project.
+
+        The picker names the project's base (always *Speech to text* here),
+        then offers the transcribe files already in the project or every file
+        break, and finally whether to transcribe only the chosen file or the
+        chosen file and every file after it.  The chosen files are handed to
+        the transcribe window, which runs the job for them alone.
+        """
+        entries = _transcribe_entries(data)
+        if not entries:
+            wx.MessageBox(
+                "This project has no transcribe files yet, so there is "
+                "nothing to transcribe.\n\nCreate the project again with at "
+                "least one source file, then try again.",
+                "Start selected files", style=wx.OK | wx.ICON_INFORMATION,
+            )
+            return
+        dlg = _StartTranscribeDialog(self, entries)
+        try:
+            if dlg.ShowModal() != wx.ID_OK:
+                return
+            start_index = dlg.start_index()
+            only_selected = dlg.only_selected()
+        finally:
+            dlg.Destroy()
+        if start_index is None:
+            return
+        chosen = (entries[start_index:start_index + 1] if only_selected
+                  else entries[start_index:])
+        chosen_sources = [entry["source"] for entry in chosen
+                          if entry.get("source")]
+        if not chosen_sources:
+            return
+        self._open_transcribe(recent["path"], chosen_sources)
+
+    def _restart_selected_ad(self, recent: dict, data: dict) -> None:
+        """Start Selected Descriptions for an audio description project.
+
+        The picker names the project's base (always *Audio description* here),
+        then offers the videos already in the project or every file break, and
+        finally whether to describe only the chosen file or the chosen file and
+        every file after it.  The chosen videos are handed to the describe
+        window, which runs the job for them alone.
+        """
+        entries = _describe_entries(data)
+        if not entries:
+            wx.MessageBox(
+                "This project has no video files yet, so there is nothing to "
+                "describe.\n\nCreate the project again with at least one video "
+                "file, then try again.",
+                "Start selected descriptions", style=wx.OK | wx.ICON_INFORMATION,
+            )
+            return
+        dlg = _StartDescribeDialog(self, entries)
+        try:
+            if dlg.ShowModal() != wx.ID_OK:
+                return
+            start_index = dlg.start_index()
+            only_selected = dlg.only_selected()
+        finally:
+            dlg.Destroy()
+        if start_index is None:
+            return
+        chosen = (entries[start_index:start_index + 1] if only_selected
+                  else entries[start_index:])
+        chosen_sources = [entry["source"] for entry in chosen
+                          if entry.get("source")]
+        if not chosen_sources:
+            return
+        self._open_describe(recent["path"], chosen_sources)
+
     def _remove_project(self):
         recent = self._require_selected()
         if not recent:
@@ -581,7 +1145,7 @@ class MainFrame(wx.Frame):
         project.remove_project(recent["path"])
         self.settings.remove_recent_project(recent["path"])
         self._refresh_recent_list()
-        self.SetStatusText(f"Removed project '{recent['name']}'.")
+        self._set_status(f"Removed project '{recent['name']}'.")
 
     def _rebuild_recent(self):
         if not self._recent_menu:
@@ -595,7 +1159,7 @@ class MainFrame(wx.Frame):
             item = self._recent_menu.Append(wx.ID_ANY, "No recent projects")
             item.Enable(False)
             return
-        for idx, recent in enumerate(recents):
+        for recent in recents:
             # Unique ID per item (wx.NewIdRef()): manual arithmetic on
             # ID_RECENT_BASE used to collide with the sequentially-generated
             # IDs of Record/Settings/Help menu items, so Ctrl+, (Settings)
@@ -626,7 +1190,7 @@ class MainFrame(wx.Frame):
         return ""
 
     def _open_doc(self, name: str, fallback_title: str):
-        import webbrowser  # noqa: PLC0415
+        import webbrowser
 
         path = self._doc_path(name)
         if not path:
@@ -638,8 +1202,8 @@ class MainFrame(wx.Frame):
             return
         try:
             webbrowser.open("file:///" + path.replace("\\", "/"))
-        except Exception:  # noqa: BLE001
-            os.startfile(path)  # type: ignore[attr-defined]  # noqa: SIM115
+        except Exception:
+            os.startfile(path)  # type: ignore[attr-defined]
 
     def _readme(self):
         self._open_doc("README.html", "Read Me - AI Voice Studio")
@@ -656,15 +1220,18 @@ class MainFrame(wx.Frame):
     def _third_party_licences(self):
         self._open_doc("THIRD-PARTY-LICENSES.html", "Third-Party Licences - AI Voice Studio")
 
+    def _whats_new(self):
+        self._open_doc("WHATS-NEW.html", "What's New - AI Voice Studio")
+
     def _check_updates(self):
         """Help ▸ Check for updates: ask GitHub for the latest release."""
-        from .update_dialog import check_for_updates_interactive  # noqa: PLC0415
+        from .update_dialog import check_for_updates_interactive
 
         check_for_updates_interactive(self, self.settings)
 
     def _python_book(self):
         """Open the Python & wxPython book in the default browser."""
-        import webbrowser  # noqa: PLC0415
+        import webbrowser
 
         here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         # In PyInstaller bundles, docs live next to the package folder
@@ -689,11 +1256,11 @@ class MainFrame(wx.Frame):
             return
         try:
             webbrowser.open("file:///" + path.replace("\\", "/"))
-        except Exception:  # noqa: BLE001
-            os.startfile(path)  # type: ignore[attr-defined]  # noqa: SIM115
+        except Exception:
+            os.startfile(path)  # type: ignore[attr-defined]
 
     def _about(self):
-        import wx.adv  # noqa: PLC0415
+        import wx.adv
 
         info = wx.adv.AboutDialogInfo()
         info.SetName("AI Voice Studio")
@@ -717,7 +1284,7 @@ def _picker_entries(data: dict, saved: list[str]) -> list[dict]:
     break through the project's ``saved`` field first and by file name
     second, so a project whose metadata is out of date still lines up.
     """
-    from ..util import sanitize_filename  # noqa: PLC0415
+    from ..util import sanitize_filename
 
     segments = data.get("segments", []) or []
     entries = []
@@ -741,6 +1308,61 @@ def _picker_entries(data: dict, saved: list[str]) -> list[dict]:
     return entries
 
 
+def _transcribe_entries(data: dict) -> list[dict]:
+    """One entry per source file of a speech-to-text project.
+
+    Each entry is ``{"position", "title", "source", "file"}``: the 0-based
+    position the transcribe window starts from, the file break's name, the
+    full path of the source file, and that file's name (``None`` when the
+    break has no source).  A transcription project stores one segment per
+    source file (see the New Project wizard), so the break's ``title`` is the
+    source file's name and ``file`` is what the picker lists under "Select a
+    transcribe file".
+    """
+    segments = data.get("segments", []) or []
+    entries = []
+    for position, seg in enumerate(segments):
+        source = str(seg.get("source") or "")
+        title = str(
+            seg.get("title") or os.path.basename(source)
+            or f"file {position + 1}"
+        )
+        entries.append({
+            "position": position,
+            "title": title,
+            "source": source,
+            "file": os.path.basename(source) if source else None,
+        })
+    return entries
+
+
+def _describe_entries(data: dict) -> list[dict]:
+    """One entry per source video of an audio description project.
+
+    Each entry is ``{"position", "title", "source", "file"}``: the 0-based
+    position the describe window starts from, the file break's name, the full
+    path of the source video, and that file's name (``None`` when the break has
+    no source).  An audio description project stores one segment per source file
+    (see the New Project wizard), so the break's ``title`` is the video's name
+    and ``file`` is what the picker lists under "Select a video file".
+    """
+    segments = data.get("segments", []) or []
+    entries = []
+    for position, seg in enumerate(segments):
+        source = str(seg.get("source") or "")
+        title = str(
+            seg.get("title") or os.path.basename(source)
+            or f"file {position + 1}"
+        )
+        entries.append({
+            "position": position,
+            "title": title,
+            "source": source,
+            "file": os.path.basename(source) if source else None,
+        })
+    return entries
+
+
 class _StartRecordingDialog(wx.Dialog):
     """Choose which file to record and how far to record (Edit menu).
 
@@ -756,12 +1378,28 @@ class _StartRecordingDialog(wx.Dialog):
     chosen file and every file after it.
     """
 
-    def __init__(self, parent, entries):
-        super().__init__(parent, title="Start selected recording", size=(600, 320))
+    def __init__(self, parent, entries, base_label="Text to speech"):
+        super().__init__(parent, title="Start selected recording", size=(600, 360))
         self._entries = [dict(entry) for entry in entries]
         self._focus_done = False
 
-        outer = wx.BoxSizer(wx.HORIZONTAL)
+        outer = wx.BoxSizer(wx.VERTICAL)
+
+        # Project base: exactly one item - the selected project's base - so
+        # the dialog always says which kind of project it acts on.  A read-only
+        # combo is used rather than a label so a screen reader announces it in
+        # the same "Project base" voice as the rest of the picker.
+        base_row = wx.BoxSizer(wx.HORIZONTAL)
+        base_row.Add(wx.StaticText(self, label="Project base"), 0,
+                     wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 8)
+        self.base_combo = wx.ComboBox(self, style=wx.CB_READONLY,
+                                      name="Project base")
+        self.base_combo.Append(base_label, "")
+        self.base_combo.SetSelection(0)
+        base_row.Add(self.base_combo, 1, wx.EXPAND)
+        outer.Add(base_row, 0, wx.EXPAND | wx.ALL, 8)
+
+        row = wx.BoxSizer(wx.HORIZONTAL)
 
         # -- sidebar: how the combo is filled -------------------------------
         side_panel = wx.Panel(self)
@@ -783,7 +1421,7 @@ class _StartRecordingDialog(wx.Dialog):
         if not any(entry.get("file") for entry in self._entries):
             # Nothing recorded yet: the only useful mode is by file break.
             self.break_radio.SetValue(True)
-        outer.Add(side_panel, 0, wx.EXPAND | wx.ALL, 8)
+        row.Add(side_panel, 0, wx.EXPAND | wx.ALL, 8)
 
         # -- combo + scope ---------------------------------------------------
         content = wx.BoxSizer(wx.VERTICAL)
@@ -808,13 +1446,16 @@ class _StartRecordingDialog(wx.Dialog):
 
         content.Add(self.CreateButtonSizer(wx.OK | wx.CANCEL), 0,
                     wx.EXPAND | wx.TOP, 12)
-        outer.Add(content, 1, wx.EXPAND | wx.ALL, 8)
+        row.Add(content, 1, wx.EXPAND | wx.ALL, 8)
+        outer.Add(row, 1, wx.EXPAND)
         self.SetSizer(outer)
 
         self.file_radio.Bind(wx.EVT_RADIOBUTTON, self._on_mode)
         self.break_radio.Bind(wx.EVT_RADIOBUTTON, self._on_mode)
         self._fill_combo()
         finalize_accessibility(self)
+        dpi.prepare(self)
+        dpi.follow(self)
         self.SetMinSize(self.GetSize())
         if parent is not None and parent.IsShown():
             self.CentreOnParent()
@@ -912,6 +1553,388 @@ class _StartRecordingDialog(wx.Dialog):
 
     def chosen_file(self) -> str | None:
         """The recorded audio file of the chosen break, when it has one."""
+        entry = self._selected_entry()
+        if entry is None:
+            return None
+        if entry.get("file"):
+            return entry["file"]
+        if self.file_radio.GetValue():
+            return self.combo.GetStringSelection() or None
+        return None
+
+
+class _StartTranscribeDialog(wx.Dialog):
+    """Choose which transcribe file to transcribe and how far (Edit menu).
+
+    The Edit menu's *Start Selected Files...* action opens this dialog for a
+    speech-to-text project.  It mirrors :class:`_StartRecordingDialog`: a
+    read-only **Project base** combo names the project's base, the sidebar
+    radio buttons choose how the combo box is filled, and the second radio
+    group chooses the scope.
+
+    * **Select a transcribe file** (default) - the combo lists the source
+      files the project already holds, so one of them is transcribed again.
+    * **Select by file break** - the combo lists every file break of the
+      project, so transcription starts at any of them.
+
+    The second radio group chooses the scope: only the chosen file, or the
+    chosen file and every file after it.
+    """
+
+    def __init__(self, parent, entries, base_label="Speech to text"):
+        super().__init__(parent, title="Start selected files", size=(620, 400))
+        self._entries = [dict(entry) for entry in entries]
+        self._focus_done = False
+
+        outer = wx.BoxSizer(wx.VERTICAL)
+
+        # Project base: exactly one item - the selected project's base.
+        base_row = wx.BoxSizer(wx.HORIZONTAL)
+        base_row.Add(wx.StaticText(self, label="Project base"), 0,
+                     wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 8)
+        self.base_combo = wx.ComboBox(self, style=wx.CB_READONLY,
+                                      name="Project base")
+        self.base_combo.Append(base_label, "")
+        self.base_combo.SetSelection(0)
+        base_row.Add(self.base_combo, 1, wx.EXPAND)
+        outer.Add(base_row, 0, wx.EXPAND | wx.ALL, 8)
+
+        row = wx.BoxSizer(wx.HORIZONTAL)
+
+        # -- sidebar: how the combo is filled -------------------------------
+        side_panel = wx.Panel(self)
+        sidebar = wx.BoxSizer(wx.VERTICAL)
+        self.file_radio = wx.RadioButton(
+            side_panel, label="Select a transcribe file", style=wx.RB_GROUP)
+        self.file_radio.SetToolTip(
+            "Choose one transcribe file of this project and transcribe it "
+            "again")
+        self.break_radio = wx.RadioButton(
+            side_panel, label="Select by file break")
+        self.break_radio.SetToolTip(
+            "Choose any file break of the project and start transcribing "
+            "at it")
+        for radio in (self.file_radio, self.break_radio):
+            radio.SetName(radio.GetLabel())
+            sidebar.Add(radio, 0, wx.ALL, 6)
+        side_panel.SetSizerAndFit(sidebar)
+        side_panel.SetMinSize((240, -1))
+        side_panel.SetName("Transcribe selection mode")
+        if not any(entry.get("file") for entry in self._entries):
+            # No source files: the only useful mode is by file break.
+            self.break_radio.SetValue(True)
+        row.Add(side_panel, 0, wx.EXPAND | wx.ALL, 8)
+
+        # -- combo + scope ---------------------------------------------------
+        content = wx.BoxSizer(wx.VERTICAL)
+        self.choice_label = wx.StaticText(self, label="")
+        self.choice_label.SetName("Transcribe selection")
+        content.Add(self.choice_label, 0, wx.BOTTOM, 4)
+        self.combo = wx.ComboBox(self, style=wx.CB_READONLY)
+        content.Add(self.combo, 0, wx.EXPAND | wx.BOTTOM, 12)
+
+        self.only_radio = wx.RadioButton(
+            self, label="Only transcribe selected file", style=wx.RB_GROUP)
+        self.only_radio.SetToolTip(
+            "Transcribe just the chosen file; the files after it are left "
+            "alone")
+        self.all_radio = wx.RadioButton(
+            self, label="Transcribe all files from here")
+        self.all_radio.SetToolTip(
+            "Transcribe the chosen file and then every file after it to the "
+            "end of the project")
+        for radio in (self.only_radio, self.all_radio):
+            radio.SetName(radio.GetLabel())
+            content.Add(radio, 0, wx.ALL, 6)
+
+        content.Add(self.CreateButtonSizer(wx.OK | wx.CANCEL), 0,
+                    wx.EXPAND | wx.TOP, 12)
+        row.Add(content, 1, wx.EXPAND | wx.ALL, 8)
+        outer.Add(row, 1, wx.EXPAND)
+        self.SetSizer(outer)
+
+        self.file_radio.Bind(wx.EVT_RADIOBUTTON, self._on_mode)
+        self.break_radio.Bind(wx.EVT_RADIOBUTTON, self._on_mode)
+        self._fill_combo()
+        finalize_accessibility(self)
+        dpi.prepare(self)
+        dpi.follow(self)
+        self.SetMinSize(self.GetSize())
+        if parent is not None and parent.IsShown():
+            self.CentreOnParent()
+        else:
+            self.Centre()
+        # Focus the checked sidebar mode button, not the combo, exactly as
+        # the recording picker does; the dialog's own focus has to be undone
+        # after it is shown.
+        self.Bind(wx.EVT_SHOW, self._on_show)
+
+    # ---------------------------------------------------------------- focus
+    def _on_show(self, event):
+        """Move the cursor to the mode button once the dialog is on screen."""
+        event.Skip()
+        if event.IsShown() and not self._focus_done:
+            self._focus_done = True
+            wx.CallAfter(self._focus_first_control)
+
+    def initial_focus_control(self):
+        """The control the dialog focuses when it opens."""
+        return self.break_radio if self.break_radio.GetValue() else self.file_radio
+
+    def _focus_first_control(self):
+        """Put the keyboard cursor on :meth:`initial_focus_control`."""
+        self.initial_focus_control().SetFocus()
+
+    # ------------------------------------------------------------------ state
+    def _fill_combo(self):
+        """(Re)fill the combo box for the selected sidebar mode."""
+        self.combo.Clear()
+        if self.file_radio.GetValue():
+            self.choice_label.SetLabel(
+                "Choose which transcribed file to transcribe again:")
+            update_accessible_name(
+                self.combo,
+                "Choose which transcribed file to transcribe again")
+            self.combo.SetToolTip(
+                "Source files that are already part of this project")
+            items = [(entry["file"], entry["position"])
+                     for entry in self._entries if entry.get("file")]
+        else:
+            self.choice_label.SetLabel(
+                "Choose which file to transcribe by file break:")
+            update_accessible_name(
+                self.combo, "Choose which file to transcribe by file break")
+            self.combo.SetToolTip(
+                "Every file break of the project")
+            items = [(entry["title"], entry["position"])
+                     for entry in self._entries]
+        for label, position in items:
+            self.combo.Append(str(label), position)
+        if self.combo.GetCount():
+            self.combo.SetSelection(0)
+        self.combo.Enable(self.combo.GetCount() > 0)
+        ok_btn = self.FindWindowById(wx.ID_OK)
+        if ok_btn is not None:
+            ok_btn.Enable(self.combo.GetCount() > 0)
+        self.Layout()
+
+    def _on_mode(self, _evt):
+        self._fill_combo()
+
+    def _selected_entry(self) -> dict | None:
+        position = self.start_index()
+        if position is None:
+            return None
+        for entry in self._entries:
+            if entry["position"] == position:
+                return entry
+        return None
+
+    # ---------------------------------------------------------------- answers
+    def start_index(self) -> int | None:
+        """0-based segment position to start transcribing at (``None`` = none)."""
+        sel = self.combo.GetSelection()
+        if sel < 0:
+            return None
+        value = self.combo.GetClientData(sel)
+        return None if value is None else int(value)
+
+    def only_selected(self) -> bool:
+        """True = transcribe only the chosen file; False = from it on."""
+        return bool(self.only_radio.GetValue())
+
+    def chosen_file(self) -> str | None:
+        """The transcribe file of the chosen break, when it has one."""
+        entry = self._selected_entry()
+        if entry is None:
+            return None
+        if entry.get("file"):
+            return entry["file"]
+        if self.file_radio.GetValue():
+            return self.combo.GetStringSelection() or None
+        return None
+
+
+class _StartDescribeDialog(wx.Dialog):
+    """Choose which video to describe and how far (Edit menu).
+
+    The Edit menu's *Start Selected Descriptions...* action opens this dialog for
+    an audio description project.  It mirrors :class:`_StartTranscribeDialog`: a
+    read-only **Project base** combo names the project's base, the sidebar radio
+    buttons choose how the combo box is filled, and the second radio group
+    chooses the scope.
+
+    * **Select a video file** (default) - the combo lists the videos the project
+      already holds, so one of them is described again.
+    * **Select by file break** - the combo lists every file break of the project,
+      so describing starts at any of them.
+
+    The second radio group chooses the scope: only the chosen file, or the chosen
+    file and every file after it.
+    """
+
+    def __init__(self, parent, entries, base_label="Audio description"):
+        super().__init__(parent, title="Start selected descriptions",
+                         size=(620, 400))
+        self._entries = [dict(entry) for entry in entries]
+        self._focus_done = False
+
+        outer = wx.BoxSizer(wx.VERTICAL)
+
+        # Project base: exactly one item - the selected project's base.
+        base_row = wx.BoxSizer(wx.HORIZONTAL)
+        base_row.Add(wx.StaticText(self, label="Project base"), 0,
+                     wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 8)
+        self.base_combo = wx.ComboBox(self, style=wx.CB_READONLY,
+                                      name="Project base")
+        self.base_combo.Append(base_label, "")
+        self.base_combo.SetSelection(0)
+        base_row.Add(self.base_combo, 1, wx.EXPAND)
+        outer.Add(base_row, 0, wx.EXPAND | wx.ALL, 8)
+
+        row = wx.BoxSizer(wx.HORIZONTAL)
+
+        # -- sidebar: how the combo is filled -------------------------------
+        side_panel = wx.Panel(self)
+        sidebar = wx.BoxSizer(wx.VERTICAL)
+        self.file_radio = wx.RadioButton(
+            side_panel, label="Select a video file", style=wx.RB_GROUP)
+        self.file_radio.SetToolTip(
+            "Choose one video of this project and describe it again")
+        self.break_radio = wx.RadioButton(
+            side_panel, label="Select by file break")
+        self.break_radio.SetToolTip(
+            "Choose any file break of the project and start describing at it")
+        for radio in (self.file_radio, self.break_radio):
+            radio.SetName(radio.GetLabel())
+            sidebar.Add(radio, 0, wx.ALL, 6)
+        side_panel.SetSizerAndFit(sidebar)
+        side_panel.SetMinSize((240, -1))
+        side_panel.SetName("Description selection mode")
+        if not any(entry.get("file") for entry in self._entries):
+            # No video files: the only useful mode is by file break.
+            self.break_radio.SetValue(True)
+        row.Add(side_panel, 0, wx.EXPAND | wx.ALL, 8)
+
+        # -- combo + scope ---------------------------------------------------
+        content = wx.BoxSizer(wx.VERTICAL)
+        self.choice_label = wx.StaticText(self, label="")
+        self.choice_label.SetName("Description selection")
+        content.Add(self.choice_label, 0, wx.BOTTOM, 4)
+        self.combo = wx.ComboBox(self, style=wx.CB_READONLY)
+        content.Add(self.combo, 0, wx.EXPAND | wx.BOTTOM, 12)
+
+        self.only_radio = wx.RadioButton(
+            self, label="Only describe selected file", style=wx.RB_GROUP)
+        self.only_radio.SetToolTip(
+            "Describe just the chosen file; the files after it are left alone")
+        self.all_radio = wx.RadioButton(
+            self, label="Describe all files from here")
+        self.all_radio.SetToolTip(
+            "Describe the chosen file and then every file after it to the end "
+            "of the project")
+        for radio in (self.only_radio, self.all_radio):
+            radio.SetName(radio.GetLabel())
+            content.Add(radio, 0, wx.ALL, 6)
+
+        content.Add(self.CreateButtonSizer(wx.OK | wx.CANCEL), 0,
+                    wx.EXPAND | wx.TOP, 12)
+        row.Add(content, 1, wx.EXPAND | wx.ALL, 8)
+        outer.Add(row, 1, wx.EXPAND)
+        self.SetSizer(outer)
+
+        self.file_radio.Bind(wx.EVT_RADIOBUTTON, self._on_mode)
+        self.break_radio.Bind(wx.EVT_RADIOBUTTON, self._on_mode)
+        self._fill_combo()
+        finalize_accessibility(self)
+        dpi.prepare(self)
+        dpi.follow(self)
+        self.SetMinSize(self.GetSize())
+        if parent is not None and parent.IsShown():
+            self.CentreOnParent()
+        else:
+            self.Centre()
+        # Focus the checked sidebar mode button, not the combo, exactly as the
+        # other pickers do; the dialog's own focus has to be undone after it is
+        # shown.
+        self.Bind(wx.EVT_SHOW, self._on_show)
+
+    # ---------------------------------------------------------------- focus
+    def _on_show(self, event):
+        """Move the cursor to the mode button once the dialog is on screen."""
+        event.Skip()
+        if event.IsShown() and not self._focus_done:
+            self._focus_done = True
+            wx.CallAfter(self._focus_first_control)
+
+    def initial_focus_control(self):
+        """The control the dialog focuses when it opens."""
+        return self.break_radio if self.break_radio.GetValue() else self.file_radio
+
+    def _focus_first_control(self):
+        """Put the keyboard cursor on :meth:`initial_focus_control`."""
+        self.initial_focus_control().SetFocus()
+
+    # ------------------------------------------------------------------ state
+    def _fill_combo(self):
+        """(Re)fill the combo box for the selected sidebar mode."""
+        self.combo.Clear()
+        if self.file_radio.GetValue():
+            self.choice_label.SetLabel(
+                "Choose which described file to describe again:")
+            update_accessible_name(
+                self.combo,
+                "Choose which described file to describe again")
+            self.combo.SetToolTip(
+                "Video files that are already part of this project")
+            items = [(entry["file"], entry["position"])
+                     for entry in self._entries if entry.get("file")]
+        else:
+            self.choice_label.SetLabel(
+                "Choose which file to describe by file break:")
+            update_accessible_name(
+                self.combo, "Choose which file to describe by file break")
+            self.combo.SetToolTip(
+                "Every file break of the project")
+            items = [(entry["title"], entry["position"])
+                     for entry in self._entries]
+        for label, position in items:
+            self.combo.Append(str(label), position)
+        if self.combo.GetCount():
+            self.combo.SetSelection(0)
+        self.combo.Enable(self.combo.GetCount() > 0)
+        ok_btn = self.FindWindowById(wx.ID_OK)
+        if ok_btn is not None:
+            ok_btn.Enable(self.combo.GetCount() > 0)
+        self.Layout()
+
+    def _on_mode(self, _evt):
+        self._fill_combo()
+
+    def _selected_entry(self) -> dict | None:
+        position = self.start_index()
+        if position is None:
+            return None
+        for entry in self._entries:
+            if entry["position"] == position:
+                return entry
+        return None
+
+    # ---------------------------------------------------------------- answers
+    def start_index(self) -> int | None:
+        """0-based segment position to start describing at (``None`` = none)."""
+        sel = self.combo.GetSelection()
+        if sel < 0:
+            return None
+        value = self.combo.GetClientData(sel)
+        return None if value is None else int(value)
+
+    def only_selected(self) -> bool:
+        """True = describe only the chosen file; False = from it on."""
+        return bool(self.only_radio.GetValue())
+
+    def chosen_file(self) -> str | None:
+        """The video of the chosen break, when it has one."""
         entry = self._selected_entry()
         if entry is None:
             return None

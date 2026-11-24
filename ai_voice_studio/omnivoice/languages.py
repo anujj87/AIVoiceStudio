@@ -33,7 +33,6 @@ Nothing here imports the engine, so it is safe in the GUI thread and in tests.
 from __future__ import annotations
 
 import re
-from typing import Dict, List, Optional, Tuple
 
 #: The picker's first entry - no hint, OmniVoice detects the language itself.
 AUTO = ""
@@ -44,7 +43,7 @@ SOURCE_URL = "https://github.com/k2-fsa/OmniVoice/blob/master/docs/languages.md"
 
 #: ``(English name, OmniVoice language id, ISO 639-3 code)`` for every
 #: language OmniVoice was trained on, as published upstream.
-LANGUAGES: Tuple[Tuple[str, str, str], ...] = (
+LANGUAGES: tuple[tuple[str, str, str], ...] = (
     ("Abadi", "kbt", "kbt"),
     ("Abkhazian", "ab", "abk"),
     ("Abron", "abr", "abr"),
@@ -696,7 +695,7 @@ LANGUAGES: Tuple[Tuple[str, str, str], ...] = (
 
 def _check() -> None:
     """Fail at import time if the generated table was ever edited by hand."""
-    seen_ids: Dict[str, str] = {}
+    seen_ids: dict[str, str] = {}
     for name, omni_id, iso in LANGUAGES:
         if not name or not omni_id or not iso:
             raise ValueError(f"incomplete language row: {(name, omni_id, iso)!r}")
@@ -714,19 +713,19 @@ _check()
 #: Number of languages OmniVoice was trained on (upstream: 646, 581k hours).
 COUNT = len(LANGUAGES)
 
-_BY_ID: Dict[str, Tuple[str, str]] = {
+_BY_ID: dict[str, tuple[str, str]] = {
     omni_id: (name, iso) for name, omni_id, iso in LANGUAGES
 }
-_BY_ISO: Dict[str, str] = {iso: omni_id for _name, omni_id, iso in LANGUAGES}
-_BY_NAME: Dict[str, str] = {name.lower(): omni_id for name, omni_id, _iso in LANGUAGES}
+_BY_ISO: dict[str, str] = {iso: omni_id for _name, omni_id, iso in LANGUAGES}
+_BY_NAME: dict[str, str] = {name.lower(): omni_id for name, omni_id, _iso in LANGUAGES}
 
 
-def language_ids() -> Tuple[str, ...]:
+def language_ids() -> tuple[str, ...]:
     """Every OmniVoice language id, in the picker's order."""
     return tuple(omni_id for _name, omni_id, _iso in LANGUAGES)
 
 
-def names() -> Tuple[str, ...]:
+def names() -> tuple[str, ...]:
     """Every English language name, in the picker's order."""
     return tuple(name for name, _omni_id, _iso in LANGUAGES)
 
@@ -736,12 +735,12 @@ def count() -> int:
     return len(LANGUAGES)
 
 
-def is_known(value: Optional[str]) -> bool:
+def is_known(value: str | None) -> bool:
     """True when ``value`` is a language id this table lists."""
     return bool(value) and str(value).strip().lower() in _BY_ID
 
 
-def display_name(value: Optional[str]) -> str:
+def display_name(value: str | None) -> str:
     """The English name of a language id, or the raw text when unknown.
 
     Used by the dialogs to describe a stored hint without a lookup table of
@@ -754,7 +753,7 @@ def display_name(value: Optional[str]) -> str:
     return entry[0] if entry else text
 
 
-def label(value: Optional[str]) -> str:
+def label(value: str | None) -> str:
     """The combo-box label of a language: ``"English (en)"``.
 
     The auto entry gets its own wording; an unknown value is shown as typed so
@@ -770,7 +769,7 @@ def label(value: Optional[str]) -> str:
     return text
 
 
-def normalise(value: Optional[str]) -> Optional[str]:
+def normalise(value: str | None) -> str | None:
     """Map free text to a canonical OmniVoice language id, or ``None``.
 
     Accepts what a user may reasonably type or paste:
@@ -812,18 +811,18 @@ def normalise(value: Optional[str]) -> Optional[str]:
     return lower
 
 
-def choices() -> List[Tuple[str, str]]:
+def choices() -> list[tuple[str, str]]:
     """``(label, value)`` pairs for the picker: auto first, then alphabetical.
 
     The list is built once per call and is cheap; callers that fill a combo box
     call it exactly once.
     """
-    out: List[Tuple[str, str]] = [(AUTO_LABEL, AUTO)]
+    out: list[tuple[str, str]] = [(AUTO_LABEL, AUTO)]
     out.extend((f"{name} ({omni_id})", omni_id) for name, omni_id, _iso in LANGUAGES)
     return out
 
 
-def selection_index(value: Optional[str]) -> int:
+def selection_index(value: str | None) -> int:
     """The :func:`choices` index of a stored hint (0 = auto, 0 when unknown)."""
     normalised = normalise(value)
     if not normalised:

@@ -103,7 +103,7 @@ def audit(title: str, window: wx.Window) -> list[str]:
 def main() -> int:
     from a11y_windows import iter_windows
 
-    app = wx.App(False)  # noqa: F841 - must stay referenced
+    app = wx.App(False)
 
     all_problems: list[str] = []
     for title, window in iter_windows():

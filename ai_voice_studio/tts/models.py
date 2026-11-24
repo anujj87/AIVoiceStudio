@@ -25,7 +25,7 @@ import os
 import re
 import shutil
 import threading
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .. import paths
 from ..util import sanitize_filename
@@ -41,18 +41,18 @@ class ModelStore:
     def __init__(self, state_file: str | None = None):
         self._file = state_file or paths.models_state_file()
         self._lock = threading.RLock()
-        self._data: Dict[str, Any] = {"variants": {}, "custom_voices": []}
+        self._data: dict[str, Any] = {"variants": {}, "custom_voices": []}
         self._load()
 
     # -- persistence --------------------------------------------------------
     def _load(self) -> None:
         try:
-            with open(self._file, "r", encoding="utf-8") as fh:
+            with open(self._file, encoding="utf-8") as fh:
                 loaded = json.load(fh)
             if isinstance(loaded, dict):
                 self._data.update(loaded)
         except FileNotFoundError:
-            pass
+            log.debug("Ignoring a failure in ModelStore._load", exc_info=True)
         except (json.JSONDecodeError, OSError) as exc:
             log.warning("Could not read model state %s: %s", self._file, exc)
 
@@ -85,7 +85,7 @@ class ModelStore:
             return False
         return os.path.isdir(variant["dir"])
 
-    def variant_info(self, tts_id: str, lang_code: str, variant_id: str) -> Optional[Dict[str, Any]]:
+    def variant_info(self, tts_id: str, lang_code: str, variant_id: str) -> dict[str, Any] | None:
         return self._data["variants"].get(tts_id, {}).get(lang_code, {}).get(variant_id)
 
     def mark_installed(self, tts_id: str, lang_code: str, variant_id: str, directory: str) -> None:
@@ -99,7 +99,7 @@ class ModelStore:
             with open(marker, "w", encoding="utf-8") as fh:
                 fh.write("complete")
         except OSError:
-            pass
+            log.debug("Ignoring a failure in ModelStore.mark_installed", exc_info=True)
         self.save()
 
     def remove_variant(self, tts_id: str, lang_code: str, variant_id: str) -> bool:
@@ -114,7 +114,7 @@ class ModelStore:
         self.save()
         return removed
 
-    def installed_variants(self) -> List[Dict[str, str]]:
+    def installed_variants(self) -> list[dict[str, str]]:
         result = []
         for tts_id, langs in self._data["variants"].items():
             for lang_code, variants in langs.items():
@@ -125,7 +125,31 @@ class ModelStore:
                         )
         return result
 
-    def installed_voices(self) -> List[Dict[str, Any]]:
+    def missing_voice_ids(self, tts_id: str, lang_code: str, variant_id: str) -> list[str]:
+        """Voices of a downloaded variant whose files are not on disk.
+
+        A variant can be marked complete while only some of its voices were
+        really installed: the download of *piper / en_US / medium* stopped
+        after its first voice and still marked the folder complete, and since
+        the Download button only looked at that mark, the other seven voices
+        could not be fetched without removing the one that worked.  The panel
+        treats such a variant as unfinished and completes it.
+        """
+        wanted = (tts_id, lang_code, variant_id)
+        missing: list[str] = []
+        for entry in self.installed_voices():
+            if (entry.get("tts"), entry.get("language"), entry.get("variant")) != wanted:
+                continue
+            # Engines that load their weights from a package or the network
+            # (Voice Lab, OmniVoice) have no local files to be missing.
+            if entry.get("engine") not in _LOCAL_MODEL_ENGINES or not entry.get("dir"):
+                continue
+            files = resolve_voice_files(entry)
+            if not files.get("model") or not files.get("tokens"):
+                missing.append(entry.get("voice") or "")
+        return missing
+
+    def installed_voices(self) -> list[dict[str, Any]]:
         """Flatten installed variants into per-voice entries usable by the UI.
 
         Piper/vits variants list their catalog voices; kokoro variants expose
@@ -168,7 +192,10 @@ class ModelStore:
                         }
                     )
                 continue
-            if engine in ("kokoro", "kitten"):
+            if engine in ("kokoro", "kitten", "supertonic"):
+                # One model file serves every speaker (and, for Supertonic,
+                # every language), so the voice entry points at the variant
+                # folder the engine itself reads from.
                 for voice in variant.get("voices", []):
                     voices.append(
                         {
@@ -237,20 +264,20 @@ class ModelStore:
                             "frontend": tts.get("frontend", ""),
                         }
                     )
-        # Voices cloned with a Voice Lab engine (Pocket TTS, Bark, F5-TTS)
+        # Voices cloned with a Voice Lab engine (Pocket TTS, F5-TTS)
         # live in ``custom_voices``; listing them here means every panel that
         # shows installed voices shows the clones too.
         voices.extend(self._voice_lab_clones())
         return voices
 
-    def _voice_lab_clones(self) -> List[Dict[str, Any]]:
+    def _voice_lab_clones(self) -> list[dict[str, Any]]:
         """Voice entries for voices cloned from a user recording."""
         try:
-            from ..voicelab import CLONE_KIND  # noqa: PLC0415
-            from ..voicelab import engines as voicelab_engines  # noqa: PLC0415
-        except Exception:  # noqa: BLE001
+            from ..voicelab import CLONE_KIND
+            from ..voicelab import engines as voicelab_engines
+        except Exception:
             return []
-        entries: List[Dict[str, Any]] = []
+        entries: list[dict[str, Any]] = []
         for voice in self.custom_voices():
             if voice.get("kind") != CLONE_KIND:
                 continue
@@ -279,7 +306,7 @@ class ModelStore:
 
     # -- custom (user-created) voices ---------------------------------------
     def add_custom_voice(self, name: str, tts_id: str, directory: str, kind: str,
-                         extra: Dict[str, Any] | None = None) -> None:
+                         extra: dict[str, Any] | None = None) -> None:
         """Register a custom (user-created) voice.
 
         ``kind`` is a sherpa voice kind (``tarball``/``onnx``) for standalone
@@ -287,7 +314,7 @@ class ModelStore:
         (``omni_clone``/``omni_design``) whose engine, reference sample and
         design instructions travel in ``extra``.
         """
-        entry: Dict[str, Any] = {
+        entry: dict[str, Any] = {
             "name": name,
             "tts": tts_id,
             "dir": directory,
@@ -321,7 +348,7 @@ class ModelStore:
                     return True
         return False
 
-    def custom_voices(self, tts_id: str | None = None) -> List[Dict[str, Any]]:
+    def custom_voices(self, tts_id: str | None = None) -> list[dict[str, Any]]:
         voices = self._data.get("custom_voices", [])
         if tts_id:
             voices = [v for v in voices if v.get("tts") == tts_id]
@@ -344,7 +371,7 @@ class ModelStore:
                     try:
                         os.remove(reference)
                     except OSError:
-                        pass
+                        log.debug("Ignoring a failure in ModelStore.remove_custom_voice", exc_info=True)
                     removed = True
             else:
                 shutil.rmtree(voice["dir"], ignore_errors=True)
@@ -353,13 +380,56 @@ class ModelStore:
         return removed
 
 
-def resolve_voice_files(voice_entry: Dict[str, Any]) -> Dict[str, Any]:
+def _borrowable_espeak_data(directory: str) -> str:
+    """The espeak-ng-data a voice may borrow, or ``""`` when there is none.
+
+    A multi-voice variant (piper, matcha) keeps one copy for all of its voices
+    in the variant folder, next to the per-voice folders, and a voice shipped
+    with its own copy keeps that one.  The application-wide copy under
+    ``models/shared`` is the last resort: a custom piper voice is built from a
+    single .onnx/.onnx.json pair and carries no data folder of its own.
+    """
+    for candidate in (
+        os.path.join(directory, "espeak-ng-data"),
+        os.path.join(os.path.dirname(os.path.normpath(directory)), "espeak-ng-data"),
+        os.path.join(paths.models_dir(), "shared", "espeak-ng-data"),
+    ):
+        if os.path.isdir(candidate):
+            return candidate
+    return ""
+
+
+#: Where the shared Supertonic-3 archive is unpacked, inside the models folder.
+_SUPERTONIC_DIR = ("shared", "supertonic-3")
+
+
+def supertonic_model_dir(preferred: str = "") -> str:
+    """The folder the Supertonic-3 int8 archive was unpacked into.
+
+    One archive carries all 31 languages and all 10 voice styles, so it is
+    downloaded **once** into ``models/shared/supertonic-3`` (the catalog's
+    ``shared_artifacts``) instead of once per language; every language of the
+    engine reads those files from here.  A copy that sits in the voice's own
+    folder (an install made by hand) still wins.
+    """
+    shared = os.path.join(paths.models_dir(), *_SUPERTONIC_DIR)
+    for candidate in (preferred, shared):
+        if candidate and os.path.isdir(candidate):
+            try:
+                if any(name.endswith(".onnx") for name in os.listdir(candidate)):
+                    return candidate
+            except OSError:
+                log.debug("Could not read %s", candidate, exc_info=True)
+    return shared
+
+
+def resolve_voice_files(voice_entry: dict[str, Any]) -> dict[str, Any]:
     """Map a voice entry (from installed_voices or custom voices) to files the
     engine needs: model path, tokens path, optional espeak-ng-data dir,
     optional kokoro voices file and sid."""
     directory = voice_entry["dir"]
     engine = voice_entry.get("engine", "vits")
-    files: Dict[str, Any] = {"engine": engine, "dir": directory}
+    files: dict[str, Any] = {"engine": engine, "dir": directory}
 
     # OmniVoice has no local model files; the model is downloaded on first use
     # by the worker subprocess via omnivoice-triton / HuggingFace.
@@ -380,11 +450,11 @@ def resolve_voice_files(voice_entry: Dict[str, Any]) -> Dict[str, Any]:
         })
         return files
 
-    # Voice Lab engines (Pocket TTS / Bark / F5-TTS) run from an installed
+    # Voice Lab engines run from an installed
     # package and keep their model in the HuggingFace cache: there are no local
     # model files for the engine to load.
     try:
-        from ..voicelab import engines as voicelab_engines  # noqa: PLC0415
+        from ..voicelab import engines as voicelab_engines
 
         if voicelab_engines.is_engine(engine):
             files.update({
@@ -393,17 +463,43 @@ def resolve_voice_files(voice_entry: Dict[str, Any]) -> Dict[str, Any]:
                 "sid": voice_entry.get("sid", 0),
             })
             return files
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception:
+        log.debug("Ignoring a failure in resolve_voice_files", exc_info=True)
 
-    def find(*names: str) -> Optional[str]:
+    if engine == "supertonic":
+        # The model is shared by every language of the engine (see
+        # ``supertonic_model_dir``); the per-language folder holds no files.
+        directory = supertonic_model_dir(directory)
+
+    def find(*names: str) -> str | None:
         for name in names:
             candidate = os.path.join(directory, name)
             if os.path.isfile(candidate):
                 return candidate
         return None
 
-    if engine == "pocket":
+    if engine == "supertonic":
+        # Supertonic 3 (sherpa-onnx): four ONNX parts, the tokenizer tables
+        # (tts.json + unicode_indexer.bin) and voice.bin, which holds all ten
+        # voice styles - ``sid`` picks one of them and the entry's language
+        # code is the ``lang`` the model speaks.
+        files.update(
+            {
+                "duration_predictor": find(
+                    "duration_predictor.int8.onnx", "duration_predictor.onnx"
+                ),
+                "text_encoder": find("text_encoder.int8.onnx", "text_encoder.onnx"),
+                "vector_estimator": find(
+                    "vector_estimator.int8.onnx", "vector_estimator.onnx"
+                ),
+                "vocoder": find("vocoder.int8.onnx", "vocoder.onnx"),
+                "tts_json": find("tts.json"),
+                "unicode_indexer": find("unicode_indexer.bin"),
+                "voice_style": find("voice.bin"),
+                "sid": voice_entry.get("sid", 0),
+            }
+        )
+    elif engine == "pocket":
         # Pocket TTS (sherpa-onnx): six ONNX parts + two JSON tables + a
         # reference (voice) WAV per voice.
         files.update(
@@ -449,7 +545,7 @@ def resolve_voice_files(voice_entry: Dict[str, Any]) -> Dict[str, Any]:
                 if f.startswith("lexicon-") and f.endswith(".txt")
             )
         except OSError:
-            pass
+            log.debug("Ignoring a failure in resolve_voice_files", exc_info=True)
         lexicon = ",".join(os.path.join(directory, f) for f in lexicons)
         files.update(
             {
@@ -469,25 +565,13 @@ def resolve_voice_files(voice_entry: Dict[str, Any]) -> Dict[str, Any]:
             steps = sorted(e for e in entries if _STEP_ONNX.match(e))
         except OSError:
             steps = []
-        if steps:
-            model = os.path.join(directory, steps[0])
-        else:
-            model = _find_onnx(directory)
+        model = os.path.join(directory, steps[0]) if steps else _find_onnx(directory)
         tokens = find("tokens.txt")
         lexicon = find("lexicon.txt")
         # Lexicon-based models (zh-baker etc.) must NOT get espeak-ng-data:
         # sherpa-onnx would switch to the piper frontend and crash on their
         # tokens.txt. Only fall back to the shared data when no lexicon exists.
-        data_dir = os.path.join(directory, "espeak-ng-data")
-        if not os.path.isdir(data_dir):
-            if not lexicon:
-                shared = os.path.join(paths.models_dir(), "shared", "espeak-ng-data")
-                if os.path.isdir(shared):
-                    data_dir = shared
-                else:
-                    data_dir = ""
-            else:
-                data_dir = ""
+        data_dir = _borrowable_espeak_data(directory) if not lexicon else ""
         vocoder = find("vocos-22khz-univ.onnx")
         if not vocoder:
             shared_vocoder = os.path.join(
@@ -512,22 +596,13 @@ def resolve_voice_files(voice_entry: Dict[str, Any]) -> Dict[str, Any]:
         # Character-frontend models (e.g. Coqui VITS) take plain text with
         # model + tokens only; the espeak-ng piper frontend must NOT be
         # attached to them.
-        data_dir = os.path.join(directory, "espeak-ng-data")
-        if voice_entry.get("frontend") != "char":
-            if not os.path.isdir(data_dir):
-                # Same rule as the vits branch: lexicon-based models must not
-                # receive the shared espeak-ng-data (sherpa-onnx would use the
-                # piper frontend).
-                if not lexicon:
-                    shared = os.path.join(
-                        paths.models_dir(), "shared", "espeak-ng-data"
-                    )
-                    if os.path.isdir(shared):
-                        data_dir = shared
-                    else:
-                        data_dir = ""
-                else:
-                    data_dir = ""
+        # Lexicon-based models must not receive espeak-ng-data either (same rule
+        # as the matcha branch): sherpa-onnx would use the piper frontend and
+        # crash on their tokens.txt.
+        if voice_entry.get("frontend") == "char" or lexicon:
+            data_dir = ""
+        else:
+            data_dir = _borrowable_espeak_data(directory)
         files.update(
             {
                 "model": model,
@@ -540,10 +615,14 @@ def resolve_voice_files(voice_entry: Dict[str, Any]) -> Dict[str, Any]:
     return files
 
 
+#: Engines whose voices are loaded from files in the models folder (and so
+#: can be missing files); every other engine loads its weights itself.
+_LOCAL_MODEL_ENGINES = ("vits", "matcha", "kokoro", "kitten")
+
 _STEP_ONNX = re.compile(r"model-steps-\d+\.onnx$")
 
 
-def _find_onnx(directory: str) -> Optional[str]:
+def _find_onnx(directory: str) -> str | None:
     try:
         entries = os.listdir(directory)
     except OSError:

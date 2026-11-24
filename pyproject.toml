@@ -1,0 +1,140 @@
+# AI Voice Studio — tooling configuration.
+#
+# The repository has no packaging metadata (the app is shipped with PyInstaller
+# from `packaging/ai_voice_studio.spec`), so this file exists to pin the two
+# things a contributor otherwise has to guess:
+#
+# * the lint baseline the source's ~680 `# noqa:` comments were written
+#   against, so `ruff check` is a reproducible, green gate; and
+# * pytest's discovery roots, so the suite runs the same way here and in CI.
+
+[tool.ruff]
+# Python 3.13 only (requirements.txt, PROJECT_SPEC §2).  The source is written
+# to a 100-column margin with long user-facing strings running a little past
+# it; 110 is the enforced ceiling, which is what the tree actually meets.
+target-version = "py313"
+line-length = 110
+extend-exclude = [
+    "build",
+    "dist",
+    "docs",
+    "winget",
+    ".venv",
+    ".venv-local",
+    "tools/innosetup",
+]
+
+[tool.ruff.lint]
+# The rule families the source's own suppressions name: pycodestyle, pyflakes,
+# bugbear, comprehensions, simplify, performance, bandit, Ruff-specific,
+# isort, pep8-naming, pyupgrade, flake8-return-free extras (ERA/TRY/LOG) and
+# pylint.  `--select ALL` is deliberately *not* used: it turns on style rules
+# (EM/TRY003 raise-with-a-message, PTH pathlib rewrites, ...) that contradict
+# choices this project makes on purpose and documents in PROJECT_SPEC §4.2.
+select = [
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes
+    "I",        # import sorting
+    "N",        # naming
+    "UP",       # pyupgrade (PEP 585/604 annotations, Python 3.13 idioms)
+    "B",        # bugbear
+    "C4",       # comprehensions
+    "SIM",      # simplify
+    "PERF",     # performance
+    "PIE",      # misc lints
+    "S",        # bandit
+    "ARG",      # unused arguments (see the ignore list)
+    "ERA",      # commented-out code
+    "TRY",      # exception handling style
+    "LOG",      # logging
+    "PL",       # pylint
+    "RUF",      # Ruff-specific
+    "ASYNC",    # async misuse
+]
+
+ignore = [
+    # ---- deliberate, documented design choices -------------------------
+    # Lazy imports keep torch/sherpa_onnx/wx out of the start-up path, so the
+    # GUI still opens when a runtime is missing (PROJECT_SPEC §4.2).
+    "PLC0415",
+    # Errors are raised as user-facing sentences ("The model folder … is
+    # missing"), not as standalone message constants; TRY003/EM101/EM102 would
+    # fight that style for no benefit.
+    "TRY003",
+    # Module-level singletons for caches and runtimes.
+    "PLW0603",
+    # wx event handlers and override callbacks must keep their signatures.
+    "ARG001", "ARG002", "ARG005",
+    # Long GUI builder methods are a size problem tracked in the audit
+    # (§5.3), not something a lint threshold can fix.
+    "PLR0911", "PLR0912", "PLR0913", "PLR0915", "PLR0917", "PLR2004",
+    # Names inherited from wx (`OnPaint`) and long-standing public API names.
+    "N802", "N803", "N807", "N814", "N815", "N818",
+    # subprocess with a known tool and a computed argument list; never a shell.
+    "S603", "S606", "S607",
+    # urlopen against fixed hosts (GitHub releases API, Hugging Face).
+    "S310",
+    # "password" labels in settings, not credentials.
+    "S105", "S106",
+    # ElementTree on XML this application wrote itself (DAISY output).
+    "S314",
+    # `number != number` is the NaN test, and ruff cannot tell it from a typo.
+    "PLR0124",
+    # Section-header comments (`# ---` then `# MOSS-TTS (…)`) read as
+    # commented-out code; there is no commented-out code in the tree and
+    # tools/dead_code_audit.py covers the real case.
+    "ERA001",
+    # Reassigning a loop variable inside the body is used for normalisation
+    # (`value = value.strip()`).
+    "PLW2901",
+    # Typographic quotes/dashes in user-facing strings.
+    "RUF001",
+    # try/else and logger.error-vs-exception are style preferences.
+    "TRY300", "TRY301", "TRY400",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# The frozen-worker shim must run before `wx` is imported: the build hands the
+# EXE a worker name and the process has to become that worker, not the GUI.
+"main.py" = ["E402"]
+# Tests and tools are not shipped and are read as scripts: their asserts *are*
+# the checks, their fixtures deliberately use mutable class attributes, their
+# helper functions are named for the API they stand in for, and a test that
+# opens a file without a `with` block is usually proving something about the
+# file, not forgetting to close it.
+"tests/*" = [
+    "S101", "S110", "S112",
+    "ARG001", "ARG002", "ARG003", "ARG004", "ARG005",
+    "B905", "B007", "E402", "N801", "N805", "N806",
+    "PLW1510", "PLW1641", "PERF401", "RUF007", "RUF012", "SIM115", "SIM117",
+]
+"tools/*" = [
+    "S101", "S110", "S112",
+    "ARG001", "ARG002", "ARG003", "ARG004", "ARG005",
+    "B905", "B007", "E402", "N801", "N805", "N806",
+    "PLW1510", "PLW1641", "PERF401", "RUF007", "RUF012", "SIM115", "SIM117",
+    # The frozen-build check scripts unmarshal bytecode they built themselves.
+    "S302",
+    # The a11y probes hold the `wx.App` in a local so that it outlives the
+    # window they build; the name itself is never read again.
+    "F841",
+]
+# The OmniVoice quality/retry path is frozen while it is being tuned: its
+# message formatting and its `int(round(...))` spellings are deliberately left
+# untouched, so a change of behaviour there is never an accident of a lint fix.
+"ai_voice_studio/omnivoice_quality.py" = ["UP031"]
+"ai_voice_studio/omnivoice/worker.py" = ["RUF046"]
+# The Windows TTS backend embeds a PowerShell script whose lines are copied
+# verbatim; re-wrapping them would change what runs.
+"ai_voice_studio/tts/windows_tts.py" = ["E501"]
+# A two-line append loop reads better than the comprehension PERF401 wants, and
+# the loops run once per model/voice/segment - not on a hot path.
+"ai_voice_studio/**" = ["PERF401"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# The GUI smoke module builds a real wx.App; the others must not import it
+# unless they ask for it.
+python_files = ["test_*.py"]
+addopts = "-q"
+filterwarnings = ["error::DeprecationWarning:ai_voice_studio.*"]

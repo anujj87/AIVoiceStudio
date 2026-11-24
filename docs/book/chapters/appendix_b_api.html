@@ -78,7 +78,10 @@
 <table>
   <thead><tr><th>Function/Class</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>get_engine(voice_entry)</code></td><td>Factory: get/create TTS engine</td></tr>
+    <tr><td><code>get_engine(voice_entry, provider, num_threads)</code></td><td>Factory: get/create the shared, cached TTS engine</td></tr>
+    <tr><td><code>get_engine_pool(voice_entry, provider, size, num_threads)</code></td><td>The cached engine for <code>size&nbsp;=&nbsp;1</code> (or a non-sherpa voice), else a <code>TtsEnginePool</code></td></tr>
+    <tr><td><code>TtsEnginePool(voice_entry, provider, size, num_threads)</code></td><td>A few interchangeable engines, so several segments can be in flight at once (GPU)</td></tr>
+    <tr><td><code>is_local_sherpa_engine(voice_entry)</code></td><td>True when a local sherpa-onnx model speaks (so it may be pooled)</td></tr>
     <tr><td><code>TtsEngine.synthesize(text, sid, speed, pitch, volume)</code></td><td>Synthesize speech</td></tr>
     <tr><td><code>_shift_pitch(samples, pitch)</code></td><td>Resample for pitch shift</td></tr>
     <tr><td><code>_apply_volume(samples, volume)</code></td><td>Scale amplitude</td></tr>
@@ -157,6 +160,8 @@ subsystem unit-testable on any machine.</p>
     <tr><td><code>detect(force=False)</code></td><td>dict</td><td><code>{'cpu': True, 'cuda': …, 'dml': False}</code></td></tr>
     <tr><td><code>cpu_threads(total=None)</code></td><td>int</td><td>Threads a CPU run may use: the top of the 80–95&nbsp;% band</td></tr>
     <tr><td><code>cuda_device_index()</code></td><td>int</td><td>Always <code>0</code>: the first NVIDIA card the driver exposes</td></tr>
+    <tr><td><code>free_vram_mb()</code></td><td>int&nbsp;|&nbsp;None</td><td>Free video memory, read from the driver when a recording starts (not cached)</td></tr>
+    <tr><td><code>synthesis_workers(compute, total=None)</code></td><td>int</td><td>Segments in flight: 1 on the CPU, 2–4 on the GPU (1 on a nearly-full card)</td></tr>
     <tr><td><code>gpu_summary()</code></td><td>str</td><td>Card name and memory, for display</td></tr>
     <tr><td><code>available_compute()</code></td><td>list</td><td>Options the UI may offer, with <code>auto</code> when there is a choice</td></tr>
     <tr><td><code>resolve_compute(choice)</code></td><td>str</td><td>Turn <code>auto|cpu|cuda|dml</code> into a concrete back-end</td></tr>
@@ -270,7 +275,7 @@ subsystem unit-testable on any machine.</p>
     <tr><td><code>_convert_to_wav(path)</code></td><td>Converts a reference clip once (cached by path, size, mtime)</td></tr>
     <tr><td><code>_resolve_resource(spec)</code></td><td>Resolves <code>"package:relative/path"</code> to a real file inside a package</td></tr>
     <tr><td><code>_supported_kwargs(callable, kwargs)</code></td><td>Feature-detects which tuning options an engine version accepts</td></tr>
-    <tr><td><code>Backend</code></td><td>Base class: one loaded engine (<code>PocketBackend</code>, <code>BarkBackend</code>, <code>F5Backend</code>)</td></tr>
+    <tr><td><code>Backend</code></td><td>Base class: one loaded engine (<code>PocketBackend</code>, <code>F5TtsBackend</code>, <code>ChatterboxBackend</code>)</td></tr>
   </tbody>
 </table>
 
@@ -291,6 +296,88 @@ subsystem unit-testable on any machine.</p>
   <tbody>
     <tr><td><code>start_index</code></td><td>0-based segment to start from (default <code>0</code>)</td></tr>
     <tr><td><code>end_index</code></td><td><strong>Exclusive</strong> end; <code>start_index + 1</code> records one segment, <code>None</code> means “to the end”</td></tr>
+  </tbody>
+</table>
+
+<h2>B.6 Speech-to-Text Modules</h2>
+
+<p>Added with the transcription subsystem; see
+<a href="ch84_stt_catalog.html">Chapters 84–86</a>. Nothing here imports wx or a
+model's back-end at import time, so the catalog and the document writers are
+unit-testable anywhere.</p>
+
+<h3>stt/catalog.py</h3>
+<table>
+  <thead><tr><th>Function</th><th>Returns</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>models()</code></td><td>list of dicts</td><td>Every model; the single description the UI and the worker both read</td></tr>
+    <tr><td><code>model(model_id)</code></td><td>dict</td><td>One entry; raises <code>KeyError</code> for an unknown id</td></tr>
+    <tr><td><code>variants(model_id)</code></td><td>list of (id, label)</td><td>The variant combo's contents</td></tr>
+    <tr><td><code>languages(model_id)</code></td><td>list of (code, name)</td><td>Spoken languages the model accepts</td></tr>
+    <tr><td><code>supports_translation(model_id)</code></td><td>bool</td><td>Whether the translation combo is enabled</td></tr>
+    <tr><td><code>supports_timestamps(model_id)</code></td><td>bool</td><td>Whether the back-end can report <em>when</em> each phrase was spoken</td></tr>
+    <tr><td><code>runner_for(model_id, variant)</code></td><td>str</td><td>How a transformers/NeMo model is driven (<code>pipeline</code>, <code>chat</code>, <code>transcription_request</code>, <code>asr</code>, <code>salm</code>)</td></tr>
+    <tr><td><code>fit(model_id, variant)</code></td><td>str</td><td>The <em>preferred</em> device (<code>cpu</code>/<code>gpu</code>), with the per-variant override</td></tr>
+    <tr><td><code>gpu_only(model_id, variant)</code></td><td>bool</td><td>A model that genuinely cannot run on a CPU</td></tr>
+    <tr><td><code>device_options(model_id, variant, has_cuda)</code></td><td>list of (id, label)</td><td>The Compute choices the dialog may offer</td></tr>
+    <tr><td><code>pip_packages(model_id)</code> / <code>cuda_packages(model_id)</code></td><td>list</td><td>What every install needs, and what only a GPU machine needs</td></tr>
+    <tr><td><code>summary_rows()</code></td><td>list of tuples</td><td>The five columns of the Manage the STT table</td></tr>
+  </tbody>
+</table>
+
+<h3>stt/environments.py</h3>
+<table>
+  <thead><tr><th>Function</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>env_dir(model_id)</code></td><td>One virtualenv per model under <code>stt_envs</code></td></tr>
+    <tr><td><code>runtime(model_id)</code></td><td>The environment's interpreter and paths</td></tr>
+    <tr><td><code>is_created(model_id)</code> / <code>remove(model_id)</code></td><td>Create or delete the environment</td></tr>
+    <tr><td><code>install_plan(model_id)</code></td><td>pip steps, each with its index (CUDA PyTorch first on a GPU machine)</td></tr>
+    <tr><td><code>installed_modules(model_id)</code></td><td>Distribution names read straight from <code>site-packages</code> (no subprocess)</td></tr>
+    <tr><td><code>verify_import(model_id)</code></td><td>Imports the back-end once and returns a message when it fails</td></tr>
+    <tr><td><code>worker_script()</code></td><td>The path of <code>stt/worker.py</code> to run in that interpreter</td></tr>
+  </tbody>
+</table>
+
+<h3>stt/engine.py</h3>
+<table>
+  <thead><tr><th>Name</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>transcribe_audio(path, *, model_id, variant, language, translate_to, accuracy, compute, on_progress)</code></td><td>Runs one file in the model's own environment and returns timed segments</td></tr>
+    <tr><td><code>compute_options(model_id, variant)</code></td><td>The Compute choices, with the CPU-only case spelled out</td></tr>
+    <tr><td><code>gpu_runtime_missing(model_id)</code></td><td>CUDA packages a GPU run still needs (Whisper's cuBLAS)</td></tr>
+    <tr><td><code>BackendMissing</code></td><td>Raised when the environment or the back-end is not installed yet</td></tr>
+    <tr><td><code>STTEngineError</code></td><td>Any other failure, carrying the worker's real cause and exit code</td></tr>
+  </tbody>
+</table>
+
+<h3>stt/output.py</h3>
+<table>
+  <thead><tr><th>Function</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>format_document(segments, output_format, include_timestamp, title)</code></td><td>TXT, Markdown, HTML, JSON, CSV, SRT or VTT from one segment list</td></tr>
+    <tr><td><code>format_timestamp(seconds, millisecond_sep)</code></td><td>Shared timing helper (SRT wants a comma, VTT a dot)</td></tr>
+    <tr><td><code>split_by_time(segments, minutes)</code></td><td>Chunks that never cut a segment in half</td></tr>
+    <tr><td><code>plan_documents(sources, split_mode, minutes, segments_by_source)</code></td><td>The documents a job will write, with colliding names disambiguated</td></tr>
+    <tr><td><code>scan_source(path, recursive)</code></td><td>Every media file under a file or folder</td></tr>
+  </tbody>
+</table>
+
+<h3>stt/job.py</h3>
+<table>
+  <thead><tr><th>Name</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>TranscriptionJob(project_dir, source_paths, options, *, on_progress, on_done, on_error)</code></td><td>A thread that transcribes its sources and writes each document as it is finished</td></tr>
+    <tr><td><code>cancel()</code></td><td>Stops before the next source or document</td></tr>
+    <tr><td><code>outputs</code></td><td>The documents written, for the completion dialog</td></tr>
+  </tbody>
+</table>
+
+<h3>gui/stt_dialog.py</h3>
+<table>
+  <thead><tr><th>Name</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>STTTranscribeDialog(parent, project_dir, settings, store, sources)</code></td><td>The transcribe dialog: compute, model, variant, language, accuracy, translation</td></tr>
   </tbody>
 </table>
 

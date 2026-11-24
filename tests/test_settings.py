@@ -137,7 +137,7 @@ class TestProcessedTextLog(unittest.TestCase):
             })
             path = os.path.join(tmp, PROCESSED_TEXT_FILE_NAME)
             self.assertTrue(os.path.exists(path))
-            with open(path, "r", encoding="utf-8") as fh:
+            with open(path, encoding="utf-8") as fh:
                 import json
 
                 data = json.load(fh)
@@ -155,7 +155,7 @@ class TestProcessedTextLog(unittest.TestCase):
             write_processed_text(tmp, {0: entry})
             write_processed_text(tmp, {0: entry, 1: second})
             path = os.path.join(tmp, "processed_text.json")
-            with open(path, "r", encoding="utf-8") as fh:
+            with open(path, encoding="utf-8") as fh:
                 import json
 
                 data = json.load(fh)

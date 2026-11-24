@@ -19,10 +19,7 @@ import wx
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
-from a11y_sample import ensure_sample_project  # noqa: E402
 
-from ai_voice_studio.settings import Settings  # noqa: E402
-from ai_voice_studio.tts.models import ModelStore  # noqa: E402
 
 _INPUTS = (wx.TextCtrl, wx.ComboBox, wx.SpinCtrl, wx.SpinCtrlDouble)
 
@@ -65,10 +62,9 @@ def find_nearby_label(win: wx.Window, ctrl: wx.Window):
             # Not on the control's row: it is an above-label candidate if its
             # bottom edge is close above the control's top and it overlaps
             # the control horizontally.
-            if y + h <= cy and cy - (y + h) <= 24 and x < cx + cw:
-                if y + h > best_above_y:
-                    best_above_y = y + h
-                    best_above = child
+            if y + h <= cy and cy - (y + h) <= 24 and x < cx + cw and y + h > best_above_y:
+                best_above_y = y + h
+                best_above = child
             continue
         # Same row: candidate only if it ends left of the control.
         if x + w <= cx + 4 and x + w > best_left_x:
@@ -114,7 +110,7 @@ def audit(title, win, out):
 def main():
     from a11y_windows import iter_windows
 
-    app = wx.App(False)  # noqa: F841 - must stay referenced
+    app = wx.App(False)
     for title, window in iter_windows():
         audit(title, window, None)
 

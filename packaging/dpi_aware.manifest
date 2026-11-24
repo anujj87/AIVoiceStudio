@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--
+  The application manifest of AI-Voice-Studio.exe.
+
+  Windows reads DPI awareness from here, and only from here for a packaged
+  build: without this file the process is DPI-*unaware*, so at 150% and 200%
+  Windows renders the application at 96 DPI and then bitmap-stretches the
+  result.  That is blurry for everyone, and it also hides the interface from a
+  screen reader - the whole window is reported as one image rather than as the
+  controls inside it, and a magnifier user zooms a picture of text instead of
+  text.
+
+  PerMonitorV2 (Windows 10 1703 and later) is what makes the application
+  receive WM_DPICHANGED when it moves between monitors with different scaling,
+  which `ai_voice_studio.gui.dpi` answers by re-deriving the window geometry
+  from the DIP values recorded when it was built.  The older `dpiAware` entry
+  next to it is the fallback that Windows 8.1 and 10-pre-1703 understand; on
+  those systems the application is scaled per monitor without the change
+  notification.
+
+  `longPathAware` lets the bundled Python open the deep project paths the
+  application itself creates under the user's Documents folder.
+-->
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <assemblyIdentity type="win32" name="AnujSharma.AIVoiceStudio" version="1.0.0.0"
+                    processorArchitecture="*"/>
+  <description>AI Voice Studio</description>
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
+    <security>
+      <requestedPrivileges>
+        <requestedExecutionLevel level="asInvoker" uiAccess="false"/>
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+  <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+    <application>
+      <!-- Windows 10 and 11 -->
+      <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"/>
+      <!-- Windows 8.1 -->
+      <supportedOS Id="{1f676c76-80e1-4239-95bb-83d0f6d0da78}"/>
+    </application>
+  </compatibility>
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>
+      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2</dpiAwareness>
+      <longPathAware xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">true</longPathAware>
+    </windowsSettings>
+  </application>
+</assembly>

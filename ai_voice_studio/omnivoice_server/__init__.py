@@ -23,7 +23,7 @@ The ``omnivoice-server`` package must be installed separately::
 
     pip install omnivoice-server
 
-Flow (Settings -> Compute -> Install OmniVoice Server):
+Flow (Settings -> Voice Clone -> Install OmniVoice Server):
 1. Check that ``omnivoice_server`` is importable from the managed venv.
 2. Install via pip (includes PyTorch, omnivoice, etc.).
 3. Server starts on-demand or auto-starts with the app.
@@ -39,10 +39,11 @@ import subprocess
 import sys
 import threading
 import time
-from typing import Any, Dict, Optional
+from typing import Any
 
 import numpy as np
 
+from .. import hf_access
 from .. import omnivoice_quality as quality
 from ..omnivoice_quality import split_sentences
 
@@ -145,7 +146,7 @@ def _tail_of(path: str, lines: int) -> str:
     try:
         with open(path, encoding="utf-8", errors="replace") as fh:
             return "".join(fh.readlines()[-lines:])
-    except Exception:  # noqa: BLE001
+    except Exception:
         return ""
 
 
@@ -184,10 +185,10 @@ def _read_server_config() -> dict:
     empty dict so callers can use ``.get()`` with defaults.
     """
     try:
-        from ..settings import Settings  # noqa: PLC0415
+        from ..settings import Settings
         s = Settings()
         return s.get("omnivoice_server", {})
-    except Exception:  # noqa: BLE001
+    except Exception:
         return {}
 
 # Default server settings
@@ -218,7 +219,7 @@ def _response_headers(resp) -> dict:
         return {}
     try:
         return {str(k).lower(): str(v) for k, v in headers.items()}
-    except Exception:  # noqa: BLE001
+    except Exception:
         return {}
 
 
@@ -285,7 +286,7 @@ def split_text_for_server(text: str, limit: int = _TEXT_CHUNK_TARGET) -> list:
 def is_available() -> bool:
     """True when ``omnivoice_server`` is importable from its own venv."""
     try:
-        from ..python_runtime import engine_runtime  # noqa: PLC0415
+        from ..python_runtime import engine_runtime
         rt = engine_runtime(ENGINE_ID)
         if not rt.is_created:
             return False
@@ -294,14 +295,14 @@ def is_available() -> bool:
             "print(importlib.metadata.version('omnivoice-server'))"
         )
         return result.returncode == 0 and bool(result.stdout.strip())
-    except Exception:  # noqa: BLE001
+    except Exception:
         return False
 
 
 def installed_version() -> str | None:
     """Return the installed omnivoice-server version, or None."""
     try:
-        from ..python_runtime import engine_runtime  # noqa: PLC0415
+        from ..python_runtime import engine_runtime
         rt = engine_runtime(ENGINE_ID)
         if not rt.is_created:
             return None
@@ -311,8 +312,8 @@ def installed_version() -> str | None:
         )
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as exc:
+        log.debug("Could not read the installed server version: %s", exc)
     return None
 
 
@@ -410,7 +411,7 @@ class OmniVoiceServerManager:
             )
             return
 
-        from ..python_runtime import engine_runtime  # noqa: PLC0415
+        from ..python_runtime import EnvironmentUnusable, engine_runtime
         rt = engine_runtime(ENGINE_ID)
 
         if not rt.is_created:
@@ -419,8 +420,15 @@ class OmniVoiceServerManager:
                 "Install the OmniVoice Server dependency first."
             )
 
+        try:
+            # An environment built by an earlier installation of the
+            # application runs on a Python that has gone; re-point it first.
+            python_exe = rt.usable_python_exe()
+        except EnvironmentUnusable as exc:
+            raise OmniVoiceServerError(str(exc)) from exc
+
         cmd = [
-            rt.python_exe, "-m", "omnivoice_server",
+            python_exe, "-m", "omnivoice_server",
             "--host", self._host,
             "--port", str(self._port),
             "--device", self._device,
@@ -433,7 +441,10 @@ class OmniVoiceServerManager:
         if self._cors_origins:
             cmd.extend(["--cors-origins", self._cors_origins])
 
-        env = dict(os.environ)
+        # ``worker_environment`` is the application's environment plus the
+        # Hugging Face token when one is configured: the server fetches its own
+        # model from Hugging Face, so a gated repository would need it here too.
+        env = hf_access.worker_environment()
         # Ensure the managed venv's site-packages are on PYTHONPATH
         # so omnivoice_server can be found.
         env["PYTHONPATH"] = rt.env_dir + os.pathsep + env.get("PYTHONPATH", "")
@@ -448,10 +459,10 @@ class OmniVoiceServerManager:
         # argument" and each synthesis request returned HTTP 500 — the
         # server looked broken while it was perfectly healthy.  Send the
         # output to a log file (truncated on each start) instead.
-        from ..paths import logs_dir  # noqa: PLC0415
+        from ..paths import logs_dir
         self._log_path = os.path.join(logs_dir(), _LOG_NAME)
         try:
-            self._log_fh = open(
+            self._log_fh = open(  # noqa: SIM115 - open for the server's lifetime
                 self._log_path, "w", encoding="utf-8", errors="replace"
             )
         except OSError as exc:
@@ -483,8 +494,8 @@ class OmniVoiceServerManager:
 
     def _wait_ready(self, timeout: float) -> None:
         """Poll the health endpoint until the server responds or timeout."""
-        import urllib.request  # noqa: PLC0415
-        import urllib.error  # noqa: PLC0415
+        import urllib.error
+        import urllib.request
 
         url = f"{self.base_url}/health"
         deadline = time.monotonic() + timeout
@@ -517,18 +528,19 @@ class OmniVoiceServerManager:
             try:
                 self._proc.terminate()
                 self._proc.wait(timeout=10)
-            except Exception:  # noqa: BLE001
+            except Exception as exc:
+                log.debug("Graceful server shutdown failed (%s); killing it", exc)
                 try:
                     self._proc.kill()
-                except Exception:  # noqa: BLE001
-                    pass
+                except Exception as kill_exc:
+                    log.debug("Server process was already gone: %s", kill_exc)
             self._proc = None
             self._ready.clear()
             if self._log_fh:
                 try:
                     self._log_fh.close()
-                except Exception:  # noqa: BLE001
-                    pass
+                except Exception as exc:
+                    log.debug("Server log file did not close cleanly: %s", exc)
                 self._log_fh = None
             log.info("OmniVoice server stopped.")
 
@@ -548,7 +560,7 @@ class OmniVoiceServerManager:
             # We did not start this server (the app started it in another
             # process, or this manager is a late arrival), so fall back to the
             # one place the server ever writes.
-            from ..paths import logs_dir  # noqa: PLC0415
+            from ..paths import logs_dir
             text = _tail_of(os.path.join(logs_dir(), _LOG_NAME), 80)
         for line in reversed(text.splitlines()):
             line = line.strip()
@@ -587,8 +599,8 @@ class OmniVoiceServerManager:
         endpoint can be slow to answer, and a single 5s probe used to
         mis-report a perfectly healthy server as "not responding".
         """
-        import urllib.request  # noqa: PLC0415
-        import urllib.error  # noqa: PLC0415
+        import urllib.error
+        import urllib.request
 
         for attempt in range(max(1, retries)):
             try:
@@ -596,7 +608,7 @@ class OmniVoiceServerManager:
                 req = urllib.request.Request(url, method="GET")
                 with urllib.request.urlopen(req, timeout=timeout) as resp:
                     return resp.status == 200
-            except Exception:  # noqa: BLE001
+            except Exception:
                 if attempt < retries - 1:
                     time.sleep(delay)
         return False
@@ -636,8 +648,6 @@ class OmniVoiceServerManager:
         ``voice`` / ``speaker`` presets and ``ref_audio``-based cloning follow
         the server's documented precedence rules.
         """
-        import urllib.request  # noqa: PLC0415
-
         if not text.strip():
             raise ValueError("Nothing to synthesize")
 
@@ -666,7 +676,7 @@ class OmniVoiceServerManager:
         # have produced if the API accepted it.  A chunk that comes back as a
         # drone is drawn again (and repaired sentence by sentence if needed),
         # so the caller still receives one continuous take per text.
-        def _send(piece: str, piece_seed: Optional[int]):
+        def _send(piece: str, piece_seed: int | None):
             return self._post_speech(
                 piece,
                 url=url,
@@ -701,14 +711,14 @@ class OmniVoiceServerManager:
         speed: float,
         stream: bool,
         response_format: str,
-        optional: Dict[str, Any],
-        seed: Optional[int],
+        optional: dict[str, Any],
+        seed: int | None,
         request_timeout_s: int | None,
     ) -> tuple:
         """One ``/v1/audio/speech`` request; returns ``(wav_bytes, headers)``."""
-        import urllib.request  # noqa: PLC0415
+        import urllib.request
 
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "model": "omnivoice",
             "input": chunk,
             "voice": voice,
@@ -777,9 +787,6 @@ class OmniVoiceServerManager:
         response_format: str = "wav",
     ) -> np.ndarray:
         """Synthesize text with voice cloning via the server (multipart)."""
-        import urllib.request  # noqa: PLC0415
-        import io  # noqa: PLC0415
-
         if not text.strip():
             raise ValueError("Nothing to synthesize")
 
@@ -789,7 +796,7 @@ class OmniVoiceServerManager:
         # same uploaded reference sample and joined in order.  A drone chunk
         # is drawn again (and repaired sentence by sentence if needed), so the
         # caller still receives one continuous take per text.
-        def _send(piece: str, piece_seed: Optional[int]):
+        def _send(piece: str, piece_seed: int | None):
             return self._post_clone(
                 piece,
                 url=url,
@@ -852,7 +859,7 @@ class OmniVoiceServerManager:
         seed: int | None,
     ) -> tuple:
         """One ``/v1/audio/speech/clone`` request; ``(wav_bytes, headers)``."""
-        import urllib.request  # noqa: PLC0415
+        import urllib.request
 
         body = self._clone_multipart_body(
             chunk,
@@ -983,14 +990,14 @@ class OmniVoiceServerManager:
         "HTTP Error 500", which hid the cause and made every request-level
         failure look like a dead server.
         """
-        import json  # noqa: PLC0415
-        import urllib.error  # noqa: PLC0415
+        import json
+        import urllib.error
 
         if not isinstance(exc, urllib.error.HTTPError):
             return str(exc)
         try:
             raw = exc.read().decode("utf-8", errors="replace")
-        except Exception:  # noqa: BLE001
+        except Exception:
             return str(exc)
         detail = raw.strip()
         try:
@@ -1001,8 +1008,8 @@ class OmniVoiceServerManager:
                     detail = str(err["message"])
                 elif payload.get("detail"):
                     detail = str(payload["detail"])
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as parse_exc:
+            log.debug("Error body was not JSON (%s); using it as text", parse_exc)
         return f"server returned HTTP {exc.code}: {detail}"
 
     @staticmethod
@@ -1069,7 +1076,8 @@ class OmniVoiceServerManager:
                     self._wav_bytes_to_samples(wav_bytes),
                     headers.get("x-no-speech-detected") == "true",
                 )
-            assert failure is not None  # REQUEST_ATTEMPTS >= 1
+            if failure is None:  # REQUEST_ATTEMPTS >= 1, so this cannot happen
+                raise OmniVoiceServerError("no synthesis attempt was made")
             raise failure
 
         return draw
@@ -1130,8 +1138,8 @@ class OmniVoiceServerManager:
     @staticmethod
     def _wav_bytes_to_samples(wav_bytes: bytes) -> np.ndarray:
         """Convert raw WAV bytes to int16 samples."""
-        import wave  # noqa: PLC0415
-        import io  # noqa: PLC0415
+        import io
+        import wave
 
         try:
             with wave.open(io.BytesIO(wav_bytes), "rb") as wf:
@@ -1148,8 +1156,8 @@ class OmniVoiceServerManager:
     def get_voice_info(self) -> dict:
         """Fetch the full ``/v1/voices`` response (voices + design
         attributes vocabulary), or ``{}`` when the server is unreachable."""
-        import urllib.request  # noqa: PLC0415
-        import urllib.error  # noqa: PLC0415
+        import urllib.error
+        import urllib.request
 
         url = f"{self.base_url}/v1/voices"
         req = urllib.request.Request(url, method="GET")
@@ -1159,12 +1167,12 @@ class OmniVoiceServerManager:
             with urllib.request.urlopen(req, timeout=10) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 return data if isinstance(data, dict) else {}
-        except Exception:  # noqa: BLE001
+        except Exception:
             return {}
 
     def get_models(self) -> list:
         """List models advertised by the server (OpenAI-compatible)."""
-        import urllib.request  # noqa: PLC0415
+        import urllib.request
 
         url = f"{self.base_url}/v1/models"
         req = urllib.request.Request(url, method="GET")
@@ -1175,8 +1183,8 @@ class OmniVoiceServerManager:
                 data = json.loads(resp.read().decode("utf-8"))
                 if isinstance(data, dict):
                     return data.get("data") or data.get("models") or []
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as exc:
+            log.debug("Listing the server's models failed: %s", exc)
         return []
 
     # -- Voice profiles (server-stored clones) -----------------------------
@@ -1219,7 +1227,7 @@ class OmniVoiceServerManager:
         overwrite: bool = False,
     ) -> dict:
         """Store a voice-cloning profile on the server (reusable)."""
-        import urllib.request  # noqa: PLC0415
+        import urllib.request
 
         url = f"{self.base_url}/v1/voices/profiles"
         body = self._build_profile_forms(
@@ -1263,8 +1271,8 @@ class OmniVoiceServerManager:
 
     def get_profile(self, profile_id: str) -> dict | None:
         """Fetch a single server-stored voice profile."""
-        import urllib.request  # noqa: PLC0415
-        import urllib.parse  # noqa: PLC0415
+        import urllib.parse
+        import urllib.request
 
         url = f"{self.base_url}/v1/voices/profiles/{urllib.parse.quote(profile_id)}"
         req = urllib.request.Request(url, method="GET")
@@ -1273,13 +1281,13 @@ class OmniVoiceServerManager:
         try:
             with urllib.request.urlopen(req, timeout=10) as resp:
                 return json.loads(resp.read().decode("utf-8"))
-        except Exception:  # noqa: BLE001
+        except Exception:
             return None
 
     def delete_profile(self, profile_id: str) -> bool:
         """Delete a server-stored voice profile."""
-        import urllib.request  # noqa: PLC0415
-        import urllib.parse  # noqa: PLC0415
+        import urllib.parse
+        import urllib.request
 
         url = f"{self.base_url}/v1/voices/profiles/{urllib.parse.quote(profile_id)}"
         req = urllib.request.Request(url, method="DELETE")
@@ -1288,7 +1296,7 @@ class OmniVoiceServerManager:
         try:
             with urllib.request.urlopen(req, timeout=10) as resp:
                 return resp.status in (200, 204)
-        except Exception:  # noqa: BLE001
+        except Exception:
             return False
 
 
@@ -1301,7 +1309,7 @@ _server_lock = threading.Lock()
 
 def get_server_manager(**kwargs) -> OmniVoiceServerManager:
     """Get or create the singleton OmniVoiceServerManager."""
-    global _server_manager  # noqa: PLW0603
+    global _server_manager
     with _server_lock:
         if _server_manager is None:
             _server_manager = OmniVoiceServerManager(**kwargs)
@@ -1333,7 +1341,7 @@ class OmniVoiceServerEngine:
             self._server.start()
 
         # Per-project OmniVoice options (see omnivoice/spec.apply_omni_to_voice).
-        from ..omnivoice import spec  # noqa: PLC0415
+        from ..omnivoice import spec
         self._omni = voice_entry.get("omni") or {}
         self._instruct = spec.resolve_instruct(
             "omnivoice_server",
@@ -1353,7 +1361,7 @@ class OmniVoiceServerEngine:
         #: caller can warn the user instead of shipping a droning take.
         self.last_warnings: list = []
 
-    def _omni_kwargs(self) -> Dict[str, Any]:
+    def _omni_kwargs(self) -> dict[str, Any]:
         """Advanced generation knobs configured for this voice.
 
         Client-level defaults keep the exact request behaviour the studio had
@@ -1427,10 +1435,10 @@ class OmniVoiceServerEngine:
         self._report_quality(samples)
 
         if pitch != 1.0:
-            from ..tts.engine import _shift_pitch  # noqa: PLC0415
+            from ..tts.engine import _shift_pitch
             samples = _shift_pitch(samples, pitch)
         if volume != 1.0:
-            from ..tts.engine import _apply_volume  # noqa: PLC0415
+            from ..tts.engine import _apply_volume
             samples = _apply_volume(samples, volume)
         return samples
 

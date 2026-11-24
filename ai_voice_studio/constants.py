@@ -2,7 +2,7 @@
 
 APP_NAME = "AI Voice Studio"
 APP_ID = "AIVoiceStudio"
-APP_VERSION = "2026.3.7"
+APP_VERSION = "2027.1.0"
 
 # Version of the first-launch terms/acceptance dialog. Bump this on every
 # release so the dialog shows again after an update (SPEC: user must re-accept
@@ -209,6 +209,261 @@ AUDIO_MODE_DESCRIPTIONS = {
 }
 
 # ---------------------------------------------------------------------------
+# Project base: text-to-speech or speech-to-text (New Project wizard)
+# ---------------------------------------------------------------------------
+PROJECT_BASE_TTS = "tts"
+PROJECT_BASE_STT = "stt"
+# Audio description: describe the picture of a video, offline, into a script (and
+# optionally an SRT/VTT track) that a blind or low-vision listener can follow.
+PROJECT_BASE_AD = "ad"
+PROJECT_BASE_CHOICES = [
+    (PROJECT_BASE_TTS, "Text to speech"),
+    (PROJECT_BASE_STT, "Speech to text"),
+    (PROJECT_BASE_AD, "Audio description"),
+]
+DEFAULT_PROJECT_BASE = PROJECT_BASE_TTS
+
+# Project type written into project.json for transcription projects.
+PROJECT_TYPE_STT = "stt_transcription"
+
+# Project type written into project.json for audio description projects.
+PROJECT_TYPE_AD = "audio_description"
+
+# ---------------------------------------------------------------------------
+# Audio description: chunking and estimates
+# ---------------------------------------------------------------------------
+#: Above this much video the wizard and the dialog stop being quiet about the
+#: compute and warn how long a description run will take.
+AD_WARN_SECONDS = 300.0
+
+#: Default chunk length used when a long video is cut into pieces.  A chunk is
+#: described on its own and the partial descriptions are merged, which is the
+#: only way the strongest off-the-shelf models reach a long video at all.
+#:
+#: A chunk bounds **memory, progress and resume**, not the length of a
+#: description; that is :data:`AD_WINDOW_SECONDS`.
+AD_CHUNK_SECONDS = 120.0
+
+#: How much video **one description** covers.
+#:
+#: This is the setting that decides how much a listener is told.  A chunk is
+#: described window by window, so a two-minute chunk still yields a description
+#: every twenty seconds - the cadence broadcast audio description uses.  One
+#: summary per chunk was measured to swallow exactly what a viewer needs: a line
+#: of on-screen text appearing, a gesture, a slide advancing.  Twenty seconds is
+#: short enough to report a change and long enough that the descriptions do not
+#: step on each other.
+AD_WINDOW_SECONDS = 20.0
+
+#: The longest a window may be.  A very large window setting still describes a
+#: chunk in pieces, so the detail does not silently collapse back to one summary
+#: per chunk.
+AD_MAX_WINDOW_SECONDS = 60.0
+AD_CHUNK_CHOICES = [
+    (60.0, "1 minute per chunk"),
+    (120.0, "2 minutes per chunk (recommended)"),
+    (180.0, "3 minutes per chunk"),
+    (300.0, "5 minutes per chunk"),
+    (600.0, "10 minutes per chunk"),
+]
+
+#: Frames sampled per second of video.  Video is far more expensive than audio
+#: per second, so every "long video" claim is really a claim about frame rate.
+AD_DEFAULT_FPS = 0.5
+AD_FPS_CHOICES = [
+    (1.0, "1 frame per second (most detail, slowest)"),
+    (0.5, "1 frame every 2 seconds (recommended)"),
+    (0.25, "1 frame every 4 seconds"),
+    (0.2, "1 frame every 5 seconds (fastest)"),
+]
+
+#: Gap fitting: the shortest silence worth speaking into, and the longest a
+#: single description may run so it never talks over the dialogue.
+AD_MIN_GAP_SECONDS = 1.5
+AD_MAX_DESCRIPTION_SECONDS = 12.0
+
+# ---------------------------------------------------------------------------
+# Audio description: where a description is spoken
+# ---------------------------------------------------------------------------
+#: Standard audio description speaks into the pauses of the existing soundtrack;
+#: extended audio description *stops the film*, speaks, and goes on, which is the
+#: only option for a film whose dialogue never leaves a pause long enough.
+AD_PLACEMENT_STANDARD = "standard"
+AD_PLACEMENT_EXTENDED = "extended"
+AD_PLACEMENT_CHOICES = [
+    (AD_PLACEMENT_STANDARD,
+     "Speak into the pauses (standard audio description)"),
+    (AD_PLACEMENT_EXTENDED,
+     "Pause the video for each description (extended audio description)"),
+]
+AD_DEFAULT_PLACEMENT = AD_PLACEMENT_STANDARD
+
+# ---------------------------------------------------------------------------
+# Audio description: track priority (which of the two tracks gives way)
+# ---------------------------------------------------------------------------
+#: Standard audio description speaks the description *over* the film's own
+#: soundtrack, so one of the two tracks has to give way somewhere.  Which one is
+#: the user's call, because it depends on the film: a lecture with one quiet
+#: speaker needs nothing, while a film scored wall to wall buries the
+#: description unless the film's own track comes down.
+AD_TRACK_PRIORITY_SAME = "same"
+AD_TRACK_PRIORITY_25 = "higher25"
+AD_TRACK_PRIORITY_50 = "higher50"
+#: The one choice that does not lower the film at all: the film's own soundtrack
+#: is left at its own level everywhere and comes down **only while a description
+#: is actually being spoken** (see ``AD_DUCK_LEVEL``), so a film with music and
+#: dialogue that never stop keeps its own sound between the descriptions instead
+#: of playing quietly for its whole length.
+AD_TRACK_PRIORITY_DUCK = "duck"
+#: Ordered from the gentlest answer to the film to the most forceful: *same*
+#: leaves both tracks alone, *duck* touches the film only under the voice, and
+#: the two percentage choices lower the film for its whole length.  The first
+#: entry is also the default (``AD_DEFAULT_TRACK_PRIORITY``), so a project
+#: written before any of these choices existed opens on exactly what it did.
+AD_TRACK_PRIORITY_CHOICES = [
+    (AD_TRACK_PRIORITY_SAME,
+     "Same volume (both tracks as they are)"),
+    (AD_TRACK_PRIORITY_DUCK,
+     "Duck, don't lower (the film's own sound dips while a description speaks)"),
+    (AD_TRACK_PRIORITY_25,
+     "Description 25% higher (the film's own sound is quieter by 25%)"),
+    (AD_TRACK_PRIORITY_50,
+     "Description 50% higher (the film's own sound is quieter by 50%)"),
+]
+
+#: What one description is worth by default: both tracks stay as they are.  A
+#: project written before any of these choices existed carries no value at all,
+#: and this is exactly what those runs did, so an old project is never mixed
+#: differently because a newer version added choices.
+AD_DEFAULT_TRACK_PRIORITY = AD_TRACK_PRIORITY_SAME
+
+#: The film soundtrack's own gain for each choice.  The description is **always**
+#: left at its own level - the voice the user tuned in Settings, spoken by the
+#: narration settings - and the film's track is what moves: *25% higher* plays it
+#: at 0.75, *50% higher* at 0.5.  Raising the description instead would clip
+#: (full-scale speech already peaks near full scale) and would change a level the
+#: user had already chosen by ear, so only one direction is applied.  *Duck, don't
+#: lower* is 1.0 here on purpose: it does not lower the film at all, it dips it
+#: while the voice is heard (``AD_DUCK_LEVEL``).
+AD_TRACK_PRIORITY_GAIN = {
+    AD_TRACK_PRIORITY_SAME: 1.0,
+    AD_TRACK_PRIORITY_25: 0.75,
+    AD_TRACK_PRIORITY_50: 0.5,
+    AD_TRACK_PRIORITY_DUCK: 1.0,
+}
+
+#: How far *Duck, don't lower* brings the film's own soundtrack down **while a
+#: description is being spoken**: a quarter of its own level, about -12 dB.  A
+#: duck is deep and short by nature - the film is normal between descriptions and
+#: steps out of the way under the voice - which is why it is not one of the
+#: quieter-for-the-whole-film gains above.
+AD_DUCK_LEVEL = 0.25
+
+#: How long the film takes to come down and to come back up, either side of a
+#: spoken description.  A step would be a click on a music track; a few tens of
+#: milliseconds is the ramp a broadcast ducker uses and is inaudible.
+AD_DUCK_EDGE_SECONDS = 0.06
+
+#: Two descriptions closer together than this are one dip.  Coming back up for a
+#: fraction of a second between two back-to-back descriptions would be heard as
+#: the film's own sound flapping, which is worse than either extreme.
+AD_DUCK_MERGE_SECONDS = 0.4
+
+#: The ceiling on the ducking expression, in characters.  The dips are written as
+#: one FFmpeg expression, and a command line has a length limit (about 32,000
+#: characters on Windows, which is the shortest of them).  A film long enough to
+#: reach this - hundreds of descriptions - is mixed as it always was rather than
+#: failing to write at all; the ducking is a refinement, not a reason to lose the
+#: described film.
+AD_DUCK_MAX_EXPRESSION = 24000
+
+#: The narration voice's own volume - how loud the spoken description is, as a
+#: multiplier of what the voice engine produces.  1.0 is the voice as it came;
+#: the slider in the Audio description window runs from ``VOLUME_MIN`` to
+#: ``VOLUME_MAX``, the same range the recording settings use, and it is the
+#: *description's* level - the film's track is what *Track priority* moves.
+AD_NARRATION_VOLUME_DEFAULT = 1.0
+
+#: Extended mode holds the film on the last frame while the description speaks,
+#: then a beat of silence before the picture moves again, so the description is
+#: never clipped by the film restarting.
+AD_PAUSE_PADDING = 0.6
+
+#: Nobody wants a pause shorter than this, however short the description is.
+AD_MIN_PAUSE_SECONDS = 0.8
+
+#: Rough spoken length of one description, used only by the pre-run estimate of
+#: how much longer an extended description makes a film.  Taken from a real run's
+#: measured pauses (8.8 - 15.2 s, about 11 s on average), because that is exactly
+#: how long the film is held for.
+AD_EXTENDED_SECONDS_PER_DESCRIPTION = 11.0
+
+#: Output documents an audio description project writes.
+AD_FORMAT_SCRIPT = "script"
+AD_FORMAT_SCRIPT_HTML = "script_html"
+AD_FORMAT_SRT = "srt"
+AD_FORMAT_VTT = "vtt"
+AD_FORMAT_JSON = "json"
+AD_OUTPUT_CHOICES = [
+    (AD_FORMAT_SCRIPT, "Description script (plain text)"),
+    (AD_FORMAT_SCRIPT_HTML, "Description script (web page)"),
+    (AD_FORMAT_SRT, "SubRip subtitles (.srt)"),
+    (AD_FORMAT_VTT, "WebVTT subtitles (.vtt)"),
+    (AD_FORMAT_JSON, "JSON with timings (.json)"),
+]
+AD_DEFAULT_OUTPUT = AD_FORMAT_SCRIPT
+
+# ---------------------------------------------------------------------------
+# Speech-to-text: output document types
+# ---------------------------------------------------------------------------
+STT_FORMAT_TXT = "txt"
+STT_FORMAT_HTML = "html"
+STT_FORMAT_MARKDOWN = "markdown"
+STT_FORMAT_SRT = "srt"
+STT_FORMAT_VTT = "vtt"
+STT_FORMAT_JSON = "json"
+STT_FORMAT_CSV = "csv"
+# Markdown, WebVTT, JSON and CSV are the "popular types for this purpose"
+# added beyond the requested .txt/.html/.srt: VTT is the open subtitle format
+# used alongside SRT, and JSON/CSV keep the per-segment timings for tooling.
+STT_OUTPUT_CHOICES = [
+    (STT_FORMAT_TXT, "Plain text (.txt)"),
+    (STT_FORMAT_HTML, "Web page (.html)"),
+    (STT_FORMAT_MARKDOWN, "Markdown (.md)"),
+    (STT_FORMAT_SRT, "SubRip subtitles (.srt)"),
+    (STT_FORMAT_VTT, "WebVTT subtitles (.vtt)"),
+    (STT_FORMAT_JSON, "JSON with timings (.json)"),
+    (STT_FORMAT_CSV, "Spreadsheet (.csv)"),
+]
+STT_DEFAULT_OUTPUT = STT_FORMAT_TXT
+
+# ---------------------------------------------------------------------------
+# Speech-to-text: source selection
+# ---------------------------------------------------------------------------
+STT_SOURCE_SINGLE = "single"
+STT_SOURCE_MULTIPLE = "multiple"
+STT_SOURCE_FOLDER = "folder"
+STT_SOURCE_CHOICES = [
+    (STT_SOURCE_SINGLE, "A single file"),
+    (STT_SOURCE_MULTIPLE, "Multiple files"),
+    (STT_SOURCE_FOLDER, "A complete folder"),
+]
+STT_DEFAULT_SOURCE = STT_SOURCE_SINGLE
+
+# ---------------------------------------------------------------------------
+# Speech-to-text: file creation mode
+# ---------------------------------------------------------------------------
+STT_SPLIT_PER_SOURCE = "per_source"
+STT_SPLIT_BY_TIME = "by_time"
+STT_SPLIT_CHOICES = [
+    (STT_SPLIT_PER_SOURCE, "A document file for each source file"),
+    (STT_SPLIT_BY_TIME, "Time by time separation"),
+]
+STT_DEFAULT_SPLIT = STT_SPLIT_PER_SOURCE
+STT_TIME_CHOICES = [10, 20, 30, 40, 50, 60]
+STT_DEFAULT_MINUTES = 30
+
+# ---------------------------------------------------------------------------
 # Document parsing
 # ---------------------------------------------------------------------------
 # Approximate page size used to split free-flowing formats (txt/md/html/docx)
@@ -251,3 +506,9 @@ HEAVY_LOG_SUBSYSTEMS = ["gui", "tts", "engine", "recording", "addons", "download
 # ---------------------------------------------------------------------------
 DOWNLOAD_TIMEOUT = 60
 DOWNLOAD_CHUNK = 256 * 1024
+
+#: The OmniVoice server's bind addresses.  ``LOOPBACK`` is the default; the
+#: "network access" checkbox switches to ``ALL_INTERFACES``, which exposes an
+#: unauthenticated HTTP server on the LAN (see docs/UserGuide.html).
+OMNIVOICE_BIND_LOOPBACK = "127.0.0.1"
+OMNIVOICE_BIND_ALL_INTERFACES = "0.0.0.0"  # noqa: S104 - see above: opt-in only

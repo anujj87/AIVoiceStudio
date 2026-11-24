@@ -726,12 +726,23 @@
 
 <h2>Glossary additions — Part X (the current system)</h2>
 
-<p>Terms introduced by the Voice Lab subsystem, the per-engine environments, the compute
-choice and the licensing model. Each one links to the chapter that explains it.</p>
+<p>Terms introduced by the Voice Lab subsystem, the speech-to-text models and their
+device fit, the per-engine environments, the compute choice and the licensing model.
+Each one links to the chapter that explains it; the speech-to-text models are
+documented in the README, in the Settings &gt; Manage the STT page itself and in <a href="ch84_stt_catalog.html">Chapters 84–86</a>.</p>
 
 <dl class="glossary">
-<dt>Bark</dt>
-<dd>Suno AI's transformer audio model, used in the Voice Lab as a voice-cloning engine. MIT licensed, over one hundred speaker presets across twelve languages. Installed as the <code>transformers</code> package plus PyTorch. See <a href="ch76_voicelab_engines.html">Chapter 76</a>.</dd>
+<dt>Input gesture</dt>
+<dd>A normalized keyboard key combination (<code>kb:control+shift+n</code>) bound to one application command, after NVDA's Input Gestures model. Commands live in <code>ai_voice_studio/gestures.py</code> grouped by category; the user's overrides replace the defaults for a command and are stored in <code>settings['gestures.bindings']</code>. Settings &gt; Keyboard gestures adds, removes and resets them, and reports a key that two commands both want rather than resolving it silently.</dd>
+
+<dt>Speech to Text (STT)</dt>
+<dd>The transcription subsystem: every speech-recognition model gets a Python environment of its own under <code>%APPDATA%\AIVoiceStudio\stt_envs\&lt;model id&gt;</code>, driven by a worker subprocess exactly like the Voice Lab engines. The catalog (<code>stt/catalog.py</code>) lists only repositories that download without a Hugging Face account, a token or a licence click-through.</dd>
+
+<dt>Device fit (CPU or GPU)</dt>
+<dd>Every STT model declares the device it is <em>preferred</em> on, and whether it truly cannot run without a GPU. Only such a model (Canary-Qwen 2.5B, Granite Speech 8B) is offered the GPU alone; every other model is offered <em>both</em> the CPU and the GPU when an NVIDIA card is present — the preferred device first — and the CPU alone when there is no card. Because one catalog entry can hold a GPU-only checkpoint and a CPU-friendly one, the choice is decided per variant. “Auto” is never offered, so the user always decides the device.</dd>
+
+<dt>Timestamps capability</dt>
+<dd>Whether a model's back-end can report <em>when</em> each phrase was spoken. Whisper and CTC models can; the audio language models (Qwen3-ASR, Voxtral, Granite Speech, Moonshine) cannot, and <code>transformers</code> raises if they are asked. The catalog declares the capability per model, and the worker never requests timings a model cannot give.</dd>
 
 <dt>Compute choice</dt>
 <dd>The per-category CPU / GPU / Auto combo box shown next to every Preview button, remembered per category in Settings under <code>preview_compute.&lt;category&gt;</code>. See <a href="ch78_compute_choice.html">Chapter 78</a>.</dd>
@@ -747,6 +758,9 @@ choice and the licensing model. Each one links to the chapter that explains it.<
 
 <dt>Engine environment (<code>tts_envs</code>)</dt>
 <dd>One Python virtualenv per TTS engine under <code>%APPDATA%\AIVoiceStudio\tts_envs\&lt;engine&gt;</code>, so engines with conflicting dependencies never share site-packages. See <a href="ch77_engine_environments.html">Chapter 77</a>.</dd>
+
+<dt>KokoClone</dt>
+<dd>A multilingual zero-shot voice-cloning system built on Kokoro-ONNX: Kokoro synthesises the text and the Kanade model re-voices it to sound like a 3&ndash;10 second reference recording. It is installed from pinned source archives (it is not on PyPI) into its own environment, and it never falls back to the shared one.</dd>
 
 <dt>F5-TTS</dt>
 <dd>A flow-matching transformer TTS with zero-shot voice cloning. MIT licensed <em>code</em>, but its released <strong>weights are CC-BY-NC-4.0</strong> (non-commercial). See <a href="ch82_licensing.html">Chapter 82</a>.</dd>
@@ -770,7 +784,7 @@ choice and the licensing model. Each one links to the chapter that explains it.<
 <dd>The runtime replacement of <code>torchaudio.load</code>/<code>save</code> with soundfile, installed only after a real decode proves TorchCodec cannot load (a machine without FFmpeg). Opt out with <code>AIVS_VOICELAB_NO_AUDIO_SHIM=0</code>. See <a href="ch79_audio_io_shim.html">Chapter 79</a>.</dd>
 
 <dt>Start Selected Recording</dt>
-<dd>The Edit-menu command that opens the recording picker: choose a mode (recorded audio file, or any file break), a target and a scope (this file only, or this file and everything after it). See <a href="ch80_start_selected_recording.html">Chapter 80</a>.</dd>
+<dd>The Edit-menu command that opens the recording picker: a read-only <em>Project base</em> combo names the project's base, then choose a mode (recorded audio file, or any file break), a target and a scope (this file only, or this file and everything after it). A transcription project opens the same layout with <em>transcribe</em> wording. See <a href="ch80_start_selected_recording.html">Chapter 80</a>.</dd>
 
 <dt>Terms version (<code>TERMS_VERSION</code>)</dt>
 <dd>The value compared against the stored acceptance. Bumping it in <code>constants.py</code> is what makes the first-launch dialog appear again after an update. See <a href="ch81_terms_dialog.html">Chapter 81</a>.</dd>
@@ -782,7 +796,7 @@ choice and the licensing model. Each one links to the chapter that explains it.<
 <dd>A tensor-core fast path for float32 maths, enabled for GPU inference. Practically indistinguishable in TTS output, markedly faster.</dd>
 
 <dt>Voice Lab</dt>
-<dd>The subsystem that installs and drives the pip-based voice-clone engines (Pocket TTS, Bark, F5-TTS) inside their own Python environments, through a worker subprocess. See <a href="ch76_voicelab_engines.html">Chapter 76</a>.</dd>
+<dd>The subsystem that installs and drives the pip-based voice-clone engines (Pocket TTS, F5-TTS, KokoClone, Chatterbox, Qwen3-TTS, VibeVoice, MOSS-TTS, GPT-SoVITS) inside their own Python environments, through a worker subprocess. See <a href="ch76_voicelab_engines.html">Chapter 76</a>.</dd>
 
 <dt>Voice registry</dt>
 <dd><code>voicelab/engines.py</code>: the data description of each engine — packages, licence, homepage, device support and built-in voices — read by the GUI, the installer and the worker alike.</dd>

@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 84: A Second Catalog - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part X — Speech to Text, Voice Lab &amp; the Current System</div><ul class="chapters"><li><a href="ch76_voicelab_engines.html">Ch 76: Voice Lab Engines</a></li><li><a href="ch77_engine_environments.html">Ch 77: One Environment per Engine</a></li><li><a href="ch78_compute_choice.html">Ch 78: Compute Choice</a></li><li><a href="ch79_audio_io_shim.html">Ch 79: Audio I/O Without FFmpeg</a></li><li><a href="ch80_start_selected_recording.html">Ch 80: Start Selected Recording</a></li><li><a href="ch81_terms_dialog.html">Ch 81: First-Launch Terms</a></li><li><a href="ch82_licensing.html">Ch 82: Licensing &amp; Compliance</a></li><li><a href="ch83_input_gestures.html">Ch 83: Input Gestures</a></li><li><a href="ch84_stt_catalog.html" class="active">Ch 84: A Second Catalog</a></li><li><a href="ch85_stt_environments.html">Ch 85: One Environment per Model</a></li><li><a href="ch86_stt_dialog.html">Ch 86: The Transcribe Dialog</a></li><li><a href="ch87_theme_studio.html">Ch 87: The Theme Studio</a></li><li><a href="ch88_update_checker.html">Ch 88: Checking for Updates</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 84</div>
+<h1>A Second Catalog: Describing Speech-to-Text Models as Data</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Recognise when a second catalog must be <em>plain Python</em> rather than JSON</li>
+  <li>Describe a model with the facts its UI and its runner each need</li>
+  <li>Express a <em>preference</em> (which device to try first) separately from a <em>limit</em> (a device that cannot work)</li>
+  <li>Declare a capability a back-end really has, instead of asking for it and catching the failure</li>
+  <li>Keep a per-variant override so one catalog entry can hold a GPU-only checkpoint and a CPU-friendly one</li>
+  <li>Derive the Settings table from the same data the dialog uses, so the two can never disagree</li>
+</ul>
+
+<hr>
+
+<h2>84.1 Why Speech to Text Needed Its Own Catalog</h2>
+
+<p>Chapter 47 built the catalog for the <em>speech</em> engines: a JSON file of
+ONNX models with download URLs, file names and byte counts. The speech-to-text
+models are a different kind of thing. They are ordinary Python packages
+(<code>faster-whisper</code>, <code>transformers</code>, <code>nemo_toolkit</code>,
+<code>speechbrain</code>) that run in a managed virtual environment, not ONNX
+graphs with a manifest. There is no download URL to pin and no graph to check a
+size for &mdash; pip resolves the dependencies &mdash; so an entry has to describe
+<em>pip packages</em>, a <em>back-end</em> and a <em>repository id</em> instead.</p>
+
+<p>The consequence is the design decision of this chapter:</p>
+
+<div class="info">
+<strong>The STT catalog is plain Python, not JSON.</strong>
+<code>ai_voice_studio/stt/catalog.py</code> declares its models as a list of
+dictionaries in code. A JSON catalog needs a schema, a loader, a validator and a
+way to point at files; for a small list of models whose extra facts (which
+transformer runner to use, whether the repository needs
+<code>trust_remote_code</code>) are not expressible as strings anyway, code is
+the simpler and safer home. The TTS catalog stayed JSON because its data
+<em>is</em> downloadable, versioned metadata.
+</div>
+
+<p>Everything else follows the project's usual rule: <strong>the catalog is the
+single description</strong>. The Settings table, the transcribe dialog's combos
+and the worker's request all read from this one module, so a model cannot appear
+in one place and be missing from another.</p>
+
+<h2>84.2 The Shape of an Entry</h2>
+
+<p>Every model is a dictionary with the fields its two audiences need. The
+Settings table (<em>Manage the STT</em>) wants columns; the transcribe dialog and
+the worker want execution facts.</p>
+
+<pre><code>{
+    "id": "whisper_large_v3",
+    "name": "Whisper Large V3",
+    "license": "MIT",
+    "languages_label": "99+",
+    "languages": WHISPER_LANGUAGES,
+    "fit": "gpu",
+    "fit_label": "\u2705 GPU or CPU",
+    "notes": "Multilingual and accurate; runs on both a GPU (~10-12 GB "
+             "VRAM for Large) and a CPU",
+    "variants": _whisper_variants(),
+    "default_variant": "large-v3",
+    "accuracy_hint": "~10.3% WER (large-v3)",
+    "backend": "faster_whisper",
+    "pip_packages": ["faster-whisper"],
+    # CTranslate2 is a CUDA build on Windows: without the cuBLAS runtime
+    # from these wheels every run failed with "Library cublas64_12.dll is
+    # not found or cannot be loaded".  The wheel ships cuDNN itself.
+    "cuda_packages": ["nvidia-cublas-cu12"],
+    "timestamps": True,
+    "alt_backends": ["whisper", "transformers"],
+    "translation": True,
+}
+</code></pre>
+
+<p>Two fields deserve a closer look, because they were added for a reason.</p>
+
+<p><strong><code>pip_packages</code> and <code>cuda_packages</code> are
+separate.</strong> The first is what every install needs; the second is what a
+<em>GPU machine</em> additionally needs. Keeping them apart is what lets a
+CPU-only computer install a model without downloading a CUDA runtime it can
+never use &mdash; while still fixing the Whisper install that quietly fell back
+to the CPU because its CTranslate2 back-end could not find
+<code>cublas64_12.dll</code>.</p>
+
+<p><strong><code>timestamps</code> is declared, not requested.</strong> The
+transformers library raises</p>
+
+<pre><code>We cannot return_timestamps yet on non-CTC models apart from Whisper!</code></pre>
+
+<p>for every audio language model. So the catalog states which models can really
+report <em>when</em> each phrase was spoken, and the worker never asks the others
+for something they cannot give:</p>
+
+<pre><code>{
+    "Whisper Large V3":     timestamps=True   # CTC/attention with word times
+    "Qwen3-ASR":            timestamps=False  # an audio language model
+    "Voxtral":              timestamps=False
+    "Granite Speech":       timestamps=False
+    "Moonshine":            timestamps=False
+}</code></pre>
+
+<p>A model without timings produces one untimed segment, and the SRT/VTT writer
+still works &mdash; it just cannot subtitle precisely, and says so by leaving the
+timing fields empty rather than inventing numbers.</p>
+
+<h2>84.3 Preference Is Not a Limit</h2>
+
+<p>A model usually runs on both a CPU and a CUDA GPU; one is simply faster. That
+is a <em>preference</em>, and the catalog keeps it in <code>fit</code>. A
+different thing entirely is a model that <strong>cannot</strong> run without a
+GPU &mdash; Canary-Qwen 2.5B is a speech-language model and Granite Speech 8B is
+about 17&nbsp;GB of weights. That is a <em>limit</em>, and it gets its own
+field:</p>
+
+<pre><code>def gpu_only(model_id: str, variant: str = "") -&gt; bool:
+    """Whether this model (or variant) genuinely cannot run without a GPU.
+
+    A speech-language model whose weights alone exceed the RAM of an ordinary
+    machine has no usable CPU path, so offering a CPU run would only set the
+    user up for a failure.
+    """
+    entry = model(model_id)
+    if entry.get("gpu_only"):
+        return True
+    return bool(variant) and variant in (entry.get("gpu_only_variants") or [])
+</code></pre>
+
+<p>The distinction is what makes the Compute combo honest. Instead of asking
+"does this machine have a GPU?" and hiding everything else, the combo is built
+from a generous rule that serves the many users who have no card at all:</p>
+
+<pre><code>def device_options(model_id: str, variant: str = "",
+                   has_cuda: bool = True) -&gt; List[Tuple[str, str]]:
+    """Compute choices the transcribe widget may offer for this model/variant."""
+    if gpu_only(model_id, variant):
+        if has_cuda:
+            return [("cuda", "GPU (CUDA)")]
+        return [("cuda", "GPU (CUDA) - no NVIDIA GPU detected, and this model "
+                         "cannot run on a CPU")]
+    if not has_cuda:
+        return [("cpu", "CPU")]          # the only choice that can work
+    gpu_option = ("cuda", "GPU (CUDA)")
+    cpu_option = ("cpu", "CPU")
+    if fit(model_id, variant) == FIT_GPU:
+        return [gpu_option, cpu_option]   # the preferred device first
+    return [cpu_option, gpu_option]
+</code></pre>
+
+<div class="tip">
+<strong>"Auto" is not offered for transcription.</strong> Elsewhere in the
+application a Compute combo may include <em>Auto</em> because the app can measure
+and choose sensibly. Here the device is a property of the <em>model</em> and the
+run is long, so the user is told exactly what will happen and picks it. A choice
+that would silently fall back when the chosen device cannot work is worse than no
+choice at all.
+</div>
+
+<h2>84.4 One Entry, Two Devices: the Variant Override</h2>
+
+<p>Canary-Qwen ships as two checkpoints under one catalog name. The 2.5B model
+is GPU-only; the 1B model runs happily on a CPU. Modelling that with two catalog
+entries would duplicate every fact except the size. Instead the entry carries a
+per-variant override:</p>
+
+<pre><code>def fit(model_id: str, variant: str = "") -&gt; str:
+    """The device this model is *preferred* on ("cpu" or "gpu").
+
+    A variant's ``variant_fit`` overrides the model-level value, because one
+    catalog entry can hold both a GPU-only checkpoint and a CPU-friendly one.
+    """
+    entry = model(model_id)
+    overrides = entry.get("variant_fit") or {}
+    if variant and variant in overrides:
+        return str(overrides[variant])
+    return str(entry.get("fit") or FIT_CPU)
+</code></pre>
+
+<p>Because the device can differ from one variant to the next, the dialog
+<strong>rebuilds the Compute combo when the variant changes</strong>. That is the
+one place where a small amount of UI bookkeeping is unavoidable, and it is
+cheap: the combo is derived from data, not from special cases.</p>
+
+<h2>84.5 Back-ends and Runners</h2>
+
+<p>A model names its <strong>back-end</strong> &mdash; the library that will run
+it &mdash; and the back-end id maps to the importable module that proves it is
+installed:</p>
+
+<pre><code>BACKEND_MODULES: Dict[str, str] = {
+    "faster_whisper": "faster_whisper",
+    "whisper": "whisper",
+    "transformers": "transformers",
+    "nemo": "nemo",
+    "speechbrain": "speechbrain",
+}
+</code></pre>
+
+<p>But "transformers" is not one interface. The generic ASR pipeline cannot run
+every architecture: a processor may want a <em>chat prompt plus audio</em> (as
+Granite Speech does), or the audio-LLM <em>request API</em> (as Qwen3-ASR and
+Voxtral do). So a model also declares <strong>how</strong> it must be driven:</p>
+
+<pre><code>RUNNER_PIPELINE = "pipeline"
+RUNNER_TRANSCRIPTION_REQUEST = "transcription_request"
+RUNNER_CHAT = "chat"
+
+# NeMo mixes plain ASR models (a .nemo checkpoint, ASRModel.from_pretrained)
+# with speech-language models (a transformers-style repository that must not
+# be sent to the ASR entry point at all).
+RUNNER_ASR = "asr"
+RUNNER_SALM = "salm"
+</code></pre>
+
+<p>These names are a <strong>contract</strong> between two processes: the worker
+cannot import <code>stt.catalog</code> (it runs on the model environment's own
+interpreter, where this application is not installed), so both sides spell the
+runner names the same way and a test pins them together. That is the same
+technique Chapter 56 used for the synthesis worker, and it is worth repeating:
+when two processes share a vocabulary, write the vocabulary down once.</p>
+
+<h2>84.6 One Table, Derived Not Typed</h2>
+
+<p>Settings &rarr; <em>Manage the STT</em> shows a table of every model with its
+licence, its languages, whether it fits the machine and a note. That table is not
+a second list to maintain &mdash; it is projected from the catalog:</p>
+
+<pre><code>def summary_rows() -&gt; List[Tuple[str, str, str, str, str]]:
+    """The five columns of the Settings > Manage the STT table."""
+    return [
+        (m["name"], m["license"], m["languages_label"], m["fit_label"], m["notes"])
+        for m in MODELS
+    ]
+</code></pre>
+
+<p>Because the fit column is a stored label rather than a computed one, the
+entry can be honest about the awkward middle case: a model that runs on both
+devices but is clearly happier on one. The label reads
+<code>✅ GPU or CPU</code> or <code>✅ CPU or GPU</code>, and the GPU-only
+checkpoints simply do not use it.</p>
+
+<div class="note">
+<strong>Gated repositories are excluded on purpose.</strong> A model whose
+Hugging Face repository only downloads after signing in and accepting a licence
+(Cohere Transcribe was one) cannot be installed by a user who has no Hugging Face
+account, and this application deliberately works without an account. Such a model
+is not in the catalog at all &mdash; no model here needs a token, a login or a
+licence click-through.
+</div>
+
+<h2>84.7 Exercises</h2>
+<ol>
+  <li>Add a model that reports timings only in its "large" variant. Which fields
+      carry that, and does anything in the dialog need to change?</li>
+  <li>Give a model a second back-end that is only installed on a GPU machine.
+      Where does that fact belong &mdash; <code>pip_packages</code>,
+      <code>cuda_packages</code>, or the environment?</li>
+  <li>The catalog is plain Python. Write the JSON schema that would be needed to
+      move it to JSON, and list the facts that genuinely cannot be expressed in
+      it.</li>
+</ol>
+
+<h2>Key Takeaways</h2>
+<ul>
+  <li>A catalog is data, and its <em>form</em> follows its content: JSON for
+      downloadable ONNX metadata, plain Python for pip packages and runner
+      hints.</li>
+  <li>Separate a preference (<code>fit</code>) from a hard limit
+      (<code>gpu_only</code>), and let the UI derive its choices from both.</li>
+  <li>Declare a capability (<code>timestamps</code>) so the runner is never asked
+      for something the back-end will refuse.</li>
+  <li>A per-variant override lets one entry hold a GPU-only checkpoint and a
+      CPU-friendly one without duplicating the entry.</li>
+  <li>Derive the Settings table from the catalog so the two descriptions cannot
+      drift apart.</li>
+</ul>
+
+</div>
+</div>
+</body>
+</html>

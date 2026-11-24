@@ -24,7 +24,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
-import winget_manifests as wm  # noqa: E402
+import winget_manifests as wm
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
@@ -56,6 +56,39 @@ def published_versions(root: str = ROOT) -> list:
     return sorted(versions)
 
 
+MANIFEST_NAMES = (
+    f"{wm.PACKAGE_IDENTIFIER}.yaml",
+    f"{wm.PACKAGE_IDENTIFIER}.installer.yaml",
+    f"{wm.PACKAGE_IDENTIFIER}.locale.{wm.LOCALE}.yaml",
+)
+
+
+def header_problems(folder: str) -> list:
+    """Problems with the comment block at the top of each shipped manifest.
+
+    ``winget-pkgs`` rejects a submission whose manifests do not begin with the
+    ``yaml-language-server`` schema line, but ``winget validate`` accepts them,
+    so this is checked here from the raw files rather than from the parsed
+    manifests (which drop comments).
+    """
+    problems: list = []
+    for name in MANIFEST_NAMES:
+        path = os.path.join(folder, name)
+        if not os.path.isfile(path):
+            continue
+        with open(path, encoding="utf-8") as handle:
+            first = next(
+                (line.strip() for line in handle if line.strip()), ""
+            )
+        expected = wm.schema_header(name)
+        if first != expected:
+            problems.append(
+                f"{name}: the first line must be {expected!r} so that "
+                "microsoft/winget-pkgs accepts the manifest"
+            )
+    return problems
+
+
 def check(version: str | None = None, root: str = ROOT) -> list:
     """Return the compliance problems of the shipped manifests (empty is good)."""
     version = str(version or _app_version())
@@ -72,17 +105,16 @@ def check(version: str | None = None, root: str = ROOT) -> list:
         ]
 
     manifests = wm.load_manifests(folder)
-    for name in (f"{wm.PACKAGE_IDENTIFIER}.yaml",
-                 f"{wm.PACKAGE_IDENTIFIER}.installer.yaml",
-                 f"{wm.PACKAGE_IDENTIFIER}.locale.{wm.LOCALE}.yaml"):
+    for name in MANIFEST_NAMES:
         if name not in manifests:
             problems.append(f"{name} is missing from {os.path.relpath(folder, root)}")
+    problems.extend(header_problems(folder))
 
     # Compare the published hashes with the installer of the same version in
     # dist/, when it has been built here.
     sha256 = {}
     installer_exists = {}
-    for arch, digest in published_hashes(manifests).items():
+    for arch in published_hashes(manifests):
         path = wm.installer_path(root, version, arch)
         installer_exists[arch] = os.path.isfile(path)
         if installer_exists[arch]:

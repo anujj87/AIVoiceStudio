@@ -6,8 +6,6 @@ import html
 import re
 import subprocess
 from pathlib import Path
-from urllib.parse import urlparse
-
 
 ROOT = Path(__file__).resolve().parents[1]
 BOOK_DIR = ROOT / "docs" / "book"

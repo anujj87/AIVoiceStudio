@@ -25,10 +25,10 @@ import wx
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
-from a11y_sample import ensure_sample_project  # noqa: E402
+from a11y_sample import ensure_sample_project
 
-from ai_voice_studio.settings import Settings  # noqa: E402
-from ai_voice_studio.tts.models import ModelStore  # noqa: E402
+from ai_voice_studio.settings import Settings
+from ai_voice_studio.tts.models import ModelStore
 
 PROJECT_DIR_FALLBACK = os.path.join("build", "e2e_omnivoice", "design")
 
@@ -49,7 +49,7 @@ def _laid_out(window: wx.Window) -> wx.Window:
         window.SetSize((max(current.width, best.width, 720),
                         max(current.height, best.height, 480)))
         window.Layout()
-    except Exception:  # noqa: BLE001 - a dev tool must never raise
+    except Exception:
         pass
     return window
 
@@ -168,7 +168,7 @@ def iter_windows():
 
     # -- "Start selected recording" picker --------------------------------
     from ai_voice_studio import project as project_mod
-    from ai_voice_studio.gui.main_frame import _StartRecordingDialog, _picker_entries
+    from ai_voice_studio.gui.main_frame import _picker_entries, _StartRecordingDialog
 
     data = project_mod.load_project(project_dir)
     saved = project_mod.recorded_files(project_dir)

@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 86: The Transcribe Dialog - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part X — Speech to Text, Voice Lab &amp; the Current System</div><ul class="chapters"><li><a href="ch76_voicelab_engines.html">Ch 76: Voice Lab Engines</a></li><li><a href="ch77_engine_environments.html">Ch 77: One Environment per Engine</a></li><li><a href="ch78_compute_choice.html">Ch 78: Compute Choice</a></li><li><a href="ch79_audio_io_shim.html">Ch 79: Audio I/O Without FFmpeg</a></li><li><a href="ch80_start_selected_recording.html">Ch 80: Start Selected Recording</a></li><li><a href="ch81_terms_dialog.html">Ch 81: First-Launch Terms</a></li><li><a href="ch82_licensing.html">Ch 82: Licensing &amp; Compliance</a></li><li><a href="ch83_input_gestures.html">Ch 83: Input Gestures</a></li><li><a href="ch84_stt_catalog.html">Ch 84: A Second Catalog</a></li><li><a href="ch85_stt_environments.html">Ch 85: One Environment per Model</a></li><li><a href="ch86_stt_dialog.html" class="active">Ch 86: The Transcribe Dialog</a></li><li><a href="ch87_theme_studio.html">Ch 87: The Theme Studio</a></li><li><a href="ch88_update_checker.html">Ch 88: Checking for Updates</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 86</div>
+<h1>The Transcribe Dialog: A Job, Its Outputs and an Honest Progress Window</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Turn a model choice into a request the engine can run, and keep the GUI out of it</li>
+  <li>Write every finished document to disk immediately, so a crash costs one file</li>
+  <li>Render one segment list into seven output formats without seven code paths in the dialog</li>
+  <li>Split a long recording by time without ever cutting a sentence in half</li>
+  <li>Name the documents so two sources with the same base name cannot overwrite each other</li>
+  <li>Use a project <em>base</em> so one dialog serves recording and transcription without saying "audio" to a user transcribing text</li>
+</ul>
+
+<hr>
+
+<h2>86.1 The Dialog's Five Choices</h2>
+
+<p>The transcribe dialog is the last step of a transcription project's wizard and
+what <em>Open</em> reopens on a recent one. It asks five things and nothing more:</p>
+
+<ol>
+  <li><strong>Compute</strong> &mdash; the device, from
+      <code>catalog.device_options()</code> (Chapter 84), rebuilt when the
+      variant changes.</li>
+  <li><strong>Speech to text model</strong> and <strong>Variant</strong> &mdash;
+      every model in the catalog, with the ones that are not installed yet
+      saying so.</li>
+  <li><strong>Language</strong> &mdash; the spoken language, or
+      <em>Detect automatically</em>.</li>
+  <li><strong>Accuracy</strong> &mdash; fast, balanced or most accurate.</li>
+  <li><strong>Translation</strong> &mdash; enabled only for a model that can
+      translate, and it says why when it is disabled.</li>
+</ol>
+
+<p>Every control follows the project's accessibility rule: a real
+<code>StaticText</code> label with an accessible name, a status line that is a
+real control rather than a painted string, and a gauge for progress. The
+transcribe dialog is software a screen-reader user has to be able to <em>hear</em>
+working, which is why the status line narrates each step ("Transcribing lecture
+1 of 3&hellip;", "Saved lecture part 2.txt").</p>
+
+<div class="tip">
+<strong>Accuracy is a policy, not a magic number.</strong> The three levels map
+to beam sizes (&ldquo;fast&rdquo; = greedy, &ldquo;balanced&rdquo; = beam 5,
+&ldquo;most accurate&rdquo; = beam 8) and every model offers the same three
+labels. That keeps the dialog predictable: a user who learned what
+<em>balanced</em> means for Whisper finds it means the same thing for Qwen3-ASR,
+and the per-model reality is shown separately as the <em>accuracy hint</em>
+(&ldquo;~10.3 % WER (large-v3)&rdquo;) from the catalog.
+</div>
+
+<h2>86.2 The Job Runs Off the GUI Thread</h2>
+
+<p>Transcription takes minutes, so the dialog starts a thread and gets out of the
+way. The job is deliberately small:</p>
+
+<pre><code>class TranscriptionJob(threading.Thread):
+    """Transcribe a list of source files into output documents."""
+
+    def __init__(self, project_dir, source_paths, options, *,
+                 on_progress=None, on_done=None, on_error=None):
+        super().__init__(daemon=True)
+        ...
+        self._cancel = threading.Event()
+        self.outputs: List[Dict[str, Any]] = []
+
+    def cancel(self) -&gt; None:
+        self._cancel.set()
+</code></pre>
+
+<p>Three rules make it safe:</p>
+
+<ul>
+  <li><strong>Plain callbacks, no widgets.</strong> The job knows nothing about
+      wx; it calls <code>on_progress(message, fraction)</code>,
+      <code>on_done(outputs)</code> or <code>on_error(exc)</code>. The dialog
+      marshals those onto the GUI thread. That is what lets the job be tested
+      without a display.</li>
+  <li><strong>Every callback is wrapped in try/except.</strong> A misbehaving
+      callback must never kill the job halfway through a long book:</li>
+</ul>
+
+<pre><code>def _report(self, message: str, fraction: float) -&gt; None:
+    if self._on_progress is not None:
+        try:
+            self._on_progress(message, max(0.0, min(1.0, fraction)))
+        except Exception:  # noqa: BLE001
+            log.debug("progress callback failed", exc_info=True)
+</code></pre>
+
+<ul>
+  <li><strong>A document is written the moment it is finished.</strong> The
+      ordering in <code>_run()</code> is not an accident:</li>
+</ul>
+
+<pre><code>for index, source in enumerate(sources, start=1):
+    if self._cancel.is_set():
+        return
+    base = (index - 1) / len(sources)
+    span = 1.0 / len(sources)
+    self._report(f"Transcribing {name} ({index} of {len(sources)})...", base)
+    segments = transcribe_audio(source, model_id=..., compute=...)
+    if self._cancel.is_set():
+        return
+    ...
+    path = self._write_document(doc_stem, part, doc_stem)
+    self.outputs.append({ "source": source, "file": os.path.basename(path), ... })
+</code></pre>
+
+<p>The fraction is computed from the <em>file index</em> and not from the
+model's own idea of progress, because a model that reports nothing would
+otherwise leave the bar at zero for twenty minutes. The progress is
+<em>per file</em>: coarse, truthful, and always moving.</p>
+
+<div class="info">
+<strong>Crash-safety is inherited, not re-invented.</strong> The recording side
+already saves each segment as it is produced (Chapter 55). Transcription follows
+the same rule so a Close, a crash or a power cut costs at most the one file in
+flight &mdash; and a three-hour lecture is not a single point of failure.
+</div>
+
+<h2>86.3 One Segment List, Seven Documents</h2>
+
+<p>A segment is a plain dictionary:</p>
+
+<pre><code>{"start": 12.4, "end": 15.9, "text": "The mitochondria is the powerhouse..."}
+</code></pre>
+
+<p>Turning segments into a document is independent of which model produced them,
+so it lives in <code>stt/output.py</code> and nothing about it is in the dialog:</p>
+
+<pre><code>def format_document(segments, output_format, include_timestamp=False, title=""):
+    """Render ``segments`` in the chosen output format.
+
+    The subtitle formats (SRT/VTT) always carry their timing - it is what makes
+    them subtitles - so ``include_timestamp`` only affects the text formats.
+    """
+    if output_format == STT_FORMAT_SRT:
+        return _as_srt(segments)
+    if output_format == STT_FORMAT_VTT:
+        return _as_vtt(segments)
+    writer = _WRITERS.get(output_format, _as_txt)
+    return writer(segments, include_timestamp, title)
+</code></pre>
+
+<table>
+  <thead>
+    <tr><th>Format</th><th>Shape</th><th>For</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>TXT</td><td>one paragraph per segment, optional <code>[hh:mm:ss]</code> prefix</td><td>study notes, pasting elsewhere</td></tr>
+    <tr><td>Markdown</td><td>a titled document with paragraphs</td><td>notes that keep structure</td></tr>
+    <tr><td>SRT</td><td>numbered cues with <code>00:00:12,400 --&gt; 00:00:15,900</code></td><td>video subtitles, nearly every player</td></tr>
+    <tr><td>VTT</td><td>cues with a <code>WEBVTT</code> header and dot milliseconds</td><td>web video, HTML tracks</td></tr>
+    <tr><td>HTML</td><td>escaped, titled, with timestamps when asked</td><td>reading in a browser or a screen reader</td></tr>
+    <tr><td>JSON</td><td>one object per segment, start/end/text</td><td>feeding the text to another program</td></tr>
+    <tr><td>CSV</td><td>a row per segment, quoted</td><td>spreadsheets, subtitling tools</td></tr>
+  </tbody>
+</table>
+
+<p>Two small decisions make the timed formats correct. Timestamps are formatted
+by one shared helper, because SRT wants a comma before the milliseconds and VTT
+wants a dot &mdash; getting that wrong produces files that <em>look</em> right and
+fail in players:</p>
+
+<pre><code>def format_timestamp(seconds, *, millisecond_sep=",") -&gt; str:
+    """hh:mm:ss&lt;sep&gt;mmm, with an empty string for a missing time."""
+</code></pre>
+
+<p>And a model without timings produces a single untimed segment, so the writers
+never fabricate a time. An SRT made from untimed segments has no meaningful cues
+&mdash; which is exactly why the catalog declares <code>timestamps</code> per
+model (Chapter 84) and the dialog can tell the user before the run that this
+model will not produce subtitles.</p>
+
+<h2>86.4 Splitting a Long Recording by Time</h2>
+
+<p>&ldquo;Time by time separation&rdquo; turns one two-hour lecture into several
+short documents. The naive implementation &mdash; cut at <em>n</em> minutes
+exactly &mdash; leaves half-sentences at every boundary. The rule here is the
+opposite: a chunk is closed when the <em>next</em> segment would push it past the
+limit, so a sentence is never cut in half.</p>
+
+<pre><code>def split_by_time(segments, minutes: int) -&gt; List[List[Segment]]:
+    """Group segments into chunks of at most ``minutes`` minutes each.
+
+    A segment is never cut in half: a chunk is closed when the *next* segment
+    would push it past the limit, and a single segment longer than the limit
+    becomes its own chunk.  Segments with no timing are all collected into one
+    chunk (there is nothing to measure against).
+    """
+    limit = max(1.0, float(minutes) * 60.0)
+    chunks: List[List[Segment]] = []
+    current: List[Segment] = []
+    for seg in segments:
+        if not current:
+            current.append(seg)
+            continue
+        start = current[0].get("start")
+        end = seg.get("end")
+        if start is None or end is None:
+            current.append(seg)
+            continue
+        if float(end) - float(start) &gt; limit:
+            chunks.append(current)
+            current = [seg]
+        else:
+            current.append(seg)
+    if current:
+        chunks.append(current)
+    return chunks
+</code></pre>
+
+<p>Note the two edge cases handled explicitly, because both happen in real files:
+a <strong>missing timestamp</strong> (an audio language model) collects everything
+into one chunk rather than guessing, and a <strong>single segment longer than the
+limit</strong> becomes its own chunk rather than being dropped or split.</p>
+
+<h2>86.5 Naming the Documents</h2>
+
+<p>The document name comes from the source file, and two sources can easily share
+a base name &mdash; <code>audio\lecture 1.mp4</code> and
+<code>lecture 1.m4a</code> in the same folder. <code>plan_documents()</code>
+resolves that before anything is written:</p>
+
+<pre><code>name = stem if len(parts) == 1 and split_mode != "by_time" else (
+    f"{stem} part {index}" if len(parts) &gt; 1 else stem
+)
+# Disambiguate two source files with the same base name.
+key = name.lower()
+if key in used:
+    used[key] += 1
+    name = f"{name} ({used[key]})"
+else:
+    used[key] = 1
+</code></pre>
+
+<p>So a split recording writes <code>lecture 1 part 1.txt</code>,
+<code>lecture 1 part 2.txt</code>&hellip;, and a collision writes
+<code>lecture 1 (2).txt</code> instead of silently overwriting the first
+transcript &mdash; a bug that would otherwise only be discovered by reading the
+wrong file.</p>
+
+<h2>86.6 One Project Base, Two Vocabularies</h2>
+
+<p>A project has a <em>base</em>: recording or transcription. The Edit menu reads
+the base and changes its own words accordingly &mdash; a transcription project
+has <em>files</em>, a recording project has <em>recordings</em>:</p>
+
+<ul>
+  <li><strong>Start Selected Recording</strong> becomes <strong>Start Selected
+      Files</strong>, offering <em>Select a transcribe file</em> or <em>Select
+      by file break</em>, then <em>Only transcribe the selected file</em> or
+      <em>Transcribe all files from here</em>.</li>
+  <li><strong>Restart All Recording</strong> becomes <strong>Restart All
+      Files</strong>, and both restart confirmations spell out that recordings
+      <em>or</em> transcribe files and the audio <em>or</em> transcribe options
+      are reset.</li>
+  <li>When the job finishes, the progress window offers <strong>Open project
+      folder</strong> &mdash; the same courtesy the recording flow has always
+      shown, because the documents land next to the project and not somewhere the
+      user has to hunt for.</li>
+</ul>
+
+<div class="note">
+<strong>Wording is part of the interface.</strong> A blind user navigating by
+menu labels cannot see which kind of project is open; if the Edit menu said
+&ldquo;recordings&rdquo; on a transcription project, the wrong command would be
+reached by muscle memory. Reading the project base and renaming the commands is
+cheaper than teaching users to remember two similar menus.
+</div>
+
+<h2>86.7 Exercises</h2>
+<ol>
+  <li>Add a "one document per heading" output mode. Where does the heading come
+      from, and how does <code>plan_documents()</code> name the files?</li>
+  <li>Change the progress model to per-segment with a total-duration estimate.
+      What happens when a model reports no timings?</li>
+  <li>Make <code>split_by_time()</code> prefer a silence gap within the last 30
+      seconds of a chunk instead of the first segment that crosses the limit.</li>
+</ol>
+
+<h2>Key Takeaways</h2>
+<ul>
+  <li>Keep the job free of widgets: plain callbacks, wrapped so a bad callback
+      cannot kill the run.</li>
+  <li>Write each finished document immediately; crash-safety is a property of
+      the ordering, not of a cleanup handler.</li>
+  <li>One formatter per output type, chosen by a table, and one shared timestamp
+      helper &mdash; SRT and VTT differ by one character.</li>
+  <li>Never cut a segment in half when splitting by time, and handle untimed
+      segments explicitly.</li>
+  <li>Disambiguate output names up front; overwriting a transcript is a silent
+      data loss.</li>
+</ul>
+
+</div>
+</div>
+</body>
+</html>

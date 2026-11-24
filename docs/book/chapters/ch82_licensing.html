@@ -9,7 +9,7 @@
 <body>
 <div class="book-container">
 <nav class="sidebar"><h2>📖 Contents</h2>
-<div class="part-header">Part X — Voice Lab &amp; the Current System</div><ul class="chapters"><li><a href="ch76_voicelab_engines.html">Ch 76: Voice Lab Engines</a></li><li><a href="ch77_engine_environments.html">Ch 77: One Environment per Engine</a></li><li><a href="ch78_compute_choice.html">Ch 78: Compute Choice</a></li><li><a href="ch79_audio_io_shim.html">Ch 79: Audio I/O Without FFmpeg</a></li><li><a href="ch80_start_selected_recording.html">Ch 80: Start Selected Recording</a></li><li><a href="ch81_terms_dialog.html">Ch 81: First-Launch Terms</a></li><li><a href="ch82_licensing.html" class="active">Ch 82: Licensing &amp; Compliance</a></li></ul>
+<div class="part-header">Part X — Speech to Text, Voice Lab &amp; the Current System</div><ul class="chapters"><li><a href="ch76_voicelab_engines.html">Ch 76: Voice Lab Engines</a></li><li><a href="ch77_engine_environments.html">Ch 77: One Environment per Engine</a></li><li><a href="ch78_compute_choice.html">Ch 78: Compute Choice</a></li><li><a href="ch79_audio_io_shim.html">Ch 79: Audio I/O Without FFmpeg</a></li><li><a href="ch80_start_selected_recording.html">Ch 80: Start Selected Recording</a></li><li><a href="ch81_terms_dialog.html">Ch 81: First-Launch Terms</a></li><li><a href="ch82_licensing.html" class="active">Ch 82: Licensing &amp; Compliance</a></li><li><a href="ch83_input_gestures.html">Ch 83: Input Gestures</a></li><li><a href="ch84_stt_catalog.html">Ch 84: A Second Catalog</a></li><li><a href="ch85_stt_environments.html">Ch 85: One Environment per Model</a></li><li><a href="ch86_stt_dialog.html">Ch 86: The Transcribe Dialog</a></li><li><a href="ch87_theme_studio.html">Ch 87: The Theme Studio</a></li><li><a href="ch88_update_checker.html">Ch 88: Checking for Updates</a></li></ul>
 </nav>
 <div class="main-content">
 
@@ -37,7 +37,7 @@ carry different terms:</p>
   <tbody>
     <tr><td><strong>Application</strong></td><td>AI Voice Studio itself</td><td>GPL-3.0</td></tr>
     <tr><td><strong>Python libraries</strong></td><td>wxPython, NumPy, sherpa-onnx, ONNX Runtime, requests, pypdf, python-docx</td><td>MIT / BSD-3 / Apache-2.0 / wxWindows</td></tr>
-    <tr><td><strong>Model code</strong></td><td>f5-tts, pocket-tts, transformers, Bark’s repo</td><td>MIT / Apache-2.0</td></tr>
+    <tr><td><strong>Model code</strong></td><td>f5-tts, pocket-tts, chatterbox-tts, qwen-tts</td><td>MIT / Apache-2.0</td></tr>
     <tr><td><strong>Model weights &amp; voices</strong></td><td>F5-TTS checkpoints, MMS, AISHELL3 data, Pocket TTS voices</td><td>CC-BY-NC-4.0, per-voice terms, dataset licences</td></tr>
   </tbody>
 </table>
@@ -167,8 +167,11 @@ for entry in catalog["tts"]:
 
 <pre><code>== Voice Lab clone engines ==
 Pocket TTS (Kyutai)                Apache-2.0 (code); per-voice licenses
-Bark (Suno AI, transformer)        MIT
 F5-TTS (transformer)               MIT (code); CC-BY-NC-4.0 (weights)
+KokoClone (Kokoro + Kanade)        Apache-2.0
+Chatterbox (Resemble AI)           MIT
+Qwen3-TTS (Alibaba Qwen)           Apache-2.0
+VibeVoice (Microsoft, fork)        MIT
 
 == Catalog TTS families ==
 Piper                              MIT
@@ -202,8 +205,8 @@ whether it touches the <em>output</em> or only the <em>software</em>:</p>
     <tr><td>Matcha-TTS</td><td>CC-BY-4.0 (conversion)</td><td>yes</td><td>check the checkpoint’s training data</td></tr>
     <tr><td>OmniVoice / Server</td><td>Apache-2.0</td><td>yes</td><td>yes</td></tr>
     <tr><td>Pocket TTS</td><td>Apache-2.0 code / per-voice</td><td>yes</td><td>check the individual voice</td></tr>
-    <tr><td><strong>Bark</strong></td><td>MIT</td><td>yes</td><td>yes</td></tr>
     <tr><td><strong>F5-TTS</strong></td><td>MIT code / <strong>CC-BY-NC-4.0 weights</strong></td><td>yes (the code)</td><td><strong>no</strong> with the released weights</td></tr>
+    <tr><td><strong>KokoClone</strong> (Kokoro-ONNX + Kanade)</td><td>Apache-2.0 (code and Kanade weights)</td><td>yes</td><td>yes</td></tr>
     <tr><td>SAPI5 / Windows Core voices</td><td>Windows and vendor EULAs</td><td>depends on your licence for those voices</td><td>depends on the voice</td></tr>
   </tbody>
 </table>

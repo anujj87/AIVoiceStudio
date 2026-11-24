@@ -16,8 +16,8 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
-from ai_voice_studio import project  # noqa: E402
-from ai_voice_studio.constants import MODE_PAGE_WITH_H1  # noqa: E402
+from ai_voice_studio import project
+from ai_voice_studio.constants import MODE_PAGE_WITH_H1
 
 SAMPLE_DIR = os.path.join("build", "a11y_sample")
 

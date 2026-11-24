@@ -47,12 +47,12 @@ def _audio_duration(path):
     # mp3/flac: probe with the project's ffmpeg helper
     try:
         sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-        from ai_voice_studio.audio import ffmpeg as ffmpeg_mod  # noqa: PLC0415
+        from ai_voice_studio.audio import ffmpeg as ffmpeg_mod
 
         exe = ffmpeg_mod.find_ffmpeg()
         if not exe:
             return None
-        import subprocess  # noqa: PLC0415
+        import subprocess
 
         result = subprocess.run(
             [exe, "-i", path, "-f", "null", "-"],

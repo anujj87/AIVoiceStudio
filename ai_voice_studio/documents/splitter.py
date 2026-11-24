@@ -26,7 +26,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import List
 
 from ..constants import (
     MODE_ALL_HEADINGS,
@@ -75,11 +74,11 @@ def _heading_title(index: int, heading_text: str) -> str:
 # ---------------------------------------------------------------------------
 # Modes
 # ---------------------------------------------------------------------------
-def split_page_with_h1(blocks: List[Block]) -> List[Segment]:
+def split_page_with_h1(blocks: list[Block]) -> list[Segment]:
     """Page by page; Heading-1 splits the page (SPEC 3.4 mode 1)."""
-    segments: List[Segment] = []
+    segments: list[Segment] = []
     counter = 0
-    pages: dict[int, List[Block]] = {}
+    pages: dict[int, list[Block]] = {}
     for block in blocks:
         pages.setdefault(block.page, []).append(block)
 
@@ -92,7 +91,12 @@ def split_page_with_h1(blocks: List[Block]) -> List[Segment]:
         if h1_idx is None:
             counter += 1
             text = "\n\n".join(b.text for b in page_blocks)
-            segments.append(Segment(index=counter, title=_page_title(counter, page_no + 1), text=text, page=page_no))
+            segments.append(Segment(
+                index=counter,
+                title=_page_title(counter, page_no + 1),
+                text=text,
+                page=page_no,
+            ))
             continue
 
         pre = page_blocks[:h1_idx]
@@ -120,7 +124,7 @@ def split_page_with_h1(blocks: List[Block]) -> List[Segment]:
     return segments
 
 
-def split_page_only(blocks: List[Block], pages_per_file: int = 1) -> List[Segment]:
+def split_page_only(blocks: list[Block], pages_per_file: int = 1) -> list[Segment]:
     """One segment per page (SPEC 3.4 mode 2).
 
     When ``pages_per_file`` > 1, consecutive pages are grouped together and
@@ -129,16 +133,14 @@ def split_page_only(blocks: List[Block], pages_per_file: int = 1) -> List[Segmen
     group: every finished group is saved immediately.
     """
     pages_per_file = max(1, int(pages_per_file or 1))
-    pages: dict[int, List[Block]] = {}
+    pages: dict[int, list[Block]] = {}
     for block in blocks:
         pages.setdefault(block.page, []).append(block)
     ordered = sorted(pages)
-    segments: List[Segment] = []
-    counter = 0
-    for start in range(0, len(ordered), pages_per_file):
+    segments: list[Segment] = []
+    for counter, start in enumerate(range(0, len(ordered), pages_per_file), start=1):
         group_pages = ordered[start:start + pages_per_file]
-        counter += 1
-        parts: List[str] = []
+        parts: list[str] = []
         for page_no in group_pages:
             parts.append("\n\n".join(b.text for b in pages[page_no]))
         segments.append(
@@ -152,7 +154,7 @@ def split_page_only(blocks: List[Block], pages_per_file: int = 1) -> List[Segmen
     return segments
 
 
-def split_one_file(blocks: List[Block]) -> List[Segment]:
+def split_one_file(blocks: list[Block]) -> list[Segment]:
     """Whole document as one single segment (no file separation).
 
     Everything is joined into one audio file.  Recording can only be resumed
@@ -168,16 +170,16 @@ def split_one_file(blocks: List[Block]) -> List[Segment]:
     ]
 
 
-def split_h1_only(blocks: List[Block]) -> List[Segment]:
+def split_h1_only(blocks: list[Block]) -> list[Segment]:
     """One segment per Heading-1 (with its content) (SPEC 3.4 mode 3).
 
     Text before the first Heading-1 becomes a leading "01 page 1" segment so no
     content is lost.
     """
-    sections: List[tuple[str | None, List[Block]]] = []  # (heading_text, blocks)
-    leading: List[Block] = []
+    sections: list[tuple[str | None, list[Block]]] = []  # (heading_text, blocks)
+    leading: list[Block] = []
     current_heading: str | None = None
-    current: List[Block] = []
+    current: list[Block] = []
 
     for block in blocks:
         if block.kind == "heading" and block.level == 1:
@@ -185,15 +187,14 @@ def split_h1_only(blocks: List[Block]) -> List[Segment]:
                 sections.append((current_heading, current))
             current_heading = block.text
             current = [block]
+        elif current_heading is None:
+            leading.append(block)
         else:
-            if current_heading is None:
-                leading.append(block)
-            else:
-                current.append(block)
+            current.append(block)
     if current_heading is not None or current:
         sections.append((current_heading, current))
 
-    segments: List[Segment] = []
+    segments: list[Segment] = []
     counter = 0
 
     if leading and any(b.text.strip() for b in leading):
@@ -222,7 +223,7 @@ def split_h1_only(blocks: List[Block]) -> List[Segment]:
     return segments
 
 
-def split_all_headings(blocks: List[Block]) -> List[Segment]:
+def split_all_headings(blocks: list[Block]) -> list[Segment]:
     """Break on every heading (levels 1-6) (SPEC 3.4 mode 4).
 
     Works exactly like :func:`split_h1_only`, except that a new segment starts
@@ -231,10 +232,10 @@ def split_all_headings(blocks: List[Block]) -> List[Segment]:
     content is lost.  Text before the first heading becomes a leading "01 page 1"
     segment.
     """
-    sections: List[tuple[str | None, List[Block]]] = []  # (heading_text, blocks)
-    leading: List[Block] = []
+    sections: list[tuple[str | None, list[Block]]] = []  # (heading_text, blocks)
+    leading: list[Block] = []
     current_heading: str | None = None
-    current: List[Block] = []
+    current: list[Block] = []
 
     for block in blocks:
         if block.kind == "heading" and 1 <= block.level <= 6:
@@ -242,15 +243,14 @@ def split_all_headings(blocks: List[Block]) -> List[Segment]:
                 sections.append((current_heading, current))
             current_heading = block.text
             current = [block]
+        elif current_heading is None:
+            leading.append(block)
         else:
-            if current_heading is None:
-                leading.append(block)
-            else:
-                current.append(block)
+            current.append(block)
     if current_heading is not None or current:
         sections.append((current_heading, current))
 
-    segments: List[Segment] = []
+    segments: list[Segment] = []
     counter = 0
 
     if leading and any(b.text.strip() for b in leading):
@@ -288,7 +288,7 @@ def split_all_headings(blocks: List[Block]) -> List[Segment]:
 DAISY_MAX_CHARS = 1200
 
 
-def split_daisy_chapters(blocks: List[Block], break_level: str = "h1") -> List[Segment]:
+def split_daisy_chapters(blocks: list[Block], break_level: str = "h1") -> list[Segment]:
     """Split into DAISY-sized chapters using headings when available.
 
     Strategy:
@@ -298,32 +298,39 @@ def split_daisy_chapters(blocks: List[Block], break_level: str = "h1") -> List[S
        boundaries into sub-segments.
     3. If there are no headings at all, split by pseudo-pages.
     """
-    from ..constants import DAISY_SPLIT_ALL_HEADINGS  # noqa: PLC0415
+    from ..constants import DAISY_SPLIT_ALL_HEADINGS
 
     # Detect which heading level to use
     h1_blocks = [b for b in blocks if b.kind == "heading" and b.level == 1]
     h2_blocks = [b for b in blocks if b.kind == "heading" and b.level == 2]
     if break_level == DAISY_SPLIT_ALL_HEADINGS:
         any_heading = [b for b in blocks if b.kind == "heading" and 1 <= b.level <= 6]
-        target_level = 0 if any_heading else 0
+        # No level filter in this mode: every heading breaks.  The variable is
+        # still set because the branch below reads it when ``use_any`` is False.
+        target_level = 0
         use_any = bool(any_heading)
     else:
         use_any = False
         target_level = 1 if h1_blocks else (2 if h2_blocks else 0)
 
     if use_any:
-        is_heading = lambda b: b.kind == "heading" and 1 <= b.level <= 6  # noqa: E731
+        def is_heading(block) -> bool:
+            """Any heading level splits a section when the caller asked for it."""
+            return block.kind == "heading" and 1 <= block.level <= 6
     else:
         if target_level == 0:
             # No headings: fall back to page-based splitting
             return _split_by_pages(blocks)
-        is_heading = lambda b: b.kind == "heading" and b.level == target_level  # noqa: E731
+
+        def is_heading(block) -> bool:
+            """Only the level the mode chose splits a section."""
+            return block.kind == "heading" and block.level == target_level
 
     # Group by heading level
-    sections: List[tuple[str, List[Block]]] = []
-    leading: List[Block] = []
+    sections: list[tuple[str, list[Block]]] = []
+    leading: list[Block] = []
     current_heading: str | None = None
-    current: List[Block] = []
+    current: list[Block] = []
 
     for block in blocks:
         if is_heading(block):
@@ -331,16 +338,15 @@ def split_daisy_chapters(blocks: List[Block], break_level: str = "h1") -> List[S
                 sections.append((current_heading, current))
             current_heading = block.text
             current = [block]
+        elif current_heading is None:
+            leading.append(block)
         else:
-            if current_heading is None:
-                leading.append(block)
-            else:
-                current.append(block)
+            current.append(block)
     if current_heading is not None or current:
         sections.append((current_heading, current))
 
     # Now split sections that are too long
-    segments: List[Segment] = []
+    segments: list[Segment] = []
     counter = 0
 
     if leading and any(b.text.strip() for b in leading):
@@ -380,15 +386,13 @@ def split_daisy_chapters(blocks: List[Block], break_level: str = "h1") -> List[S
     return segments
 
 
-def _split_by_pages(blocks: List[Block]) -> List[Segment]:
+def _split_by_pages(blocks: list[Block]) -> list[Segment]:
     """Fallback: split by pseudo-pages when no headings exist."""
-    pages: dict[int, List[Block]] = {}
+    pages: dict[int, list[Block]] = {}
     for block in blocks:
         pages.setdefault(block.page, []).append(block)
-    segments: List[Segment] = []
-    counter = 0
-    for page_no in sorted(pages):
-        counter += 1
+    segments: list[Segment] = []
+    for counter, page_no in enumerate(sorted(pages), start=1):
         text = "\n\n".join(b.text for b in pages[page_no])
         segments.append(Segment(
             index=counter,
@@ -399,10 +403,10 @@ def _split_by_pages(blocks: List[Block]) -> List[Segment]:
     return segments
 
 
-def _split_text_blocks(blocks: List[Block]) -> List[str]:
+def _split_text_blocks(blocks: list[Block]) -> list[str]:
     """Split a list of blocks into chunks of DAISY_MAX_CHARS."""
-    chunks: List[str] = []
-    current_parts: List[str] = []
+    chunks: list[str] = []
+    current_parts: list[str] = []
     current_len = 0
     for block in blocks:
         text = block.text.strip()
@@ -434,7 +438,7 @@ def split_document(
     doc: Document,
     mode: str,
     pages_per_file: int = 1,
-) -> List[Segment]:
+) -> list[Segment]:
     """Split ``doc`` into segments for ``mode``.
 
     ``pages_per_file`` only applies to :data:`MODE_PAGE_ONLY` (how many pages

@@ -45,6 +45,11 @@ class CatalogStructureTest(unittest.TestCase):
                     # the operating system: there is nothing to download.
                     if tts.get("builtin"):
                         continue
+                    # An engine whose one archive serves every language
+                    # (Supertonic 3) downloads it through ``shared_artifacts``
+                    # instead of per variant, so no variant carries one.
+                    if tts.get("shared_model"):
+                        continue
                     artifacts = []
                     if variant.get("artifact"):
                         artifacts.append(variant["artifact"])
@@ -233,7 +238,7 @@ class ResolveVoiceFilesTest(unittest.TestCase):
         vdir = self._voice_dir("matcha_en/default")
         for f in ("model-steps-3.onnx", "tokens.txt", "espeak-ng-data"):
             p = os.path.join(vdir, f)
-            if f.endswith(".onnx") or f.endswith(".txt"):
+            if f.endswith((".onnx", ".txt")):
                 open(p, "w").close()
             else:
                 os.makedirs(p)
@@ -332,7 +337,7 @@ class ResolveVoiceFilesTest(unittest.TestCase):
 
         voices = [v for v in store.installed_voices() if v["engine"] == "kitten"]
         self.assertEqual(len(voices), 8)
-        self.assertEqual([v["voice"] for v in voices][0], "bella")
+        self.assertEqual(next(v["voice"] for v in voices), "bella")
 
         files = resolve_voice_files(voices[0])
         self.assertEqual(files["engine"], "kitten")
@@ -354,6 +359,51 @@ class ResolveVoiceFilesTest(unittest.TestCase):
         files = resolve_voice_files({"dir": vdir, "engine": "kitten", "sid": 1})
         self.assertTrue(files["model"].endswith("model.fp32.onnx"))
         self.assertTrue(files["tokens"].endswith("tokens.txt"))
+
+    def test_missing_voice_ids_reports_the_voices_that_are_not_on_disk(self):
+        """A variant marked complete can still be missing most of its voices.
+
+        The download of piper / en_US / medium once installed only its first
+        voice and still marked the folder complete; the Download button then
+        stayed disabled and the other seven voices could not be fetched
+        without removing the one that worked.
+        """
+        store = ModelStore(state_file=os.path.join(self.tmp.name, "models3.json"))
+        variants = store.variant_dir("piper", "en_US", "medium")
+        os.makedirs(os.path.join(variants, "lessac"), exist_ok=True)
+        for name in ("en_US-lessac-medium.onnx", "tokens.txt"):
+            open(os.path.join(variants, "lessac", name), "w").close()
+        store.mark_installed("piper", "en_US", "medium", variants)
+
+        missing = store.missing_voice_ids("piper", "en_US", "medium")
+
+        self.assertNotIn("lessac", missing)
+        self.assertIn("amy", missing)
+        self.assertEqual(len(missing), 7, missing)
+        # An installed voice is only "missing" through its own folder, so the
+        # other variants are unaffected.
+        self.assertEqual(store.missing_voice_ids("piper", "en_US", "high"), [])
+
+    def test_a_downloaded_variant_with_all_its_files_has_nothing_missing(self):
+        store = ModelStore(state_file=os.path.join(self.tmp.name, "models4.json"))
+        vdir = store.variant_dir("kokoro", "multi", "v1_0")
+        for name in ("model.onnx", "tokens.txt", "voices.bin"):
+            open(os.path.join(vdir, name), "w").close()
+        store.mark_installed("kokoro", "multi", "v1_0", vdir)
+
+        self.assertEqual(store.missing_voice_ids("kokoro", "multi", "v1_0"), [])
+
+    def test_an_installed_kitten_variant_is_complete_from_its_own_model(self):
+        """Kitten keeps all of its speakers in one artifact at the variant root."""
+        store = ModelStore(state_file=os.path.join(self.tmp.name, "models5.json"))
+        vdir = store.variant_dir("kitten", "en", "v0_8_nano_int8")
+        for name in ("model.int8.onnx", "tokens.txt", "voices.bin"):
+            open(os.path.join(vdir, name), "w").close()
+        store.mark_installed("kitten", "en", "v0_8_nano_int8", vdir)
+
+        self.assertEqual(
+            store.missing_voice_ids("kitten", "en", "v0_8_nano_int8"), []
+        )
 
     def test_piper_char_frontend_ignores_shared_espeak(self):
         """Character-frontend voices must not receive the

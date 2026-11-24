@@ -6,7 +6,7 @@ them means the same thing: a *hint* to the engine.  Picking a language pins it
 (OmniVoice's own detection can read a short line with the wrong accent, or as
 gibberish); picking Auto leaves that detection in charge.  The list never
 removes voices, because an OmniVoice voice can speak any of the model's
-languages.  The voice library (Settings > OmniVoice engines) can pin a created
+languages.  The voice library (Settings > Voice Clone) can pin a created
 voice to one language as well.
 """
 
@@ -25,17 +25,17 @@ import wx
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from wx_test_app import get_app  # noqa: E402
+from wx_test_app import get_app
 
-from ai_voice_studio import project, venv_packages  # noqa: E402
-from ai_voice_studio.constants import MODE_PAGE_WITH_H1  # noqa: E402
-from ai_voice_studio.gui import language_choice  # noqa: E402
-from ai_voice_studio.gui.model_panels import AvailablePanel  # noqa: E402
-from ai_voice_studio.gui.recording_dialog import RecordingDialog  # noqa: E402
-from ai_voice_studio.gui.settings_dialog import _OmniVoiceEnginesPanel  # noqa: E402
-from ai_voice_studio.omnivoice import languages, spec, voice_store  # noqa: E402
-from ai_voice_studio.settings import Settings  # noqa: E402
-from ai_voice_studio.tts.models import ModelStore  # noqa: E402
+from ai_voice_studio import project, venv_packages
+from ai_voice_studio.constants import MODE_PAGE_WITH_H1
+from ai_voice_studio.gui import language_choice
+from ai_voice_studio.gui.model_panels import AvailablePanel
+from ai_voice_studio.gui.recording_dialog import RecordingDialog
+from ai_voice_studio.gui.settings_dialog import _OmniVoiceEnginesPanel
+from ai_voice_studio.omnivoice import languages, spec, voice_store
+from ai_voice_studio.settings import Settings
+from ai_voice_studio.tts.models import ModelStore
 
 
 class _AppMixin(unittest.TestCase):
@@ -277,7 +277,7 @@ class AvailableTtsLanguageTest(_AppMixin):
 
 
 class VoiceLibraryLanguageTest(_AppMixin):
-    """Settings > OmniVoice engines pins the language into a created voice."""
+    """Settings > Voice Clone (OmniVoice half) pins the language into a voice."""
 
     def test_create_voice_remembers_the_pin(self):
         store = self._store()

@@ -15,7 +15,6 @@ objects, so neither dependency has to be installed here.
 
 from __future__ import annotations
 
-import importlib.util
 import os
 import struct
 import sys
@@ -26,9 +25,11 @@ from unittest import mock
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-import numpy as np  # noqa: E402
+import contextlib
 
-from ai_voice_studio import voicelab  # noqa: E402
+import numpy as np
+
+from ai_voice_studio import voicelab
 
 WORKER = os.path.join(
     os.path.dirname(os.path.abspath(voicelab.__file__)), "worker.py"
@@ -287,10 +288,8 @@ class ReferenceConversionTest(unittest.TestCase):
 
     def _cleanup_converted(self):
         for path in self.converted:
-            try:
+            with contextlib.suppress(OSError):
                 os.remove(path)
-            except OSError:
-                pass
 
     def _source(self, name, frames=50):
         """A file whose *bytes* are a WAV but whose name is not `.wav`."""

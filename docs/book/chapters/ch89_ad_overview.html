@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 89: Audio Description - Building AI Voice Studio</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="book-container">
+<nav class="sidebar"><h2>📖 Contents</h2>
+<div class="part-header">Part XI — Audio Description</div><ul class="chapters"><li><a href="ch89_ad_overview.html" class="active">Ch 89: Narrating Video</a></li><li><a href="ch90_ad_catalog_envs.html">Ch 90: A Catalog of Describers</a></li><li><a href="ch91_ad_windows.html">Ch 91: Chunks, Windows &amp; Change</a></li><li><a href="ch92_ad_placement.html">Ch 92: Placement &amp; Extended AD</a></li><li><a href="ch93_ad_described_film.html">Ch 93: The Described Film</a></li><li><a href="ch94_ad_dialog.html">Ch 94: The Describe Window</a></li></ul>
+</nav>
+<div class="main-content">
+
+<div class="chapter-number">Chapter 89</div>
+<h1>Audio Description: Narrating What Is on Screen</h1>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Say what audio description is, and who it is for</li>
+  <li>Separate the three things a run produces and who each one is for</li>
+  <li>Explain why the source video must never be written to</li>
+  <li>Lay out the package the feature is built from</li>
+  <li>Recognise the two ways a description can be placed in time</li>
+</ul>
+
+<hr>
+
+<h2>89.1 What Audio Description Is</h2>
+
+<p>An audio description is the narration a blind or low-vision viewer needs in
+order to follow a picture: who is on screen, what they are doing, what the text
+on the wall says, where the camera goes, what has just changed. It is not a
+transcript (that is the speech to text half of this application) and it is not a
+subtitle track (that is one of the outputs, not the whole job). It is writing
+that has to be <em>short</em>, <em>objective</em> and <em>true</em>, and it has
+to land between the lines of dialogue without covering them.</p>
+
+<p>The accessibility literature is unusually clear about where the difficulty
+lives. The VideoA11y study collected guidelines from 154 industry standards and
+found the same complaints repeating: descriptions that are too long, and
+descriptions that invent detail the describer could not have seen. Both are
+prompt problems more than model problems, which is why the guideline prompt is a
+first-class part of this feature and not a user preference &mdash; see
+<code>ai_voice_studio/describe/prompts.py</code>.</p>
+
+<p>Everything here runs on the user's own machine, exactly like the rest of the
+application: a vision-language model in a Python environment of its own, FFmpeg
+for frames, and the voices that were already downloaded for recording.</p>
+
+<h2>89.2 The Three Outputs</h2>
+
+<p>A run writes three files per video into the project folder, and they serve
+three different people:</p>
+
+<table>
+  <thead><tr><th>File</th><th>For whom</th></tr></thead>
+  <tbody>
+    <tr><td><code>Lecture.txt</code> &mdash; or <code>.html</code>,
+        <code>.srt</code>, <code>.vtt</code>, <code>.json</code></td>
+        <td>A describer or editor who will review and correct the draft; a player
+        that will speak the SRT/VTT at the right moment; a downstream tool that
+        wants the JSON.</td></tr>
+    <tr><td><code>Lecture - narration.wav</code></td>
+        <td>A listener who wants the descriptions as audio, laid at the times
+        they belong to.</td></tr>
+    <tr><td><code>Lecture - described.mp4</code></td>
+        <td><strong>The viewer.</strong> The film itself, with the description in
+        it: the original picture and sound with the description over the pauses,
+        or the picture stopped for every description.</td></tr>
+  </tbody>
+</table>
+
+<p>The first two are documents. The third is what makes this an audio
+description rather than a description <em>of</em> a video: the viewer plays one
+file and hears both. It is written by <code>describe/job.py</code> through
+<code>describe/extended.py</code>, which owns both FFmpeg graphs &mdash; one
+that mixes the description over the film's own soundtrack, and one that stops
+the film for every description.</p>
+
+<div class="note">
+<strong>Never the source.</strong> The described film is a <em>new</em> file,
+named from the source with a <code> - described</code> suffix, and in standard
+placement the picture stream is copied with <code>-c:v copy</code> rather than
+re-encoded, so what the viewer sees is bit-for-bit the source video. Nothing
+this feature does writes to the source file, renames it or moves it.
+</div>
+
+<h2>89.3 Two Ways to Place a Description</h2>
+
+<p>A description has to be heard, and it must not be heard over dialogue. There
+are exactly two ways to arrange that, and the feature offers both as a single
+choice called <em>Placement</em>:</p>
+
+<ul>
+  <li><strong>Standard</strong> &mdash; speak into a pause of the existing
+      soundtrack. The film is unchanged: its length, its picture and its
+      dialogue are all exactly as they were. This is the right default, and its
+      limit is that a film whose dialogue never stops has no room for it.</li>
+  <li><strong>Extended</strong> &mdash; stop the film. The picture holds on the
+      frame it had reached, the soundtrack goes quiet, the description is
+      spoken, and the film goes on. Nothing is ever talked over, at the price of
+      a longer film &mdash; about eleven seconds per description on the voice
+      measured here, and it is the only option that works for wall-to-wall
+      dialogue.</li>
+</ul>
+
+<p>The two are exclusive because they contradict each other: fitting a
+description into a pause assumes the film keeps playing. Choosing one therefore
+switches the other's controls off rather than letting a combination that cannot
+be honoured sit on screen.</p>
+
+<h2>89.4 The Package Layout</h2>
+
+<pre>ai_voice_studio/describe/
+    catalog.py        which models exist, their licences, sizes and costs
+    environments.py   one Python environment per model
+    weights.py        the per-variant checkpoint cache
+    worker.py         the standalone script a model's interpreter runs
+    engine.py         starting the worker, reading its response
+    pipeline.py       chunking, windows, estimates, gap fitting (pure)
+    prompts.py        the guideline prompt
+    media.py          FFmpeg probes (length, video files)
+    narration.py      text to speech for the descriptions
+    extended.py       the plan and the FFmpeg graphs for described films
+    output.py         the description documents
+    job.py            the background job the dialog starts</pre>
+
+<p>The split is deliberate. <code>pipeline.py</code> has no wx, no subprocess
+and no model: it is arithmetic over numbers and lists, so the decisions that
+matter &mdash; how a video is cut up, how long a run will take, where a
+description may be spoken &mdash; are tested exactly. <code>worker.py</code> is
+the opposite extreme: it is <em>standalone</em>, imports only
+<code>transformers</code>, <code>torch</code> and <code>PIL</code>, and is
+started by the interpreter of a model's own environment, which cannot import the
+application at all.</p>
+
+<div class="tip">
+<strong>A worker, not an import.</strong> A describing model drags in a whole
+PyTorch and <code>transformers</code> version, and two models in this catalogue
+disagree about both. The application never imports a model's back-end: it writes
+its request as JSON, starts <code>worker.py</code> with that model's
+<code>python.exe</code>, and reads the descriptions back the same way.
+</div>
+
+<h2>89.5 Exercises</h2>
+<ol>
+  <li>Add a fourth output: a plain-text list of the moments at which the
+      description speaks, for an editor who will re-record it.</li>
+  <li>Which of the three outputs can be produced without FFmpeg, and which
+      cannot? Justify each answer from the code.</li>
+  <li>The described film is named <code>… - described.mp4</code> in both
+      placements. Why is one name enough?</li>
+</ol>
+
+<h2>Key Takeaways</h2>
+<ul>
+  <li>Audio description serves a viewer, so a run must end in something
+      watchable &mdash; the described film &mdash; and not only in documents.</li>
+  <li>The source is read-only; the described film is a new file, and in standard
+      placement its picture is copied rather than re-encoded.</li>
+  <li>Placement is a single choice between speaking into a pause and stopping
+      the film, because a description cannot both wait and not wait.</li>
+  <li>Pure planning in one module and a standalone worker in another is what
+      makes both halves testable.</li>
+</ul>
+
+</div>
+</div>
+</body>
+</html>

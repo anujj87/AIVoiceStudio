@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import atexit
+import contextlib
 import os
 import re
-import shutil
 import subprocess
 import sys
 import threading
@@ -27,27 +27,6 @@ def sanitize_filename(name: str, max_len: int = 60) -> str:
     return name
 
 
-def sanitize_text(text: str) -> str:
-    """Normalise whitespace while keeping paragraph breaks."""
-    text = text.replace("\r\n", "\n").replace("\r", "\n")
-    text = _MULTI_SPACE.sub(" ", text)
-    text = _MULTI_NEWLINE.sub("\n\n", text)
-    return text.strip()
-
-
-def ensure_dir(path: str) -> str:
-    os.makedirs(path, exist_ok=True)
-    return path
-
-
-def format_bytes(num: float) -> str:
-    for unit in ("B", "KB", "MB", "GB"):
-        if abs(num) < 1024.0:
-            return f"{num:.1f} {unit}"
-        num /= 1024.0
-    return f"{num:.1f} TB"
-
-
 def clamp(value: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, value))
 
@@ -63,34 +42,26 @@ def find_python() -> str:
     """
     if not getattr(sys, "frozen", False):
         return sys.executable
-    # Always use the managed virtualenv (created on demand).
-    try:
+    # Always use the managed virtualenv (created on demand).  A failure here is
+    # reported by the FileNotFoundError below, which tells the user what to do.
+    with contextlib.suppress(Exception):
         from .python_runtime import get_runtime
         rt = get_runtime()
         if not rt.is_created:
             rt.ensure_env()  # creates venv using system Python
         if os.path.isfile(rt.python_exe):
             return rt.python_exe
-    except Exception:  # noqa: BLE001
-        pass
     raise FileNotFoundError(
         "Could not create the managed Python environment.  "
         "Make sure Python 3.10+ is installed on this system."
     )
 
 
-def worker_command(module: str, *args: str) -> list[str]:
-    """Build a command for a worker in development or a frozen app."""
-    if getattr(sys, "frozen", False):
-        return [sys.executable, "--aivs-worker", module, *args]
-    return [sys.executable, "-m", module, *args]
-
-
 # ---------------------------------------------------------------------------
 # Child processes started from background threads
 # ---------------------------------------------------------------------------
 #: Children still running, so the exit hook below can reach them.
-_children: "set[subprocess.Popen]" = set()
+_children: set[subprocess.Popen] = set()
 _children_lock = threading.Lock()
 _drain_registered = False
 
@@ -144,10 +115,9 @@ def drain_children(timeout: float = 3.0) -> None:
     with _children_lock:
         procs = list(_children)
     for proc in procs:
-        try:
+        # The process may have exited on its own a moment ago.
+        with contextlib.suppress(Exception):
             proc.kill()
-        except Exception:  # noqa: BLE001
-            pass
     end = time.monotonic() + 1.0
     while time.monotonic() < end:
         with _children_lock:

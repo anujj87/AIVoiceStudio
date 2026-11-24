@@ -20,15 +20,18 @@
 <body>
 
 <h1>AI Voice Studio &mdash; User Guide</h1>
-<p>Developed by <strong>Anuj Sharma</strong>. Application version <strong>2026.3.7</strong>.
+<p>Developed by <strong>Anuj Sharma</strong>. Application version <strong>2027.1.0</strong>.
 This guide explains installation, the first-launch terms of use, the first
 recording, every Settings category, voice cloning with the Voice Lab engines,
-punctuation, the compute back-ends, licences and how to solve common problems.
+themes, punctuation, the compute back-ends, speech-to-text transcription,
+licences and how to solve common problems.
 The application is designed to be fully usable with a screen reader (NVDA, JAWS,
 Narrator).</p>
 
 <h2>Contents</h2>
 <ul>
+  <li><a href="#whatfor">What you can use it for</a></li>
+  <li><a href="#free">Free, with no hidden cost</a></li>
   <li><a href="#installation">Installation</a></li>
   <li><a href="#terms">First launch &mdash; terms of use</a></li>
   <li><a href="#firstrecording">Making your first recording</a></li>
@@ -36,8 +39,11 @@ Narrator).</p>
   <li><a href="#projectlifecycle">Project lifecycle (Edit menu)</a></li>
   <li><a href="#recordingwindow">The Recording window</a></li>
   <li><a href="#settings">Settings (all categories)</a></li>
+  <li><a href="#gestures">Keyboard gestures</a></li>
   <li><a href="#voices">Downloading voices</a></li>
   <li><a href="#cloning">Voice cloning &mdash; the Voice Lab engines</a></li>
+  <li><a href="#transcription">Transcription &mdash; speech to text</a></li>
+  <li><a href="#audiodescription">Audio description &mdash; describing a video</a></li>
   <li><a href="#punctuation">Punctuation modes</a></li>
   <li><a href="#compute">Compute &mdash; choosing CPU or GPU</a></li>
   <li><a href="#updates">Updating to a newer version</a></li>
@@ -48,10 +54,63 @@ Narrator).</p>
   <li><a href="#troubleshooting">Troubleshooting</a></li>
 </ul>
 
+<h2 id="whatfor">What you can use it for</h2>
+<p>Everything AI Voice Studio does happens on your own computer: nothing is
+uploaded and no account is needed. That makes it useful both for convenience and
+for work that has to stay private.</p>
+<ul>
+  <li><strong>Podcasts and audio essays</strong> &mdash; open a script (PDF, DOCX,
+      Markdown, HTML or clipboard text), record it, and play the finished episode
+      with the <code>.m3u8</code> / <code>.pls</code> / <code>.wpl</code>
+      playlist the project generates.</li>
+  <li><strong>Game voice-over and character voices</strong> &mdash; clone a voice
+      from a five-second sample and give every line of a character the same
+      voice (see <a href="#cloning">Voice cloning</a>).</li>
+  <li><strong>Study notes and revision audio</strong> &mdash; record your notes
+      once and listen to them while you walk, drive, or take a break from
+      reading.</li>
+  <li><strong>Audiobooks, lessons and accessible reading</strong> &mdash; DAISY
+      2.02 and DAISY 3 books (audio, text and images) with playlists.</li>
+  <li><strong>Audio and video into text</strong> &mdash; transcribe recordings,
+      voice memos, interviews and <strong>video or audio lectures</strong> into
+      TXT, Markdown, SRT, VTT, HTML, JSON or CSV (see
+      <a href="#transcription">Transcription</a>).</li>
+  <li><strong>Subtitles and captions</strong> &mdash; write SRT or VTT with real
+      timings for a video, a lecture recording or an accessibility pass.</li>
+</ul>
+
+<h2 id="free">Free, with no hidden cost</h2>
+<p>The application is <strong>completely free</strong>: no price, no
+subscription, no &ldquo;Pro&rdquo; edition, no trial, no feature behind a payment,
+<strong>no advertising</strong>, no in-app purchase, no account and no telemetry.
+The one optional download it offers (the ONNX GPU runtime, about 1.8&nbsp;GB) is
+free too. The program is free software under the <strong>GPL-3.0</strong>.</p>
+<p>That licence covers <em>the program</em>. The voices, engines and
+speech-recognition models you download are <strong>separate works with their own
+licences</strong>: most are MIT or Apache-2.0 and are free to use, while a few
+(such as the MMS voices and the F5-TTS weights, which are CC-BY-NC-4.0) are for
+personal, non-commercial use only, and the SAPI5 / Windows voices follow your
+Windows licence. If you intend to use a recording commercially, check that
+voice&rsquo;s licence first &mdash; <strong>Help &rarr; Third-Party Licences</strong>
+lists all of them.</p>
+
 <h2 id="installation">Installation</h2>
+<p>There are two ways to install AI Voice Studio on Windows, and both use the
+same installer:</p>
+<ul>
+  <li><strong>With winget</strong> &mdash; the package is in the Windows Package Manager
+      repository: <code>winget install AnujSharma.AIVoiceStudio</code>. Update it later with
+      <code>winget upgrade AnujSharma.AIVoiceStudio</code> and remove it with
+      <code>winget uninstall AnujSharma.AIVoiceStudio</code>. If winget says the package
+      was not found, run <code>winget source update</code> first (or add
+      <code>--source winget</code>). <code>winget search AIVoiceStudio</code> lists it.</li>
+  <li><strong>With the setup file</strong> &mdash; download
+      <code>AI-Voice-Studio-v-2027-1-0-Setup-x64.exe</code> (or <code>-x86</code> for 32-bit
+      Windows) from <code>github.com/anujj87/AIVoiceStudio/releases</code> and run it.</li>
+</ul>
 <ol>
-  <li>Run <code>AI-Voice-Studio-v-2026-3-7-Setup-x64.exe</code> and follow the installer. (With winget, <code>winget install AnujSharma.AIVoiceStudio</code> does the same thing.)</li>
-  <li>Choose whether to install for all users or only for you.</li>
+  <li>Run <code>AI-Voice-Studio-v-2027-1-0-Setup-x64.exe</code> and follow the installer.</li>
+  <li>The installer asks whether to install for all users (administrator rights required) or for you only. Choosing <strong>for me only</strong> needs no administrator rights and installs the application under <code>%LOCALAPPDATA%\Programs</code>; an earlier installation of the same version family is updated in place.</li>
   <li>When asked, choose whether to create a desktop icon and whether to launch the application after setup.</li>
   <li>Read the licence page &mdash; it lists the third-party components the application bundles. The same information is available after installation from <strong>Help &rarr; Third-Party Licences</strong>.</li>
 </ol>
@@ -84,7 +143,7 @@ version that ships newer terms asks again.</div>
 
 <h2 id="firstrecording">Making your first recording</h2>
 <ol>
-  <li>Open <strong>Settings</strong> (Ctrl+,). In the <strong>Download and remove</strong> category choose a TTS engine (Piper is a good start), a language and a variant, then press <strong>Download selected variant</strong>. Wait for the download to finish.</li>
+  <li>Open <strong>Settings</strong> (Ctrl+,). In the <strong>Download and remove ONNX TTS</strong> category choose a TTS engine (Piper is a good start), a language and a variant, then press <strong>Download selected variant</strong>. Wait for the download to finish.</li>
   <li>Close Settings. Press <strong>Ctrl+Shift+N</strong> to create a new project.</li>
   <li>Type a project name, press <strong>Open document</strong> and choose a PDF, TXT, DOC/DOCX, HTML or Markdown file. Choose the punctuation mode.</li>
   <li>Press <strong>Next</strong>, choose how the document is split into audio files, then press <strong>Finish</strong>. The Recording window opens.</li>
@@ -102,13 +161,13 @@ list for the same actions as the Edit menu.</p>
 <h2 id="projectlifecycle">Project lifecycle (Edit menu)</h2>
 <table>
   <tr><th>Action</th><th>What it does</th></tr>
-  <tr><td>Resume Recording</td><td>Opens the selected project; recording continues from the first unsaved segment.</td></tr>
-  <tr><td>Restart Project&hellip;</td><td>Deletes all recordings and settings, keeps only the project name, and opens the New Project window again so you can choose a document and options afresh.</td></tr>
-  <tr><td>Restart All Recording</td><td>Deletes every recorded audio file; every segment is recorded again from the beginning.</td></tr>
-  <tr><td>Start Selected Recording&hellip;</td><td>Opens a picker with a sidebar that decides what the combo box lists:<ul>
-    <li><strong>Select an audio file</strong> (default) &mdash; the files already recorded in the project folder, so one of them is recorded again.</li>
+  <tr><td>Resume the project</td><td>Opens the selected project; recording continues from the first unsaved segment.</td></tr>
+  <tr><td>Restart Project&hellip;</td><td>Deletes all recordings or transcribe files and the project settings, keeps only the project name, and opens the New Project window again so you can choose a document and the audio creation or transcribe options afresh.</td></tr>
+  <tr><td>Restart All Recording<br>(<em>Restart All Files</em> for a transcription project)</td><td>Deletes every recorded or transcribe file; every segment is recorded or transcribed again from the beginning.</td></tr>
+  <tr><td>Start Selected Recording&hellip;<br>(<em>Start Selected Files&hellip;</em> for a transcription project)</td><td>Opens a picker whose first control is a read-only <strong>Project base</strong> combo naming the selected project's base (<em>Text to speech</em> or <em>Speech to text</em>). A sidebar then decides what the combo box lists:<ul>
+    <li><strong>Select an audio file</strong> / <strong>Select a transcribe file</strong> (default) &mdash; the files already recorded in the project folder, so one of them is recorded again.</li>
     <li><strong>Select by file break</strong> &mdash; every file break of the project, recorded or not, so recording can start at any break.</li>
-  </ul>A second pair of options decides how far recording goes: <strong>Only record selected file</strong> records just that file and stops, while <strong>Record all files from here</strong> records the chosen file and then every file after it to the end of the project. The chosen file is deleted first so it is recorded again. Recording itself still starts from the <strong>Start recording</strong> button of the Recording window.<br>
+  </ul>A second pair of options decides how far recording goes: <strong>Only record selected file</strong> (<strong>Only transcribe selected file</strong>) records just that file and stops, while <strong>Record all files from here</strong> (<strong>Transcribe all files from here</strong>) records the chosen file and then every file after it to the end of the project. The chosen file is deleted first so it is recorded again. Recording itself still starts from the <strong>Start recording</strong> button of the Recording window.<br>
   The dialog never refuses to open for lack of recordings: a 100-chapter book can have chapter 75 recorded today and the rest later. The only requirement is a project whose document has been split into file breaks.</td></tr>
   <tr><td>Remove Project&hellip;</td><td>Removes the project from the menu and deletes its folder from your hard disk. This cannot be undone.</td></tr>
 </table>
@@ -135,24 +194,88 @@ and voice combo boxes, the rate/pitch/volume sliders, and the output format
 <p>Settings uses the same layout as the NVDA screen reader's Settings dialog: a
 list of categories on the left, the selected category's panel on the right, and
 OK / Cancel / Apply buttons. Move through the categories with the arrow keys
-(the panel changes as you move), switch with Ctrl+Tab, press Enter for OK and
-Ctrl+S to apply without closing. The categories are, in order:</p>
+(the panel changes as you move), switch with Ctrl+Tab, press Enter for OK, and
+Ctrl+S to apply without closing. <strong>Apply</strong> saves your changes and
+stays in the dialog; its <strong>Alt+A</strong> access key and <strong>Ctrl+S</strong>
+do exactly the same work, and an applied theme is repainted across the whole
+application at once. The categories are, in order:</p>
 <table>
   <tr><th>#</th><th>Category</th><th>What it contains</th></tr>
-  <tr><td>1</td><td><strong>General</strong></td><td>Theme (System / Light / Dark), the folders where recorded audio files and downloaded voice models are saved (each with a Browse&hellip; button), and <strong>Developer Mode</strong>.</td></tr>
-  <tr><td>2</td><td><strong>Download and remove</strong></td><td>Pick a TTS engine, language and variant, then download or remove it. Downloads show a progress bar and can be cancelled. Engines that are installed as Python packages (the Voice Lab engines) are handled in their own category instead.</td></tr>
-  <tr><td>3</td><td><strong>Available TTS</strong></td><td>Lists the voices you have downloaded, installed as packages or cloned, grouped by engine. The fourth combo box selects the voice; <strong>Preview selected voice</strong> plays a short sample. A <strong>Compute</strong> combo sits next to the Preview button.</td></tr>
-  <tr><td>4</td><td><strong>Voice clone</strong></td><td>The Voice Lab clone engines &mdash; see <a href="#cloning">Voice cloning</a>.</td></tr>
-  <tr><td>5</td><td><strong>OmniVoice engines</strong></td><td>Install / remove the OmniVoice engines and edit their generation defaults. A <strong>Compute</strong> combo sits next to the Preview button.</td></tr>
+  <tr><td>1</td><td><strong>General</strong></td><td><strong>Developer Mode</strong>, the folder where your projects are saved and the folder where downloaded voice models are stored, each with its own named button (<strong>Browse project location&hellip;</strong> and <strong>Browse model location&hellip;</strong>) so a screen reader can say which folder a button changes, and the update behaviour. The theme and wallpaper moved to the <strong>Appearance</strong> category below.</td></tr>
+  <tr><td>2</td><td><strong>Appearance</strong></td><td>Everything about the look of the window: the <strong>Theme</strong> list (System default, the original Light and Dark, ten original predefined dark themes and ten new <em>vibrant</em> dark themes, plus every theme you create), <strong>Create custom theme&hellip;</strong>, and the <strong>wallpaper</strong> for the theme &mdash; on/off, a picture of your own and the background style. See <a href="#themes">Themes and wallpapers</a>.</td></tr>
+  <tr><td>3</td><td><strong>Download and remove ONNX TTS</strong></td><td>Pick a TTS engine, language and variant, then download or remove it. Downloads show a progress bar and can be cancelled. Engines that are installed as Python packages (the Voice Lab engines) are handled in their own category instead.</td></tr>
+  <tr><td>4</td><td><strong>Available TTS</strong></td><td>Lists the voices you have downloaded, installed as packages or cloned, grouped by engine. The fourth combo box selects the voice; <strong>Preview selected voice</strong> plays a short sample. A <strong>Compute</strong> combo sits next to the Preview button.</td></tr>
+  <tr><td>5</td><td><strong>Voice Clone</strong></td><td>Every cloning engine on one page, chosen from one <strong>TTS engine</strong> list at the top: the Voice Lab engines (see <a href="#cloning">Voice cloning</a>) and the two <strong>OmniVoice engines</strong> (<em>OmniVoice Server</em> and <em>OmniVoice (direct, Triton)</em>). The controls of the engine you pick follow below it &mdash; for a Voice Lab engine <strong>Install engine&hellip;</strong> / <strong>Remove engine</strong>, the device list, the sample box and the voices ready to use; for an OmniVoice engine the <strong>OmniVoice packages</strong> box with <strong>Install OmniVoice dependency</strong> / <strong>Remove OmniVoice dependency</strong> (<code>omnivoice-triton</code>) and <strong>Install OmniVoice Server</strong> / <strong>Remove OmniVoice Server</strong> (<code>omnivoice-server</code>), their install status, the three engine cards (Server, Triton, Hybrid), and the OmniVoice voice library where you create, rename, delete and preview OmniVoice voices. A <strong>Compute</strong> combo sits next to the library's Preview button.</td></tr>
   <tr><td>6</td><td><strong>OmniVoice Server</strong></td><td>Controls the OpenAI-compatible OmniVoice HTTP server: host, port, device, diffusion steps, concurrency, API key, CORS origins, start/stop and health check.</td></tr>
   <tr><td>7</td><td><strong>Recording settings</strong></td><td>Default speed, pitch and volume for new projects, plus a preview text box and a Preview button that hears the current defaults through a downloaded voice. A <strong>Compute</strong> combo sits next to the Preview button.</td></tr>
   <tr><td>8</td><td><strong>Punctuation</strong></td><td>The default punctuation mode for new projects, with a voice cascade (TTS &rarr; variant &rarr; voice), an example box that shows exactly how text will be spoken, and a Preview button with its own <strong>Compute</strong> combo.</td></tr>
   <tr><td>9</td><td><strong>Audio file creation</strong></td><td>How the document is split into audio files (for example one file per page, or per heading). Each mode shows a description.</td></tr>
   <tr><td>10</td><td><strong>DAISY settings</strong></td><td>Defaults for DAISY books: language, publisher and whether the DAISY 3 book includes the text.</td></tr>
-  <tr><td>11</td><td><strong>Compute</strong></td><td>Shows the detected CPU/GPU capability and manages the optional ONNX GPU (CUDA) runtime for the built-in engines (about 1.8&nbsp;GB): <strong>Download GPU runtime</strong> / <strong>Remove GPU runtime</strong>. Restart after installing or removing it.</td></tr>
-  <tr><td>12</td><td><strong>Developer</strong></td><td>Only visible with Developer Mode: heavy logging, addon management, the addon Python environment (install pip packages, list installed packages) and diagnostics.</td></tr>
-  <tr><td>13</td><td><strong>Reset</strong></td><td>Restores every setting to its default value. Downloaded voices and installed engines are not deleted.</td></tr>
+  <tr><td>11</td><td><strong>Manage the STT</strong></td><td>The speech-to-text models &mdash; see <a href="#transcription">Transcription</a>. A table of every model (licence, languages, the devices it runs on, notes) with <strong>Install model</strong> / <strong>Remove model</strong> and its own environment's status. When a model's environment is missing the CUDA runtime its GPU path needs, the status says so and <strong>Install selected model</strong> becomes <strong>Repair selected model</strong>.</td></tr>
+  <tr><td>12</td><td><strong>Manage the video describer</strong></td><td>The video-description models (the vision-language model that writes the narration) &mdash; see <a href="#audiodescription">Audio description</a>. A table of every model and variant with its size, video memory, fit and download state, and its own environment's status.</td></tr>
+  <tr><td>13</td><td><strong>Hugging Face account</strong></td><td>The access token a <em>gated</em> model needs &mdash; Google's Gemma&nbsp;3 and Pocket TTS's voice-cloning weights are the two in the application. Paste a read token from <code>huggingface.co/settings/tokens</code>; <strong>Check token</strong> asks huggingface.co whose token it is and reports the account, <strong>Get a token&hellip;</strong> opens the page where one is created, and <strong>Clear token</strong> removes it. There is no per-model token &mdash; one read token serves every gated model, and what grants the access is accepting that model's licence &mdash; so <strong>Model</strong> picks the gated model being set up, <strong>Open the model page&hellip;</strong> opens the page whose own accept button grants it, and <strong>Check access</strong> asks huggingface.co whether this token's account may download <em>that</em> model (which tells a wrong token from a licence that was never accepted). Open models download with no account at all. See <a href="#audiodescription">Audio description</a> and <a href="#voiceclone">Voice Clone</a>.</td></tr>
+  <tr><td>14</td><td><strong>Keyboard gestures</strong></td><td>Every command with the keyboard keys that trigger it &mdash; see <a href="#gestures">Keyboard gestures</a>.</td></tr>
+  <tr><td>15</td><td><strong>Compute</strong></td><td>Shows the detected CPU/GPU capability and manages the optional ONNX GPU (CUDA) runtime for the built-in engines (about 1.8&nbsp;GB): <strong>Download GPU runtime</strong> / <strong>Remove GPU runtime</strong>. Restart after installing or removing it. The OmniVoice packages are installed from <strong>Voice Clone</strong>, not here.</td></tr>
+  <tr><td>16</td><td><strong>Developer</strong></td><td>Only visible with Developer Mode: heavy logging, addon management, the addon Python environment (install pip packages, list installed packages) and diagnostics.</td></tr>
+  <tr><td>17</td><td><strong>Reset</strong></td><td>Restores every setting to its default value. Downloaded voices and installed engines are not deleted.</td></tr>
 </table>
+
+<h2 id="themes">Themes and wallpapers</h2>
+<p>Settings &rarr; <strong>Appearance</strong> holds the <strong>Theme</strong>
+list. It starts with <strong>System default</strong>, <strong>Light</strong> and
+<strong>Dark</strong> &mdash; the three appearances the application has always
+shipped, unchanged &mdash; and then offers twenty predefined dark themes. The
+first ten are the original set, each with its own sincere palette and painted
+style:</p>
+<ul>
+  <li><strong>Midnight Graphite</strong> &mdash; neutral charcoal, slate-blue accent.</li>
+  <li><strong>Obsidian Gold</strong> &mdash; near-black, antique gold, soft vignette.</li>
+  <li><strong>Deep Navy</strong> &mdash; navy blue, royal-blue accent.</li>
+  <li><strong>Forest Pine</strong> &mdash; pine green, leaf-green dots.</li>
+  <li><strong>Plum Royale</strong> &mdash; royal plum, orchid accent.</li>
+  <li><strong>Crimson Slate</strong> &mdash; slate charcoal, crimson stripes.</li>
+  <li><strong>Ocean Teal</strong> &mdash; deep teal, aqua waves.</li>
+  <li><strong>Amber Dusk</strong> &mdash; dusk brown, golden glow.</li>
+  <li><strong>Carbon Lime</strong> &mdash; carbon black, bold lime grid.</li>
+  <li><strong>Blue Steel</strong> &mdash; gunmetal grey-blue, steel diagonal.</li>
+</ul>
+<p>The second ten are the <em>vibrant</em> set, added on request: the same dark,
+legible baseline (every pair of these palettes passes WCAG AA contrast), but
+with saturated, vivid accents and backgrounds tinted with the accent's own
+hue, so they read as colourful rather than neutral:</p>
+<ul>
+  <li><strong>Neon Magenta</strong> &mdash; deep magenta-black, piercing pink corner glow.</li>
+  <li><strong>Inferno Red</strong> &mdash; ember-black, vivid signal-red stripes.</li>
+  <li><strong>Solar Flare</strong> &mdash; burnt-orange black, hot molten-orange blend.</li>
+  <li><strong>Voltage Yellow</strong> &mdash; olive-black, electric-yellow grid.</li>
+  <li><strong>Laser Lime</strong> &mdash; moss-black, searing lime-green dots.</li>
+  <li><strong>Emerald Surge</strong> &mdash; deep forest black, brilliant emerald waves.</li>
+  <li><strong>Cyber Cyan</strong> &mdash; ink-black, bright cyan diagonal.</li>
+  <li><strong>Azure Rush</strong> &mdash; midnight-blue black, vivid azure blend.</li>
+  <li><strong>Electric Indigo</strong> &mdash; indigo-black, saturated electric-violet vignette.</li>
+  <li><strong>Ultraviolet</strong> &mdash; near-black violet, glowing ultraviolet vignette.</li>
+</ul>
+<p>The original ten are untouched by the new ones: same names, same colours,
+same order in the list.</p>
+<p>Every theme&mdash;built-in, predefined or custom&mdash;can carry a
+<strong>wallpaper</strong>. Tick <em>Show a wallpaper in the empty area of the
+welcome screen</em>, then use <em>Choose image&hellip;</em> to pick a picture (PNG,
+JPG, BMP, GIF or WebP) or leave it empty to use the theme's own painted style.
+The welcome screen is three regions: a full-width <em>action bar</em> with the
+four main buttons (<strong>Remove selected project</strong>, <code>Alt+J</code>;
+<strong>Create New Project</strong>; <strong>Record (open a project)</strong>;
+<strong>Settings (download voices)</strong>), a left <em>projects sidebar</em>
+with the Recent projects list, and the large empty area that remains. The
+wallpaper fills <em>only</em> that empty area, so it never paints behind a
+button or the project list; the background style list overrides the pattern the
+theme would otherwise draw.</p>
+<p><strong>Create custom theme&hellip;</strong> (in Settings &rarr;
+<strong>Appearance</strong>) opens the theme studio: name the
+theme, pick its background, text, control, control-text, accent and heading
+colours, choose a painted style from the live preview, and give it a wallpaper.
+<strong>Save theme</strong> adds it to the Theme list; you can create, edit and
+delete as many as you like. Custom themes and wallpapers are stored with your
+settings.</p>
 
 <h2 id="voices">Downloading voices</h2>
 <p>Voices are downloaded from the official open-source releases
@@ -173,12 +296,28 @@ Selecting a voice that is not in the installed variant plays the first
 English voice, so always match the voice to the variant you downloaded.</p>
 
 <h2 id="cloning">Voice cloning &mdash; the Voice Lab engines</h2>
-<p>Three text-to-speech engines are installed as Python packages instead of
+<p>The text-to-speech engines are installed as Python packages instead of
 downloaded ONNX models, because they are generative models that can copy a voice
-from a short sample: <strong>Pocket TTS (Kyutai)</strong>, <strong>Bark (Suno
-AI)</strong> and <strong>F5-TTS</strong>. Together they are called the
-<em>Voice Lab</em>, and they are configured in <strong>Settings &rarr; Voice
-clone</strong>. OmniVoice (categories 5 and 6) can also clone a voice.</p>
+from a short sample: <strong>Pocket TTS (Kyutai)</strong>, <strong>F5-TTS</strong>,
+<strong>KokoClone</strong> (Kokoro-ONNX speech plus Kanade voice conversion),
+<strong>Chatterbox</strong> (Resemble AI), <strong>Qwen3-TTS</strong>,
+<strong>VibeVoice</strong> (Microsoft, community fork), <strong>MOSS-TTS</strong>
+(OpenMOSS), <strong>GPT-SoVITS</strong> (RVC-Boss) and, for the Indian languages,
+<strong>Indic Parler-TTS</strong> (AI4Bharat). Together
+they are called the <em>Voice Lab</em>, and they are configured in
+<strong>Settings &rarr; Voice clone</strong>. OmniVoice (categories 5 and 6) can
+also clone a voice. Pocket TTS, F5-TTS and KokoClone run on
+the CPU or the GPU; the large transformers (Chatterbox, Qwen3-TTS, VibeVoice,
+MOSS-TTS, GPT-SoVITS) and Indic Parler-TTS are GPU-only, because their CPU run
+is many times slower than real time. Indic Parler-TTS is not a cloning engine at
+all &mdash; it speaks with one of its 65
+named speakers, picked by rewriting the prose description of the voice and its
+delivery. Every variant offered fits
+inside 12&nbsp;GB of video memory. GPT-SoVITS has no voices of its own: it always
+speaks from a recording you clone, and it speaks English, Chinese, Korean and
+Cantonese &mdash; Japanese is not offered, because its Japanese front-end needs
+<code>pyopenjtalk</code>, which has no installable build for the Python this app
+runs on.</p>
 <ol>
   <li>In the <strong>Engine</strong> combo choose the engine, then press
       <strong>Install engine&hellip;</strong>. The dialog names the packages that will be
@@ -193,7 +332,10 @@ clone</strong>. OmniVoice (categories 5 and 6) can also clone a voice.</p>
       detected. See <a href="#compute">Compute</a> for how much of the machine each
       choice uses.</li>
   <li>Choose what to speak: <strong>Use a built-in voice</strong> (the pre-made voices
-      the engine ships with &mdash; Pocket TTS and Bark provide many) or <strong>Clone a
+      the engine ships with &mdash; Pocket TTS, KokoClone, Qwen3-TTS, VibeVoice
+      and MOSS-TTS provide many; GPT-SoVITS provides none, so clone a voice for
+      it)
+      or <strong>Clone a
       voice from a sample</strong>: type a voice name, pick a clean 4&ndash;15&nbsp;second
       recording of one speaker, optionally type its transcript, and press
       <strong>Create cloned voice</strong>.</li>
@@ -204,13 +346,26 @@ clone</strong>. OmniVoice (categories 5 and 6) can also clone a voice.</p>
 <p>Cloned and built-in voices then appear in <strong>Available TTS</strong>, in the
 Preview cascades and in the Recording window, so they can be used everywhere
 without further configuration.</p>
-<div class="note"><strong>Licences differ per engine.</strong> Pocket TTS and Bark are
-Apache-2.0/MIT; F5-TTS code is MIT but its model weights are
+<div class="note"><strong>Licences differ per engine.</strong> Pocket TTS is
+Apache-2.0 (with per-voice terms), Chatterbox and VibeVoice are MIT and Indic
+Parler-TTS is Apache-2.0; F5-TTS code is MIT but
+its model weights are
 <strong>CC-BY-NC-4.0, which forbids commercial use</strong>. Check
 <strong>Help &rarr; Third-Party Licences</strong> before commercial work &mdash;
 the same obligation you accepted in the Terms of Use dialog.</div>
 <div class="tip">The first synthesis with a freshly installed engine downloads its model
 from Hugging Face and is therefore slow; later sentences are much faster.</div>
+<div class="note"><strong>Pocket TTS: the pre-made voices need nothing, cloning
+needs one thing.</strong> Kyutai's <em>voice-cloning</em> weights live in the
+gated repository <code>kyutai/pocket-tts</code>; the 26 pre-made voices do not,
+which is why Pocket TTS speaks the moment it is installed and only
+<em>Clone a voice from a sample</em> asks for an account. The engine does not
+fail without it &mdash; it quietly loads its cloning-free weights &mdash; so a
+clone attempt is what stops, and it names the two steps: accept the licence at
+<code>https://huggingface.co/kyutai/pocket-tts</code> and add a read token in
+<strong>Settings &rarr; Hugging Face account</strong>. Choose <em>Pocket TTS
+voice cloning</em> in that panel and press <strong>Check access</strong> to see
+whether it is in place before you clone.</div>
 
 <h3>One Python environment per engine</h3>
 <p>Every pip-installed engine gets its own virtual environment under
@@ -218,14 +373,411 @@ from Hugging Face and is therefore slow; later sentences are much faster.</div>
 <table>
   <tr><th>Environment</th><th>Used by</th></tr>
   <tr><td><code>tts_envs\pocket_tts</code></td><td>Pocket TTS (Kyutai)</td></tr>
-  <tr><td><code>tts_envs\bark</code></td><td>Bark (Suno AI)</td></tr>
   <tr><td><code>tts_envs\f5tts</code></td><td>F5-TTS</td></tr>
+  <tr><td><code>tts_envs\chatterbox</code></td><td>Chatterbox (Resemble AI)</td></tr>
+  <tr><td><code>tts_envs\qwen3tts</code></td><td>Qwen3-TTS</td></tr>
+  <tr><td><code>tts_envs\vibevoice</code></td><td>VibeVoice</td></tr>
+  <tr><td><code>stt_envs\&lt;model id&gt;</code></td><td>One speech-to-text model each</td></tr>
+  <tr><td><code>tts_envs\kokoclone</code></td><td>KokoClone (Kokoro-ONNX + Kanade) &mdash; own environment only, never the shared one</td></tr>
   <tr><td><code>tts_envs\omnivoice</code></td><td>OmniVoice <em>and</em> OmniVoice Server (one deliberate shared environment)</td></tr>
+  <tr><td><code>tts_envs\indic_parler</code></td><td>Indic Parler-TTS</td></tr>
   <tr><td><code>addon_env</code></td><td>Addons, the Developer category and the ONNX GPU runtime</td></tr>
 </table>
 <p>Each engine's worker process runs on its own environment's interpreter, so
 PyTorch and CUDA never enter the application process. Removing an engine
-uninstalls its packages from its environment only.</p>
+uninstalls its packages from its environment only. KokoClone goes further: it
+runs in <code>tts_envs\kokoclone</code> and nowhere else. It is never reported
+as installed because another engine's package is present in the shared
+environment, and <em>Remove engine</em> deletes its environment (with the models
+it downloaded) instead of taking packages out of the shared one.</p>
+
+<h2 id="transcription">Transcription &mdash; speech to text</h2>
+<p>A transcription project turns recorded audio (and video files) into text
+documents instead of the other way round. Create one with <strong>Project &rarr;
+New project &rarr; Transcription</strong>, choose the recordings or the folder to
+transcribe, then open the <strong>Transcribe</strong> dialog &mdash; the last step
+of the wizard, and what <strong>Open</strong> reopens on a recent transcription
+project. The dialog offers five choices:</p>
+<ul>
+  <li><strong>Compute</strong> &mdash; the device to run the chosen model on.
+      Only a model that <em>cannot</em> run without a GPU (Canary-Qwen 2.5B,
+      Granite Speech 8B) is offered the GPU alone; every other model offers
+      <strong>both the CPU and the GPU</strong> when an NVIDIA card is present
+      (the recommended device first) and the CPU alone on a machine with no
+      card. The list is rebuilt when you change the variant, because one model
+      can hold a GPU-only checkpoint and a CPU-friendly one. &ldquo;Auto&rdquo;
+      is deliberately not offered: it would quietly pick the device instead of
+      you.</li>
+  <li><strong>Speech to text model</strong> and <strong>Variant</strong> &mdash; any model
+      from <strong>Settings &rarr; Manage the STT</strong>. Models that are not installed
+      yet say so in the list.</li>
+  <li><strong>Language</strong> &mdash; the spoken language, or <em>Detect
+      automatically</em> where the model supports it.</li>
+  <li><strong>Accuracy</strong> &mdash; fast (greedy decoding), balanced (beam search,
+      recommended) or most accurate (wide beam search, slowest).</li>
+  <li><strong>Translation</strong> &mdash; only for the models that can translate speech
+      into English; on the others the box says so and is disabled.</li>
+</ul>
+<p><strong>Start transcribe</strong> runs the job in the background and writes one document
+per source (or one per time slice) into the project folder: TXT, SRT, VTT, HTML, JSON or
+CSV, with or without timestamps, following the choices made when the project was created.
+A modal progress window shows how far the run has got and can cancel it; when it finishes,
+<strong>Open project folder</strong> opens the folder the documents were written to. The
+status line shows what is happening, and a failure names its cause instead of a traceback
+tail.</p>
+<h3>What you can transcribe</h3>
+<p>A source can be a single file or a whole folder (the folder is walked
+recursively). <strong>Audio</strong>: WAV, MP3, FLAC, M4A, AAC, OGG/Opus, WMA and
+AIFF. <strong>Video</strong>: MP4, MKV, MOV, WebM, AVI, M4V, MPG, MPEG, WMV, TS
+and M2TS &mdash; FFmpeg, which the application already downloads for MP3/FLAC
+output, decodes them, so a <strong>lecture recorded as video</strong> needs no
+separate step. The output document is named after the source file and written
+next to the project.</p>
+<ul>
+  <li><strong>TXT / Markdown</strong> &mdash; plain study notes, with an optional
+      timestamp at the start of each line.</li>
+  <li><strong>SRT / VTT</strong> &mdash; ready-made subtitles or captions with
+      real timings, for a video, a lecture recording or an accessibility pass.</li>
+  <li><strong>HTML</strong> &mdash; a titled document you can open in a browser or
+      a screen reader.</li>
+  <li><strong>JSON / CSV</strong> &mdash; one record per segment, with its start
+      and end, for feeding the text into something else.</li>
+</ul>
+<p>With <strong>time by time separation</strong> a long recording is split into
+parts of the number of minutes you choose, so a two-hour lecture becomes several
+short documents instead of one enormous file. Because everything runs on the
+machine, a confidential interview or a private note can be transcribed with no
+internet connection at all.</p>
+<p>Every model is installed into a Python environment <em>of its own</em> under
+<code>%APPDATA%\AIVoiceStudio\stt_envs\&lt;model id&gt;</code>, so their dependencies
+(NeMo, <code>transformers</code>, two different PyTorch pins, <code>protobuf</code>)
+can never break each other. <em>Remove model</em> deletes that environment. No model
+needs a Hugging Face account, a token or a licence click-through.</p>
+<div class="note"><strong>Not every model can report timings.</strong> Whisper and the
+NeMo text models say when each phrase was spoken; the audio language models (Qwen3-ASR,
+Voxtral, Granite Speech, Moonshine) do not, and are never asked to &mdash; they produce
+one untimed segment. Voxtral is offered at 3B only: the 24B model is too large for an
+ordinary 12&nbsp;GB card.</div>
+
+<h2 id="audiodescription">Audio description &mdash; describing a video</h2>
+<p><strong>Audio description</strong> narrates what is happening on screen for a
+blind or low-vision viewer: who is there, what they do, what text or code has
+appeared, where the picture goes. AI Voice Studio watches the video with a
+vision-language model, writes the descriptions, speaks them with one of your
+offline voices, and muxes them into a new copy of the film. Nothing is uploaded:
+the model runs on your own machine, in a Python environment of its own.</p>
+<div class="tip"><strong>Three files per video, and the source is never touched.</strong>
+One run writes (1) the <strong>description document</strong> in the format the
+project chose, (2) the <strong>spoken narration</strong> &mdash; an audio file of
+the descriptions read aloud &mdash; and (3) the <strong>described video</strong>:
+a <em>new</em> file next to the project containing the original picture and
+sound with the description heard over the pauses. Your source video is read
+only; it is never edited, moved or overwritten.</div>
+
+<h3>Creating an audio description project</h3>
+<p><strong>Project &rarr; New project</strong>, then choose the project base
+<strong>Audio description</strong> and give the project a name. The wizard page
+then asks for the video(s) and the describing model:</p>
+<ul>
+  <li><strong>Video files</strong> &mdash; one or more video files (MP4, MKV, MOV,
+      AVI, WebM, WMV, M4V, MPG, TS, 3GP, OGV and more). A whole folder can be
+      added; files that are not video are refused with their names listed.</li>
+  <li><strong>Video description model</strong> &mdash; every model in <strong>Settings
+      &rarr; Manage the video describer</strong> (Qwen3-VL, Qwen2.5-VL, Qwen2.5-Omni,
+      Qwen3-Omni, Gemma&nbsp;3, Gemma&nbsp;4, MiniCPM-o, MiniCPM-V&nbsp;4,
+      SmolVLM2, Moondream). Every entry says whether it is <strong>ready to use</strong>
+      or <strong>not installed</strong>.</li>
+  <li><strong>Model variant</strong> &mdash; the checkpoint of that model, each
+      labelled with its download size and the video memory it needs: <em>downloaded</em>,
+      <em>not downloaded yet</em> or <em>download stopped part-way</em>.</li>
+  <li><strong>Compute</strong> &mdash; the CPU or the GPU for the model.</li>
+  <li><strong>Frame rate</strong> &mdash; how many frames of every second of video
+      the model is shown (1 per second to 1 per five seconds). More frames is
+      more detail and more time.</li>
+  <li><strong>Chunk</strong> &mdash; how much video is described in one pass
+      before the run stops to save progress (1&ndash;10 minutes per chunk). This
+      is about memory, progress and resuming; what one <em>description</em>
+      covers is decided by the window below.</li>
+  <li><strong>Output document</strong> &mdash; description script (plain text or a
+      web page), SRT or WebVTT subtitles, or JSON.</li>
+</ul>
+<p>The page also shows the estimated run time and how many descriptions that video
+will produce &mdash; about one for every twenty seconds of video &mdash; and warns
+before anything starts on a long film, because describing video is far slower
+than transcribing it.</p>
+
+<h3>Audio description in the Settings window</h3>
+<p><strong>Settings &rarr; Manage the video describer</strong> is where the models
+are installed. Each model lists its licence, its download size and the video
+memory it wants, and each <em>variant</em> is a row of its own:</p>
+<ul>
+  <li><strong>Install model environment</strong> / <strong>Repair model
+      environment</strong> &mdash; builds (or repairs) that model's private Python
+      environment under
+      <code>%APPDATA%\AIVoiceStudio\describe_envs\&lt;model id&gt;</code>. It turns
+      into <em>Repair</em> when something is missing from it, such as the CUDA
+      runtime on a GPU machine.</li>
+  <li><strong>Download selected variant</strong> / <strong>Remove variant
+      download</strong> &mdash; fetches or deletes the checkpoint of the variant
+      selected in the row. Downloading <em>one</em> variant never takes the
+      others away: every variant of a model keeps its own Download button, so a
+      second checkpoint can be fetched at any time.</li>
+  <li><strong>Status</strong> &mdash; the state of that variant: <em>Downloaded</em>,
+      <em>Not downloaded (about N GB)</em>, <em>Partly downloaded</em> (a fetch that
+      was cancelled or failed; downloading it again continues where it stopped)
+      or <em>Install the model first</em>.</li>
+  <li><strong>Remove model environment</strong> &mdash; deletes that environment and
+      everything in it.</li>
+</ul>
+<div class="note"><strong>Two layers, not one.</strong> The packages of a model are
+shared by all its variants; a checkpoint belongs to one variant. That is why
+installing a model and downloading a variant are separate buttons, and why
+removing one variant leaves the model (and its other variants) installed.</div>
+<div class="note"><strong>A checkpoint larger than your card is loaded in 4 bits.</strong>
+On a machine with an NVIDIA card, the model environment also installs
+<code>bitsandbytes</code>, the quantiser. A variant whose weights are larger than
+the card &mdash; Gemma&nbsp;3 12B is about 24&nbsp;GB &mdash; is then loaded in
+4-bit form (about a quarter of the size) instead of being spilled to the disk,
+which used to end the run with a Windows access violation. A model that fits is
+still loaded at full precision.</div>
+<div class="note"><strong>Gemma&nbsp;3 needs a Hugging Face token; nothing else
+here does.</strong> Every Gemma&nbsp;3 checkpoint lives in Google's <em>gated</em>
+repository, so its download only works for an account that has accepted its
+licence. Three steps, once: choose the model in
+<strong>Settings &rarr; Hugging Face account</strong> and press <strong>Open the
+model page&hellip;</strong>, then press the page's own accept button
+(<em>Agree and access repository</em>); create a <em>read</em> token at
+<code>https://huggingface.co/settings/tokens</code>; paste it into the same panel
+and press <strong>Check token</strong> (it reports whose token it is) and then
+<strong>Check access</strong> (it says whether the licence is in place for that
+model). There is no per-model token &mdash; one read token serves every gated
+model &mdash; and <em>Check access</em> is what tells a mistyped token from a
+licence that was never accepted, which look identical in the library's error. A
+gated model says so before it starts &mdash; in the Status column of the table and
+again when a run is asked for without a token &mdash; rather than failing part-way
+through a download with the library's <code>401 &mdash; Cannot access gated repo
+... Please log in</code>. The token stays in your own
+<code>%APPDATA%\AIVoiceStudio\settings.json</code> and is sent only to
+huggingface.co; an <code>HF_TOKEN</code> environment variable or a previous
+<code>huggingface-cli login</code> works just as well for users who already have
+one.</div>
+
+<h3>The Audio description window</h3>
+<p>The last step of the wizard &mdash; and what <strong>Open</strong> reopens on a
+recent audio description project &mdash; is the <strong>Audio description</strong>
+window. It does not ask again what the project already decided: the model, its
+variant, the device, the frame rate, the chunk length and the output format are
+reported at the top, with the state of the model and of the variant next to them.</p>
+<p>What it asks is how the descriptions are placed and who speaks them:</p>
+<ul>
+  <li><strong>Placement</strong> &mdash; how the description reaches the viewer:
+    <ul>
+      <li><strong>Speak into the pauses (standard)</strong> &mdash; the film is not
+          changed at all. Each description is placed in a silence of the
+          soundtrack, so the picture and the film's length stay as they are.</li>
+      <li><strong>Pause the video for each description (extended)</strong> &mdash;
+          the picture stops on the frame it had reached, the description is
+          spoken into the quiet, and the film goes on. Nothing is ever talked
+          over, at the price of a longer film (about eleven seconds per
+          description). This is the only option for a video whose dialogue never
+          leaves a pause, and the one to use when the text on screen matters:
+          the pause is the moment the viewer reads it.</li>
+    </ul></li>
+  <li><strong>Track priority</strong> &mdash; which of the two tracks gives way,
+      which is the one place the description and the film's own soundtrack are
+      heard <em>together</em> (standard placement). The list runs from the
+      gentlest answer to the film to the most forceful, and it opens on the
+      first, which is what every run before these choices existed produced.
+      <strong>Same volume</strong> &mdash; the default &mdash; mixes both tracks
+      exactly as they were produced. <strong>Duck, don't lower</strong> does not
+      lower the film at all: it dips
+      the film's own soundtrack to a quarter of its own level (about
+      &minus;12&nbsp;dB) while a description is actually being spoken, over a fast
+      fade at either end, and lets it back up between descriptions &mdash; the
+      choice for a film whose music never stops, because its own sound is left
+      alone everywhere the description is not talking. The moments are not
+      estimated: the narration track records where each description is really
+      heard while it is written, and two descriptions less than half a second
+      apart are one dip, so the film does not flap back up in the middle of a
+      spoken passage. If a dip cannot be applied at all, the film is mixed with
+      both its tracks as they are rather than losing its own sound.
+      <strong>Description 25% higher</strong> and
+      <strong>Description 50% higher</strong> keep the description at the level
+      your narration settings gave it and mix the film's own soundtrack at 75%
+      or 50% of it, so a description stands out from a film whose music and
+      dialogue never stop. Only the film's track moves: raising the description
+      instead would clip (speech at full scale already peaks at full scale) and
+      would change a level you had already chosen by ear &mdash; unless you ask
+      for it with the narration volume slider below. With extended
+      placement the combo is switched off, because the film's soundtrack is
+      silent while the description is spoken and there is nothing to balance.</li>
+  <li><strong>Fit descriptions into the pauses</strong> &mdash; uses the
+      speech-to-text model chosen in Settings to find the silent gaps and put
+      each description into the pause that follows the moment it describes,
+      instead of at a fixed boundary. Only available with standard placement,
+      because pausing the film replaces the idea. A description that no pause
+      can hold is left out of the timed track rather than spoken over dialogue,
+      and the run says how many that was.</li>
+  <li><strong>Also speak the descriptions into a narration audio file</strong>
+      &mdash; turns the descriptions into speech with an offline voice, and is
+      <em>on by default</em> on a machine that has a voice, because it is what
+      produces the narration audio <em>and</em> the described video. With
+      standard placement it can be switched off, and then only the document is
+      written; with extended placement it is always on, because a description
+      the viewer cannot hear is not an audio description.</li>
+  <li><strong>Narration TTS model &rarr; Narration model variant &rarr; Narration
+      voice</strong> &mdash; the same cascade the Recording window uses, listing
+      only the voices you have already downloaded. The audio is written in the
+      format chosen in <strong>Settings &rarr; Recording settings</strong>.</li>
+  <li><strong>Narration voice volume</strong> &mdash; how loud the description is
+      spoken, directly under the voice that speaks it. 1.00 is the voice as it
+      was downloaded, 0.50 is half of it and 2.00 is twice it; the value is
+      remembered for the next project and written into the run's own record.
+      Only the description moves here &mdash; the film's own soundtrack is what
+      <strong>Track priority</strong> sets.</li>
+</ul>
+<p><strong>Start audio description</strong> runs the job in the background. A
+progress window shows the percentage and can cancel the run; the window's own
+<strong>chunk report</strong> lists every piece as it is described, with its text,
+and says when a piece was skipped because the picture had not changed.
+<strong>Closing the window does not lose work</strong>: the description script is
+rewritten after every finished piece, so a run that is stopped after an hour
+keeps the descriptions it had already produced, and starting again continues
+from what is missing.</p>
+<p>When the run finishes, a summary names the three outputs and any warnings
+(for example a voice that could not be loaded, or a described video that could
+not be written), and offers <strong>Open project folder</strong>.</p>
+
+<h3>What appears in the project folder</h3>
+<p>For a source video called <code>Lecture.mp4</code>, a run writes:</p>
+<table>
+  <thead><tr><th>File</th><th>What it is</th></tr></thead>
+  <tbody>
+    <tr><td><code>Lecture.txt</code><br>(or <code>.html</code>, <code>.srt</code>,
+        <code>.vtt</code>, <code>.json</code>)</td>
+        <td>The description document in the chosen format: the reviewable script,
+        a subtitle track or machine-readable JSON. The plain-text script is also
+        written beside any of the other formats, because a description without a
+        script a human can edit is only half useful.</td></tr>
+    <tr><td><code>Lecture - narration.wav</code></td>
+        <td>The spoken descriptions, laid on the original film's clock at the
+        times they belong to. Written in WAV, or as MP3/FLAC if that is the
+        recording format.</td></tr>
+    <tr><td><code>Lecture - described.mp4</code></td>
+        <td><strong>The film you can watch.</strong> With standard placement the
+        original picture stream is <em>copied untouched</em> and the original
+        soundtrack is mixed with the narration, so the viewer hears the film and
+        the description together. With extended placement the picture is the
+        described one (pauses included) and the soundtrack is silent while the
+        description speaks. Never the source file.</td></tr>
+  </tbody>
+</table>
+<p>With extended placement the narration file is named
+<code>Lecture - extended narration.wav</code>: it is written on the
+<em>described</em> film's clock, and confusing it with the standard track would
+put the voice in the wrong place. The extended description's times in the script
+and the subtitle track are those of the described film too, with the held time
+shown for every description (<em>picture held 9.4 s</em>).</p>
+<p><strong>Edit &rarr; Restart All Descriptions</strong> deletes all three files
+for the project's videos and marks the sources pending again; <strong>Edit &rarr;
+Start Selected Descriptions</strong> describes only the videos you pick.</p>
+
+<h3>How the descriptions are produced</h3>
+<ul>
+  <li><strong>Chunks</strong> &mdash; the video is cut into the chunks chosen in
+      the wizard. A chunk is what bounds memory, what the progress bar counts and
+      what can be resumed; it is <em>not</em> one description.</li>
+  <li><strong>Windows</strong> &mdash; each chunk is described window by window,
+      one description for about <strong>twenty seconds</strong> of video. This is
+      the setting that decides how much a listener is told: one summary per
+      two-minute chunk says &ldquo;a man sits in a chair beside a
+      whiteboard&rdquo; and never mentions the line of code that appeared on it,
+      which is exactly what twenty-second descriptions fix.</li>
+  <li><strong>Frames</strong> &mdash; the frames sampled from a window (at the
+      chosen frame rate) go to the model in one prompt. If they do not fit your
+      graphics card, the ones kept are spread evenly over the window, so it is
+      still described from end to end, and the run says so.</li>
+  <li><strong>What came before</strong> &mdash; each description is told what the
+      previous one said, so the model reports <em>what has changed</em> &mdash; text,
+      code, a gesture, a new person &mdash; instead of describing the same scene
+      again.</li>
+  <li><strong>The guideline prompt</strong> &mdash; every request carries the
+      professional audio-description rules: present tense, one or two short
+      sentences, say what matters first, be objective, never invent, name a person
+      only when the video itself does.</li>
+  <li><strong>The picture-change gate</strong> &mdash; a window whose picture is
+      the same as the last one described is skipped: it would repeat what the
+      listener has already heard and, in extended mode, stop the film for
+      nothing. The report says which pieces were skipped and why.</li>
+</ul>
+<div class="note"><strong>FFmpeg is required.</strong> It decodes the video to
+sample frames, reads the video's length and writes the described video. If it is
+not installed, <strong>Start audio description</strong> offers to download it
+(about 1&nbsp;GB into <code>%APPDATA%\AIVoiceStudio\ffmpeg</code>) and asks you
+to press Start again when it has arrived. The same FFmpeg serves MP3/FLAC output
+and transcription.</div>
+
+<h3>Standard or extended?</h3>
+<table>
+  <thead><tr><th></th><th>Standard (speak into the pauses)</th><th>Extended (pause the film)</th></tr></thead>
+  <tbody>
+    <tr><td>Picture</td><td>unchanged, copied frame for frame</td><td>stops on the current frame for every description</td></tr>
+    <tr><td>Dialogue</td><td>never covered &mdash; a silence is required</td><td>never covered &mdash; the film waits</td></tr>
+    <tr><td>Film length</td><td>identical to the source</td><td>longer by the spoken time (about 11 s per description)</td></tr>
+    <tr><td>On-screen text</td><td>read out if a pause is long enough</td><td>the pause is when the viewer reads it; the description explains it</td></tr>
+    <tr><td>Best for</td><td>dialogue with pauses &mdash; films, documentaries, talks</td><td>wall-to-wall dialogue, dense slides, code and numbers</td></tr>
+    <tr><td>Needs</td><td>an installed voice for the audio and the video</td><td>an installed voice, always</td></tr>
+  </tbody>
+</table>
+
+<h3>Getting the best descriptions</h3>
+<ul>
+  <li>Start with a small model and a short clip: <em>Qwen3-VL 2B</em> or
+      <em>SmolVLM2</em> on the CPU, <em>Qwen3-VL 4B</em> on a 12&nbsp;GB card.
+      <em>Qwen3-VL 8B</em> is the best quality that fits a 12&nbsp;GB card.</li>
+  <li>Raise the frame rate &mdash; and prefer <strong>extended</strong> placement
+      &mdash; when the video is mostly on-screen text, slides, code or numbers.</li>
+  <li>Keep chunk length at its default: shorter chunks bound memory and make a long
+      film easier to stop and continue, and they no longer change how much is
+      said.</li>
+  <li>A long run can be closed and resumed; descriptions already written are kept.</li>
+  <li>Everything is a draft. The script is written for exactly this reason: read
+      it, correct the names and the wording, and keep it with the film.</li>
+</ul>
+
+<h3>If something goes wrong</h3>
+<ul>
+  <li><em>&ldquo;This model is not installed yet&rdquo;</em> &mdash; install it in
+      <strong>Settings &rarr; Manage the video describer</strong>.</li>
+  <li><em>&ldquo;Could not load the model on this graphics card&rdquo;</em> &mdash;
+      the checkpoint is larger than the card and the 4-bit load could not be
+      built. Press <strong>Repair model environment</strong> (it adds the
+      quantiser), or choose a smaller variant.</li>
+  <li><em>&ldquo;Storing the downloaded model files as copies&rdquo;</em> &mdash;
+      a normal note on a Windows account without Developer Mode: the Hugging Face
+      cache cannot use symbolic links, so files are copied into the cache
+      instead. Nothing to fix.</li>
+  <li><em>&ldquo;401 &mdash; Cannot access gated repo &hellip; Please log
+      in&rdquo;</em> &mdash; the chosen checkpoint (Gemma&nbsp;3 is the only one)
+      downloads only for an account that has accepted its licence. Open the
+      model's page on huggingface.co, accept the licence, then paste a read
+      token into <strong>Settings &rarr; Hugging Face account</strong> and press
+      <strong>Check token</strong>. A run says this before it starts whenever no
+      token is configured, so the message should not appear mid-download.</li>
+  <li><em>&ldquo;Pocket TTS could not download the weights that can clone a
+      voice&rdquo;</em> &mdash; the 26 pre-made voices still work; cloning needs
+      the gated <code>kyutai/pocket-tts</code> weights. Accept their licence on
+      that page and add a read token in <strong>Settings &rarr; Hugging Face
+      account</strong>, then record again. <strong>Check access</strong> in that
+      panel (with <em>Pocket TTS voice cloning</em> chosen) says whether it is in
+      place.</li>
+  <li><em>&ldquo;Could not write the described video&rdquo;</em> &mdash; FFmpeg is
+      missing or could not read the source. The script and the narration are
+      still written; install FFmpeg and run the project again.</li>
+  <li><em>Fewer descriptions than expected, or pieces reported as skipped</em>
+      &mdash; the picture genuinely had not changed, or no pause was long enough.
+      Choose extended placement if the dialogue never stops.</li>
+</ul>
 
 <h2 id="punctuation">Punctuation modes</h2>
 <p>Not every TTS voice can pronounce punctuation. The punctuation mode chosen
@@ -240,6 +792,13 @@ to the voice:</p>
 <p>The exact spoken text of every recorded segment is saved as
 <code>processed_text.json</code> in the project folder, next to the audio file
 it produced.</p>
+<p>Expression tags are not punctuation, and no mode touches them. A voice that
+reads them &mdash; Kitten TTS 2.0, with a leading <code>[emotion]</code> tag,
+inline <code>&lt;event&gt;</code> tags and <code>(((emphasis)))</code> spans
+&mdash; is given them exactly as written, so <code>[joyful]</code> is never read
+out as &ldquo;left bracket joyful right bracket&rdquo; and
+<code>(((hardly)))</code> keeps its emphasis. The Settings &rarr; Punctuation
+example shows this as soon as such a voice is selected.</p>
 
 <h2 id="compute">Compute &mdash; choosing CPU or GPU</h2>
 <p>The application uses two kinds of engine, and they need different things:</p>
@@ -259,7 +818,7 @@ driver exposes &mdash; there is no model or VRAM requirement.</p>
 
 <h3>A Compute combo in every category</h3>
 <p>Each category that has a <strong>Preview</strong> button &mdash; <em>Available TTS</em>,
-<em>Recording settings</em>, <em>Punctuation</em> and <em>OmniVoice engines</em> &mdash; has
+<em>Recording settings</em>, <em>Punctuation</em> and <em>Voice Clone</em> (the OmniVoice library) &mdash; has
 a small <strong>Compute</strong> combo next to it. Pick <strong>CPU</strong> or
 <strong>GPU</strong> (and <strong>Auto</strong> when both exist) and the next preview runs
 there. The choice is remembered per category, so a long preview session keeps using it
@@ -276,6 +835,29 @@ and a project remembers the compute option it was recorded with.</p>
       window and the audio writer stay responsive. Machines with fewer than four logical CPUs
       keep one core free instead; a single-core machine uses its one core.</li>
 </ul>
+<p>A GPU recording keeps <strong>two segments in flight at once</strong> (up to four on a
+larger machine). The built-in ONNX engines prepare and speak one sentence per call, so a
+single engine spends most of its time waiting for the CPU to turn the next sentence into
+sounds and the card is idle in between. A second segment overlaps that CPU work with the
+card, which raises its usage and shortens the recording; each segment is still produced by
+the same model with the same settings, so the audio does not change. A small model such as
+Kokoro-82M cannot keep a modern card at 100% for long &mdash; one sentence is too little
+work &mdash; so the meter shows bursts; a CPU recording stays one segment at a time,
+because it already uses its whole thread band.</p>
+<p>The <strong>Voice Lab engines</strong> fill a card the same way, but each of them says how
+much of it one segment costs: they speak one text per call, so a second segment at the same
+time needs a <strong>second loaded model</strong> &mdash; a second worker process of its own.
+The plan is read from the card when the recording starts: the memory free then, less a
+<strong>1.5 GB reserve</strong> the desktop keeps, divided by that copy's measured peak.
+Kitten TTS 2.0 is the heaviest of them at <strong>5 GB a copy</strong> (a 1.7B model held at
+bf16, plus its codec), so a 12 GB card keeps one copy, a 16 GB card two and a 24 GB card
+three. The lighter the copy, the more of them a card holds: GPT-SoVITS's 1.4&ndash;3.2 GB
+copies give three even on a 12 GB card, while the 3.6&ndash;9.5 GB copies of Chatterbox,
+VibeVoice and MOSS-TTS leave room for one or two. Qwen3-TTS is the exception in the other
+direction: its own call takes a <strong>list</strong> of texts, so several segments are
+generated from one loaded model in a single batched call. The application log records
+which plan a recording settled on, and every segment is still the same model with the
+same settings, so the audio does not change.</p>
 
 <h2 id="updates">Updating to a newer version</h2>
 <p>AI Voice Studio is published on GitHub. The application can tell you when a
@@ -310,9 +892,11 @@ Updates &rarr; Check for updates automatically when the application starts</stro
 <p>The dialog's <strong>Do not remind me about this version again</strong> check box mutes
 one specific version &mdash; you will be told again when a later one is released.</p>
 <h3>Installing with winget</h3>
-<p>AI Voice Studio follows the Windows Package Manager standard. Once the
-package is in the winget repository these work from any terminal:</p>
+<p>AI Voice Studio follows the Windows Package Manager standard, and its package
+(<code>AnujSharma.AIVoiceStudio</code>) is published there. These work from any
+terminal:</p>
 <ul>
+  <li><code>winget search AnujSharma.AIVoiceStudio</code> &mdash; show the package winget has.</li>
   <li><code>winget install AnujSharma.AIVoiceStudio</code> &mdash; install it.</li>
   <li><code>winget upgrade AnujSharma.AIVoiceStudio</code> &mdash; update it in place.</li>
   <li><code>winget uninstall AnujSharma.AIVoiceStudio</code> &mdash; remove it.</li>
@@ -332,7 +916,7 @@ the repository's <code>winget</code> folder.</p>
   <tr><td>Alt+F / Alt+E / Alt+T / Alt+H</td><td>File / Edit / Tools / Help menus</td></tr>
   <tr><td>Enter</td><td>Open selected recent project; OK in dialogs; activate the default button</td></tr>
   <tr><td>Ctrl+Tab / Ctrl+Shift+Tab</td><td>Next / previous Settings category</td></tr>
-  <tr><td>Ctrl+S</td><td>Apply settings</td></tr>
+  <tr><td>Ctrl+S</td><td>Apply settings (the same as the Settings dialog's <strong>Apply</strong> button and its Alt+A access key)</td></tr>
 </table>
 
 <h3>Access keys (Alt + letter)</h3>
@@ -341,7 +925,7 @@ underlined letter. They work whatever control has the focus, in every window.</p
 <table>
   <tr><th>Access key</th><th>Action</th></tr>
   <tr><td>Alt+P</td><td>Preview the selected voice (Available TTS, Recording settings, Punctuation, the OmniVoice voice library and the Voice Clone panel)</td></tr>
-  <tr><td>Alt+D</td><td>Download the variant selected in <strong>Settings &rarr; Download and remove</strong></td></tr>
+  <tr><td>Alt+D</td><td>Download the variant selected in <strong>Settings &rarr; Download and remove ONNX TTS</strong></td></tr>
   <tr><td>Alt+S</td><td>Start (or resume) recording &mdash; Recording window</td></tr>
   <tr><td>Alt+D</td><td>Check for updates &mdash; Help menu</td></tr>
   <tr><td>Alt+N</td><td>Check for updates now &mdash; Settings &rarr; General</td></tr>
@@ -355,13 +939,32 @@ window, so the button carries no access key at all and is reached with
 Project</strong> button, not by the File menu: the key presses that button, exactly
 as a mouse click does.</p>
 <p>In the main window the menu bar keeps its own letters (<strong>Alt+R</strong> is
-<em>Edit &rarr; Resume Recording</em>, <strong>Alt+N</strong> is <em>File &rarr; New Project</em>),
+<em>Edit &rarr; Resume the project</em>, <strong>Alt+N</strong> is <em>File &rarr; New Project</em>),
 which is why the welcome panel's remove button uses Alt+J.</p>
 <p>If an access key lands on a button that cannot be used yet &mdash; <strong>Alt+D</strong>
 on a model that is already downloaded, for example &mdash; the window beeps and says
 why in its own status line instead of doing nothing.</p>
-<p>The <strong>Download and remove</strong> page opens on a model that is already downloaded,
+<p>The <strong>Download and remove ONNX TTS</strong> page opens on a model that is already downloaded,
 so Remove is ready the moment the page appears.</p>
+
+<h2 id="gestures">Keyboard gestures</h2>
+<p>Settings &rarr; <strong>Keyboard gestures</strong> is modelled on NVDA's Input
+Gestures dialog. The commands are grouped by category in a tree (Projects,
+Recording, Help, Application); selecting one lists the keyboard keys that
+trigger it. <strong>Add gesture&hellip;</strong> asks you to press the combination
+you want, <strong>Remove gesture</strong> takes one away, and <strong>Restore
+defaults</strong> forgets your changes to that command.</p>
+<ul>
+  <li>A gesture is a key with <strong>Ctrl</strong>, <strong>Alt</strong> or
+      <strong>Windows</strong>, or a function key. A bare letter is refused,
+      because it would take over ordinary typing.</li>
+  <li>If the key you press is already assigned to another command, the dialog
+      names that command and asks before taking the key away from it.</li>
+  <li>Two commands that still end up asking for the same key are reported in
+      the status line as a conflict rather than silently resolved.</li>
+  <li>Bindings are saved with the other settings and take effect as soon as
+      the Settings window closes &mdash; no restart.</li>
+</ul>
 
 <h2 id="developermode">Developer Mode</h2>
 <p>Enable Developer Mode in <strong>Settings &rarr; General &rarr; Enable Developer Mode</strong> to unlock advanced features:</p>
@@ -393,8 +996,9 @@ so Remove is ready the moment the page appears.</p>
   <tr><td>User Guide</td><td>This document.</td></tr>
   <tr><td>Addon Development Guide</td><td>How to write an addon.</td></tr>
   <tr><td>Accessibility Guidelines</td><td>The accessibility rules every control in the app follows.</td></tr>
-  <tr><td>Python &amp; wxPython Book (F1)</td><td>The bundled book: 82 chapters and 3 appendices from basic Python to rebuilding this application, including the Voice Lab, per-engine environments, compute choice and this release's features.</td></tr>
+  <tr><td>Python &amp; wxPython Book (F1)</td><td>The bundled book: 88 chapters and 3 appendices from basic Python to rebuilding this application, including speech-to-text transcription, the Voice Lab, per-engine and per-model environments, compute choice, keyboard gestures, the theme studio and the update checker.</td></tr>
   <tr><td>Third-Party Licences</td><td><code>THIRD-PARTY-LICENSES.html</code> &mdash; every bundled component, its licence type and the full licence text where reproduction is permitted.</td></tr>
+  <tr><td>What's New</td><td><code>WHATS-NEW.html</code> &mdash; what changed between the 2026 and 2027 series.</td></tr>
   <tr><td>Check for updates (Alt+D)</td><td>Asks GitHub for the newest release; if there is one, offers to download and install it. See <a href="#updates">Updating to a newer version</a>.</td></tr>
   <tr><td>About AI Voice Studio</td><td>Version and author information.</td></tr>
 </table>
@@ -414,6 +1018,21 @@ started in another. The application now resolves the interpreter from the engine
 environment and says so in the engine's own words when nothing is installed. If you still
 see it: open <strong>Settings &rarr; Voice clone</strong>, remove the engine and install it
 again; then close and reopen the Recording window.</p>
+
+<h3>&ldquo;did not find executable at &hellip;&rdquo; after reinstalling AI Voice Studio</h3>
+<p>Every model you install runs in its own Python environment under
+<code>%APPDATA%\AIVoiceStudio</code>, and an environment remembers the exact Python it was
+built from. Installations before this one built them from a Python <em>inside the program
+folder</em>, so reinstalling the application somewhere else - &ldquo;only me&rdquo; after an
+all-users install, or into a different folder - left every one of them naming a folder that
+had gone. Starting such a model failed with exit code 103 and <code>did not find executable
+at '...': The system cannot find the path specified.</code>, which looks like a model crash.</p>
+<p>Environments are now built from a per-user copy of the Python the application ships
+(<code>%APPDATA%\AIVoiceStudio\python_runtime</code>), which cannot move, so a reinstall no
+longer affects the models you already have. An environment that still names a Python that
+has gone is repaired in place the next time the model is used - its downloaded packages are
+kept. If a run still fails this way, install that model again from its category in
+<strong>Settings</strong>: that builds its environment from scratch.</p>
 
 <h3>Recording fails with a TorchCodec / FFmpeg error</h3>
 <p>Newer TorchAudio decodes through TorchCodec, which on Windows looks for FFmpeg's shared

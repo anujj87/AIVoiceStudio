@@ -18,6 +18,7 @@ import textwrap
 import wx
 
 from ..constants import TERMS_VERSION
+from . import dpi
 from .a11y import set_accessible_name
 
 # One entry per required checkbox, in display order.
@@ -112,6 +113,8 @@ class AcceptanceDialog(wx.Dialog):
         # not Escape, not the (hidden) close box, not Alt+F4.
         self.Bind(wx.EVT_CHAR_HOOK, self._on_char_hook)
         self.Bind(wx.EVT_CLOSE, self._on_close)
+        dpi.prepare(self)
+        dpi.follow(self)
         self._on_toggle(None)
 
     # -- state ---------------------------------------------------------------

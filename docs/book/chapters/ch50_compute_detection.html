@@ -18,7 +18,7 @@
 <h1>Compute Back-end Detection</h1>
 
 <div class="info">
-  <strong>Current implementation (2026.3.1).</strong> <code>compute.py</code> now answers three
+  <strong>Current implementation (2027.1.0).</strong> <code>compute.py</code> now answers three
   separate questions, and they must not be confused:
   <ul>
     <li><em>Is there an NVIDIA GPU?</em> — <code>has_nvidia_gpu()</code>, a cached
@@ -31,6 +31,13 @@
     <li><em>How much of the machine may a run use?</em> — <code>cpu_threads()</code> returns the
     top of the <strong>80–95&nbsp;%</strong> band of logical CPUs, and <code>cuda_device_index()</code>
     is always <code>0</code> (whatever card the driver exposes).</li>
+    <li><em>How many segments may be synthesized at once?</em> — <code>synthesis_workers()</code>
+    (2027.1.0) answers <strong>1</strong> for the CPU back-end, which already uses its whole
+    thread band, and a small number (2, up to 4 on a machine with more cores) for the GPU
+    back-end, whose card would otherwise wait for the CPU on every single sentence.
+    <code>free_vram_mb()</code> reads the driver once per recording and drops back to a
+    single engine on a nearly-full card, so a second copy of the model never has to fit
+    by luck.</li>
   </ul>
   The choice is offered per category next to every Preview button. Full detail, code and line
   annotations: <a href="ch78_compute_choice.html">Chapter 78</a>.

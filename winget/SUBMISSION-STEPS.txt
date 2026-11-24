@@ -1,0 +1,403 @@
+================================================================================
+Getting AI Voice Studio into microsoft/winget-pkgs
+================================================================================
+
+This is the full runbook: the first submission, and every later version.
+`winget/README.md` describes the package; this file describes the paperwork.
+
+STATUS (2026-11-24)
+  release    v2026.3.7 published and marked "Latest" on GitHub
+  manifests  winget/manifests/a/AnujSharma/AIVoiceStudio/2026.3.7/ (3 files)
+  PR         microsoft/winget-pkgs#440575  MERGED 2026-11-21T21:29Z
+             https://github.com/microsoft/winget-pkgs/pull/440575
+             base master <- anujj87:AnujSharma.AIVoiceStudio-2026.3.7
+             @ 13b3c58; reviewDecision APPROVED, mergeStateStatus was BLOCKED
+             until a moderator approved, labels Validation-Completed +
+             Azure-Pipeline-Passed + Moderator-Approved + New-Package
+  CLA        signed (microsoft-github-policy-service, "agree" as anujj87);
+             label Needs-CLA removed, license/cla = success
+  first run  01-07 passed; 08. Installation Validation FAILED because the
+             manifest's silent switches were incomplete (see step 08).
+             09/10 were skipped because 08 failed.
+  fixed      commit c5d484de on the fork branch adds /SUPPRESSMSGBOXES.
+             Verified locally, then pushed - pushing alone was enough to
+             restart the pipeline, no @wingetbot run was needed.
+  re-run     on c5d484de ALL TEN steps passed (08. Installation Validation
+             finished 2026-09-25T13:2xZ, 09 and 10 followed), the failure
+             labels cleared by themselves, and the PR is labelled
+             Validation-Completed + Azure-Pipeline-Passed.  At that point the
+             only thing left was a moderator: reviewDecision was
+             REVIEW_REQUIRED, mergeStateStatus BLOCKED, because the check-in
+             policies require a moderator to approve PRs from the community.
+             Poll with the gh api command at the end of step 8.
+  installer  packaging/installer_common.iss hardened as well (install-mode
+             choice kept, DisableStartupPrompt=yes) and verified by hand on
+             this machine: the rebuilt installer installs unattended and exits
+             0 with /SILENT + /SUPPRESSMSGBOXES, with /VERYSILENT +
+             /SUPPRESSMSGBOXES, and with /VERYSILENT alone; the uninstaller
+             exits 0 and leaves nothing behind.  The published v2026.3.7
+             asset predates that change, so the winget package it ships relies
+             on the manifest's /SUPPRESSMSGBOXES - which is verified to be
+             enough, by step 08 itself.
+  decision   the published v2026.3.7 bytes are left alone; the hardened
+             installer ships with the next version.  Do not replace a released
+             asset - the winget package needs no such thing.
+  third run  on 2026-10-30 step 02 refused the manifests again, this time for
+             the schema version: "This manifest version has been depreciated.
+             Please use version 1.28.0." (Manifest-Version-Deprecated).  The
+             three files, the generator's MANIFEST_VERSION and the $schema URLs
+             now say 1.28.0; the installer URL, SHA256 and switches are
+             unchanged, so steps 03-10 see the same bytes that passed before.
+  merged     2026-11-21T21:29Z, on 13b3c58 (the 1.28.0 commit), after the
+             moderator step cleared: reviewDecision APPROVED, labels
+             Validation-Completed + Azure-Pipeline-Passed + Moderator-Approved
+             + New-Package.  Nothing from this repository was pushed for it -
+             the commit was already on the fork branch.
+  publish    wingetbot, 2026-11-21T21:2xZ: "Publish pipeline succeeded for this
+             Pull Request.  Once you refresh your index, this change should be
+             present." (build 394429), label Publish-Pipeline-Succeeded.
+  catalogue  refreshed on 2026-11-24 with `winget source update` (msstore,
+             winget, winget-font all report "Done"), and the package is now in
+             the public index:
+
+               Name             Id                       Version  Source
+               AI Voice Studio  AnujSharma.AIVoiceStudio 2026.3.7  winget
+
+             `winget show AnujSharma.AIVoiceStudio` resolves the whole
+             manifest - Installer Type inno, InstallerUrl the v2026.3.7 x64
+             release asset, InstallerSha256 941D...852F (the same bytes the
+             manifest names), Release Date 2026-09-23, moniker
+             aivoicestudio - so any machine can install it with
+             `winget install AnujSharma.AIVoiceStudio`.  The 2026.3.7
+             submission is finished; the next version starts again at Step 1,
+             and Help > Check for updates still reads GitHub releases, not the
+             winget catalogue.
+
+
+--------------------------------------------------------------------------------
+Step 0 - prerequisites (once)
+--------------------------------------------------------------------------------
+  * The GitHub release for the version must exist and be public *before* the
+    manifests are submitted: the Installers[].InstallerUrl points at the
+    release asset, and validation downloads it.
+  * `gh auth status` must be logged in as anujj87 (the account that owns the
+    release and signs the CLA).  Needs the `repo` scope; a `workflow` scope is
+    not required, and there are no PATs on any command line here.
+  * The fork `anujj87/winget-pkgs` must exist.  winget-pkgs' default branch is
+    `master` (not `main`).
+
+
+--------------------------------------------------------------------------------
+Step 1 - bump the version
+--------------------------------------------------------------------------------
+  * ai_voice_studio/constants.py       APP_VERSION = "X.Y.Z"
+  * ai_voice_studio/__init__.py        __version__   = "X.Y.Z"
+  * packaging/installer_common.iss     AppVersion=, VersionInfoVersion=,
+                                       VersionInfoProductVersion=,
+                                       OutputBaseFilename=AI-Voice-Studio-v-<dashed>-Setup-{#MyAppArch}
+  * tools/winget_manifests.py already derives the file name, the download URL
+    and the ProductCode from these, so they cannot drift apart on their own.
+  `tests/test_winget.py` reads the .iss back and fails if the two disagree.
+
+
+--------------------------------------------------------------------------------
+Step 2 - build the installer
+--------------------------------------------------------------------------------
+  powershell -ExecutionPolicy Bypass -File packaging\build.ps1 -Arch x64
+
+  Produces dist\AI-Voice-Studio-v-<dashed>-Setup-x64.exe.  Add `-Arch x86` for
+  a second installer; each architecture is published as its own Installers[]
+  entry.  An architecture with no built installer is simply left out of the
+  manifest (winget rejects an entry whose hash is unknown).
+
+
+--------------------------------------------------------------------------------
+Step 3 - generate the manifests
+--------------------------------------------------------------------------------
+  .venv/Scripts/python.exe tools/make_winget.py --date YYYY-MM-DD --notes "..."
+  (or just tools/make_winget.py, which uses today's date and no release note)
+
+  Writes the three files under
+  winget\manifests\a\AnujSharma\AIVoiceStudio\<version>\ and then runs
+  tools/winget_validate.py, so a bad manifest is caught here, not upstream.
+  Each file's *first* line is the `# yaml-language-server: $schema=...` line
+  (see the traps in Appendix B).
+
+
+--------------------------------------------------------------------------------
+Step 4 - check locally (all three, it takes seconds)
+--------------------------------------------------------------------------------
+  .venv/Scripts/python.exe tools/winget_validate.py
+  winget validate --manifest "winget\manifests\a\AnujSharma\AIVoiceStudio\<version>"
+  .venv/Scripts/python.exe -m pytest tests/test_winget.py -q
+
+  `winget validate` alone is not enough: it does not check the schema comment
+  line or the Inno switch flags that the pipeline's later steps check.
+
+
+--------------------------------------------------------------------------------
+Step 4b - prove the install really is unattended (worth the five minutes)
+--------------------------------------------------------------------------------
+  Step 08 is the only step that cannot be predicted from a manifest, and it
+  costs a two-hour queue to learn.  Running the switches by hand predicts it:
+
+    exe="dist/AI-Voice-Studio-v-<dashed>-Setup-x64.exe"
+    "$exe" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART      # winget's Silent
+    "$exe" /SILENT    /SUPPRESSMSGBOXES /NORESTART      # SilentWithProgress
+    "$exe" /VERYSILENT /NORESTART                        # and without it
+
+  Every one must exit 0 promptly and leave an entry in
+
+    HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\
+      {D9B4E3A0-7A1E-4E8B-9C2F-AIVOICESTUDIO01}_is1
+
+  `winget list --name "AI Voice"` should then show it as
+  ARP\User\X64\{D9B4E3A0-...}_is1, and the uninstaller
+  (`%LOCALAPPDATA%\Programs\AI Voice Studio\unins000.exe`, same switches)
+  must exit 0 and leave neither the entry nor the folder behind.  A install
+  that hangs here is a step 08 failure, found in seconds instead of hours.
+
+  Do this BEFORE pushing: the installer used for the test must be the same
+  bytes the manifest's InstallerSha256 points at.
+
+
+--------------------------------------------------------------------------------
+Step 5 - create (or update) the fork branch
+--------------------------------------------------------------------------------
+  The branch is named exactly AnujSharma.AIVoiceStudio-<version> and carries
+  only the three manifest files:
+
+    winget-pkgs/
+      manifests/a/AnujSharma/AIVoiceStudio/<version>/
+        AnujSharma.AIVoiceStudio.yaml
+        AnujSharma.AIVoiceStudio.installer.yaml
+        AnujSharma.AIVoiceStudio.locale.en-US.yaml
+
+  Check the installer by hand first (step 4b), then push.  Files on that
+  branch were put there through the GitHub Contents API, which keeps the diff
+  to exactly these three paths:
+
+    gh api --method PUT repos/anujj87/winget-pkgs/contents/<path> \
+      -f message="..." -f branch="AnujSharma.AIVoiceStudio-<version>" \
+      -f content="$(base64 -w0 <local file>)" -f sha=<blob sha of the old file>
+
+  Re-push a correction the same way, with the `sha` of the file being replaced
+  (fetch it with `gh api repos/.../contents/<path>?ref=<branch> --jq .sha`).
+  Keep LF line endings: do not let an editor rewrite them to CRLF.
+  Never commit anything that is not one of those three files, and never two
+  versions in one pull request.
+
+
+--------------------------------------------------------------------------------
+Step 6 - open the pull request
+--------------------------------------------------------------------------------
+  Title:  New package: AnujSharma.AIVoiceStudio version <version>
+  Base:   microsoft/winget-pkgs  master
+  Head:   anujj87:AnujSharma.AIVoiceStudio-<version>
+
+  Open it via the web UI (the branch already exists, so "compare across
+  forks" is one click).  Use wingetcreate only for reference; this repository
+  generates its own manifests so the hashes and the switches are under test.
+  A PR must contain one package version and nothing but its manifests.
+
+
+--------------------------------------------------------------------------------
+Step 7 - sign the CLA (first contribution only)
+--------------------------------------------------------------------------------
+  The microsoft-github-policy-service bot asks for the CLA and applies
+  Needs-CLA.  It is a legal agreement, so the contributor has to sign it in
+  person - post the comment as the GitHub account that opened the PR:
+
+    @microsoft-github-policy-service agree
+
+  (or, if contributing as part of employment, name the company instead:
+   `@microsoft-github-policy-service agree company="..."`)
+
+  The label disappears within about a minute and the license/cla check turns
+  green.  This is a separate process from the validation pipeline: the
+  pipeline runs whether or not the CLA is signed.
+
+
+--------------------------------------------------------------------------------
+Step 8 - the validation pipeline (the part that fails in practice)
+--------------------------------------------------------------------------------
+  Ten numbered steps plus license/cla:
+
+    01. Pull Request Validation          manifest files only, one version
+    02. Manifest Validation              schema + the yaml-language-server line
+    03. URLs Validation                  every URL in the manifest answers 200
+    04. URL Domain Validation            installer URL is the publisher's
+    05. Manifest Policy Validation       content policy
+    06. Catalog Content Verification     nothing contradicts the catalogue
+    07. Installers Scan                  downloads the .exe, Defender + engines
+    08. Installation Validation          installs it UNATTENDED, then
+                                         uninstalls and reinstalls
+    09. Installer Metadata Validation    ARP metadata read back from step 08
+    10. Validation Completed             the verdict comment
+
+  Step 08 is the one that rejects a manifest that looks perfect.  It runs
+  `winget install` with no human present, so any dialog the installer can
+  raise fails the run with:
+
+    "During installation testing, this application failed to install without
+     user input.  Did you forget to add Silent or SilentWithProgress switches?"
+
+  **This happened on the first submission, and dialogs were the cause.**
+  The manifest wrote `Silent: /VERYSILENT` and nothing else.  `/VERYSILENT`
+  hides the wizard but deliberately still shows prompts and message boxes, and
+  that installer raised two of them: Setup's own "This will install ... Do you
+  wish to continue?" prompt, and the install-mode dialog from
+  `PrivilegesRequiredOverridesAllowed=dialog`.  Declaring InstallerSwitches had
+  replaced winget's Inno defaults, which do include /SUPPRESSMSGBOXES.
+
+  The fix has two layers, so that either one alone would be enough:
+
+  1. The manifest writes the flags in full:
+
+       Silent:             /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
+       SilentWithProgress: /SILENT /SUPPRESSMSGBOXES /NORESTART
+
+     `tools/winget_manifests.py` enforces this (REQUIRED_SILENT_FLAGS) and
+     tests/test_winget.py fails if a flag goes missing.
+
+  2. `packaging/installer_common.iss` no longer raises Setup's choiceless
+     "Do you wish to continue?" prompt: `DisableStartupPrompt=yes`.  The
+     install-mode choice (`PrivilegesRequiredOverridesAllowed=dialog`) is kept
+     on purpose, so installs for all users stay possible; `PrivilegesRequired=
+     lowest` keeps the default and the recommended-choice fallback per-user,
+     which is what `Scope: user` says.
+
+  Measured on the published 2026.3.7 bytes, from an empty machine:
+
+    Setup-x64.exe /VERYSILENT /NORESTART                      -> never exits
+                                                                (waits for a
+                                                                click), nothing
+                                                                installed
+    Setup-x64.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART    -> exit 0, installs
+    Setup-x64.exe /SILENT    /SUPPRESSMSGBOXES /NORESTART    -> exit 0, installs
+    rebuilt installer with the .iss fix, /VERYSILENT /NORESTART -> exit 0, installs
+
+  So the flag is what makes the *published* build work (see step 4b), and the
+  script change is what makes every future build work regardless.
+
+  Other step 08 failures worth checking, in the order worth checking them:
+    * Scope/privilege mismatch.  The installer is PrivilegesRequired=lowest,
+      so the manifest says Scope: user.  If an installer ever needs HKLM,
+      {autopf} in Program Files, or a service, it needs
+      ElevationRequirement: elevationRequired instead - the validation VM
+      runs as a standard, non-elevated user.
+    * A missing dependency (Visual C++ runtime and friends).
+    * A [Run] entry without `skipifsilent`, launching the app mid-install.
+
+  Step 08 is genuinely slow - a normal run takes about two hours to get a VM
+  and finish, so do not assume a long queue means trouble.  Watch it with:
+
+    gh api "repos/microsoft/winget-pkgs/commits/<head-sha>/check-runs?per_page=100" \
+      --jq '.check_runs[] | "\(.name) | \(.status) | \(.conclusion)"' | sort
+
+  (paginate with --paginate: there are over a hundred check runs per commit
+  and the numbered steps are on the second page).
+
+
+--------------------------------------------------------------------------------
+Step 9 - after a fix: re-run the pipeline
+--------------------------------------------------------------------------------
+  Push the corrected file(s) to the fork branch (Step 5).  A new commit
+  normally starts the pipeline again by itself.  If it does not, ask for a
+  re-run by commenting on the PR:
+
+    @wingetbot run
+
+  The failure labels (Validation-Unattended-Failed, Needs-Author-Feedback,
+  Validation-Guide) clear when the re-run passes.  Needs-Author-Feedback is on
+  a clock: with no activity for 5 days No-Recent-Activity is added, and 3 days
+  after that the PR is closed automatically - so a fix should go up promptly.
+
+
+--------------------------------------------------------------------------------
+Step 10 - after it merges
+--------------------------------------------------------------------------------
+  * winget-pkgs' publish pipeline picks the merged manifest up; the package
+    then appears in `winget search`.
+  * A later version is a new manifest folder and a new PR (Steps 1-6).
+  * Nothing in the app has to change between submissions: Help > Check for
+    updates reads GitHub releases, not the winget catalogue.
+
+
+================================================================================
+Appendix A - the field values, and where they come from
+================================================================================
+  PackageIdentifier   AnujSharma.AIVoiceStudio
+                      <Publisher>.<PackageName>, no spaces; the directory is
+                      manifests/a/AnujSharma/AIVoiceStudio/<version>/
+  PackageVersion      2026.3.7      the GitHub tag is v2026.3.7
+  InstallerType       inno          packaging/*.iss is an Inno Setup script
+  Scope               user          default install is per-user: PrivilegesRequired=lowest
+                                    (the mode dialog can still elevate to an
+                                    all-users install, which winget does not
+                                    track)
+  InstallModes        interactive, silent, silentWithProgress
+  InstallerSwitches   Silent             /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
+                      SilentWithProgress /SILENT /SUPPRESSMSGBOXES /NORESTART
+  ProductCode         {D9B4E3A0-7A1E-4E8B-9C2F-AIVOICESTUDIO01}_is1
+                      Inno's AppId (note the doubled brace in the .iss, which
+                      Inno unescapes) plus the _is1 suffix Inno gives its
+                      "Apps and features" entry.
+  MinimumOSVersion    10.0.17763.0
+  InstallerUrl        <repo>/releases/download/v2026.3.7/<exact asset name>
+                      versioned, never /releases/latest
+  InstallerSha256     of dist\AI-Voice-Studio-v-2026-3-7-Setup-x64.exe
+                      941DDDB49994F9076846749603C134291950472CEAD2A5224242B62F7C7B852F
+  ReleaseDate         2026-09-23
+  Locale              Publisher/Author Anuj Sharma, GPL-3.0-or-later,
+                      Moniker aivoicestudio, PackageUrl = the GitHub repo
+
+
+================================================================================
+Appendix B - traps that have actually bitten this package
+================================================================================
+  1. A manifest without the
+     `# yaml-language-server: $schema=https://aka.ms/winget-manifest.<kind>.<ver>.schema.json`
+     first line is rejected by pipeline step 02 - and `winget validate` on a
+     local manifest does NOT check for it, so it passes locally and fails
+     upstream.  tools/make_winget.py writes it; tools/winget_validate.py
+     checks it; SchemaHeaderTest in tests/test_winget.py guards it.
+
+  2. A deprecated ManifestVersion is rejected as Manifest-Version-Deprecated,
+     with the replacement in the message: "This manifest version has been
+     depreciated. Please use version X."  The repository retires schema
+     versions on a schedule and the bot is the authority on which one is
+     current - 1.6.0 was refused on the first 2026.3.7 submission and 1.12.0
+     on the third (2026-10-30, asking for 1.28.0).  Take the version from that
+     message, put it in MANIFEST_VERSION in tools/winget_manifests.py, and the
+     three $schema URLs then name the same version as the ManifestVersion
+     field automatically.  EveryShippedManifestTest re-checks every folder in
+     winget/manifests, so a retired version cannot linger in an open PR.
+
+  3. **Silent switches must be complete, and the installer must not ask.**
+     Declaring InstallerSwitches replaces winget's Inno defaults for those
+     keys, so a bare /VERYSILENT drops /SUPPRESSMSGBOXES - and the install then
+     waits for a click forever (pipeline step 08; reproduced here in 60
+     seconds).  The .iss keeps `PrivilegesRequiredOverridesAllowed=dialog` on
+     purpose, so /SUPPRESSMSGBOXES is not optional - never trim the switch
+     set, and never drop /SUPPRESSMSGBOXES from either mode.
+
+  4. Never change the Inno AppId.  It is what Windows uses to recognise an
+     installed copy, so every existing installation would be orphaned, and the
+     ProductCode in the installer manifest has to match it.
+
+  5. Never use a /releases/latest URL.  The bytes behind it change, the hash
+     in the manifest stops matching, and validation reports a hash mismatch.
+
+  6. Never rename the GitHub account or the repository.  Copies of 2026.3.7
+     already installed in the field hard-code
+     api.github.com/repos/anujj87/AIVoiceStudio/releases/latest in
+     ai_voice_studio/updates.py for Help > Check for updates.
+
+  7. One pull request carries one package version and only manifest files.
+
+  8. Testing an install locally is awkward: `winget install --manifest` uses
+     the same Inno AppId as the real installation and will overwrite it, and
+     `winget settings --enable LocalManifestFiles` needs elevation.  Use
+     Windows Sandbox (Tools\SandboxTest.ps1) instead.  Never wrap an elevation
+     request in sudo/doas; ask for it explicitly.

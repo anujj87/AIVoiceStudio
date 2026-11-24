@@ -9,7 +9,7 @@ from unittest import mock
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from ai_voice_studio import compute  # noqa: E402
+from ai_voice_studio import compute
 
 
 def _reset_cache():
@@ -141,6 +141,59 @@ class CpuThreadsTest(unittest.TestCase):
         # Any CUDA-capable NVIDIA card is accepted: the first (usually only)
         # device is used, with no model or VRAM requirement.
         self.assertEqual(compute.cuda_device_index(), 0)
+
+
+class SynthesisWorkersTest(unittest.TestCase):
+    """A GPU run keeps a few segments in flight; a CPU run keeps one."""
+
+    def _machine(self, cpus: int, vram):
+        for patcher in (
+            mock.patch.object(compute.os, "cpu_count", return_value=cpus),
+            mock.patch.object(compute, "free_vram_mb", return_value=vram),
+        ):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def test_a_cpu_run_stays_one_segment_at_a_time(self):
+        # The CPU back-end already uses its whole thread band; a second segment
+        # in flight would only make the two compete for the same cores.
+        self._machine(cpus=32, vram=8192)
+        self.assertEqual(compute.synthesis_workers("cpu"), 1)
+        self.assertEqual(compute.synthesis_workers("dml"), 1)
+
+    def test_a_gpu_run_keeps_a_second_segment_in_flight(self):
+        self._machine(cpus=6, vram=8192)
+        self.assertEqual(compute.synthesis_workers("cuda"), 2)
+
+    def test_a_larger_machine_feeds_the_card_more_segments(self):
+        for cpus, expected in ((12, 3), (16, 4), (64, 4)):
+            with self.subTest(cpus=cpus):
+                self._machine(cpus=cpus, vram=8192)
+                self.assertEqual(compute.synthesis_workers("cuda"), expected)
+
+    def test_a_nearly_full_card_is_left_to_a_single_engine(self):
+        # Not room for a second copy of the model.
+        self._machine(cpus=16, vram=512)
+        self.assertEqual(compute.synthesis_workers("cuda"), 1)
+
+    def test_video_memory_that_cannot_be_read_does_not_block_the_pipeline(self):
+        self._machine(cpus=16, vram=None)
+        self.assertEqual(compute.synthesis_workers("cuda"), 4)
+
+    def test_a_run_of_one_segment_loads_one_engine(self):
+        self._machine(cpus=16, vram=8192)
+        self.assertEqual(compute.synthesis_workers("cuda", total=1), 1)
+        self.assertEqual(compute.synthesis_workers("cuda", total=2), 2)
+
+    def test_free_video_memory_is_read_from_the_driver(self):
+        with mock.patch.object(compute.subprocess, "run",
+                               return_value=_FakeResult(0, "11198\n")):
+            self.assertEqual(compute.free_vram_mb(), 11198)
+
+    def test_free_video_memory_is_unknown_when_the_driver_is_silent(self):
+        with mock.patch.object(compute.subprocess, "run",
+                               return_value=_FakeResult(1, "")):
+            self.assertIsNone(compute.free_vram_mb())
 
 
 if __name__ == "__main__":

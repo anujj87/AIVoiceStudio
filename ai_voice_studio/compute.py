@@ -25,7 +25,6 @@ import math
 import os
 import subprocess
 import sys
-from typing import Dict, List, Optional
 
 from . import runtime
 from .constants import COMPUTE_AUTO, COMPUTE_CPU, COMPUTE_CUDA, COMPUTE_DML
@@ -63,9 +62,10 @@ def has_nvidia_gpu(force: bool = False) -> bool:
             text=True,
             timeout=10,
             creationflags=flags,
+            check=False,
         )
         found = result.returncode == 0 and bool(result.stdout.strip())
-    except Exception:  # noqa: BLE001
+    except Exception:
         found = False
     _nvidia_cache = found
     return found
@@ -84,7 +84,7 @@ def _has_npu() -> bool:
     return False
 
 
-def detect(force: bool = False) -> Dict[str, bool]:
+def detect(force: bool = False) -> dict[str, bool]:
     """Return {'cpu': bool, 'cuda': bool, 'dml': bool} (cached).
 
     ``force=True`` re-runs every probe, *including* the (otherwise cached)
@@ -105,7 +105,7 @@ def detect(force: bool = False) -> Dict[str, bool]:
 # ---------------------------------------------------------------------------
 # How much of the machine a run may use
 # ---------------------------------------------------------------------------
-def cpu_threads(total: Optional[int] = None) -> int:
+def cpu_threads(total: int | None = None) -> int:
     """How many CPU threads a local run should use.
 
     The CPU back-end uses as much of the machine as it can while staying
@@ -123,13 +123,94 @@ def cpu_threads(total: Optional[int] = None) -> int:
         cpus = 1
     if cpus <= 1:
         return 1
-    low = max(1, int(math.ceil(cpus * CPU_THREAD_MIN_RATIO)))
-    high = max(1, int(math.floor(cpus * CPU_THREAD_MAX_RATIO)))
+    low = max(1, math.ceil(cpus * CPU_THREAD_MIN_RATIO))
+    high = max(1, math.floor(cpus * CPU_THREAD_MAX_RATIO))
     if high < low:
         # Too few cores for a non-empty 80-95% band: leave one core free.
         return max(1, cpus - 1)
     # As much CPU as the rule allows: the top of the band.
     return max(1, min(high, cpus))
+
+
+#: A GPU run keeps this many segments in flight (see :func:`synthesis_workers`).
+#: Two is the measured sweet spot on a six-core machine; four is the ceiling,
+#: because past that the CPU-side work starts competing with itself.
+GPU_WORKERS_MIN = 2
+GPU_WORKERS_MAX = 4
+
+#: Roughly how many logical CPUs one segment in flight needs: the front-end
+#: (text normalisation and espeak-ng phonemisation) is CPU work that sherpa-onnx
+#: runs for one sentence at a time, while the card is idle waiting for it.
+GPU_WORKER_CPUS = 4
+
+#: Free video memory a GPU run wants before it keeps more than one segment in
+#: flight.  Each engine holds its own copy of the model (Kokoro fp32 is ~330 MB
+#: plus the ONNX Runtime arena), so a nearly-full card is left to one engine.
+GPU_WORKER_MIN_FREE_VRAM_MB = 2048
+
+def free_vram_mb() -> int | None:
+    """Free video memory in MB, or ``None`` when it cannot be read.
+
+    Driver-only, like :func:`has_nvidia_gpu`: it is a hint for how many model
+    copies a GPU run may hold, never a requirement.  Deliberately *not* cached
+    (unlike the driver check): how much is free changes while the application
+    runs, and a recording reads it once when it starts.
+    """
+    value: int | None = None
+    try:
+        flags = 0
+        if sys.platform == "win32":
+            flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=memory.free", "--format=csv,noheader,nounits"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            creationflags=flags,
+            check=False,
+        )
+        first = (result.stdout or "").strip().splitlines()
+        if result.returncode == 0 and first:
+            value = int(float(first[0].strip()))
+    except Exception:
+        value = None
+    return value
+
+
+def synthesis_workers(compute: str, total: int | None = None) -> int:
+    """How many segments the chosen back-end synthesizes at the same time.
+
+    A CPU run already uses as much of the machine as it is allowed
+    (:func:`cpu_threads`) and is strictly one segment at a time.
+
+    A GPU run is different: sherpa-onnx prepares and runs **one sentence** per
+    call, and the Kokoro implementation ignores ``max_num_sentences`` (see
+    ``TtsEngine._build_config``), so the card spends most of each call waiting
+    for the CPU to phonemise the next sentence.  Feeding it a second (or third)
+    segment at the same time overlaps that CPU work with GPU inference, which is
+    what raises utilisation and cuts wall time - measured on an RTX 3060 with a
+    six-core CPU: one worker 0.185x realtime at ~15% GPU, two workers 0.127x
+    realtime at ~25% GPU, while three or four only made the CPU compete with
+    itself.  The audio of each segment is produced exactly as before; only how
+    many segments are in flight changes.
+    """
+    if provider_for(compute) != COMPUTE_CUDA:
+        return 1
+    try:
+        cpus = int(os.cpu_count() or 1)
+    except (TypeError, ValueError):
+        cpus = 1
+    workers = max(GPU_WORKERS_MIN, min(GPU_WORKERS_MAX, cpus // GPU_WORKER_CPUS))
+    free = free_vram_mb()
+    if free is not None and free < GPU_WORKER_MIN_FREE_VRAM_MB:
+        # Not enough room for a second copy of the model: one engine it is.
+        workers = 1
+    if total is not None:
+        try:
+            workers = min(workers, max(1, int(total)))
+        except (TypeError, ValueError):
+            log.debug("Ignoring a failure in synthesis_workers", exc_info=True)
+    return max(1, workers)
 
 
 def cuda_device_index() -> int:
@@ -158,16 +239,17 @@ def gpu_summary() -> str:
             text=True,
             timeout=10,
             creationflags=flags,
+            check=False,
         )
         first = (result.stdout or "").strip().splitlines()
         if result.returncode == 0 and first:
             return first[0].strip()
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception:
+        log.debug("Ignoring a failure in gpu_summary", exc_info=True)
     return ""
 
 
-def available_compute() -> List[str]:
+def available_compute() -> list[str]:
     """Compute options the UI may offer (plus Auto when >1)."""
     det = detect()
     options = []
@@ -211,7 +293,3 @@ def runtime_hint(compute: str) -> str:
     }
     return hints.get(compute, hints[COMPUTE_CPU])
 
-
-def env_is_packaged() -> bool:
-    """True when running from a frozen (PyInstaller) build."""
-    return bool(getattr(sys, "frozen", False))

@@ -37,7 +37,9 @@ screen readers (NVDA, JAWS, Narrator) and keyboard-only navigation.</p>
   <li><a href="#focus">Focus Management</a></li>
   <li><a href="#announcements">Screen Reader Announcements</a></li>
   <li><a href="#contrast">Color and Contrast</a></li>
+  <li><a href="#scaling">Display Scaling and Windows High Contrast</a></li>
   <li><a href="#dialogs">Dialogs and Windows</a></li>
+  <li><a href="#titles">Window Titles and the Application Version</a></li>
   <li><a href="#menus">Menus and Shortcuts</a></li>
   <li><a href="#groups">Radio Groups and Dependent Controls</a></li>
   <li><a href="#gated">Gated Buttons and Consent Dialogs</a></li>
@@ -154,7 +156,7 @@ self.btn.SetToolTip("Begin synthesizing audio for all pending segments")</pre>
 <tr><td>Escape</td><td>Cancel dialog</td></tr>
 <tr><td>Arrow keys</td><td>Navigate within lists, combos, radio groups</td></tr>
 <tr><td>Ctrl+Tab / Ctrl+Shift+Tab</td><td>Switch settings categories</td></tr>
-<tr><td>Ctrl+S</td><td>Apply settings (in Settings dialog)</td></tr>
+<tr><td>Ctrl+S</td><td>Apply settings (in the Settings dialog: the same as its Apply button and that button's Alt+A access key)</td></tr>
 <tr><td>F1</td><td>Open the bundled book</td></tr>
 <tr><td>F5</td><td>Refresh (Log Viewer)</td></tr>
 </table>
@@ -163,6 +165,17 @@ self.btn.SetToolTip("Begin synthesizing audio for all pending segments")</pre>
 <p>In the Settings dialog, Enter activates OK (NVDA convention). Inside
 multi-line text boxes, Enter inserts a new line instead. Inside buttons,
 combo boxes, and list boxes, Enter is passed through to the control.</p>
+
+<h3>Settings Categories Are Built When First Opened</h3>
+<p>The Settings dialog builds one category panel at the moment it is first
+shown instead of all eighteen when the dialog opens, which is what makes it
+appear immediately. Nothing a screen reader user notices changes with it: the
+category list is complete from the start, and a category that is opened gets
+its accessible names, its theme and its own state exactly as before, just then
+rather than earlier. A category that is never opened has no controls and writes
+nothing, so the values it holds stay as they are through Apply, OK and Cancel.
+Keep this in mind when testing: a name that arrives late is a defect here,
+because the panel is named as it is built.</p>
 
 <!-- ================================================================ -->
 <h2 id="focus">Focus Management</h2>
@@ -181,8 +194,39 @@ combo boxes, and list boxes, Enter is passed through to the control.</p>
 <!-- ================================================================ -->
 <h2 id="announcements">Screen Reader Announcements</h2>
 
-<p>When dynamic content changes, screen readers must be notified. In wxPython,
-the primary mechanism is updating the accessible name of a status control:</p>
+<p>When dynamic content changes, screen readers must be notified. A screen reader
+only reads a control the user navigates to, so an application that repaints a
+progress bar and says nothing is silent. The application pushes the change
+through <code>gui/announce.py</code>, which raises an MSAA <em>live region</em>
+change &mdash; the desktop equivalent of <code>aria-live</code>:</p>
+
+<pre>from ai_voice_studio.gui import announce
+
+# A status line: the label is set and the same sentence is announced.
+announce.status_text(self.status, "Recording segment 3 of 10")
+
+# A refusal or validation error: assertive, it interrupts.
+announce.status_error(self.status, "Choose a document to read first.")
+
+# Anything else (a background worker may call this from its own thread).
+announce.announce("Downloaded 4 of 9 files", key="download")</pre>
+
+<p>The announcer keeps one 1x1 <code>wx.StaticText</code> per window whose
+accessible name is the message and whose accessible state carries
+<code>STATE_SYSTEM_LIVE_REGION</code>. It raises
+<code>EVENT_OBJECT_LIVEREGIONCHANGED</code> and
+<code>EVENT_OBJECT_NAMECHANGE</code> on that control, so NVDA, JAWS and
+Narrator read the message without the focus moving. Progress is announced in
+10-point steps, polite messages are paced and coalesced per key, and an
+error clears whatever was still queued. Nothing is announced that is not also
+visible on screen.</p>
+
+<p>The announcer follows the window the user is in: when a modal dialog opens
+it gets its own live region, and the event is raised where the focus is,
+rather than on a main window that has gone to the background.</p>
+
+<p>The older mechanism, updating the accessible name of a status control, is
+still worth knowing (it is what the announcement layer does underneath):</p>
 
 <pre># When recording progress changes:
 self.status.SetLabel("Recording segment 3 of 10")
@@ -195,12 +239,26 @@ self.log_text.SetName(f"Log file {filename}: showing last 200 of 1500 lines")
 
 <h3>Patterns</h3>
 <ul>
-  <li><strong>Progress updates</strong>: Update both <code>SetLabel()</code> and
-      <code>SetName()</code> on the status text.</li>
-  <li><strong>Error messages</strong>: Use <code>wx.MessageBox</code> which is
-      natively accessible, or update an accessible name.</li>
-  <li><strong>Completion</strong>: Announce "Recording complete" or "Download
-      finished" via accessible name.</li>
+  <li><strong>Status lines</strong>: never call <code>SetLabel()</code> on a
+      label the user reads as status. Use <code>announce.status_text()</code>:
+      it sets the label and announces the same sentence, so what is seen and
+      what is heard cannot drift. Every status line follows this rule - the
+      main window's status bar, the recording, transcribe and describe windows,
+      the voice previews, the theme studio, the download list, the wizard's
+      source counts and every Settings category (voice library, server
+      profiles, the server and engine controls, the Python environment).</li>
+  <li><strong>Progress updates</strong>: <code>announce.status_text()</code>
+      with a <code>key</code>, so a stream of percentages collapses to the
+      latest one instead of queueing a backlog; a long operation announces in
+      10-point steps.</li>
+  <li><strong>Refusals and validation errors</strong>: use
+      <code>announce.status_error()</code>, or <code>wx.MessageBox</code> for a
+      modal error (it is natively accessible). <code>status_error()</code> is
+      assertive: it interrupts, and it clears the stale percentages still
+      waiting to be read.</li>
+  <li><strong>Completion</strong>: <code>announce.status_text()</code>; a
+      progress dialog flushes what is still queued when it closes, so the last
+      message is not lost.</li>
   <li><strong>Content loading</strong>: When loading logs, files, or lists,
       update the accessible name to describe what was loaded.</li>
 </ul>
@@ -227,6 +285,52 @@ self.log_text.SetName(f"Log file {filename}: showing last 200 of 1500 lines")
 <p>Both exceed WCAG AAA requirements (7:1).</p>
 
 <!-- ================================================================ -->
+<h2 id="scaling">Display Scaling and Windows High Contrast</h2>
+
+<p>Two Windows settings change what the whole interface looks like without the
+application being asked: display scaling (125%, 150%, 200%) and high contrast.
+Neither may cost the user a control &mdash; not a label cut off at the edge of a
+dialog, not dark text on a black system background.</p>
+
+<h3>Display scaling</h3>
+
+<ul>
+  <li>The process is per-monitor DPI aware, so Windows reports the real scale of
+      the display instead of stretching a bitmap of it.</li>
+  <li>Layouts are written in device-independent pixels (DIPs): sizes, minimum
+      sizes, sizer borders and fonts are given the values they would have at
+      100% and <code>dpi.prepare()</code> scales them, so a window keeps the
+      same footprint in DIPs on any display.</li>
+  <li>A control built <em>after</em> its window was prepared (a settings
+      category opened for the first time) is scaled as it is added, and a
+      window moved to another monitor is laid out again for the new scale.</li>
+  <li>A window whose size <em>is</em> its content is fitted rather than
+      multiplied: 23 pixels of text become 34 at 150%, not 34.5, and such a
+      window may legitimately differ from an exact multiple of the scale. It is
+      never left smaller than the content it holds.</li>
+  <li><strong>Verify:</strong> <code>python tools/check_dpi_layout.py</code>
+      builds every dialog and the main window at 100%, 150% and 200% and reports
+      any control that the conversion clipped, squeezed or left with no area.
+      Screenshots of each window at each scale are written to
+      <code>build/dpi_layout</code> (<code>--no-screenshots</code> measures
+      without showing anything).</li>
+</ul>
+
+<h3>High contrast</h3>
+
+<ul>
+  <li>When Windows high contrast is on, the system palette wins over every
+      theme: the built-in light and dark palettes, the twenty dark presets, any
+      custom theme and any wallpaper. Windows has already chosen colours the
+      user can read.</li>
+  <li>The chosen theme is left alone, so turning high contrast off restores the
+      theme the user had &mdash; nothing has to be picked again.</li>
+  <li>The same tool proves it: with contrast forced on it prints the palette
+      that will be used, its contrast ratio, and the colour a themed label
+      actually ends up with.</li>
+</ul>
+
+<!-- ================================================================ -->
 <h2 id="dialogs">Dialogs and Windows</h2>
 
 <ul>
@@ -237,6 +341,38 @@ self.log_text.SetName(f"Log file {filename}: showing last 200 of 1500 lines")
       for standard button layout &mdash; these are natively accessible.</li>
   <li>Category panels in Settings use the NVDA <code>SettingsPanel</code>
       pattern with <code>_SettingsPanelAccessible</code>.</li>
+</ul>
+
+<!-- ================================================================ -->
+<h2 id="titles">Window Titles and the Application Version</h2>
+
+<p>Two Windows conventions answer &ldquo;what is this window, and which program
+is it?&rdquo; for a screen reader &mdash; and both are read from somewhere other
+than the application's own About box.</p>
+
+<ul>
+  <li><strong>The window's title.</strong> NVDA+T reports the title of the
+      active window. wxPython gives every window a name of its own making
+      &mdash; a frame answers <code>GetName()</code> with <code>"frame"</code>
+      and a dialog with <code>"dialog"</code> &mdash; so that leftover class
+      name must never be copied into an accessible name.
+      <code>finalize_accessibility()</code> names a top-level window with its
+      title and reads it <em>live</em>, because the describe and transcribe
+      windows rename themselves as a project opens
+      (<code>"Audio description - &lt;film&gt;"</code>); a control that nobody
+      named stays unnamed instead of being announced as
+      <code>"listBox"</code> or <code>"panel"</code>.</li>
+  <li><strong>The executable's name and version.</strong> NVDA's <em>report the
+      application version</em> gesture asks Windows for the
+      <code>ProductName</code> and <code>ProductVersion</code> of the running
+      file, which come from its VERSIONINFO resource.
+      <code>packaging/ai_voice_studio.spec</code> takes that resource from
+      <code>tools/make_version_info.py</code>; without it Windows answers
+      nothing and NVDA says &ldquo;Application unknown, version not
+      detected&rdquo;. <code>tests/test_packaging.py</code> holds the resource
+      against <code>constants.APP_VERSION</code>, and the same tool reads a
+      built executable back:
+      <code>python tools/make_version_info.py dist\AIVS-64\AI-Voice-Studio\AI-Voice-Studio.exe</code>.</li>
 </ul>
 
 <!-- ================================================================ -->
@@ -255,6 +391,7 @@ self.log_text.SetName(f"Log file {filename}: showing last 200 of 1500 lines")
 <tr><td>Ctrl+Shift+R</td><td>Tools</td><td>Record</td></tr>
 <tr><td>Ctrl+,</td><td>Tools</td><td>Settings</td></tr>
 <tr><td>F1</td><td>Help</td><td>Python &amp; wxPython Book</td></tr>
+<tr><td>Alt+D</td><td>Help</td><td>Check for updates</td></tr>
 </table>
 <p>Menu items without an accelerator must still be reachable with the keyboard:
 <strong>Alt</strong> opens the menu bar, the mnemonic letter opens the menu
@@ -285,6 +422,29 @@ arrow keys move between items.</p>
 </ul>
 <p>The access keys in use are listed in the <em>Keyboard shortcuts</em> chapter of the User
 Guide.</p>
+
+<h3>Configurable gestures (Settings &gt; Keyboard gestures)</h3>
+<p>A user whose screen reader or workflow already owns a shortcut can rebind it.
+Settings &gt; <em>Keyboard gestures</em> follows NVDA's Input Gestures dialog: the
+commands are grouped by category in a tree, the selected command's keys are listed,
+and <strong>Add gesture…</strong>, <strong>Remove gesture</strong> and
+<strong>Restore defaults</strong> edit them. Rules that keep the feature accessible:
+</p>
+<ul>
+  <li><strong>A gesture needs Ctrl, Alt or Windows (or a function key).</strong> A bare
+      letter is refused with a sentence saying why, so ordinary typing can never be
+      shadowed.</li>
+  <li><strong>A key another command already owns is named first.</strong> Nothing is
+      taken silently, and a genuine clash is reported in the status line while the
+      dispatcher resolves it deterministically (the first declared command wins).</li>
+  <li><strong>Removing the last key from a command unbinds it.</strong> The user's map
+      replaces the defaults for that command, so "no keys" means no keys.</li>
+  <li><strong>Bindings apply without a restart.</strong> The main window reloads them
+      when the Settings dialog closes.</li>
+</ul>
+<p>The command catalog and the binding model live in
+<code>ai_voice_studio/gestures.py</code>, which imports nothing from wx, so the rules
+above are unit-tested without a window.</p>
 
 <!-- ================================================================ -->
 <h2 id="groups">Radio Groups and Dependent Controls</h2>
@@ -394,6 +554,9 @@ category change and the Recording window with NVDA running before shipping a rel
 <tr><td>12</td><td>Controls whose contents depend on a choice update the label and accessible name</td><td>Change the radio button and re-read the combo box</td></tr>
 <tr><td>13</td><td>Gated dialogs cannot be dismissed into a &ldquo;yes&rdquo;</td><td>Press Escape and the close box; the action must not run</td></tr>
 <tr><td>14</td><td>Long operations announce progress and can be cancelled</td><td>Start a download or an install and press Escape</td></tr>
+<tr><td>15</td><td>Dialogs keep their geometry at 150% and 200% scaling</td><td>Run <code>python tools/check_dpi_layout.py</code>; it must report no findings</td></tr>
+<tr><td>16</td><td>Nothing relies on an application colour when high contrast is on</td><td>Turn on a high contrast theme and open each window</td></tr>
+<tr><td>17</td><td>Status, progress and error text is announced, not only painted</td><td>Search the window for <code>.SetLabel()</code> on a status label; it must go through <code>announce.status_text()</code> or <code>announce.status_error()</code></td></tr>
 </table>
 
 <div class="tip"><strong>Testing tip:</strong> Enable NVDA or Narrator and navigate

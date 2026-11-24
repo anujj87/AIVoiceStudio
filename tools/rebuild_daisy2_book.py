@@ -17,8 +17,8 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from ai_voice_studio import project  # noqa: E402
-from ai_voice_studio.documents.daisy_builder import build_daisy_book  # noqa: E402
+from ai_voice_studio import project
+from ai_voice_studio.documents.daisy_builder import build_daisy_book
 
 
 def main() -> int:

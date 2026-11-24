@@ -13,8 +13,8 @@ import json
 import os
 import tempfile
 import unittest
-import urllib.request
 import urllib.error
+import urllib.request
 import wave
 from unittest import mock
 
@@ -28,8 +28,8 @@ from ai_voice_studio.omnivoice_quality import (
 )
 from ai_voice_studio.omnivoice_server import (
     REQUEST_ATTEMPTS,
-    OmniVoiceServerManager,
     OmniVoiceServerError,
+    OmniVoiceServerManager,
     split_text_for_server,
 )
 
@@ -701,9 +701,8 @@ class RequestRetryTest(unittest.TestCase):
                 lambda i: (_ for _ in ()).throw(
                     self._http_error(500, "Internal Server Error"))
             ),
-        ):
-            with self.assertRaises(OmniVoiceServerError) as ctx:
-                self._clone()
+        ), self.assertRaises(OmniVoiceServerError) as ctx:
+            self._clone()
 
         self.assertEqual(len(self.requests), REQUEST_ATTEMPTS)
         message = str(ctx.exception)
@@ -721,9 +720,8 @@ class RequestRetryTest(unittest.TestCase):
                 lambda i: (_ for _ in ()).throw(
                     self._http_error(422, "Request validation failed"))
             ),
-        ):
-            with self.assertRaises(OmniVoiceServerError) as ctx:
-                self._clone()
+        ), self.assertRaises(OmniVoiceServerError) as ctx:
+            self._clone()
 
         self.assertEqual(len(self.requests), 1)
         self.assertIn("server returned HTTP 422", str(ctx.exception))
@@ -736,9 +734,8 @@ class RequestRetryTest(unittest.TestCase):
         with mock.patch.object(
             urllib.request, "urlopen",
             self._fake_urlopen(lambda i: (_ for _ in ()).throw(refused)),
-        ):
-            with self.assertRaises(OmniVoiceServerError) as ctx:
-                self._clone()
+        ), self.assertRaises(OmniVoiceServerError) as ctx:
+            self._clone()
 
         self.assertEqual(len(self.requests), REQUEST_ATTEMPTS)
         from ai_voice_studio.gui.dialogs import looks_like_server_error
@@ -794,9 +791,8 @@ class RequestRetryTest(unittest.TestCase):
                     lambda i: (_ for _ in ()).throw(
                         self._http_error(500, "Internal Server Error"))
                 ),
-            ):
-                with self.assertRaises(OmniVoiceServerError) as ctx:
-                    self._clone()
+            ), self.assertRaises(OmniVoiceServerError) as ctx:
+                self._clone()
 
         message = str(ctx.exception)
         self.assertIn(
@@ -830,9 +826,8 @@ class RequestRetryTest(unittest.TestCase):
                 lambda i: (_ for _ in ()).throw(
                     self._http_error(500, "Synthesis failed: out of memory"))
             ),
-        ):
-            with self.assertRaises(OmniVoiceServerError) as ctx:
-                self._clone()
+        ), self.assertRaises(OmniVoiceServerError) as ctx:
+            self._clone()
         self.assertIn("out of memory", str(ctx.exception))
 
 

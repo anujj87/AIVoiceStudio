@@ -13,13 +13,25 @@ text.  Two usage patterns:
 An optional ``cancel`` button simply invokes the supplied callback; the
 dialog stays up until :meth:`TaskProgressDialog.finish` is called so the
 caller controls its lifetime.
+
+Both the message and the position of the bar are **announced**: a listener who
+is not looking at the dialog (or whose focus never left the button that started
+the work) hears the same thing the status line shows, through
+:mod:`ai_voice_studio.gui.announce`.  Progress is announced in 10-point steps,
+so a fast job says "20 percent", "30 percent" instead of every value.
 """
 
 from __future__ import annotations
 
+import contextlib
+
 import wx
 
-from .a11y import _tint, finalize_accessibility
+from . import announce, dpi
+from .a11y import finalize_accessibility
+
+#: How far the bar must move before its position is worth announcing again.
+ANNOUNCE_STEP = 10
 
 
 class TaskProgressDialog(wx.Dialog):
@@ -42,6 +54,7 @@ class TaskProgressDialog(wx.Dialog):
             style = wx.CAPTION | wx.RESIZE_BORDER
         super().__init__(parent, title=title, style=style)
         self._on_cancel = on_cancel
+        self._announced_value: int | None = None
 
         sizer = wx.BoxSizer(wx.VERTICAL)
         self._message = wx.StaticText(self, label=message)
@@ -72,6 +85,8 @@ class TaskProgressDialog(wx.Dialog):
         self.SetMinSize(self.GetSize())
         # Real MSAA accNames (gauge + message).
         finalize_accessibility(self)
+        dpi.prepare(self)
+        dpi.follow(self)
         if parent is not None and parent.IsShown():
             self.CentreOnParent()
         else:
@@ -93,21 +108,27 @@ class TaskProgressDialog(wx.Dialog):
     def stop_pulse(self) -> None:
         timer = getattr(self, "_pulse_timer", None)
         if timer is not None:
-            try:
+            # The timer may already be gone (the dialog was destroyed).
+            with contextlib.suppress(Exception):
                 timer.Stop()
-            except Exception:  # noqa: BLE001
-                pass
 
     # -- helpers ------------------------------------------------------------
     def set_message(self, message: str) -> None:
-        self._message.SetLabel(message)
         self._message.SetName("Progress message: " + message)
         self._message.Update()
+        # The label and the announcement come from one string.
+        announce.status_text(self._message, message, key="progress-message")
 
     def show_progress(self, value: int) -> None:
-        """Set the gauge to ``value`` (0-100) and repaint immediately."""
-        self.gauge.SetValue(max(0, min(100, int(value))))
+        """Set the gauge to ``value`` (0-100), repaint, and say where it is."""
+        value = max(0, min(100, int(value)))
+        self.gauge.SetValue(value)
         self.gauge.Update()
+        if (self._announced_value is None
+                or abs(value - self._announced_value) >= ANNOUNCE_STEP
+                or value == 100):
+            self._announced_value = value
+            announce.announce(f"{value} percent", key="progress")
 
     def update(self, value: int, message: str | None = None) -> None:
         if message is not None:
@@ -123,12 +144,10 @@ class TaskProgressDialog(wx.Dialog):
     def finish(self) -> None:
         """Close and destroy the dialog (safe to call more than once)."""
         self.stop_pulse()
-        try:
+        # Deliver anything still waiting rather than dropping it with the
+        # window it was going to be read from.
+        announce.get_announcer().flush()
+        # Closing twice is allowed: the second call finds nothing to destroy.
+        with contextlib.suppress(Exception):
             self.Destroy()
-        except Exception:  # noqa: BLE001 - already destroyed
-            pass
 
-
-def tint(control: wx.Window) -> None:
-    """Apply the current theme colours to a fresh control (re-export)."""
-    _tint(control)

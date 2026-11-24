@@ -39,14 +39,13 @@ from __future__ import annotations
 import logging
 import os
 import re
-import shutil
 import subprocess
 import uuid
 import wave
 import zipfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from html.parser import HTMLParser
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from ..constants import (
     DAISY3_DTBOOK_FILE,
@@ -101,13 +100,13 @@ _IMG_TAG_RE = re.compile(
 def build_daisy3_book(
     output_dir: str,
     project_name: str,
-    segments: List[Dict[str, Any]],
+    segments: list[dict[str, Any]],
     audio_format: str = "wav",
     language: str = "en",
     publisher: str = "",
     source_file: str = "",
     author: str = "",
-    meta: Optional[Dict[str, str]] = None,
+    meta: dict[str, str] | None = None,
 ) -> str:
     """Build the complete DAISY 3 book structure into ``<output_dir>/DAISY3``.
 
@@ -135,21 +134,21 @@ def build_daisy3_book(
     os.makedirs(daisy_dir, exist_ok=True)
 
     book_uid = "urn:uuid:" + str(uuid.uuid4())
-    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    now_iso = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # 1. Copy recorded audio under digit-only names and measure durations.
     #    MP3 segments are re-encoded to 44.1 kHz MPEG-1 Layer III when
     #    needed (see daisy_builder._stage_audio): DAISY players decode that
     #    profile reliably, while the engines' native low-rate MPEG-2 LSF
     #    MP3s cut out in strict players.
-    entries: List[Dict[str, Any]] = []
+    entries: list[dict[str, Any]] = []
     for i, seg in enumerate(ready, start=1):
         src = os.path.join(output_dir, os.path.basename(seg["saved"]))
         ext = (os.path.splitext(os.path.basename(seg["saved"]))[1] or
                "." + (audio_format or "wav")).lstrip(".").lower()
         audio_name = f"aud{i:04d}.{ext}"
         dst = os.path.join(daisy_dir, audio_name)
-        from .daisy_builder import _stage_audio  # noqa: PLC0415
+        from .daisy_builder import _stage_audio
 
         _stage_audio(src, dst, ext)
         dur = _audio_duration(dst, ext)
@@ -190,7 +189,7 @@ def build_daisy3_book(
     # 5. Per-segment SMIL 2.0 content documents.  Each SMIL carries the
     #    cumulative book offset (dtb:offset) and the book total time
     #    (dtb:totalElapsed) as DAISY 3 players expect.
-    smil_files: List[str] = []
+    smil_files: list[str] = []
     for entry in entries:
         entry["book_total_ms"] = total_ms
         smil_files.append(_write_smil(daisy_dir, entry, book_uid, project_name))
@@ -212,7 +211,7 @@ def build_daisy3_book(
 
 
 def export_daisy3_zip(project_dir: str, zip_path: str,
-                      book_folder: Optional[str] = None) -> str:
+                      book_folder: str | None = None) -> str:
     """Package the generated DAISY 3 book into a distributable ZIP archive."""
     daisy_dir = os.path.join(project_dir, DAISY3_OUTPUT_DIR_NAME)
     if not os.path.isdir(daisy_dir) or not os.path.isfile(
@@ -237,14 +236,14 @@ def export_daisy3_zip(project_dir: str, zip_path: str,
 # ---------------------------------------------------------------------------
 # Synchronized text blocks
 # ---------------------------------------------------------------------------
-def _entry_blocks(entry: Dict[str, Any], id_counter: List[int]) -> List[Dict[str, Any]]:
+def _entry_blocks(entry: dict[str, Any], id_counter: list[int]) -> list[dict[str, Any]]:
     """Compute the synchronized text blocks of one segment.
 
     The first block is the segment heading; every non-empty paragraph follows.
     Each block carries the DTBook element id it will be attached to, the SMIL
     ``<text>`` id, the ``<par>`` id and its share of the audio.
     """
-    blocks: List[Dict[str, Any]] = []
+    blocks: list[dict[str, Any]] = []
 
     def add(dtbook_id: str, text: str) -> None:
         id_counter[0] += 1
@@ -270,15 +269,15 @@ def _entry_blocks(entry: Dict[str, Any], id_counter: List[int]) -> List[Dict[str
 def _write_dtbook(
     daisy_dir: str,
     title: str,
-    entries: List[Dict[str, Any]],
+    entries: list[dict[str, Any]],
     book_uid: str,
     now_iso: str,
     language: str,
     publisher: str,
     source_file: str,
     author: str,
-    images: Optional[List[Tuple[str, str, bytes]]] = None,
-    meta: Optional[Dict[str, str]] = None,
+    images: list[tuple[str, str, bytes]] | None = None,
+    meta: dict[str, str] | None = None,
 ) -> None:
     """Write the DTBook 2005-3 text content document."""
     publisher = publisher.strip() or "AI Voice Studio"
@@ -324,7 +323,7 @@ def _write_dtbook(
 
     # Body: one level1 per segment; heading as h1, paragraphs as p.  Every
     # element carries the id the SMIL <text> elements point at.
-    body_parts: List[str] = []
+    body_parts: list[str] = []
     for entry in entries:
         blocks = entry["blocks"]
         head_block = blocks[0]
@@ -383,7 +382,7 @@ def _write_dtbook(
 # ---------------------------------------------------------------------------
 # Images (DTBook imggroup)
 # ---------------------------------------------------------------------------
-def _dtbook_image_section(images: List[Tuple[str, str, bytes]]) -> str:
+def _dtbook_image_section(images: list[tuple[str, str, bytes]]) -> str:
     """Return the rearmatter ``<level1>`` holding every image.
 
     Uses the official DTBook image markup: ``<imggroup>`` with ``<img``
@@ -399,25 +398,25 @@ def _dtbook_image_section(images: List[Tuple[str, str, bytes]]) -> str:
     for i, (name, _mime, _data) in enumerate(images, start=1):
         stem = os.path.splitext(name)[0]
         lines.append(
-            '        <imggroup id="imggrp_{i:04d}">\n'
-            '          <img id="img_{i:04d}" src="images/{name}" alt="{alt}"/>\n'
-            '          <captions id="cap_{i:04d}" imgref="img_{i:04d}">\n'
-            '            <p id="cap_{i:04d}_p">{alt}</p>\n'
+            f'        <imggroup id="imggrp_{i:04d}">\n'
+            f'          <img id="img_{i:04d}" src="images/{name}" alt="{_escape(stem)}"/>\n'
+            f'          <captions id="cap_{i:04d}" imgref="img_{i:04d}">\n'
+            f'            <p id="cap_{i:04d}_p">{_escape(stem)}</p>\n'
             '          </captions>\n'
-            '        </imggroup>'.format(i=i, name=name, alt=_escape(stem))
+            '        </imggroup>'
         )
     lines.append('      </level1>\n')
     return "\n".join(lines)
 
 
-def _extract_images(source_file: str) -> List[Tuple[str, str, bytes]]:
+def _extract_images(source_file: str) -> list[tuple[str, str, bytes]]:
     """Return ``(file_name, mime_type, data)`` for images in the source.
 
     Supported sources: DOCX and EPUB (ZIP media entries) and HTML (local
     ``<img src>`` files).  Everything else yields no images -- the book is
     then simply text + audio.
     """
-    images: List[Tuple[str, str, bytes]] = []
+    images: list[tuple[str, str, bytes]] = []
     if not source_file or not os.path.isfile(source_file):
         return images
     ext = os.path.splitext(source_file)[1].lower()
@@ -426,15 +425,15 @@ def _extract_images(source_file: str) -> List[Tuple[str, str, bytes]]:
             images = _images_from_zip(source_file)
         elif ext in (".html", ".htm"):
             images = _images_from_html(source_file)
-    except Exception:  # noqa: BLE001 -- images are best effort
+    except Exception:
         return []
     return images
 
 
 def _stage_images(
-    images: List[Tuple[str, str, bytes]],
+    images: list[tuple[str, str, bytes]],
     daisy_dir: str,
-) -> List[Tuple[str, str, bytes]]:
+) -> list[tuple[str, str, bytes]]:
     """Copy extracted images into ``<daisy_dir>/images/`` (digit-only names).
 
     Returns the staged ``(new_name, mime, data)`` list used by the DTBook and
@@ -444,7 +443,7 @@ def _stage_images(
         return []
     img_dir = os.path.join(daisy_dir, "images")
     os.makedirs(img_dir, exist_ok=True)
-    staged: List[Tuple[str, str, bytes]] = []
+    staged: list[tuple[str, str, bytes]] = []
     for i, (_name, mime, data) in enumerate(images, start=1):
         ext = _ext_for_mime(mime, _name)
         new_name = f"img{i:04d}{ext}"
@@ -461,8 +460,8 @@ def _ext_for_mime(mime: str, name: str) -> str:
     return os.path.splitext(name)[1].lower() or ".png"
 
 
-def _images_from_zip(path: str) -> List[Tuple[str, str, bytes]]:
-    found: List[Tuple[str, str, bytes]] = []
+def _images_from_zip(path: str) -> list[tuple[str, str, bytes]]:
+    found: list[tuple[str, str, bytes]] = []
     with zipfile.ZipFile(path) as zf:
         for info in zf.infolist():
             if info.is_dir():
@@ -474,7 +473,9 @@ def _images_from_zip(path: str) -> List[Tuple[str, str, bytes]]:
             stem = os.path.basename(info.filename)
             try:
                 data = zf.read(info)
-            except Exception:  # noqa: BLE001
+            except Exception as exc:
+                # One unreadable image must not cost the whole book.
+                log.debug("Skipping image %s: %s", info.filename, exc)
                 continue
             found.append((stem, mime, data))
     return found
@@ -483,21 +484,21 @@ def _images_from_zip(path: str) -> List[Tuple[str, str, bytes]]:
 class _ImgSrcParser(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
-        self.srcs: List[str] = []
+        self.srcs: list[str] = []
 
-    def handle_starttag(self, tag: str, attrs: List[Tuple[str, str]]) -> None:
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str]]) -> None:
         if tag.lower() == "img":
             for name, value in attrs:
                 if name.lower() == "src" and value:
                     self.srcs.append(value)
 
 
-def _images_from_html(path: str) -> List[Tuple[str, str, bytes]]:
+def _images_from_html(path: str) -> list[tuple[str, str, bytes]]:
     base = os.path.dirname(os.path.abspath(path))
-    with open(path, "r", encoding="utf-8", errors="replace") as fh:
+    with open(path, encoding="utf-8", errors="replace") as fh:
         parser = _ImgSrcParser()
         parser.feed(fh.read())
-    found: List[Tuple[str, str, bytes]] = []
+    found: list[tuple[str, str, bytes]] = []
     seen: set = set()
     for src in parser.srcs:
         if "://" in src or src.startswith("data:"):
@@ -521,19 +522,19 @@ def _images_from_html(path: str) -> List[Tuple[str, str, bytes]]:
 def _write_ncx(
     daisy_dir: str,
     title: str,
-    entries: List[Dict[str, Any]],
+    entries: list[dict[str, Any]],
     book_uid: str,
     now_iso: str,
     language: str,
     publisher: str,
     total_ms: int,
-    meta: Optional[Dict[str, str]] = None,
+    meta: dict[str, str] | None = None,
 ) -> None:
     """Write the NCX navigation file (navMap with one navPoint per segment)."""
     meta = meta or {}
     title = meta.get("title") or title
     author = (meta.get("creator") or publisher).strip() or "AI Voice Studio"
-    nav_points: List[str] = []
+    nav_points: list[str] = []
     for entry in entries:
         blocks = entry["blocks"]
         nav_points.append(
@@ -574,7 +575,7 @@ def _write_ncx(
 # ---------------------------------------------------------------------------
 def _write_smil(
     daisy_dir: str,
-    entry: Dict[str, Any],
+    entry: dict[str, Any],
     book_uid: str,
     book_title: str,
 ) -> str:
@@ -590,7 +591,7 @@ def _write_smil(
     # The <text> element references the DTBook fragment (book.xml#id) and
     # carries its own id; the audio is sliced proportionally by character
     # count across the blocks.
-    pars: List[str] = []
+    pars: list[str] = []
     elapsed = 0.0
     for idx, block in enumerate(blocks):
         if idx == len(blocks) - 1:
@@ -651,7 +652,7 @@ def _total_ms(total_ms_value: Any) -> int:
         return 0
 
 
-def _smil_name(entry: Dict[str, Any]) -> str:
+def _smil_name(entry: dict[str, Any]) -> str:
     return f"{entry['number']:04d}.smil"
 
 
@@ -661,7 +662,7 @@ def _smil_name(entry: Dict[str, Any]) -> str:
 def _write_opf(
     daisy_dir: str,
     title: str,
-    entries: List[Dict[str, Any]],
+    entries: list[dict[str, Any]],
     book_uid: str,
     now_iso: str,
     language: str,
@@ -669,9 +670,9 @@ def _write_opf(
     source_file: str,
     author: str,
     total_ms: int,
-    smil_files: List[str],
-    images: Optional[List[Tuple[str, str, bytes]]] = None,
-    meta: Optional[Dict[str, str]] = None,
+    smil_files: list[str],
+    images: list[tuple[str, str, bytes]] | None = None,
+    meta: dict[str, str] | None = None,
 ) -> str:
     """Write the OPF package manifest and return its path."""
     images = images or []
@@ -737,7 +738,7 @@ def _write_opf(
         f'    <dc:date>{_escape(date)}</dc:date>\n'
         f'    <dc:publisher>{_escape(publisher)}</dc:publisher>\n'
         + optional_meta +
-        f'    <dc:format>Daisy 3</dc:format>'
+        '    <dc:format>Daisy 3</dc:format>'
         + source_meta + '\n'
         '    <meta name="dtb:uid" content="' + _escape(book_uid) + '" />\n'
         '    <meta name="dtb:depth" content="1" />\n'
@@ -773,10 +774,10 @@ def _audio_duration(path: str, ext: str) -> float:
                 frames = wf.getnframes()
                 rate = wf.getframerate()
                 return frames / rate if rate else 0.0
-        except Exception:  # noqa: BLE001
+        except Exception:
             return 0.0
     try:
-        from ..audio import ffmpeg as ffmpeg_mod  # noqa: PLC0415
+        from ..audio import ffmpeg as ffmpeg_mod
 
         exe = ffmpeg_mod.find_ffmpeg()
         if not exe:
@@ -787,6 +788,7 @@ def _audio_duration(path: str, ext: str) -> float:
             text=True,
             timeout=30,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            check=False,
         )
         match = re.search(
             r"Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)", result.stderr or ""
@@ -794,8 +796,8 @@ def _audio_duration(path: str, ext: str) -> float:
         if match:
             h, m, s = match.groups()
             return int(h) * 3600 + int(m) * 60 + float(s)
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception:
+        log.debug("Ignoring a failure in _audio_duration", exc_info=True)
     return 0.0
 
 

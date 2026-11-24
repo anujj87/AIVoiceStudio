@@ -13,7 +13,7 @@ import shutil
 import subprocess
 import threading
 import zipfile
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from .. import paths
 from ..constants import FFMPEG_DOWNLOAD_URL, FFMPEG_EXE_NAME
@@ -22,7 +22,7 @@ from ..tts.downloader import DownloadCancelled, download_file
 log = logging.getLogger(__name__)
 
 
-def find_ffmpeg() -> Optional[str]:
+def find_ffmpeg() -> str | None:
     """Locate ffmpeg.exe: app-folder copy first, then system PATH."""
     app_copy = os.path.join(paths.ffmpeg_dir(), FFMPEG_EXE_NAME)
     if os.path.isfile(app_copy):
@@ -31,7 +31,7 @@ def find_ffmpeg() -> Optional[str]:
     return found
 
 
-def ensure_ffmpeg() -> Optional[str]:
+def ensure_ffmpeg() -> str | None:
     """Return a working ffmpeg path or None (used to gate MP3/FLAC output)."""
     candidate = find_ffmpeg()
     if candidate and _works(candidate):
@@ -47,15 +47,16 @@ def _works(path: str) -> bool:
             text=True,
             timeout=15,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            check=False,
         )
         return result.returncode == 0
-    except Exception:  # noqa: BLE001
+    except Exception:
         return False
 
 
 def download_ffmpeg(
-    progress: Optional[Callable[[str, int, int], None]] = None,
-    cancel_event: Optional[threading.Event] = None,
+    progress: Callable[[str, int, int], None] | None = None,
+    cancel_event: threading.Event | None = None,
 ) -> str:
     """Download and unpack FFmpeg into the app's user folder; return exe path."""
     ffdir = paths.ffmpeg_dir()
@@ -107,6 +108,7 @@ def convert_wav(src_wav: str, dest_path: str, fmt: str, ffmpeg_exe: str) -> None
         text=True,
         timeout=600,
         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        check=False,
     )
     if result.returncode != 0:
         raise RuntimeError(f"FFmpeg conversion to {fmt} failed: {result.stderr[-400:]}")
@@ -130,19 +132,20 @@ def needs_mp3_normalization(path: str) -> bool:
             text=True,
             timeout=30,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            check=False,
         )
-        import re  # noqa: PLC0415
+        import re
 
         stream = re.search(
             r"Stream #\d+:\d+.*?: Audio: mp3.*?, (\d+) Hz", result.stderr or "")
         if not stream:
             return False
         return int(stream.group(1)) < 44100
-    except Exception:  # noqa: BLE001
+    except Exception:
         return False
 
 
-def normalize_mp3_for_daisy(src: str, dst: str, ffmpeg_exe: Optional[str] = None) -> None:
+def normalize_mp3_for_daisy(src: str, dst: str, ffmpeg_exe: str | None = None) -> None:
     """Transcode an MP3 to DAISY-friendly MPEG-1 Layer III 44.1 kHz mono.
 
     Used by the DAISY builders when staging recorded audio: a segment saved
@@ -166,12 +169,13 @@ def normalize_mp3_for_daisy(src: str, dst: str, ffmpeg_exe: Optional[str] = None
         text=True,
         timeout=600,
         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        check=False,
     )
     if result.returncode != 0 or not os.path.isfile(tmp_out):
         try:
             os.remove(tmp_out)
         except OSError:
-            pass
+            log.debug("Ignoring a failure in normalize_mp3_for_daisy", exc_info=True)
         raise RuntimeError(
             f"FFmpeg normalization failed for {src}: {result.stderr[-400:]}")
     os.replace(tmp_out, dst)

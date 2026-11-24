@@ -18,7 +18,7 @@
 <h1>Settings Dialog</h1>
 
 <div class="info">
-  <strong>Current implementation (2026.3.1).</strong> The dialog now has a <strong>Voice Clone</strong>
+  <strong>Current implementation (2027.1.0).</strong> The dialog now has a <strong>Voice Clone</strong>
   page with one section per Voice Lab engine: install / remove the engine, its size and
   licence, the device selector (CPU / GPU / Auto), per-engine tuning defaults and a
   <strong>Compute</strong> combo next to each Preview button. Installs run in the engine’s
@@ -27,7 +27,21 @@
   <a href="ch78_compute_choice.html">Chapter 78</a>. Package status labels are answered from a
   cached, non-blocking probe (<code>venv_packages</code>) so opening Settings stays instant under
   a screen reader.
-</div>
+
+  <strong>One Voice Clone page.</strong> The <em>OmniVoice engines</em> category that used to
+  follow <em>Voice Clone</em> is merged into it: <code>_VoiceCloneCategoryPanel</code> holds the
+  Voice Lab half (<code>VoiceClonePanel</code>) and the OmniVoice half
+  (<code>_OmniVoiceEnginesPanel</code>) on one page. The two OmniVoice <strong>Install</strong> /
+  <strong>Remove</strong> button pairs (<code>omnivoice-triton</code> and <code>omnivoice-server</code>)
+  moved there from the <em>Compute</em> page, so every pip-installed cloning engine is
+  installed where it is configured; <em>Compute</em> keeps only the ONNX GPU (CUDA) runtime,
+  and the <em>OmniVoice Server</em> page keeps the HTTP server's own settings. The page
+  carries <strong>one</strong> engine list (the <code>TTS engine</code> combo box) holding every
+  Voice Lab engine and both OmniVoice engines; the controls of the chosen family follow
+  it, and each half's own combo box is collapsed, so an engine is picked once rather than
+  once per half.
+
+  <strong>Beyond the Voice Lab.</strong> The dialog also has a <strong>Manage the STT</strong> page that installs the speech-recognition models, one into a Python environment of its own, and names the CUDA wheel a GPU run needs; a <strong>Keyboard gestures</strong> page modelled on NVDA’s Input Gestures dialog; and, on the General page, <em>Create custom theme…</em> opening the theme studio. See <a href="ch85_stt_environments.html">Chapter 85</a>, <a href="ch83_input_gestures.html">Chapter 83</a> and <a href="ch87_theme_studio.html">Chapter 87</a>.</div>
 
 <h2>Learning Objectives</h2>
 <ul>
@@ -46,8 +60,8 @@
     <tr><td>General</td><td>GeneralPanel</td><td>Theme, developer mode</td></tr>
     <tr><td>Download and remove</td><td>DownloadPanel</td><td>Download/remove voice models</td></tr>
     <tr><td>Available TTS</td><td>AvailablePanel</td><td>List installed voices, preview</td></tr>
-    <tr><td>Voice Clone</td><td>ClonePanel</td><td>Create cloned voices (XTTS v2)</td></tr>
-    <tr><td>Compute</td><td>ComputePanel</td><td>GPU detection, OmniVoice install</td></tr>
+    <tr><td>Voice Clone</td><td>_VoiceCloneCategoryPanel</td><td>Voice Lab engines + OmniVoice engines (install, voice library)</td></tr>
+    <tr><td>Compute</td><td>_ComputePanel</td><td>GPU detection, ONNX GPU (CUDA) runtime</td></tr>
     <tr><td>OmniVoice Server</td><td>ServerPanel</td><td>HTTP server configuration</td></tr>
     <tr><td>DAISY</td><td>DaisyPanel</td><td>DAISY book settings</td></tr>
     <tr><td>Developer</td><td>DeveloperPanel</td><td>Pip install, log viewer</td></tr>

@@ -6,7 +6,7 @@ working driver is detected) and Auto when there is a choice.  The choice is
 remembered per category in Settings (``preview_compute.<category>``), and the
 preview uses it:
 
-* the pip-installed engines (Voice Lab: Pocket TTS, Bark, F5-TTS) run
+* the pip-installed engines (Voice Lab: Pocket TTS, F5-TTS) run
   on their own PyTorch, so "GPU" means CUDA there without any extra runtime;
 * the ONNX engines (Piper, Kokoro, ...) use the sherpa-onnx GPU back-end,
   which additionally needs the CUDA runtime downloaded from Settings > Compute
@@ -18,7 +18,7 @@ without wx.
 
 from __future__ import annotations
 
-from typing import List, Optional, Tuple
+import contextlib
 
 #: Settings key prefix.  It must *not* be ``compute.preview``: ``compute`` is
 #: a plain string setting (the global back-end), so nesting under it would
@@ -26,11 +26,11 @@ from typing import List, Optional, Tuple
 SETTINGS_PREFIX = "preview_compute"
 
 
-def choices() -> List[Tuple[str, str]]:
+def choices() -> list[tuple[str, str]]:
     """``(value, label)`` pairs for the combo (CPU first, GPU when present)."""
-    from .. import compute  # noqa: PLC0415
+    from .. import compute
 
-    options: List[Tuple[str, str]] = [("cpu", "CPU")]
+    options: list[tuple[str, str]] = [("cpu", "CPU")]
     if compute.has_nvidia_gpu():
         options.append(("cuda", "GPU (CUDA)"))
     if len(options) > 1:
@@ -47,7 +47,7 @@ def _stored_choice(settings, category: str):
     """The category's saved choice, or ``None`` when the user never chose."""
     try:
         value = str(settings.get(settings_key(category), "") or "").lower()
-    except Exception:  # noqa: BLE001
+    except Exception:
         return None
     valid = {value for value, _label in choices()}
     return value if value in valid else None
@@ -58,22 +58,24 @@ def saved_choice(settings, category: str) -> str:
     return _stored_choice(settings, category) or "cpu"
 
 
-def provider_for_preview(choice: str, engine_id: Optional[str] = None) -> str:
+def provider_for_preview(choice: str, engine_id: str | None = None) -> str:
     """Turn the combo value into the provider string ``get_engine`` expects.
 
     ``engine_id`` is the voice's engine: the Voice Lab engines resolve their
     own device (CUDA via their own PyTorch), every other engine goes through
     the ONNX compute detection (which needs the downloaded GPU runtime).
     """
-    from .. import compute  # noqa: PLC0415
+    from .. import compute
 
     if engine_id:
-        from ..voicelab import engines as voice_lab  # noqa: PLC0415
+        from ..voicelab import engines as voice_lab
 
         if voice_lab.is_engine(engine_id):
-            from ..voicelab import resolve_device  # noqa: PLC0415
+            from ..voicelab import resolve_device
 
-            return resolve_device(choice)
+            # The engine is passed on: one that only runs on the GPU ignores
+            # a CPU choice rather than starting a run that cannot finish.
+            return resolve_device(choice, engine_id)
     return compute.provider_for(compute.resolve_compute(choice))
 
 
@@ -98,9 +100,9 @@ def make_compute_row(parent, settings, category: str, default: str = "cpu"):
     the user picks something (an engine that *needs* the GPU, like OmniVoice,
     passes ``"cuda"``).
     """
-    import wx  # noqa: PLC0415
+    import wx
 
-    from .a11y import set_accessible_name  # noqa: PLC0415
+    from .a11y import set_accessible_name
 
     label = wx.StaticText(parent, label="Compute:")
     combo = wx.ComboBox(parent, style=wx.CB_READONLY, name="Compute")
@@ -128,10 +130,11 @@ def make_compute_row(parent, settings, category: str, default: str = "cpu"):
     def _persist(_evt):
         if settings is None:
             return
-        try:
+        # The choice is only a convenience default; the window rebuilds it from
+        # settings the next time it opens, so a settings file that cannot be
+        # written must not break the combo box.
+        with contextlib.suppress(Exception):
             settings.set(settings_key(category), _combo_value(combo))
-        except Exception:  # noqa: BLE001
-            pass
 
     combo.Bind(wx.EVT_COMBOBOX, _persist)
     return label, combo

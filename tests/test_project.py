@@ -9,8 +9,8 @@ import unittest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from ai_voice_studio import project  # noqa: E402
-from ai_voice_studio.constants import MODE_PAGE_WITH_H1  # noqa: E402
+from ai_voice_studio import project
+from ai_voice_studio.constants import MODE_PAGE_WITH_H1
 
 
 def _make_project(tmp: str, segments: int) -> str:
@@ -43,7 +43,7 @@ class TestProjectLifecycle(unittest.TestCase):
             removed = project.reset_recordings(pdir)
 
             self.assertEqual(removed, 4)  # 3 segments + 1 stray audio file
-            for p in saved + [stray]:
+            for p in [*saved, stray]:
                 self.assertFalse(os.path.exists(p))
             data = project.load_project(pdir)
             for seg in data["segments"]:

@@ -8,6 +8,7 @@ __pycache__/
 # Virtual environments
 .venv/
 .venv32/
+.venv-local/
 
 # Build output
 build/
@@ -25,3 +26,49 @@ tools/*.exe
 # Logs
 *.log
 vendor/
+
+# Editor and OS clutter
+.vscode/
+.idea/
+*.code-workspace
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Local secrets and environment overrides - never commit a token
+/settings.json
+.env
+.env.*
+!.env.example
+
+# Coverage, type-checking and tooling caches
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.mypy_cache/
+.tox/
+
+# Installed virtualenv under an older name
+venv/
+
+# Scratch files from editing, probing and packaging
+*~
+*.swp
+*.tmp
+*.bak
+*.orig
+*.rej
+*.dmp
+*.pyz
+tmp/
+packaging/Output/
+
+# Model weights and other large downloads kept inside the checkout
+models/
+
+# Private working notes at the repository root (planning and audit material)
+/AUDIO_DESCRIPTION_PLAN.md
+/OFFLINE_AI_VIDEO_AUDIO_DESCRIPTION_RESEARCH.txt
+/PROJECT_AUDIT.md
+/PROJECT_SCORECARD.md

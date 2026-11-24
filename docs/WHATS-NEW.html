@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Voice Studio - What's New (2026 to 2027)</title>
+<style>
+  body { font-family: Verdana, Arial, sans-serif; max-width: 56em; margin: 1.5em auto; padding: 0 1em; line-height: 1.6; color: #222; }
+  h1 { border-bottom: 2px solid #555; padding-bottom: .3em; }
+  h2 { margin-top: 1.8em; border-bottom: 1px solid #ccc; padding-bottom: .2em; color: #333; }
+  h3 { margin-top: 1.2em; color: #444; }
+  code { font-family: Consolas, monospace; background: #f4f4f4; padding: 0.15em 0.3em; border-radius: 3px; }
+  pre { background: #f8f8f8; border: 1px solid #ddd; border-radius: 4px; padding: 1em; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.9em; }
+  table { border-collapse: collapse; margin: 1em 0; width: 100%; }
+  th, td { border: 1px solid #999; padding: .4em .7em; text-align: left; }
+  th { background: #eee; }
+  .note { background: #fff8dc; border-left: 4px solid #e0b400; padding: .6em 1em; margin: 1em 0; }
+  .tip { background: #eef7ee; border-left: 4px solid #2e8b57; padding: .6em 1em; margin: 1em 0; }
+  .new { background: #eef2ff; border-left: 4px solid #4444cc; padding: .6em 1em; margin: 1em 0; }
+</style>
+</head>
+<body>
+
+<h1>AI Voice Studio &mdash; What's New</h1>
+<p>This page lists what changed between the <strong>2026</strong> series and the
+<strong>2027</strong> series. The application itself stays free, offline and
+screen-reader first; nothing here changes that.</p>
+
+<h2>Contents</h2>
+<ul>
+  <li><a href="#free">Free, with no hidden cost</a></li>
+  <li><a href="#headline">The headline: speech to text</a></li>
+  <li><a href="#stt-models">Transcription models</a></li>
+  <li><a href="#stt-device">One device per model</a></li>
+  <li><a href="#audio-description">Audio description: describing video</a></li>
+  <li><a href="#gated-models">A gated model now explains itself</a></li>
+  <li><a href="#voicelab">Voice Lab engines, 2027</a></li>
+  <li><a href="#environments">One Python environment per engine</a></li>
+  <li><a href="#compute">Compute choice and GPU use</a></li>
+  <li><a href="#projects">Projects, menus and progress</a></li>
+  <li><a href="#gestures">Keyboard gestures and accessibility</a></li>
+  <li><a href="#themes">Twenty dark themes and wallpapers</a></li>
+  <li><a href="#updates">Updates and installation</a></li>
+  <li><a href="#removed">What was removed, and why</a></li>
+</ul>
+
+<!-- ================================================================ -->
+<h2 id="free">Free, with no hidden cost</h2>
+<div class="tip">
+<strong>AI Voice Studio is completely free.</strong> There is no price, no
+subscription, no &ldquo;Pro&rdquo; edition, no trial, no feature behind a
+payment, <strong>no advertising</strong> and no in-app purchase. There is no
+account to create and no telemetry: the program does not phone home, and every
+voice, every engine and every transcription runs on your own computer,
+offline. The one optional download it offers (the ONNX GPU runtime, about
+1.8&nbsp;GB) is free as well.
+</div>
+<p>The <strong>application</strong> is free software under the
+<strong>GPL-3.0</strong> &mdash; use it, study it, share it, modify it. That
+licence covers <em>the program</em>, not the voices: the voice engines and the
+speech models you download are <strong>separate works with their own
+licences</strong>. Most are MIT or Apache-2.0 and are free to use, including
+commercially; a few &mdash; the MMS voices and the F5-TTS weights, which are
+CC-BY-NC-4.0 &mdash; are for personal, non-commercial use only, and the SAPI5
+and Windows Core voices follow your Windows licence. So the software has no
+hidden cost, and most voices are free, but if you plan to use a recording
+commercially, check that voice&rsquo;s licence first. <strong>Help &rarr;
+Third-Party Licences</strong> lists every one of them.</p>
+
+<!-- ================================================================ -->
+<h2 id="headline">The headline: speech to text</h2>
+<div class="new">
+<strong>2027 adds a whole second direction: text from audio.</strong>
+A project can now be a <em>Speech to text</em> project. You choose a
+transcription model, its variant, the spoken language, the accuracy and the
+output format, and AI Voice Studio writes the transcript as plain text,
+timestamped text, SRT, VTT, HTML, JSON or CSV &mdash; one document per source
+file, or split by time.
+</div>
+<p>Transcription runs in the same offline, no-account way as everything else:
+no Hugging Face login, no API key, no upload. Every model runs in its own
+Python environment, exactly like the speech engines, so a NeMo model and a
+<code>transformers</code> model can never break one another.</p>
+<p>A source can be audio or <strong>video</strong>: WAV, MP3, FLAC, M4A, AAC,
+OGG/Opus, WMA and AIFF, plus MP4, MKV, MOV, WebM, AVI, MPG, WMV and TS, which
+the FFmpeg the application already downloads decodes for you. That is what
+turns a recorded <strong>lecture or class</strong> into searchable text, a
+<strong>voice memo or meeting</strong> into notes, and a <strong>video</strong>
+into an SRT or VTT subtitle file. A folder is walked recursively, and
+<em>time by time separation</em> can split a two-hour lecture into several short
+documents.</p>
+
+<!-- ================================================================ -->
+<h2 id="stt-models">Transcription models</h2>
+<p>Nine models ship in the 2027 catalog:</p>
+<table>
+<tr><th>Model</th><th>Best for</th><th>Device</th></tr>
+<tr><td>Whisper Large V3</td><td>General, wide language coverage, timings</td><td>GPU or CPU</td></tr>
+<tr><td>Whisper Small/Base</td><td>A modest machine, quick drafts</td><td>CPU or GPU</td></tr>
+<tr><td>Qwen3-ASR</td><td>Multilingual accuracy</td><td>GPU or CPU</td></tr>
+<tr><td>NVIDIA Canary-Qwen 2.5B</td><td>Leading English WER, 25 languages</td><td>GPU only</td></tr>
+<tr><td>NVIDIA Canary-Qwen 1B</td><td>Smaller Canary, 25 languages</td><td>CPU or GPU</td></tr>
+<tr><td>NVIDIA Parakeet TDT</td><td>Low latency, real time</td><td>GPU or CPU</td></tr>
+<tr><td>Moonshine</td><td>Tiny and fast on the CPU</td><td>CPU or GPU</td></tr>
+<tr><td>SpeechBrain</td><td>Small CPU recipes, English and Hindi</td><td>CPU or GPU</td></tr>
+<tr><td>Voxtral Mini 3B</td><td>Multilingual, translation to English</td><td>GPU or CPU</td></tr>
+<tr><td>IBM Granite Speech 1B / 2B</td><td>Strong English, CPU or GPU</td><td>CPU or GPU</td></tr>
+<tr><td>IBM Granite Speech 8B</td><td>Most accurate, ~17&nbsp;GB of weights</td><td>GPU only</td></tr>
+</table>
+
+<!-- ================================================================ -->
+<h2 id="stt-device">A device that tells the truth</h2>
+<p>The Compute combo now labels what each model can really do. Only a model
+that <em>cannot</em> run without a GPU &mdash; Canary-Qwen 2.5B and Granite
+Speech 8B &mdash; is offered the GPU alone; every other model offers
+<strong>both the CPU and the GPU</strong> whenever an NVIDIA card is present,
+with the recommended device first, and the CPU alone on a machine with no
+card. Because the device can differ between variants, the combo is rebuilt
+when the variant changes: Canary-Qwen&rsquo;s 2.5B shows GPU only, its 1B
+CPU or GPU. On a machine with no card, a GPU-only model says so and disables
+<strong>Start transcribe</strong> rather than starting a run that cannot work.
+You are never offered <code>Auto</code>. A GPU run no longer waits for the
+optional sherpa-onnx GPU runtime, because the models bring their own PyTorch.</p>
+<p>A GPU run also needs its CUDA runtime inside that model&rsquo;s own
+environment. Whisper&rsquo;s CTranslate2 back-end needs cuBLAS, which
+<code>faster-whisper</code> does not ship: the catalog names it as a CUDA-only
+package and the installer adds it on a GPU machine. An environment installed
+before that wheel was known (Whisper Large V3 here) quietly fell back to the
+CPU; <strong>Manage the STT</strong> now names the missing wheel and turns
+<strong>Install selected model</strong> into a repair.</p>
+
+<!-- ================================================================ -->
+<h2 id="audio-description">Audio description: describing video</h2>
+<div class="new">
+<strong>New in 2027: AI Voice Studio describes video.</strong> An audio
+description project runs a vision-language model over a video and writes the
+narration a blind or low-vision viewer needs &mdash; who is there, what they do,
+what text or code has appeared, where the picture goes. Like everything else in
+the application it runs on your own machine, in an environment of its own, with
+no account and no upload.
+</div>
+<p>One run writes <strong>three files per video</strong>, and the project folder
+says which is which:</p>
+<ul>
+  <li>the <strong>description document</strong> &mdash; script, HTML, SRT, WebVTT or
+      JSON, in the format the project chose (the reviewable script is always
+      written beside any other format);</li>
+  <li>the <strong>spoken narration</strong> &mdash; the descriptions read aloud by
+      one of your offline voices, laid at the times they belong to; and</li>
+  <li>the <strong>described video</strong> &mdash; a <em>new</em> file that plays the
+      film with the description: the original picture stream copied untouched and
+      the original soundtrack mixed with the narration, or, in extended audio
+      description, the film stopped for each description. The source video is
+      never modified.</li>
+</ul>
+<p><strong>Extended audio description</strong> is the second way to place a
+description: instead of speaking into a pause of the soundtrack, the picture
+holds on the frame it had reached while the description is spoken and then goes
+on. Nothing is ever talked over, at the price of a longer film &mdash; and it is
+the only option for a video whose dialogue never leaves a pause.</p>
+<p><strong>A description you can hear over the film.</strong> Standard audio
+description speaks the description over the film's own soundtrack, and the two
+were always mixed at their own levels &mdash; which buries the description in a
+film whose music and dialogue never stop. The Audio description window now has a
+<strong>Track priority</strong> combo, beside Placement and above
+<em>Start audio description</em>: <strong>Same volume</strong> (the default, both
+tracks exactly as they were produced), <strong>Duck, don't lower</strong>,
+<strong>Description 25% higher</strong> or <strong>Description 50%
+higher</strong>. The description keeps the level your narration settings gave it
+and the film's own soundtrack is mixed at 75% or 50% of it &mdash; only the film's
+track moves, because turning the description up would clip and would change a
+level you chose by ear. The last two choices are listened to the other way round
+if you want a louder description instead: a <strong>Narration voice
+volume</strong> slider now sits under the narration voice and sets the
+description's own level here, without opening Settings. <strong>Duck, don't
+lower</strong> never lowers the film: it dips the film's own
+soundtrack to a quarter of its own level &mdash; about &minus;12&nbsp;dB, measured
+on a real mix &mdash; while a description is actually being spoken, over a fade of
+about a tenth of a second at either end, and lets it back up between
+descriptions, so a film whose music never stops keeps its own sound everywhere
+the description is not talking. The moments are not estimated: the narration track
+records where each description is really heard as it is written, so the dip
+follows the voice rather than a setting, and two descriptions less than half a
+second apart are one dip instead of the film flapping between them. A dip that
+cannot be applied &mdash; a film so long that the list of moments would not fit on
+one command line &mdash; falls back to mixing both tracks as they are, never to
+losing the film's own sound. Extended placement has nothing to balance &mdash; the
+film is silent while the description is spoken &mdash; so it switches the combo
+off and says why. The combo now runs from the gentlest answer to the film to the
+most forceful: <em>Same volume</em>, <em>Duck, don't lower</em>, then the two
+percentage choices, and it opens on the first, which is exactly what every run
+before these choices existed produced.</p>
+<p><strong>One description per twenty seconds, not one per chunk.</strong> A
+chunk still bounds memory, the progress bar and resuming, but the length of a
+<em>description</em> is a window of its own, because one summary per two-minute
+chunk was measured to reduce a whole lecture to &ldquo;a man sits in a chair
+beside a whiteboard&rdquo; &mdash; and to never mention the line of code that had
+appeared on it. Each window is also told what the previous description said, so
+the model reports what has <em>changed</em>, and a window whose picture has not
+changed at all is skipped (and reported as skipped) rather than spoken again.</p>
+<p><strong>Models too large for the card now run instead of crashing.</strong>
+A checkpoint bigger than the graphics card is loaded in 4 bits with
+<code>bitsandbytes</code> (Gemma&nbsp;3 12B is about 24&nbsp;GB of weights and
+fits a 12&nbsp;GB card that way); nothing is offloaded to the disk any more, which
+is what ended a real run with a Windows access violation, and a model that
+cannot run at all is refused with its reason instead of a crash. Pressing
+<strong>Repair model environment</strong> adds the quantiser to an environment
+built before it was part of the GPU install.</p>
+<p><strong>Installing a model and downloading a variant are separate steps.</strong>
+The packages of a model are shared by all of its variants; a checkpoint belongs
+to one. Settings &rarr; <em>Manage the video describer</em> therefore shows one
+Install/Repair button per model and one Download/Remove button <em>per variant</em>,
+with a status column, so downloading one checkpoint no longer takes the others'
+Download buttons away.</p>
+<p><strong>FFmpeg is asked for, not complained about.</strong> If FFmpeg is not
+installed, <em>Start audio description</em> offers to download it (it decodes the
+frames, reads the video's length and writes the described video) instead of
+refusing to run. A Windows account without Developer Mode gets its Hugging Face
+cache stored as copies rather than symlinks, automatically &mdash; and the run says
+so rather than reporting it as an error.</p>
+
+<h2 id="gated-models">A gated model now explains itself</h2>
+<div class="new">
+<strong>New: Google's Gemma&nbsp;3 works, and its licence is explained instead of
+being hit as a wall.</strong> Every Gemma&nbsp;3 checkpoint lives in a
+<em>gated</em> Hugging Face repository: it downloads only for an account that has
+accepted Google's licence. Until now the run failed part-way through with the
+library's <code>401 &mdash; Cannot access gated repo &hellip; Please log in</code>,
+which names neither the page that grants access nor any way to give the
+application a token. Settings &rarr; <strong>Hugging Face account</strong> is that
+way: paste a read token from <code>huggingface.co/settings/tokens</code>, press
+<strong>Check token</strong>, and it says whose token it is before anything is
+downloaded.
+</div>
+<p>A gated model now says what it needs <em>before</em> it starts. Its variant is
+marked in <strong>Manage the video describer</strong>'s status column, and a run
+asked for without a token stops with two sentences naming the page on which to
+accept the licence and the panel to paste the token into &mdash; no gigabyte is
+fetched, and no model is loaded, until that access is in place. The token is
+carried into the model's own worker process, so the download itself is
+authenticated, and it is kept in your own
+<code>%APPDATA%\AIVoiceStudio\settings.json</code>, sent only to huggingface.co.
+Users who already have one can keep using <code>HF_TOKEN</code> or a previous
+<code>huggingface-cli login</code> instead.</p>
+<p><strong>One token, and the panel does both halves of the job.</strong> A gated
+model needs two things, and neither is a per-model token: the licence accepted on
+that model's own page, with the account the token belongs to, and that token
+given to the application. So the panel now names the models it can set up
+(<strong>Model</strong>), opens the page whose own <em>Agree and access
+repository</em> button grants the access (<strong>Open the model
+page&hellip;</strong>), and asks Hugging Face the question the failure itself
+leaves open with <strong>Check access</strong>: can <em>this</em> token's account
+download <em>this</em> model? A mistyped token and a licence that was never
+accepted produce the same error message and are fixed in two different places,
+and <em>Check access</em> is what says which one it is &mdash; it answers with the
+account name and with the page to accept, rather than with the library's bare
+<code>401</code>. Asking a repository it can reach is a few hundred bytes, not a
+checkpoint: the check fetches the smallest file the repository lists.</p>
+
+<p><strong>The same gate explains itself in the Voice Lab.</strong> Pocket TTS
+clones a voice from a 5&ndash;10 second sample, and those weights live in Kyutai's
+gated repository <code>kyutai/pocket-tts</code> &mdash; the 26 pre-made voices live
+outside it. Without access the library does not fail: it loads its cloning-free
+weights, so the pre-made voices work the moment the engine is installed and
+<em>only cloning</em> stops, with advice to run an <code>hf auth login</code>
+command this installation does not have. It now stops with the two steps that do
+work &mdash; accept the licence on that page, add a read token in Settings
+&rarr; <strong>Hugging Face account</strong> &mdash; and the run's notes say that
+the engine is running without voice cloning, so the cause is visible before a
+clone is attempted.</p>
+
+<p><strong>Nothing else changed hands.</strong> Every other describing model
+&mdash; and every speech-to-text model, which was checked one by one against
+Hugging Face &mdash; still downloads with no account, no token and no
+click-through, and <code>tools/check_hf_access.py</code> re-checks the whole list
+(now including Kyutai's repository) against the live API.</p>
+
+<h2 id="settings">Settings: one Voice Clone page</h2>
+<p><strong>The <em>OmniVoice engines</em> category is merged into <em>Voice Clone</em>.</strong>
+Every cloning engine now lives on one page: the Voice Lab engines first, then the
+OmniVoice engines with their <strong>Install OmniVoice dependency</strong> /
+<strong>Remove OmniVoice dependency</strong> (<code>omnivoice-triton</code>) and
+<strong>Install OmniVoice Server</strong> / <strong>Remove OmniVoice Server</strong>
+(<code>omnivoice-server</code>) buttons, their install status, the three engine cards
+(Server, Triton, Hybrid) and the OmniVoice voice library.</p>
+<p><strong>One engine list.</strong> The two halves each had their own TTS combo box; they
+are one <strong>TTS engine</strong> list at the top of the page now, holding every Voice Lab
+engine plus <em>OmniVoice Server</em> and <em>OmniVoice (direct, Triton)</em>, and the
+controls of the engine you pick follow below it. Picking an engine speaks its name and
+whether it is installed before the rest of its details.</p>
+<p>Those two install button pairs moved out of <strong>Compute</strong>, so an engine is
+installed on the page where it is configured, exactly like the Voice Lab engines.
+<strong>Compute</strong> keeps the optional ONNX GPU (CUDA) runtime, and the
+<strong>OmniVoice Server</strong> category is unchanged &mdash; it still holds the HTTP
+server's host, port, device, API key, CORS and start/stop controls.</p>
+<p><strong>Install with winget.</strong> The package is published in the Windows Package
+Manager repository, so <code>winget install AnujSharma.AIVoiceStudio</code> installs the same
+installer, <code>winget upgrade AnujSharma.AIVoiceStudio</code> updates it and
+<code>winget search AIVoiceStudio</code> finds it. Run <code>winget source update</code> first
+if a fresh machine does not list it yet. The User Guide and the readme now open with these
+commands.</p>
+
+<h2 id="voicelab">Voice Lab engines, 2027</h2>
+<p>The Voice Clone engines are now <strong>Pocket TTS</strong>,
+<strong>F5-TTS</strong>, <strong>KokoClone</strong>,
+<strong>Chatterbox</strong>, <strong>Qwen3-TTS</strong>,
+<strong>VibeVoice</strong>, <strong>MOSS-TTS</strong> and
+<strong>GPT-SoVITS</strong>. Each engine has its own tuning controls, remembered
+per engine in Settings and overridable per project.</p>
+<p><strong>MOSS-TTS</strong> (OpenMOSS) adds two checkpoints that fit a 12&nbsp;GB
+card &mdash; the 48&nbsp;kHz Local Transformer 4B and 1.7B models.</p>
+<p>The 100M <strong>Nano</strong> checkpoint was offered at first, but it had no
+speaker of its own: upstream always drives it in <em>voice-clone</em> mode with a
+prompt recording, and without one it came back as a fraction of a second of
+near-silence about as often as it spoke. That variant has been removed.</p>
+<p>The <strong>GPT-SoVITS</strong> install no longer asks for
+<code>jieba_fast</code> &mdash; a C extension with no build for the Python this
+app runs on, which made pip fail the whole install with just &ldquo;pip install
+failed (exit 1)&rdquo;. The worker stands in plain <code>jieba</code> under that
+name, and a failed pip step now reports the line that explains it.</p>
+<p>A new engine joins them: <strong>Indic Parler-TTS</strong>,
+which speaks the Indian languages &mdash; Hindi, Bengali, Tamil, Telugu and the
+rest of the AI4Bharat set &mdash; and takes its text directly, so it needs no
+<code>pynini</code> text front-end, which has no Windows build. It is not a
+cloning engine &mdash; it speaks with one of its 65 named speakers, chosen by a
+description you can rewrite in <em>Engine tuning</em> &mdash; and needs an
+NVIDIA GPU, like the other large transformers.</p>
+<p>Two engines surveyed alongside it were <strong>removed</strong> before this
+release: <strong>IndicF5</strong> and <strong>OmniVoice ONNX</strong>. Neither
+spoke the text it was handed. IndicF5 was an F5-TTS fine-tune whose checkpoint
+only half loaded under the <code>transformers</code> it pinned, so its take came
+back as speech-shaped nonsense (a word error rate of 0.52&ndash;0.89 against the
+text it was given), and the OmniVoice ONNX export's backbone barely conditioned
+on its input at all &mdash; the same Hindi sentence came back as unrelated Hindi
+at 0.95&ndash;1.00, in its own voice and when cloning. The application's own
+<strong>OmniVoice</strong> engines, which run the PyTorch checkpoint, are the
+ones to use for speech.</p>
+<p>Two models that were surveyed at the same time are deliberately
+<em>not</em> offered, because no installable Windows runtime exists for them:
+<strong>Svara-TTS</strong> (vLLM/FlashInfer are Linux-only and it has no
+CPython&nbsp;3.13 Windows wheel) and AI4Bharat's
+<strong>Indic-TTS</strong> (its front-end needs <code>pynini</code>, which has no
+Windows wheel, and its pinned <code>numba</code> release has no build for the
+Python this app runs on).</p>
+<p>Both <strong>MOSS-TTS</strong> and <strong>GPT-SoVITS</strong> also read audio
+through the soundfile shim now: without FFmpeg, a reference recording could not
+be loaded at all.</p>
+<p><strong>GPT-SoVITS</strong>
+(RVC-Boss) adds its six releases (v2ProPlus, v2Pro, v4, v3, v2 and v1) for
+few-shot cloning from as little as five seconds of audio. GPT-SoVITS has no
+voices of its own: it is clone-only, so its voices appear once you create or
+clone one on the Voice Clone page. It speaks English, Chinese, Korean and
+Cantonese; Japanese is not offered, because its Japanese front-end needs
+<code>pyopenjtalk</code>, which has no installable build for the Python this app
+runs on. Both engines run in their own Python environment, like every other
+Voice Lab engine.</p>
+
+<!-- ================================================================ -->
+<h2 id="environments">One Python environment per engine</h2>
+<p>Every pip-installed engine &mdash; and, in 2027, every transcription model
+&mdash; gets its own environment under
+<code>%APPDATA%\AIVoiceStudio\</code> (<code>tts_envs\&lt;engine&gt;</code> and
+<code>stt_envs\&lt;model&gt;</code>). Two engines that need conflicting
+dependencies can never break each other, and removing an engine removes its
+environment with it.</p>
+<p>Those environments are built on a <strong>per-user copy of the Python the
+application ships</strong>
+(<code>%APPDATA%\AIVoiceStudio\python_runtime</code>), so they keep working when
+the application is reinstalled, upgraded or moved into another folder: a model
+you downloaded once does not have to be downloaded again just because setup ran
+a second time. An environment that still names a Python from an earlier
+installation is <strong>repaired in place</strong> - its packages are kept - the
+next time it is used, instead of failing with &ldquo;did not find executable at
+...&rdquo; and exit code 103.</p>
+
+<!-- ================================================================ -->
+<h2 id="compute">Compute choice and GPU use</h2>
+<p>A Compute choice sits next to the actions that need it, remembered per
+category. On a GPU machine the speech engine now keeps several segments in
+flight instead of one, so the card is no longer idle between sentences.</p>
+
+<!-- ================================================================ -->
+<h2 id="projects">Projects, menus and progress</h2>
+<ul>
+  <li><strong>Speech-to-text projects.</strong> The New Project wizard opens on
+      the <em>Project base</em> choice, so the first decision is which kind of
+      project you are making.</li>
+  <li><strong>Menus that match the project.</strong> The Edit menu's wording
+      follows the selected project: a transcription project has
+      <em>files</em>, a recording project has <em>recordings</em>.</li>
+  <li><strong>A real progress window.</strong> A transcription now shows a
+      modal progress dialog that can be cancelled, and finishing offers
+      <em>Open project folder</em> &mdash; the same courtesy the recording flow
+      has always shown.</li>
+  <li><strong>Start Selected Files.</strong> For a transcription project the
+      Edit menu's picker states the project base and offers
+      <em>Select a transcribe file</em> or <em>Select by file break</em>, then
+      <em>Only transcribe selected file</em> or <em>Transcribe all files from
+      here</em> &mdash; the same out-of-order convenience recording projects
+      have.</li>
+  <li><strong>Clearer confirmations.</strong> <em>Restart Project</em> and
+      <em>Restart All Files</em> now spell out that recordings <em>or</em>
+      transcribe files and the audio creation <em>or</em> transcribe options
+      are reset.</li>
+</ul>
+
+<!-- ================================================================ -->
+<h2 id="gestures">Keyboard gestures and accessibility</h2>
+<p>One shared access-key handler activates the labelled button in every window
+whatever has the focus, and explains a key whose target is disabled instead of
+doing nothing. The frame's shortcuts are checked against the physical keyboard
+so a Shift+letter gesture is never missed. A <em>What's New</em> item joined the
+Help menu, and the accessibility and gesture audits run in the test suite.</p>
+<p>The window title now reaches a screen reader. wxPython names every window
+after its own class, and that leftover name was being announced: NVDA+T on the
+main window said &ldquo;frame&rdquo; instead of the title. A window's accessible
+name is now its title &mdash; read live, so the describe window's
+&ldquo;Audio description &ndash; &lt;film&gt;&rdquo; is what you hear &mdash; and a
+control nobody named is left unnamed rather than announced as
+&ldquo;listBox&rdquo; or &ldquo;panel&rdquo;.</p>
+<p>The executable itself now carries the application's name and version, so the
+screen reader's <em>report the application version</em> command answers
+&ldquo;AI Voice Studio, version 2027.1.0&rdquo; instead of &ldquo;Application
+unknown, version not detected&rdquo;.</p>
+<p>Settings &rarr; General no longer offers two identical <em>Browse...</em>
+buttons. The first folder is named for what it holds &mdash; the <strong>Project
+save location</strong>, where your projects and their recordings live &mdash; and
+each row carries its own button, <strong>Browse project location...</strong> and
+<strong>Browse model location...</strong>, so a screen reader announces which
+folder a button changes.</p>
+
+<!-- ================================================================ -->
+<h2 id="themes">Twenty dark themes and wallpapers</h2>
+<div class="new">
+<strong>2027 gives the interface a wardrobe.</strong>
+The original <em>Light</em> and <em>Dark</em> themes are untouched, and twenty
+predefined dark themes join them. The first ten are the original set &mdash;
+Midnight Graphite, Obsidian Gold, Deep Navy, Forest Pine, Plum Royale, Crimson
+Slate, Ocean Teal, Amber Dusk, Carbon Lime and Blue Steel &mdash; each with a
+distinct palette and a painted style of its own, so no two look alike.
+</div>
+<p><strong>Ten more were added on request, and these ones are vibrant:</strong>
+Neon Magenta, Inferno Red, Solar Flare, Voltage Yellow, Laser Lime, Emerald
+Surge, Cyber Cyan, Azure Rush, Electric Indigo and Ultraviolet. They keep the
+same dark, WCAG&nbsp;AA-legible text as every other theme, but their accents are
+saturated and their backgrounds are tinted with the accent's own hue, so they
+read as colourful rather than neutral. The original ten are exactly as they
+were: same names, same colours, and still the first ten in the Theme list.</p>
+<p>The theme controls now live in their own category. <strong>Settings &rarr;
+Appearance</strong> holds the theme list, the custom theme studio and the
+wallpaper, while <strong>Settings &rarr; General</strong> keeps the developer
+switch, the project and model folders and the update settings. Nothing was
+removed in the move.</p>
+<p>A <strong>custom theme studio</strong> (Settings &rarr; Appearance &rarr;
+<em>Create custom theme&hellip;</em>) lets you choose every colour &mdash;
+background, text, control, control text, accent and heading &mdash; pick a
+painted style and name the theme. There is no limit: create, edit and delete as
+many themes as you like. A live preview shows each change before you save.</p>
+<p>Any theme &mdash; built-in, predefined or custom &mdash; can carry a
+<strong>wallpaper</strong>: choose your own picture, or let the theme draw its
+pattern. The welcome screen is now a full-width <em>action bar</em> of the four
+main buttons &mdash; <strong>Remove selected project</strong> (<code>Alt+J</code>),
+<strong>Create New Project</strong>, <strong>Record (open a project)</strong> and
+<strong>Settings (download voices)</strong> &mdash; above a left <em>projects
+sidebar</em> holding the Recent projects list, and the wallpaper fills only the
+large empty area that remains beside them. It never paints behind a button or
+the project list.</p>
+
+<!-- ================================================================ -->
+<h2 id="updates">Updates and installation</h2>
+<ul>
+  <li><strong>Help &rarr; Check for updates</strong> asks GitHub for the newest
+      release and can download the installer for your Windows version. A quiet
+      check runs once a day; nothing is downloaded or installed unless you ask.</li>
+  <li>The installer still lets you choose <em>install for all users</em> or
+      <em>install for me only</em>.</li>
+  <li>A <code>winget</code> package (<code>AnujSharma.AIVoiceStudio</code>) lets
+      <code>winget install</code> and <code>winget upgrade</code> use exactly
+      this installer.</li>
+</ul>
+
+<!-- ================================================================ -->
+<h2 id="removed">What was removed, and why</h2>
+<ul>
+  <li><strong>Bark (Suno AI)</strong> was removed from the Voice Clone engines:
+      its 130 speaker presets and <code>.npz</code>-only "cloning" were the one
+      engine the rest of the Voice Clone page could not express.</li>
+  <li><strong>NeuTTS</strong> was removed: it needed a gated Hugging Face login
+      the application cannot provide.</li>
+  <li><strong>Cohere Transcribe</strong> was never offered: it only downloads
+      after signing in to Hugging Face and accepting a licence, and this
+      application deliberately works without an account.</li>
+  <li><strong>Voxtral 24B</strong> was removed from the catalog: its ~48&nbsp;GB
+      of bfloat16 weights cannot load on the 12&nbsp;GB cards the catalog
+      targets. The 3B model is the one that fits.</li>
+</ul>
+
+<p class="tip">Thank you for using AI Voice Studio. Everything on this page is
+free and offline; the whole application is built so a screen reader user can do
+all of it from the keyboard.</p>
+
+</body>
+</html>

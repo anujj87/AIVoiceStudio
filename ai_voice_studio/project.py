@@ -13,7 +13,7 @@ import logging
 import os
 import shutil
 import threading
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .constants import PROJECT_FILE_NAME
 
@@ -31,11 +31,13 @@ def create_project(
     name: str,
     source_file: str,
     audio_mode: str,
-    segments: List[Dict[str, Any]],
-    tts_settings: Optional[Dict[str, Any]] = None,
-    project_type: Optional[str] = None,
-    daisy_settings: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    segments: list[dict[str, Any]],
+    tts_settings: dict[str, Any] | None = None,
+    project_type: str | None = None,
+    daisy_settings: dict[str, Any] | None = None,
+    stt_settings: dict[str, Any] | None = None,
+    describe_settings: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     data = {
         "name": name,
         "source_file": source_file,
@@ -47,6 +49,7 @@ def create_project(
                 "index": seg.get("index", i + 1),
                 "title": seg.get("title", f"segment {i + 1}"),
                 "text": seg.get("text", ""),
+                "source": seg.get("source"),
                 "status": "pending",
                 "saved": None,
             }
@@ -54,18 +57,20 @@ def create_project(
         ],
         "tts": tts_settings or {},
         "daisy": daisy_settings or {},
+        "stt": stt_settings or {},
+        "describe": describe_settings or {},
     }
     save_project(project_dir, data)
     return data
 
 
-def load_project(project_dir: str) -> Dict[str, Any]:
+def load_project(project_dir: str) -> dict[str, Any]:
     path = project_file(project_dir)
-    with open(path, "r", encoding="utf-8") as fh:
+    with open(path, encoding="utf-8") as fh:
         return json.load(fh)
 
 
-def save_project(project_dir: str, data: Dict[str, Any]) -> None:
+def save_project(project_dir: str, data: dict[str, Any]) -> None:
     os.makedirs(project_dir, exist_ok=True)
     path = project_file(project_dir)
     with _lock:
@@ -108,7 +113,7 @@ def first_pending_index(project_dir: str) -> int:
 _AUDIO_EXTS = (".wav", ".mp3", ".flac")
 
 
-def recorded_files(project_dir: str) -> List[str]:
+def recorded_files(project_dir: str) -> list[str]:
     """Audio files actually present in the project folder (sorted).
 
     Uses the files on disk rather than the ``saved`` field in project.json so

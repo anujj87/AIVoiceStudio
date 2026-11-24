@@ -39,7 +39,7 @@ import wx
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
-from ai_voice_studio.gui import access_keys  # noqa: E402
+from ai_voice_studio.gui import access_keys
 
 
 def _hint_sink(window: wx.Window) -> wx.Window | None:
@@ -147,7 +147,7 @@ def audit(title: str, window: wx.Window) -> list[str]:
 def main() -> int:
     from a11y_windows import iter_windows
 
-    app = wx.App(False)  # noqa: F841 - must stay referenced
+    app = wx.App(False)
 
     all_problems: list[str] = []
     for title, window in iter_windows():

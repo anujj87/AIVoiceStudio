@@ -483,7 +483,7 @@ Hello, AI Voice Studio!</code></pre>
 │   │   └── daisy_builder.py     <span class="cm"># DAISY 2.02 book builder</span>
 │   ├── jobs/                    <span class="cm"># Background processing</span>
 │   │   └── synthesizer.py       <span class="cm"># Background TTS worker</span>
-│   ├── voicelab/                <span class="cm"># Voice cloning (Pocket TTS, Bark, F5-TTS)</span>
+│   ├── voicelab/                <span class="cm"># Voice cloning (Pocket TTS, F5-TTS, ...)</span>
 │   │   ├── engines.py           <span class="cm"># Engine registry &amp; built-in voices</span>
 │   │   └── worker.py            <span class="cm"># Cloning subprocess (own env per engine)</span>
 │   ├── omnivoice/               <span class="cm"># OmniVoice TTS engine</span>
@@ -677,7 +677,7 @@ Hello, AI Voice Studio!</code></pre>
         <br><span class="desc"><code>│   │   └── synthesizer.py       # Background TTS worker</code></span>
       </li>
       <li>
-        <strong>Line 41:</strong> <code>│   ├── voicelab/                # Voice cloning (Pocket TTS, Bark, F5-TTS)</code>
+        <strong>Line 41:</strong> <code>│   ├── voicelab/                # Voice cloning (Pocket TTS, F5-TTS, ...)</code>
         <br><span class="desc">The Voice Lab package: the engines that clone a voice from a short sample. Each one is installed into its own Python environment (see Chapter 77).</span>
       </li>
       <li>

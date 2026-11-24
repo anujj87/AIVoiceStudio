@@ -24,8 +24,8 @@ import unittest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from ai_voice_studio import __version__  # noqa: E402
-from ai_voice_studio.constants import APP_VERSION, TERMS_VERSION  # noqa: E402
+from ai_voice_studio import __version__
+from ai_voice_studio.constants import APP_VERSION, TERMS_VERSION
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 DOCS = os.path.join(ROOT, "docs")
@@ -40,12 +40,18 @@ HELP_DOCS = (
     "AddonDevelopmentGuide.html",
     "AccessibilityGuide.html",
     "THIRD-PARTY-LICENSES.html",
+    "WHATS-NEW.html",
 )
 
 # Documents a user reads as the current truth.  The book is excluded on
 # purpose: it is a textbook and may describe a subsystem historically, with a
 # "Current implementation" callout, which ``tests/test_book.py`` guards.
-SHIPPED_DOCS = HELP_DOCS + ("../README.md", "../PROJECT_SPEC.md")
+SHIPPED_DOCS = (*HELP_DOCS, "../README.md", "../PROJECT_SPEC.md")
+
+# What's New is a changelog: naming a component that was *removed* is its whole
+# job, so the "retired" checks below do not apply to it (its removals are
+# checked to say they were removed instead).
+CHANGELOG_DOCS = ("WHATS-NEW.html",)
 
 # Phrases that only ever described a component or menu item that no longer
 # exists.  A document may not carry one because the shipped documentation is
@@ -131,6 +137,8 @@ class DocsCurrencyTest(unittest.TestCase):
 
     def test_no_retired_component_is_still_described_as_current(self):
         for name in SHIPPED_DOCS:
+            if name in CHANGELOG_DOCS:
+                continue
             text = _read(DOCS, name)
             for phrase in RETIRED:
                 with self.subTest(document=name, phrase=phrase):
@@ -143,7 +151,8 @@ class DocsCurrencyTest(unittest.TestCase):
     def test_retired_names_appear_only_beside_a_retirement(self):
         for name in SHIPPED_DOCS:
             text = _read(DOCS, name)
-            for phrase in RETIRED_IF_ASSERTED:
+            for phrase in (*RETIRED_IF_ASSERTED,
+                           *(RETIRED if name in CHANGELOG_DOCS else ())):
                 for line in text.splitlines():
                     if phrase not in line:
                         continue
@@ -177,6 +186,14 @@ class DocsCurrencyTest(unittest.TestCase):
             "Compute",
             "Terms of Use",
             "Third-Party Licences",
+            "Keyboard gestures",
+            "What's New",
+            # The Appearance category and its second set of themes: a document
+            # that still sends the reader to General for the theme list is out
+            # of date, so the doc test names both.
+            "Appearance",
+            "Neon Magenta",
+            "Ultraviolet",
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, guide)

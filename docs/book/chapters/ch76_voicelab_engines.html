@@ -9,7 +9,7 @@
 <body>
 <div class="book-container">
 <nav class="sidebar"><h2>📖 Contents</h2>
-<div class="part-header">Part X — Voice Lab &amp; the Current System</div><ul class="chapters"><li><a href="ch76_voicelab_engines.html" class="active">Ch 76: Voice Lab Engines</a></li><li><a href="ch77_engine_environments.html">Ch 77: One Environment per Engine</a></li><li><a href="ch78_compute_choice.html">Ch 78: Compute Choice</a></li><li><a href="ch79_audio_io_shim.html">Ch 79: Audio I/O Without FFmpeg</a></li><li><a href="ch80_start_selected_recording.html">Ch 80: Start Selected Recording</a></li><li><a href="ch81_terms_dialog.html">Ch 81: First-Launch Terms</a></li><li><a href="ch82_licensing.html">Ch 82: Licensing &amp; Compliance</a></li></ul>
+<div class="part-header">Part X — Speech to Text, Voice Lab &amp; the Current System</div><ul class="chapters"><li><a href="ch76_voicelab_engines.html" class="active">Ch 76: Voice Lab Engines</a></li><li><a href="ch77_engine_environments.html">Ch 77: One Environment per Engine</a></li><li><a href="ch78_compute_choice.html">Ch 78: Compute Choice</a></li><li><a href="ch79_audio_io_shim.html">Ch 79: Audio I/O Without FFmpeg</a></li><li><a href="ch80_start_selected_recording.html">Ch 80: Start Selected Recording</a></li><li><a href="ch81_terms_dialog.html">Ch 81: First-Launch Terms</a></li><li><a href="ch82_licensing.html">Ch 82: Licensing &amp; Compliance</a></li><li><a href="ch83_input_gestures.html">Ch 83: Input Gestures</a></li><li><a href="ch84_stt_catalog.html">Ch 84: A Second Catalog</a></li><li><a href="ch85_stt_environments.html">Ch 85: One Environment per Model</a></li><li><a href="ch86_stt_dialog.html">Ch 86: The Transcribe Dialog</a></li><li><a href="ch87_theme_studio.html">Ch 87: The Theme Studio</a></li><li><a href="ch88_update_checker.html">Ch 88: Checking for Updates</a></li></ul>
 </nav>
 <div class="main-content">
 
@@ -52,12 +52,68 @@ differences into <strong>data</strong>:</p>
 </table>
 
 <div class="info">
-  The three engines in the current build are <strong>Pocket TTS</strong> (Kyutai,
-  <code>pocket-tts</code>), <strong>Bark</strong> (Suno, via <code>transformers</code>)
-  and <strong>F5-TTS</strong> (<code>f5-tts</code>). All three run on the CPU and can
-  additionally run on an NVIDIA GPU — see <a href="ch78_compute_choice.html">Chapter 78</a>.
-  An earlier fourth engine (NeuTTS) was removed from the project: it required a
-  Hugging&nbsp;Face login, which no part of this application should depend on.
+  The engines in the current build are <strong>Pocket TTS</strong> (Kyutai,
+  <code>pocket-tts</code>), <strong>F5-TTS</strong> (<code>f5-tts</code>),
+  <strong>KokoClone</strong> (<code>kokoclone</code>, Kokoro-ONNX speech plus
+  Kanade zero-shot voice conversion), <strong>Chatterbox</strong>
+  (<code>chatterbox-tts</code>), <strong>Qwen3-TTS</strong> (<code>qwen-tts</code>),
+  <strong>VibeVoice</strong> (the community fork, a pinned source archive),
+  <strong>MOSS-TTS</strong> (<code>moss-tts</code>, built from a pinned source
+  archive), <strong>GPT-SoVITS</strong> (RVC-Boss, fetched as a source tree
+  and run from it), <strong>Indic Parler-TTS</strong> (AI4Bharat, for the Indian
+  languages).
+  Pocket TTS, F5-TTS and KokoClone
+  run on the CPU and can additionally run on an
+  NVIDIA GPU; Chatterbox, Qwen3-TTS, VibeVoice, MOSS-TTS, GPT-SoVITS and
+  Indic Parler-TTS are GPU-only because their CPU run is many times slower
+  than real time (Indic Parler-TTS is also the one engine that is not a
+  cloning engine: it speaks with one of its named speakers, chosen by a
+  description you can rewrite). Every
+  variant offered fits inside 12&nbsp;GB of video memory, and GPT-SoVITS
+  ships no voices of its own: it always clones one.
+  Indic Parler-TTS takes its text directly, so it needs no
+  <code>pynini</code> text front-end — the reason two other Indian engines that
+  were surveyed at the same time are deliberately <em>not</em> here:
+  <strong>Svara-TTS</strong> (vLLM and FlashInfer are Linux-only, and it has no
+  CPython 3.13 Windows wheel) and AI4Bharat's <strong>Indic-TTS</strong> (its
+  front-end needs <code>pynini</code>, which has no Windows wheel, and its
+  pinned <code>numba</code> has no build for the Python this application runs
+  on). Both decisions are recorded in <code>PROJECT_SPEC.md</code> §2.2.3.
+  Both MOSS-TTS checkpoints synthesise from the text alone. GPT-SoVITS speaks English, Chinese, Korean and
+  Cantonese; Japanese is deliberately not offered, because its Japanese
+  front-end needs <code>pyopenjtalk</code>, which has no installable build for
+  the Python this application runs on. See
+  <a href="ch78_compute_choice.html">Chapter 78</a>.
+  Two earlier engines were removed from the project: <strong>NeuTTS</strong>,
+  because it required a Hugging&nbsp;Face login (no part of this application
+  should depend on an account), and <strong>Suno Bark</strong>, whose 130 preset
+  speakers and <code>.npz</code>-only “cloning” made it the one engine the rest
+  of the Voice Clone page could not express. Two engines added in the 2027.1.0
+  survey were removed again for one reason: neither spoke the text it was
+  handed. <strong>IndicF5</strong> was an F5-TTS fine-tune whose checkpoint only
+  half loaded under the <code>transformers</code> it pinned (a word error rate
+  of 0.52&ndash;0.89 against the text it was given), and <strong>OmniVoice
+  ONNX</strong>'s published export barely conditioned on its input at all (the
+  same Hindi sentence came back as unrelated Hindi at 0.95&ndash;1.00). The
+  application's own <strong>OmniVoice</strong> engines, which run the PyTorch
+  checkpoint, are the ones to use for speech.
+</div>
+
+<div class="note">
+  <strong>KokoClone is the one engine that is not on PyPI.</strong> Its own
+  package and the Kanade voice-conversion model it clones with are published as
+  source trees on GitHub, so <code>engines.py</code> declares them as pinned
+  source archives and <code>install_plan</code> gives them their own
+  <code>pip</code> steps: the archives with <code>--no-deps</code> (their
+  dependency lists would otherwise replace the CUDA build of PyTorch with
+  PyPI's CPU wheel) and <code>misaki</code> — the phonemiser every KokoClone
+  call routes text through — with <code>--ignore-requires-python</code>, because
+  it declares <code>Requires-Python: &lt;3.13</code> while the application runs
+  on 3.13. KokoClone is also the one engine marked
+  <code>own_environment</code>: it runs in <code>tts_envs\kokoclone</code> and
+  nowhere else, never in the shared <code>addon_env</code> where OmniVoice
+  lives, and <em>Remove engine</em> deletes that environment instead of
+  uninstalling its packages from the shared one.
 </div>
 
 <h2>76.2 Engines as Data: the Registry</h2>
@@ -110,9 +166,10 @@ because each one has exactly one consumer:</p>
 <p>Sherpa-onnx engines download <em>model artifacts</em> and then expose voices
 from the downloaded files. Voice Lab engines are different: their voices are
 supplied by the installed Python package, so they cannot live in the JSON
-catalog. Bark alone would need 130 rows (twelve languages × ten speakers plus
-the lightweight English checkpoint), and F5-TTS points at reference files
-<em>inside</em> its own wheel.</p>
+catalog. Pocket TTS ships 26 pre-made voices, KokoClone one Kokoro voice per
+language it speaks, and F5-TTS points at reference files <em>inside</em> its own
+wheel — none of which can be downloaded, and none of which the Download page
+should offer as an artifact.</p>
 
 <p>The solution is a factory that produces entries in exactly the shape
 <code>ModelStore.installed_voices</code> returns:</p>
@@ -138,13 +195,13 @@ the lightweight English checkpoint), and F5-TTS points at reference files
   <h4>Explain Line by Line Code Description (Block 2)</h4>
   <ol>
     <li><strong>Line 1:</strong> the signature<br>
-    <span class="desc">Positional arguments describe the voice; <code>**extra</code> carries engine-specific additions (Bark’s <code>repo</code>, F5-TTS’s <code>ref_resource</code>). A variadic tail keeps the factory generic while still allowing one engine to add fields.</span></li>
+    <span class="desc">Positional arguments describe the voice; <code>**extra</code> carries engine-specific additions (F5-TTS’s <code>ref_resource</code> and <code>ref_text</code>, VibeVoice’s preset path). A variadic tail keeps the factory generic while still allowing one engine to add fields.</span></li>
     <li><strong>Lines 2–4:</strong> <code>tts</code>, <code>tts_name</code>, <code>engine</code><br>
     <span class="desc">Three keys that mean almost the same thing, each consumed by a different layer: <code>tts</code> is what the Download panel groups by, <code>tts_name</code> is the label, <code>engine</code> is what <code>get_engine</code> switches on. Reconciliation happens once, here, instead of in five panels.</span></li>
     <li><strong>Lines 5–8:</strong> <code>language</code>, <code>variant</code>, <code>voice</code>, <code>voice_name</code><br>
     <span class="desc">The same four-part voice identity used by the JSON catalog, so a voice entry is interchangeable no matter where it came from.</span></li>
     <li><strong>Line 9:</strong> <code>"sid": 0</code><br>
-    <span class="desc">Speaker id for engines that address voices numerically. PyTorch engines address voices by <em>name</em> (Bark’s <code>v2/en_speaker_3</code>), so the numeric id stays a harmless default rather than a special case in the renderer.</span></li>
+    <span class="desc">Speaker id for engines that address voices numerically. PyTorch engines address voices by <em>name</em> (KokoClone’s <code>af_bella</code>, Pocket TTS’s <code>alba</code>), so the numeric id stays a harmless default rather than a special case in the renderer.</span></li>
     <li><strong>Line 10:</strong> <code>"dir": ""</code><br>
     <span class="desc">Empty on purpose: these voices have no model directory on disk. Panels that display <code>dir</code> get an empty string instead of a path that does not exist — the absence is <em>stated</em>, not implied.</span></li>
     <li><strong>Line 11:</strong> <code>"builtin_voice": True</code><br>
@@ -156,43 +213,36 @@ the lightweight English checkpoint), and F5-TTS points at reference files
   </ol>
 </div>
 
-<p>The Bark generator is worth reading because it shows how much UI code a data
-factory removes:</p>
+<p>The Pocket TTS generator is worth reading because it shows how much UI code a
+data factory removes:</p>
 
-<pre><code>if engine_id == "bark":
-    voices = []
-    for code, label in _BARK_LANGUAGES:
-        for speaker in range(10):
-            voices.append(_entry(
-                "bark", code, "bark_v2", f"v2/{code}_speaker_{speaker}",
-                f"{label} speaker {speaker + 1} (of 10)",
-            ))
-    for speaker in range(10):
-        voices.append(_entry(
-            "bark", "en", "bark_small", f"v2/en_speaker_{speaker}",
-            f"Bark small - English speaker {speaker + 1} (of 10)",
-            repo="suno/bark-small",
-        ))
-    return voices</code></pre>
+<pre><code>if engine_id == "pocket_tts":
+    return [
+        _entry(
+            "pocket_tts", language, "pocket_v1", voice,
+            f"{voice.replace('_', ' ').title()} "
+            f"({_LANGUAGE_NAMES.get(language, language)})",
+        )
+        for voice, language in _POCKET_VOICES
+    ]</code></pre>
 
 <div class="line-explanation">
   <h4>Explain Line by Line Code Description (Block 3)</h4>
   <ol>
-    <li><strong>Lines 2–3:</strong> the nested loops<br>
-    <span class="desc">Twelve languages × ten speakers = 120 preset voices, generated instead of typed. When Bark adds a language, one tuple entry adds ten voices.</span></li>
-    <li><strong>Line 5:</strong> <code>f"v2/{code}_speaker_{speaker}"</code><br>
-    <span class="desc">Bark’s speaker id format. The <code>v2/</code> prefix is part of the identifier Bark itself expects, so it is built here rather than patched in later.</span></li>
-    <li><strong>Line 6:</strong> the human label<br>
-    <span class="desc">“English speaker 3 (of 10)” tells the user how many options exist, which changes how they listen. Generating labels from data keeps them consistent for all 120 voices.</span></li>
-    <li><strong>Lines 8–13:</strong> the small-checkpoint voices<br>
-    <span class="desc"><code>suno/bark-small</code> is English-only but much lighter on a CPU, so it is offered as a separate <em>variant</em> of English with <code>repo</code> set on the entry. The worker later prioritises <code>repo</code> over the default checkpoint, which is how the variant choice reaches the model loader.</span></li>
+    <li><strong>Line 1:</strong> the per-engine branch<br>
+    <span class="desc">Voices are generated per engine, because only the engine knows where its voices come from: Pocket TTS names them and states each one’s language in one tuple, F5-TTS points at files inside its wheel, VibeVoice at preset recordings it downloads. One function, one branch per source — instead of five hand-maintained JSON blocks.</span></li>
+    <li><strong>Line 4:</strong> the voice id and language<br>
+    <span class="desc"><code>_POCKET_VOICES</code> is a single tuple of <code>(voice id, language code)</code> pairs, so the voice list <em>and</em> the language list come from one place. Adding a voice is one tuple entry, not a code change.</span></li>
+    <li><strong>Lines 5–6:</strong> the human label<br>
+    <span class="desc">“Peter Yearsley (English)” is derived from the id rather than typed twice. Generating labels from data keeps them consistent for all 26 voices and keeps the registry free of display strings.</span></li>
   </ol>
 </div>
 
 <div class="tip">
   Voice lists like this are the reason <code>count_builtin_voices()</code> exists as a
   public helper: the GUI shows “26 voices”, and a test can assert that number without
-  re-implementing the loop.
+  re-implementing the loop. It is also what keeps the promise that a pre-made voice
+  needs no download.
 </div>
 
 <h2>76.4 Driving an Engine in a Subprocess</h2>
@@ -203,9 +253,11 @@ recordings. The application therefore runs <code>voicelab/worker.py</code> as a
 separate interpreter process and talks to it over pipes:</p>
 
 <pre><code>{"cmd": "ping"}
-{"cmd": "synthesize", "engine": "bark", "device": "cuda", "text": "...",
- "threads": 15, "voice": "v2/en_speaker_3", "repo": "suno/bark",
- "options": {"temperature": 0.7}}
+{"cmd": "synthesize", "engine": "f5tts", "device": "cuda", "text": "...",
+ "threads": 15, "voice": "basic_ref_en",
+ "ref_resource": "f5_tts:infer/examples/basic/basic_ref_en.wav",
+ "ref_text": "Some call me nature, others call me mother nature.",
+ "options": {"nfe_step": 16}}
 </code></pre>
 
 <p>One line of request in, one line of JSON out. The worker keeps the model
@@ -235,7 +287,7 @@ error <em>before</em> the first paragraph of a book is involved.</p>
     <li><strong>Line 5:</strong> <code>self._lock = threading.RLock()</code><br>
     <span class="desc">A re-entrant lock, because the recording thread writes a request and then reads a response; <code>RLock</code> means a helper called from inside the locked section cannot deadlock itself. It is the only synchronisation the class needs, since a process pipe is otherwise usable from several threads.</span></li>
     <li><strong>Line 6:</strong> <code>self._timeout = 1800.0</code><br>
-    <span class="desc">Thirty minutes. A CPU Bark run on a long paragraph is slow but healthy; a shorter timeout would kill work that is still progressing. A timeout exists at all so a wedged process cannot freeze the recording forever.</span></li>
+    <span class="desc">Thirty minutes. A CPU run of a diffusion model on a long paragraph is slow but healthy; a shorter timeout would kill work that is still progressing. A timeout exists at all so a wedged process cannot freeze the recording forever.</span></li>
     <li><strong>Line 7:</strong> <code>self._next_id = 0</code><br>
     <span class="desc">Request counter reserved for pairing requests with responses. JSON-lines is strictly sequential today; the id makes a future interleaved protocol possible without re-designing the class.</span></li>
   </ol>
@@ -264,9 +316,10 @@ exact JSON the worker would receive with no process and no wx involved.</p>
         value = entry.get(key)
         if value:
             request[key] = value
-    if engine_id == "bark" and not request.get("repo"):
-        request["repo"] = ("suno/bark-small"
-                           if entry.get("variant") == "bark_small" else "suno/bark")
+    if engine_id == "kokoclone":
+        request["workspace"] = kokoclone_workspace()
+    if engine_id == "vibevoice":
+        request["workspace"] = vibevoice_workspace()
     overrides = _options.clean(engine_id, tuning)
     if not overrides:
         overrides = _options.clean(engine_id, entry.get("options"))
@@ -287,8 +340,8 @@ exact JSON the worker would receive with no process and no wx involved.</p>
     <span class="desc">Six keys every request carries. <code>threads</code> comes from <code>cpu_thread_count()</code>, which delegates to <code>compute.cpu_threads()</code> — the 80–95&nbsp;% band of Chapter 78. The worker does not decide how much CPU to use; the application does, and the worker applies it.</span></li>
     <li><strong>Lines 13–16:</strong> copying the voice keys<br>
     <span class="desc">Only non-empty values are copied, from an explicit allow-list (<code>_VOICE_KEYS</code>). An allow-list beats “send the whole entry” for two reasons: the request cannot leak UI-only fields into the engine, and the set of fields the worker must understand stays small enough to document.</span></li>
-    <li><strong>Lines 17–20:</strong> the Bark checkpoint rule<br>
-    <span class="desc">Bark downloads one of two repositories. The <em>variant</em> (“Bark small”) is a voice-list concept the engine does not know, so it is translated here into the repository the worker passes to <code>transformers</code>. Note the <code>not request.get("repo")</code> guard: an entry that already set <code>repo</code> (as <code>_entry</code> does for bark-small voices) wins, so both paths agree.</span></li>
+    <li><strong>Lines 17–20:</strong> the engine-specific additions<br>
+    <span class="desc">Two engines need one more field than the voice keys provide: KokoClone and VibeVoice load their weights from the <em>current directory</em>, so the request carries the workspace those downloads live in. The rule is stated per engine and in exactly one place — adding a third such engine means adding three lines here, not touching every caller.</span></li>
     <li><strong>Lines 21–24:</strong> tuning overrides<br>
     <span class="desc">Two carriers are supported and cleaned by the same validator: the function argument (Settings defaults applied by the panel) and the voice entry (per-project overrides stored in the project). Empty results are omitted entirely, so an untouched project sends no <code>options</code> key at all and the engine uses its own defaults.</span></li>
   </ol>
@@ -381,18 +434,40 @@ for engine_id in engines.engine_ids():
     installs : pocket-tts, soundfile, scipy
     license  : Apache-2.0 (code); per-voice licenses
     gpu      : True
-Bark (Suno AI, transformer)         130 voices
-    installs : transformers, torch, soundfile, scipy
-    license  : MIT
-    gpu      : True
 F5-TTS (transformer)                  2 voices
     installs : f5-tts, torch, torchaudio, soundfile
     license  : MIT (code); CC-BY-NC-4.0 (weights)
+    gpu      : True
+KokoClone (Kokoro + Kanade)           7 voices
+    installs : kokoclone, kanade-tokenizer, torch, torchaudio, ...
+    license  : Apache-2.0
+    gpu      : True
+Chatterbox (Resemble AI)             25 voices
+    installs : chatterbox-tts, torch, torchaudio, soundfile
+    license  : MIT
+    gpu      : True
+Qwen3-TTS (Alibaba Qwen)             18 voices
+    installs : qwen-tts, torch, torchaudio, soundfile
+    license  : Apache-2.0
+    gpu      : True
+VibeVoice (Microsoft, community fork) 14 voices
+    installs : vibevoice, torch, soundfile
+    license  : MIT
     gpu      : True</code></pre>
+
+<p>Three of those are <strong>GPU-only</strong>: Chatterbox (350-500M),
+Qwen3-TTS (0.6-1.7B) and VibeVoice (1.5-7B) are large transformers whose CPU run
+is many times slower than real time, so <code>devices</code> is
+<code>"gpu"</code> rather than <code>"cpu+gpu"</code>, and
+<code>gpu_only()</code> is what makes the device selectors offer the GPU alone.
+<code>cuda_packages()</code> points Chatterbox at the CUDA 12.6 index — it pins
+<code>torch==2.6.0</code>, and the CUDA build of that release is published there
+and nowhere newer — while <code>resolve_device()</code> ignores a stored CPU
+choice for such an engine instead of starting a run that could not finish.</p>
 
 <div class="exercise">
   <ol>
-    <li>Add a fourth engine entry to <code>ENGINES</code> — a fake one is fine
+    <li>Add another engine entry to <code>ENGINES</code> — a fake one is fine
     (<code>id="demo"</code>, <code>packages=("demo-tts",)</code>). Which other
     dictionaries in <code>engines.py</code> must gain an entry before the worker
     could load it, and why do the two lists exist separately?</li>

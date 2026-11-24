@@ -6,11 +6,11 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import wx  # noqa: E402
+import wx
 
-from ai_voice_studio.settings import Settings  # noqa: E402
-from ai_voice_studio.tts.models import ModelStore  # noqa: E402
-from ai_voice_studio.gui.new_project_wizard import NewProjectWizard  # noqa: E402
+from ai_voice_studio.gui.new_project_wizard import NewProjectWizard
+from ai_voice_studio.settings import Settings
+from ai_voice_studio.tts.models import ModelStore
 
 OBJID_CLIENT = 0xFFFFFFFC
 CHILDID_SELF = 0

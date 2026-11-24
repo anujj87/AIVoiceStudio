@@ -35,7 +35,8 @@ whole-output ratio cannot express that.
 from __future__ import annotations
 
 import random
-from typing import Any, Callable, NamedTuple
+from collections.abc import Callable
+from typing import Any, NamedTuple
 
 import numpy as np
 
@@ -412,7 +413,9 @@ def attempt_seed(seed: int | None, attempt: int) -> int | None:
     if attempt == 0:
         return int(seed) if seed is not None else None
     if seed is None:
-        return random.randint(0, 2 ** 31 - 1)
+        # Deliberate per-attempt jitter so a re-draw is not the same draw;
+        # nothing here is a security decision.
+        return random.randint(0, 2 ** 31 - 1)  # noqa: S311 - seed jitter, not crypto
     return int(seed) + attempt * _SEED_STRIDE
 
 
@@ -628,7 +631,7 @@ def recover(
     chunk that stays a drone keeps its best-looking take and is reported
     instead of failing the whole recording.
     """
-    import logging  # noqa: PLC0415
+    import logging
 
     log = logging.getLogger(__name__)
 

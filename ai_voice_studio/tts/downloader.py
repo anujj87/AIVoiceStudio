@@ -10,18 +10,18 @@ Downloads official model artifacts (tar.bz2) with:
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import shutil
 import tarfile
 import tempfile
 import threading
-from typing import Callable, Dict, List, Optional
+from collections.abc import Callable
+from typing import Any
 
 import requests
 
-from .. import paths, constants
+from .. import paths
 from ..constants import DOWNLOAD_CHUNK, DOWNLOAD_TIMEOUT
 from ..tts import catalog
 from ..tts.models import ModelStore
@@ -42,14 +42,14 @@ class DownloadError(Exception):
 def download_file(
     url: str,
     dest_dir: str,
-    filename: Optional[str] = None,
-    progress: Optional[ProgressCallback] = None,
-    cancel_event: Optional[threading.Event] = None,
+    filename: str | None = None,
+    progress: ProgressCallback | None = None,
+    cancel_event: threading.Event | None = None,
 ) -> str:
     """Download ``url`` to ``dest_dir`` (resumable). Returns final file path."""
     os.makedirs(dest_dir, exist_ok=True)
     if filename is None:
-        filename = url.split("/")[-1].split("?")[0]
+        filename = url.rsplit("/", maxsplit=1)[-1].split("?", maxsplit=1)[0]
     dest = os.path.join(dest_dir, filename)
     part = dest + ".part"
 
@@ -94,9 +94,9 @@ def download_file(
 
 def hf_file_list(
     repo: str,
-    prefixes: Optional[List[str]] = None,
-    exact: Optional[List[str]] = None,
-) -> List[str]:
+    prefixes: list[str] | None = None,
+    exact: list[str] | None = None,
+) -> list[str]:
     """List files of a HuggingFace model repo matching ``prefixes``/``exact``.
 
     Used for raw-file model variants that are served
@@ -116,7 +116,7 @@ def hf_file_list(
         raise DownloadError(f"Could not list files of {repo}: {exc}") from exc
 
     siblings = data.get("siblings", [])
-    result: List[str] = []
+    result: list[str] = []
     for s in siblings:
         name = s.get("rfilename", "")
         if not name:
@@ -152,7 +152,7 @@ def safe_extract_tarball(
                 name = member.name.replace("\\", "/")
                 parts = name.split("/")
                 rel = "/".join(parts[1:]) if len(parts) > 1 else name
-                if rel.startswith("..") or rel.startswith("/"):
+                if rel.startswith(("..", "/")):
                     raise DownloadError(f"Unsafe path in archive: {name}")
                 if not rel or rel.endswith("/"):
                     continue
@@ -166,12 +166,171 @@ def safe_extract_tarball(
         for entry in os.listdir(src):
             s = os.path.join(src, entry)
             d = os.path.join(dest_dir, entry)
-            if os.path.isdir(s):
-                shutil.move(s, d)
-            elif os.path.isfile(s):
-                shutil.move(s, d)
+            # shutil.move() moves a directory *into* an existing directory of
+            # the same name, so extracting a second archive over the first
+            # buried espeak-ng-data/espeak-ng-data one level deeper every time.
+            # The older copy is replaced instead.
+            _replace(d)
+            shutil.move(s, d)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _replace(path: str) -> None:
+    """Clear ``path`` so the next ``shutil.move`` does not land inside it."""
+    try:
+        if os.path.isdir(path) and not os.path.islink(path):
+            shutil.rmtree(path, ignore_errors=True)
+        elif os.path.exists(path) or os.path.islink(path):
+            os.remove(path)
+    except OSError as exc:  # a locked file must not abort an install
+        log.warning("Could not replace %s: %s", path, exc)
+
+
+#: Prefix of the folder an extraction is staged in, inside the variant folder.
+#: Each call makes its own (a download and a repair can run at the same time)
+#: and removes it as soon as the files are in place.
+_STAGING_PREFIX = ".staging-"
+
+#: The espeak-ng-data folder every voice of a variant shares.
+_ESPEAK_DIR = "espeak-ng-data"
+
+
+def voice_for_artifact(variant: dict, artifact: str) -> dict[str, Any] | None:
+    """The catalog voice an artifact belongs to.
+
+    ``None`` means the artifact belongs to the variant itself (kokoro and
+    kitten ship one model for all of their speakers), in which case its files
+    belong at the variant root.
+    """
+    if variant.get("artifact") == artifact:
+        return None
+    for voice in variant.get("voices", []):
+        if voice.get("artifact") == artifact:
+            return voice
+    return None
+
+
+def install_archive(archive: str, dest: str, voice: dict | None = None) -> str:
+    """Move one archive's files into the folder the engine reads.
+
+    ``dest`` is the variant folder.  An artifact that belongs to a catalog
+    voice lands in ``dest/<voice_id>/``, which is where the engine looks for a
+    per-voice model (piper: one folder per voice; matcha and vits-zh: a single
+    ``default`` folder); an artifact that belongs to the variant itself stays
+    in ``dest`` (kokoro, kitten).
+
+    The ``espeak-ng-data`` a piper archive carries is the same for every voice
+    of a variant, so one copy is kept in the variant folder rather than one per
+    voice (~13 MB each).  Returns the folder the files were moved into.
+    """
+    target = dest if not voice else os.path.join(dest, voice["id"])
+    os.makedirs(target, exist_ok=True)
+    staging = tempfile.mkdtemp(dir=dest, prefix=_STAGING_PREFIX)
+    try:
+        safe_extract_tarball(archive, staging)
+        for entry in sorted(os.listdir(staging)):
+            src = os.path.join(staging, entry)
+            if entry == _ESPEAK_DIR:
+                shared = os.path.join(dest, _ESPEAK_DIR)
+                if os.path.isdir(shared) and os.listdir(shared):
+                    continue
+                _replace(shared)
+                shutil.move(src, shared)
+                continue
+            dst = os.path.join(target, entry)
+            _replace(dst)
+            shutil.move(src, dst)
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
+    return target
+
+
+def drop_staging_folders(dest: str) -> None:
+    """Remove the staging folders an interrupted extraction left behind."""
+    try:
+        names = os.listdir(dest)
+    except OSError:
+        return
+    for name in names:
+        if name.startswith(_STAGING_PREFIX):
+            shutil.rmtree(os.path.join(dest, name), ignore_errors=True)
+
+
+def _has_onnx(directory: str) -> bool:
+    try:
+        return any(name.lower().endswith(".onnx") for name in os.listdir(directory))
+    except OSError:
+        return False
+
+
+def repair_voice_layout(voice_entry: dict[str, Any]) -> bool:
+    """Give a voice its own folder when an older build left its files loose.
+
+    Every build up to 2027.1.0 extracted each archive of a variant into the
+    variant folder itself, where the last voice's ``model.onnx``/``tokens.txt``
+    overwrote the ones before it: the per-voice folders the engine reads
+    (``<variant>/<voice>``) stayed empty, so every voice of a multi-voice
+    variant - piper medium/high, matcha, the Chinese VITS voice - failed with
+    "Model files are incomplete (missing model, tokens)" while the files it
+    wanted were sitting one folder above it.
+
+    The archives of that download are still on disk, so the voice is put back
+    together from its own archive here - no download, no re-install.  Only a
+    voice that the catalog knows, whose folder is the one its variant owns,
+    that still has its archive beside it and that holds no model is touched.
+    Returns ``True`` once the voice folder holds a model.
+    """
+    voice_dir = str(voice_entry.get("dir") or "")
+    if not voice_dir:
+        return False
+    # A voice installed by the old build has no folder of its own at all; one
+    # that has been repaired already holds a model and is left alone.
+    if os.path.isdir(voice_dir) and _has_onnx(voice_dir):
+        return True
+    variant_dir = os.path.dirname(os.path.normpath(voice_dir))
+    if not os.path.isdir(variant_dir):
+        return False
+
+    language = str(voice_entry.get("language") or "")
+    variant_id = str(voice_entry.get("variant") or "")
+    # The folder has to be the one this voice's variant owns, so an archive
+    # that happens to sit in an unrelated folder is never unpacked into it.
+    if os.path.basename(variant_dir) != variant_id:
+        return False
+    if os.path.basename(os.path.dirname(variant_dir)) != language:
+        return False
+
+    tts = catalog.find_tts(str(voice_entry.get("tts") or ""))
+    if not tts:
+        return False
+    variant = catalog.find_variant(tts, language, variant_id)
+    if not variant:
+        return False
+    voice = next(
+        (v for v in variant.get("voices", []) if v.get("id") == voice_entry.get("voice")),
+        None,
+    )
+    if not voice:
+        return False
+
+    artifact = os.path.basename(str(voice.get("artifact") or ""))
+    archive = os.path.join(variant_dir, artifact) if artifact else ""
+    if not archive or not os.path.isfile(archive):
+        return False
+    try:
+        install_archive(archive, variant_dir, voice)
+    except (tarfile.TarError, OSError) as exc:
+        log.warning("Could not repair %s from %s: %s", voice_dir, archive, exc)
+        return False
+    if not _has_onnx(voice_dir):
+        return False
+    try:
+        os.remove(archive)
+    except OSError:
+        log.debug("Ignoring a failure in repair_voice_layout", exc_info=True)
+    log.info("Repaired %s from %s", voice_dir, os.path.basename(archive))
+    return True
 
 
 class ModelDownloader:
@@ -180,7 +339,7 @@ class ModelDownloader:
     def __init__(self, store: ModelStore):
         self.store = store
 
-    def _artifact_url(self, tts: Dict, artifact: str) -> str:
+    def _artifact_url(self, tts: dict, artifact: str) -> str:
         base = tts.get("artifact_base", "")
         return base.rstrip("/") + "/" + artifact
 
@@ -189,8 +348,8 @@ class ModelDownloader:
         tts_id: str,
         lang_code: str,
         variant_id: str,
-        progress: Optional[ProgressCallback] = None,
-        cancel_event: Optional[threading.Event] = None,
+        progress: ProgressCallback | None = None,
+        cancel_event: threading.Event | None = None,
     ) -> None:
         tts = catalog.find_tts(tts_id)
         if not tts:
@@ -203,32 +362,60 @@ class ModelDownloader:
         os.makedirs(dest, exist_ok=True)
 
         artifacts = self._variant_artifacts(variant)
+        # Archives are kept until the whole variant is in place: a download
+        # that fails on the fourth voice then re-uses the first three instead
+        # of fetching them again.  They are deleted once it has succeeded.
+        archives: list[str] = []
         for artifact in artifacts:
             if cancel_event and cancel_event.is_set():
                 raise DownloadCancelled()
-            url = self._artifact_url(tts, artifact)
-            tarball = download_file(
-                url,
-                dest,
-                filename=os.path.basename(artifact),
-                progress=progress,
-                cancel_event=cancel_event,
-            )
-
-            # Extract .tar.bz2 archives so model.onnx / tokens.txt are
-            # available immediately (not just the raw archive).
-            if tarball.endswith(".tar.bz2") or tarball.endswith(".tar.gz"):
+            filename = os.path.basename(artifact)
+            archive = os.path.join(dest, filename)
+            voice = voice_for_artifact(variant, artifact)
+            target = dest if not voice else os.path.join(dest, voice["id"])
+            if not os.path.isfile(archive) and _has_onnx(target):
+                # This voice is already installed (its folder holds a model), so
+                # a variant that stopped part-way - or one downloaded by an
+                # older build that only installed the first voice - fetches
+                # what is missing and leaves the rest alone.
                 if progress:
-                    progress(f"Extracting {os.path.basename(tarball)}", 0, 0)
-                safe_extract_tarball(tarball, dest)
-                # Keep the archive so future calls can skip re-download
-                # (the _variant_artifacts check already handles this).
+                    progress(f"{filename} (already installed)", 1, 1)
+                continue
+            if os.path.isfile(archive):
+                # Already downloaded by an interrupted run (download_file only
+                # renames a finished file into place, so an archive that exists
+                # is complete).
+                if progress:
+                    progress(filename, 1, 1)
+            else:
+                url = self._artifact_url(tts, artifact)
+                archive = download_file(
+                    url,
+                    dest,
+                    filename=filename,
+                    progress=progress,
+                    cancel_event=cancel_event,
+                )
+            archives.append(archive)
+
+            # Extract the archive into the folder the engine reads, so a
+            # per-voice artifact ends up in <variant>/<voice>/ and the
+            # variant's own artifact in <variant>/ (see install_archive).
+            if archive.endswith((".tar.bz2", ".tar.gz")):
+                if progress:
+                    progress(f"Extracting {filename}", 0, 0)
+                try:
+                    install_archive(archive, dest, voice)
+                except (tarfile.TarError, OSError) as exc:
+                    # Never trust a corrupt archive on the next run.
+                    try:
+                        os.remove(archive)
+                    except OSError:
+                        log.debug("Ignoring a failure in ModelDownloader.download_variant", exc_info=True)
+                    raise DownloadError(f"Could not extract {filename}: {exc}") from exc
 
         # Download shared artifacts (espeak-ng-data, vocoders, etc.)
         self._download_extras(tts, tts.get("shared_artifacts", []), progress, cancel_event)
-
-        # Organize per-voice files
-        self._organize_voice(dest, variant, artifacts)
 
         # Download HF files for raw-file variants
         hf_files = variant.get("hf_files")
@@ -257,8 +444,17 @@ class ModelDownloader:
 
         self.store.mark_installed(tts_id, lang_code, variant_id, dest)
 
-    def _variant_artifacts(self, variant: Dict) -> List[str]:
-        artifacts: List[str] = []
+        # Only now is the variant complete: drop the archives (the extracted
+        # files are what the engine reads) and any staging folder left behind.
+        drop_staging_folders(dest)
+        for archive in archives:
+            try:
+                os.remove(archive)
+            except OSError as exc:
+                log.warning("Could not remove %s: %s", archive, exc)
+
+    def _variant_artifacts(self, variant: dict) -> list[str]:
+        artifacts: list[str] = []
         if variant.get("artifact"):
             artifacts.append(variant["artifact"])
         for voice in variant.get("voices", []):
@@ -268,10 +464,10 @@ class ModelDownloader:
 
     def _download_extras(
         self,
-        tts: Dict,
-        extras: List[Dict],
-        progress: Optional[ProgressCallback],
-        cancel_event: Optional[threading.Event],
+        tts: dict,
+        extras: list[dict],
+        progress: ProgressCallback | None,
+        cancel_event: threading.Event | None,
     ) -> None:
         for extra in extras:
             if cancel_event and cancel_event.is_set():
@@ -310,37 +506,41 @@ class ModelDownloader:
             if progress:
                 progress(filename, 1, 1)
 
-    def _organize_voice(self, dest: str, variant: Dict, artifact: str) -> None:
-        """Move extracted files for one artifact into ``dest/<voice_id>/``."""
-        voice = next(
-            (v for v in variant.get("voices", []) if v.get("artifact") == artifact), None
-        )
-        target = dest if not voice else os.path.join(dest, voice["id"])
-        os.makedirs(target, exist_ok=True)
-        tmp = os.path.join(dest, "tmp_extract")
-        if not os.path.isdir(tmp):
-            return
-        for entry in os.listdir(tmp):
-            src = os.path.join(tmp, entry)
-            dst = os.path.join(target, entry)
-            if os.path.isdir(src):
-                if os.path.isdir(dst):
-                    shutil.rmtree(dst)
-                shutil.move(src, dst)
-            elif os.path.isfile(src):
-                if os.path.exists(dst):
-                    os.remove(dst)
-                shutil.move(src, dst)
-        shutil.rmtree(tmp, ignore_errors=True)
-
     def remove_variant(self, tts_id: str, lang_code: str, variant_id: str) -> bool:
-        return self.store.remove_variant(tts_id, lang_code, variant_id)
+        removed = self.store.remove_variant(tts_id, lang_code, variant_id)
+        self._remove_unused_shared_model(tts_id)
+        return removed
+
+    def _remove_unused_shared_model(self, tts_id: str) -> None:
+        """Delete an engine's shared model once its last variant is gone.
+
+        An engine whose archive serves every one of its languages (Supertonic
+        3: one int8 model for all 31) keeps the model in ``models/shared``
+        rather than in a language folder.  Removing a language must therefore
+        free the real download as soon as nothing else uses it - otherwise the
+        Remove button would report success and leave ~130 MB on the disk with
+        no engine left to read it.
+        """
+        tts = catalog.find_tts(tts_id)
+        if not tts or not tts.get("shared_model"):
+            return
+        if any(entry.get("tts") == tts_id for entry in self.store.installed_variants()):
+            # Another language of this engine still reads the same model.
+            return
+        for extra in tts.get("shared_artifacts", []):
+            folder = os.path.join(
+                paths.models_dir(), *str(extra.get("dest", "shared")).split("/")
+            )
+            if not os.path.isdir(folder):
+                continue
+            shutil.rmtree(folder, ignore_errors=True)
+            log.info("Removed the shared model of %s from %s", tts_id, folder)
 
     # -- shared espeak-ng-data (needed by raw custom piper voices) ----------
     def ensure_shared_espeak_data(
         self,
-        progress: Optional[ProgressCallback] = None,
-        cancel_event: Optional[threading.Event] = None,
+        progress: ProgressCallback | None = None,
+        cancel_event: threading.Event | None = None,
     ) -> str:
         shared = os.path.join(paths.models_dir(), "shared", "espeak-ng-data")
         if os.path.isdir(shared) and os.listdir(shared):

@@ -26,7 +26,6 @@ Usage::
 
 from __future__ import annotations
 
-import atexit
 import datetime
 import logging
 import logging.handlers
@@ -35,7 +34,6 @@ import platform
 import sys
 import threading
 import traceback
-from typing import Optional
 
 from . import paths
 
@@ -88,7 +86,10 @@ def _crash_handler(exc_type, exc_value, exc_tb):
                     fh.write(f"Memory RSS: {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss} KB\n")
                 except (ImportError, AttributeError):
                     pass
-    except Exception:
+    except Exception:  # noqa: S110 - see the comment below
+        # This is the crash handler itself: it runs after an unhandled
+        # exception, so anything it raises (or logs, which could re-enter it)
+        # would replace the traceback the user needs.
         pass
     # Call the original handler
     _original_excepthook(exc_type, exc_value, exc_tb)
@@ -230,21 +231,6 @@ def _install_exception_logger() -> None:
     threading.Thread.__init__ = _patched_thread_init
 
 
-def is_heavy_logging_enabled() -> bool:
-    """Check if heavy logging is currently active."""
-    return _heavy_enabled
-
-
-def get_log_path() -> str:
-    """Return the path to the main log file."""
-    return paths.log_file()
-
-
-def get_log_dir() -> str:
-    """Return the path to the logs directory."""
-    return paths.logs_dir()
-
-
 def get_logger(name: str) -> logging.Logger:
     """Get a logger for a subsystem (automatically routed to subsystem file)."""
     return logging.getLogger(name)
@@ -282,6 +268,7 @@ def log_system_info() -> None:
              "--format=csv,noheader"],
             capture_output=True, text=True, timeout=5,
             creationflags=flags,
+            check=False,
         )
         if result.returncode == 0:
             for line in result.stdout.strip().splitlines():
@@ -312,5 +299,9 @@ def log_exception_with_context(
         type(exc).__name__,
         exc,
         context,
-        exc_info=True,
+        # ``exc_info`` takes the *exception* here, not ``True``: this helper is
+        # called from except blocks but runs as a normal function, and a bare
+        # ``True`` outside a handler records "NoneType: None" instead of the
+        # traceback the whole function exists to keep.
+        exc_info=exc,
     )

@@ -1,4 +1,4 @@
-"""Headless E2E drive of Settings -> "OmniVoice engines" voice library.
+"""Headless E2E drive of the Settings -> Voice Clone OmniVoice voice library.
 
 Creates a clone voice and a design voice through the real panel handlers
 (no GPU synthesis - creation/rename/delete are local store work), then
@@ -15,12 +15,12 @@ import tempfile
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-import wx  # noqa: E402
+import wx
 
-from ai_voice_studio import paths  # noqa: E402
-from ai_voice_studio.gui.settings_dialog import SettingsDialog  # noqa: E402
-from ai_voice_studio.settings import Settings  # noqa: E402
-from ai_voice_studio.tts.models import ModelStore  # noqa: E402
+from ai_voice_studio import paths
+from ai_voice_studio.gui.settings_dialog import SettingsDialog
+from ai_voice_studio.settings import Settings
+from ai_voice_studio.tts.models import ModelStore
 
 
 def main() -> int:
@@ -63,7 +63,7 @@ def main() -> int:
     wx.TextEntryDialog = _FakeEntryDlg
 
     try:
-        app = wx.App(False)
+        wx.App(False)
         frame = wx.Frame(None)
         store = ModelStore(state_file=state)
         dlg = SettingsDialog(frame, Settings(), store)

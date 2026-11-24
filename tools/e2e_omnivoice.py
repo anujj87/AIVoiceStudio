@@ -20,13 +20,12 @@ It needs an NVIDIA GPU, the managed Python runtime created, and
 
 from __future__ import annotations
 
+import contextlib
 import gc
-import json
 import logging
 import os
 import shutil
 import sys
-import tempfile
 import time
 import wave
 
@@ -112,10 +111,8 @@ def _release_engines():
     from ai_voice_studio.tts import engine as engine_mod
 
     for eng in list(engine_mod._engine_cache.values()):
-        try:
+        with contextlib.suppress(Exception):
             eng.close()
-        except Exception:  # noqa: BLE001
-            pass
     engine_mod.clear_engine_cache()
     gc.collect()
 
@@ -124,8 +121,8 @@ def _record(log, project_dir: str, mode_label: str) -> dict:
     """Open the Recording window and record all pending segments."""
     import wx
 
-    from ai_voice_studio.gui.recording_dialog import RecordingDialog
     from ai_voice_studio.gui import dialogs as dialogs_mod
+    from ai_voice_studio.gui.recording_dialog import RecordingDialog
     from ai_voice_studio.settings import Settings
     from ai_voice_studio.tts.models import ModelStore
 
@@ -238,10 +235,8 @@ def _record(log, project_dir: str, mode_label: str) -> dict:
                 "messageboxes": messageboxes,
             }
         finally:
-            try:
+            with contextlib.suppress(Exception):
                 dialog._worker and dialog._worker.cancel()
-            except Exception:  # noqa: BLE001
-                pass
             dialog.Destroy()
     finally:
         wx.MessageBox = original_messagebox
@@ -269,7 +264,6 @@ def main() -> int:
     os.makedirs(OUT_ROOT, exist_ok=True)
 
     from ai_voice_studio.omnivoice import spec
-    from ai_voice_studio.project import first_pending_index
 
     results = []
     try:
@@ -331,7 +325,7 @@ def main() -> int:
         print("\nWorker messages (skipped parameters / warnings):")
         print("-" * 78)
         return 0
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.error("E2E failed: %s: %s", type(exc).__name__, exc)
         import traceback
 

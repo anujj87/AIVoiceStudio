@@ -20,6 +20,7 @@ import webbrowser
 
 import wx
 
+from . import dpi
 from .progress import TaskProgressDialog
 
 log = logging.getLogger(__name__)
@@ -85,6 +86,8 @@ class _ActionDialog(wx.Dialog):
         self.SetSizer(sizer)
         self.Fit()
         self.SetMinSize(self.GetSize())
+        dpi.prepare(self)
+        dpi.follow(self)
         if parent is not None and parent.IsShown():
             self.CentreOnParent()
         else:
@@ -105,11 +108,11 @@ def open_folder(path: str) -> None:
     if not path or not os.path.isdir(path):
         return
     try:
-        os.startfile(path)  # type: ignore[attr-defined]  # noqa: SIM115 - Windows
-    except Exception:  # noqa: BLE001
+        os.startfile(path)  # type: ignore[attr-defined]
+    except Exception:
         try:
             webbrowser.open("file:///" + os.path.normpath(path).replace("\\", "/"))
-        except Exception:  # noqa: BLE001
+        except Exception:
             log.debug("Could not open folder %s", path, exc_info=True)
 
 
@@ -220,8 +223,8 @@ def restart_omni_server(parent: wx.Window) -> None:
     def _job():
         ok, text = False, "OmniVoice server restart failed."
         try:
-            from ..omnivoice_server import get_server_manager  # noqa: PLC0415
-            from ..settings import Settings  # noqa: PLC0415
+            from ..omnivoice_server import get_server_manager
+            from ..settings import Settings
 
             cfg = Settings().get("omnivoice_server", {})
             mgr = get_server_manager(
@@ -235,7 +238,7 @@ def restart_omni_server(parent: wx.Window) -> None:
             )
             mgr.restart(timeout=180.0)
             ok, text = True, f"OmniVoice server restarted at {mgr.base_url}."
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             ok, text = False, f"Could not restart the OmniVoice server: {exc}"
         wx.CallAfter(_done, ok, text)
 

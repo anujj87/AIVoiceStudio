@@ -2858,6 +2858,1946 @@
       ]
     },
     {
+      "id": "supertonic",
+      "name": "Supertonic 3",
+      "engine": "supertonic",
+      "license": "OpenRAIL",
+      "homepage": "https://github.com/supertone-inc/supertonic",
+      "artifact_base": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/",
+      "shared_model": true,
+      "shared_model_note": "One int8 archive carries all 31 languages and all 10 voice styles: it is downloaded once into models/shared/supertonic-3 and every language of this engine reads it from there, so a second language costs no download.",
+      "shared_artifacts": [
+        {
+          "artifact": "sherpa-onnx-supertonic-3-tts-int8-2026-05-11.tar.bz2",
+          "dest": "shared/supertonic-3"
+        }
+      ],
+      "languages": [
+        {
+          "code": "ar",
+          "name": "Arabic",
+          "variants": [
+            {
+              "id": "int8",
+              "name": "Int8 (128 MB, CPU and GPU)",
+              "voices": [
+                {
+                  "id": "f1",
+                  "name": "F1 (female)",
+                  "sid": 0
+                },
+                {
+                  "id": "f2",
+                  "name": "F2 (female)",
+                  "sid": 1
+                },
+                {
+                  "id": "f3",
+                  "name": "F3 (female)",
+                  "sid": 2
+                },
+                {
+                  "id": "f4",
+                  "name": "F4 (female)",
+                  "sid": 3
+                },
+                {
+                  "id": "f5",
+                  "name": "F5 (female)",
+                  "sid": 4
+                },
+                {
+                  "id": "m1",
+                  "name": "M1 (male)",
+                  "sid": 5
+                },
+                {
+                  "id": "m2",
+                  "name": "M2 (male)",
+                  "sid": 6
+                },
+                {
+                  "id": "m3",
+                  "name": "M3 (male)",
+                  "sid": 7
+                },
+                {
+                  "id": "m4",
+                  "name": "M4 (male)",
+                  "sid": 8
+                },
+                {
+                  "id": "m5",
+                  "name": "M5 (male)",
+                  "sid": 9
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "bg",
+          "name": "Bulgarian",
+          "variants": [
+            {
+              "id": "int8",
+              "name": "Int8 (128 MB, CPU and GPU)",
+              "voices": [
+                {
+                  "id": "f1",
+                  "name": "F1 (female)",
+                  "sid": 0
+                },
+                {
+                  "id": "f2",
+                  "name": "F2 (female)",
+                  "sid": 1
+                },
+                {
+                  "id": "f3",
+                  "name": "F3 (female)",
+                  "sid": 2
+                },
+                {
+                  "id": "f4",
+                  "name": "F4 (female)",
+                  "sid": 3
+                },
+                {
+                  "id": "f5",
+                  "name": "F5 (female)",
+                  "sid": 4
+                },
+                {
+                  "id": "m1",
+                  "name": "M1 (male)",
+                  "sid": 5
+                },
+                {
+                  "id": "m2",
+                  "name": "M2 (male)",
+                  "sid": 6
+                },
+                {
+                  "id": "m3",
+                  "name": "M3 (male)",
+                  "sid": 7
+                },
+                {
+                  "id": "m4",
+                  "name": "M4 (male)",
+                  "sid": 8
+                },
+                {
+                  "id": "m5",
+                  "name": "M5 (male)",
+                  "sid": 9
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "cs",
+          "name": "Czech",
+          "variants": [
+            {
+              "id": "int8",
+              "name": "Int8 (128 MB, CPU and GPU)",
+              "voices": [
+                {
+                  "id": "f1",
+                  "name": "F1 (female)",
+                  "sid": 0
+                },
+                {
+                  "id": "f2",
+                  "name": "F2 (female)",
+                  "sid": 1
+                },
+                {
+                  "id": "f3",
+                  "name": "F3 (female)",
+                  "sid": 2
+                },
+                {
+                  "id": "f4",
+                  "name": "F4 (female)",
+                  "sid": 3
+                },
+                {
+                  "id": "f5",
+                  "name": "F5 (female)",
+                  "sid": 4
+                },
+                {
+                  "id": "m1",
+                  "name": "M1 (male)",
+                  "sid": 5
+                },
+                {
+                  "id": "m2",
+                  "name": "M2 (male)",
+                  "sid": 6
+                },
+                {
+                  "id": "m3",
+                  "name": "M3 (male)",
+                  "sid": 7
+                },
+                {
+                  "id": "m4",
+                  "name": "M4 (male)",
+                  "sid": 8
+                },
+                {
+                  "id": "m5",
+                  "name": "M5 (male)",
+                  "sid": 9
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "da",
+          "name": "Danish",
+          "variants": [
+            {
+              "id": "int8",
+              "name": "Int8 (128 MB, CPU and GPU)",
+              "voices": [
+                {
+                  "id": "f1",
+                  "name": "F1 (female)",
+                  "sid": 0
+                },
+                {
+                  "id": "f2",
+                  "name": "F2 (female)",
+                  "sid": 1
+                },
+                {
+                  "id": "f3",
+                  "name": "F3 (female)",
+                  "sid": 2
+                },
+                {
+                  "id": "f4",
+                  "name": "F4 (female)",
+                  "sid": 3
+                },
+                {
+                  "id": "f5",
+                  "name": "F5 (female)",
+                  "sid": 4
+                },
+                {
+                  "id": "m1",
+                  "name": "M1 (male)",
+                  "sid": 5
+                },
+                {
+                  "id": "m2",
+                  "name": "M2 (male)",
+                  "sid": 6
+                },
+                {
+                  "id": "m3",
+                  "name": "M3 (male)",
+                  "sid": 7
+                },
+                {
+                  "id": "m4",
+                  "name": "M4 (male)",
+                  "sid": 8
+                },
+                {
+                  "id": "m5",
+                  "name": "M5 (male)",
+                  "sid": 9
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "de",
+          "name": "German",
+          "variants": [
+            {
+              "id": "int8",
+              "name": "Int8 (128 MB, CPU and GPU)",
+              "voices": [
+                {
+                  "id": "f1",
+                  "name": "F1 (female)",
+                  "sid": 0
+                },
+                {
+                  "id": "f2",
+                  "name": "F2 (female)",
+                  "sid": 1
+                },
+                {
+                  "id": "f3",
+                  "name": "F3 (female)",
+                  "sid": 2
+                },
+                {
+                  "id": "f4",
+                  "name": "F4 (female)",
+                  "sid": 3
+                },
+                {
+                  "id": "f5",
+                  "name": "F5 (female)",
+                  "sid": 4
+                },
+                {
+                  "id": "m1",
+                  "name": "M1 (male)",
+                  "sid": 5
+                },
+                {
+                  "id": "m2",
+                  "name": "M2 (male)",
+                  "sid": 6
+                },
+                {
+                  "id": "m3",
+                  "name": "M3 (male)",
+                  "sid": 7
+                },
+                {
+                  "id": "m4",
+                  "name": "M4 (male)",
+                  "sid": 8
+                },
+                {
+                  "id": "m5",
+                  "name": "M5 (male)",
+                  "sid": 9
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "el",
+          "name": "Greek",
+          "variants": [
+            {
+              "id": "int8",
+              "name": "Int8 (128 MB, CPU and GPU)",
+              "voices": [
+                {
+                  "id": "f1",
+                  "name": "F1 (female)",
+                  "sid": 0
+                },
+                {
+                  "id": "f2",
+                  "name": "F2 (female)",
+                  "sid": 1
+                },
+                {
+                  "id": "f3",
+                  "name": "F3 (female)",
+                  "sid": 2
+                },
+                {
+                  "id": "f4",
+                  "name": "F4 (female)",
+                  "sid": 3
+                },
+                {
+                  "id": "f5",
+                  "name": "F5 (female)",
+                  "sid": 4
+                },
+                {
+                  "id": "m1",
+                  "name": "M1 (male)",
+                  "sid": 5
+                },
+                {
+                  "id": "m2",
+                  "name": "M2 (male)",
+                  "sid": 6
+                },
+                {
+                  "id": "m3",
+                  "name": "M3 (male)",
+                  "sid": 7
+                },
+                {
+                  "id": "m4",
+                  "name": "M4 (male)",
+                  "sid": 8
+                },
+                {
+                  "id": "m5",
+                  "name": "M5 (male)",
+                  "sid": 9
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "en",
+          "name": "English",
+          "variants": [
+            {
+              "id": "int8",
+              "name": "Int8 (128 MB, CPU and GPU)",
+              "voices": [
+                {
+                  "id": "f1",
+                  "name": "F1 (female)",
+                  "sid": 0
+                },
+                {
+                  "id": "f2",
+                  "name": "F2 (female)",
+                  "sid": 1
+                },
+                {
+                  "id": "f3",
+                  "name": "F3 (female)",
+                  "sid": 2
+                },
+                {
+                  "id": "f4",
+                  "name": "F4 (female)",
+                  "sid": 3
+                },
+                {
+                  "id": "f5",
+                  "name": "F5 (female)",
+                  "sid": 4
+                },
+                {
+                  "id": "m1",
+                  "name": "M1 (male)",
+                  "sid": 5
+                },
+                {
+                  "id": "m2",
+                  "name": "M2 (male)",
+                  "sid": 6
+                },
+                {
+                  "id": "m3",
+                  "name": "M3 (male)",
+                  "sid": 7
+                },
+                {
+                  "id": "m4",
+                  "name": "M4 (male)",
+                  "sid": 8
+                },
+                {
+                  "id": "m5",
+                  "name": "M5 (male)",
+                  "sid": 9
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "es",
+          "name": "Spanish",
+          "variants": [
+            {
+              "id": "int8",
+              "name": "Int8 (128 MB, CPU and GPU)",
+              "voices": [
+                {
+                  "id": "f1",
+                  "name": "F1 (female)",
+                  "sid": 0
+                },
+                {
+                  "id": "f2",
+                  "name": "F2 (female)",
+                  "sid": 1
+                },
+                {
+                  "id": "f3",
+                  "name": "F3 (female)",
+                  "sid": 2
+                },
+                {
+                  "id": "f4",
+                  "name": "F4 (female)",
+                  "sid": 3
+                },
+                {
+                  "id": "f5",
+                  "name": "F5 (female)",
+                  "sid": 4
+                },
+                {
+                  "id": "m1",
+                  "name": "M1 (male)",
+                  "sid": 5
+                },
+                {
+                  "id": "m2",
+                  "name": "M2 (male)",
+                  "sid": 6
+                },
+                {
+                  "id": "m3",
+                  "name": "M3 (male)",
+                  "sid": 7
+                },
+                {
+                  "id": "m4",
+                  "name": "M4 (male)",
+                  "sid": 8
+                },
+                {
+                  "id": "m5",
+                  "name": "M5 (male)",
+                  "sid": 9
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "et",
+          "name": "Estonian",
+          "variants": [
+            {
+              "id": "int8",
+              "name": "Int8 (128 MB, CPU and GPU)",
+              "voices": [
+                {
+                  "id": "f1",
+                  "name": "F1 (female)",
+                  "sid": 0
+                },
+                {
+                  "id": "f2",
+                  "name": "F2 (female)",
+                  "sid": 1
+                },
+                {
+                  "id": "f3",
+                  "name": "F3 (female)",
+                  "sid": 2
+                },
+                {
+                  "id": "f4",
+                  "name": "F4 (female)",
+                  "sid": 3
+                },
+                {
+                  "id": "f5",
+                  "name": "F5 (female)",
+                  "sid": 4
+                },
+                {
+                  "id": "m1",
+                  "name": "M1 (male)",
+                  "sid": 5
+                },
+                {
+                  "id": "m2",
+                  "name": "M2 (male)",
+                  "sid": 6
+                },
+                {
+                  "id": "m3",
+                  "name": "M3 (male)",
+                  "sid": 7
+                },
+                {
+                  "id": "m4",
+                  "name": "M4 (male)",
+                  "sid": 8
+                },
+                {
+                  "id": "m5",
+                  "name": "M5 (male)",
+                  "sid": 9
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "fi",
+          "name": "Finnish",
+          "variants": [
+            {
+              "id": "int8",
+              "name": "Int8 (128 MB, CPU and GPU)",
+              "voices": [
+                {
+                  "id": "f1",
+                  "name": "F1 (female)",
+                  "sid": 0
+                },
+                {
+                  "id": "f2",
+                  "name": "F2 (female)",
+                  "sid": 1
+                },
+                {
+                  "id": "f3",
+                  "name": "F3 (female)",
+                  "sid": 2
+                },
+                {
+                  "id": "f4",
+                  "name": "F4 (female)",
+                  "sid": 3
+                },
+                {
+                  "id": "f5",
+                  "name": "F5 (female)",
+                  "sid": 4
+                },
+                {
+                  "id": "m1",
+                  "name": "M1 (male)",
+                  "sid": 5
+                },
+                {
+                  "id": "m2",
+                  "name": "M2 (male)",
+                  "sid": 6
+                },
+                {
+                  "id": "m3",
+                  "name": "M3 (male)",
+                  "sid": 7
+                },
+                {
+                  "id": "m4",
+                  "name": "M4 (male)",
+                  "sid": 8
+                },
+                {
+                  "id": "m5",
+                  "name": "M5 (male)",
+                  "sid": 9
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "fr",
+          "name": "French",
+          "variants": [
+            {
+              "id": "int8",
+              "name": "Int8 (128 MB, CPU and GPU)",
+              "voices": [
+                {
+                  "id": "f1",
+                  "name": "F1 (female)",
+                  "sid": 0
+                },
+                {
+                  "id": "f2",
+                  "name": "F2 (female)",
+                  "sid": 1
+                },
+                {
+                  "id": "f3",
+                  "name": "F3 (female)",
+                  "sid": 2
+                },
+                {
+                  "id": "f4",
+                  "name": "F4 (female)",
+                  "sid": 3
+                },
+                {
+                  "id": "f5",
+                  "name": "F5 (female)",
+                  "sid": 4
+                },
+                {
+                  "id": "m1",
+                  "name": "M1 (male)",
+                  "sid": 5
+                },
+                {
+                  "id": "m2",
+                  "name": "M2 (male)",
+                  "sid": 6
+                },
+                {
+                  "id": "m3",
+                  "name": "M3 (male)",
+                  "sid": 7
+                },
+                {
+                  "id": "m4",
+                  "name": "M4 (male)",
+                  "sid": 8
+                },
+                {
+                  "id": "m5",
+                  "name": "M5 (male)",
+                  "sid": 9
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "hi",
+          "name": "Hindi",
+          "variants": [
+            {
+              "id": "int8",
+              "name": "Int8 (128 MB, CPU and GPU)",
+              "voices": [
+                {
+                  "id": "f1",
+                  "name": "F1 (female)",
+                  "sid": 0
+                },
+                {
+                  "id": "f2",
+                  "name": "F2 (female)",
+                  "sid": 1
+                },
+                {
+                  "id": "f3",
+                  "name": "F3 (female)",
+                  "sid": 2
+                },
+                {
+                  "id": "f4",
+                  "name": "F4 (female)",
+                  "sid": 3
+                },
+                {
+                  "id": "f5",
+                  "name": "F5 (female)",
+                  "sid": 4
+                },
+                {
+                  "id": "m1",
+                  "name": "M1 (male)",
+                  "sid": 5
+                },
+                {
+                  "id": "m2",
+                  "name": "M2 (male)",
+                  "sid": 6
+                },
+                {
+                  "id": "m3",
+                  "name": "M3 (male)",
+                  "sid": 7
+                },
+                {
+                  "id": "m4",
+                  "name": "M4 (male)",
+                  "sid": 8
+                },
+                {
+                  "id": "m5",
+                  "name": "M5 (male)",
+                  "sid": 9
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "hr",
+          "name": "Croatian",
+          "variants": [
+            {
+              "id": "int8",
+              "name": "Int8 (128 MB, CPU and GPU)",
+              "voices": [
+                {
+                  "id": "f1",
+                  "name": "F1 (female)",
+                  "sid": 0
+                },
+                {
+                  "id": "f2",
+                  "name": "F2 (female)",
+                  "sid": 1
+                },
+                {
+                  "id": "f3",
+                  "name": "F3 (female)",
+                  "sid": 2
+                },
+                {
+                  "id": "f4",
+                  "name": "F4 (female)",
+                  "sid": 3
+                },
+                {
+                  "id": "f5",
+                  "name": "F5 (female)",
+                  "sid": 4
+                },
+                {
+                  "id": "m1",
+                  "name": "M1 (male)",
+                  "sid": 5
+                },
+                {
+                  "id": "m2",
+                  "name": "M2 (male)",
+                  "sid": 6
+                },
+                {
+                  "id": "m3",
+                  "name": "M3 (male)",
+                  "sid": 7
+                },
+                {
+                  "id": "m4",
+                  "name": "M4 (male)",
+                  "sid": 8
+                },
+                {
+                  "id": "m5",
+                  "name": "M5 (male)",
+                  "sid": 9
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "hu",
+          "name": "Hungarian",
+          "variants": [
+            {
+              "id": "int8",
+              "name": "Int8 (128 MB, CPU and GPU)",
+              "voices": [
+                {
+                  "id": "f1",
+                  "name": "F1 (female)",
+                  "sid": 0
+                },
+                {
+                  "id": "f2",
+                  "name": "F2 (female)",
+                  "sid": 1
+                },
+                {
+                  "id": "f3",
+                  "name": "F3 (female)",
+                  "sid": 2
+                },
+                {
+                  "id": "f4",
+                  "name": "F4 (female)",
+                  "sid": 3
+                },
+                {
+                  "id": "f5",
+                  "name": "F5 (female)",
+                  "sid": 4
+                },
+                {
+                  "id": "m1",
+                  "name": "M1 (male)",
+                  "sid": 5
+                },
+                {
+                  "id": "m2",
+                  "name": "M2 (male)",
+                  "sid": 6
+                },
+                {
+                  "id": "m3",
+                  "name": "M3 (male)",
+                  "sid": 7
+                },
+                {
+                  "id": "m4",
+                  "name": "M4 (male)",
+                  "sid": 8
+                },
+                {
+                  "id": "m5",
+                  "name": "M5 (male)",
+                  "sid": 9
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "id",
+          "name": "Indonesian",
+          "variants": [
+            {
+              "id": "int8",
+              "name": "Int8 (128 MB, CPU and GPU)",
+              "voices": [
+                {
+                  "id": "f1",
+                  "name": "F1 (female)",
+                  "sid": 0
+                },
+                {
+                  "id": "f2",
+                  "name": "F2 (female)",
+                  "sid": 1
+                },
+                {
+                  "id": "f3",
+                  "name": "F3 (female)",
+                  "sid": 2
+                },
+                {
+                  "id": "f4",
+                  "name": "F4 (female)",
+                  "sid": 3
+                },
+                {
+                  "id": "f5",
+                  "name": "F5 (female)",
+                  "sid": 4
+                },
+                {
+                  "id": "m1",
+                  "name": "M1 (male)",
+                  "sid": 5
+                },
+                {
+                  "id": "m2",
+                  "name": "M2 (male)",
+                  "sid": 6
+                },
+                {
+                  "id": "m3",
+                  "name": "M3 (male)",
+                  "sid": 7
+                },
+                {
+                  "id": "m4",
+                  "name": "M4 (male)",
+                  "sid": 8
+                },
+                {
+                  "id": "m5",
+                  "name": "M5 (male)",
+                  "sid": 9
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "it",
+          "name": "Italian",
+          "variants": [
+            {
+              "id": "int8",
+              "name": "Int8 (128 MB, CPU and GPU)",
+              "voices": [
+                {
+                  "id": "f1",
+                  "name": "F1 (female)",
+                  "sid": 0
+                },
+                {
+                  "id": "f2",
+                  "name": "F2 (female)",
+                  "sid": 1
+                },
+                {
+                  "id": "f3",
+                  "name": "F3 (female)",
+                  "sid": 2
+                },
+                {
+                  "id": "f4",
+                  "name": "F4 (female)",
+                  "sid": 3
+                },
+                {
+                  "id": "f5",
+                  "name": "F5 (female)",
+                  "sid": 4
+                },
+                {
+                  "id": "m1",
+                  "name": "M1 (male)",
+                  "sid": 5
+                },
+                {
+                  "id": "m2",
+                  "name": "M2 (male)",
+                  "sid": 6
+                },
+                {
+                  "id": "m3",
+                  "name": "M3 (male)",
+                  "sid": 7
+                },
+                {
+                  "id": "m4",
+                  "name": "M4 (male)",
+                  "sid": 8
+                },
+                {
+                  "id": "m5",
+                  "name": "M5 (male)",
+                  "sid": 9
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "ja",
+          "name": "Japanese",
+          "variants": [
+            {
+              "id": "int8",
+              "name": "Int8 (128 MB, CPU and GPU)",
+              "voices": [
+                {
+                  "id": "f1",
+                  "name": "F1 (female)",
+                  "sid": 0
+                },
+                {
+                  "id": "f2",
+                  "name": "F2 (female)",
+                  "sid": 1
+                },
+                {
+                  "id": "f3",
+                  "name": "F3 (female)",
+                  "sid": 2
+                },
+                {
+                  "id": "f4",
+                  "name": "F4 (female)",
+                  "sid": 3
+                },
+                {
+                  "id": "f5",
+                  "name": "F5 (female)",
+                  "sid": 4
+                },
+                {
+                  "id": "m1",
+                  "name": "M1 (male)",
+                  "sid": 5
+                },
+                {
+                  "id": "m2",
+                  "name": "M2 (male)",
+                  "sid": 6
+                },
+                {
+                  "id": "m3",
+                  "name": "M3 (male)",
+                  "sid": 7
+                },
+                {
+                  "id": "m4",
+                  "name": "M4 (male)",
+                  "sid": 8
+                },
+                {
+                  "id": "m5",
+                  "name": "M5 (male)",
+                  "sid": 9
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "ko",
+          "name": "Korean",
+          "variants": [
+            {
+              "id": "int8",
+              "name": "Int8 (128 MB, CPU and GPU)",
+              "voices": [
+                {
+                  "id": "f1",
+                  "name": "F1 (female)",
+                  "sid": 0
+                },
+                {
+                  "id": "f2",
+                  "name": "F2 (female)",
+                  "sid": 1
+                },
+                {
+                  "id": "f3",
+                  "name": "F3 (female)",
+                  "sid": 2
+                },
+                {
+                  "id": "f4",
+                  "name": "F4 (female)",
+                  "sid": 3
+                },
+                {
+                  "id": "f5",
+                  "name": "F5 (female)",
+                  "sid": 4
+                },
+                {
+                  "id": "m1",
+                  "name": "M1 (male)",
+                  "sid": 5
+                },
+                {
+                  "id": "m2",
+                  "name": "M2 (male)",
+                  "sid": 6
+                },
+                {
+                  "id": "m3",
+                  "name": "M3 (male)",
+                  "sid": 7
+                },
+                {
+                  "id": "m4",
+                  "name": "M4 (male)",
+                  "sid": 8
+                },
+                {
+                  "id": "m5",
+                  "name": "M5 (male)",
+                  "sid": 9
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "lt",
+          "name": "Lithuanian",
+          "variants": [
+            {
+              "id": "int8",
+              "name": "Int8 (128 MB, CPU and GPU)",
+              "voices": [
+                {
+                  "id": "f1",
+                  "name": "F1 (female)",
+                  "sid": 0
+                },
+                {
+                  "id": "f2",
+                  "name": "F2 (female)",
+                  "sid": 1
+                },
+                {
+                  "id": "f3",
+                  "name": "F3 (female)",
+                  "sid": 2
+                },
+                {
+                  "id": "f4",
+                  "name": "F4 (female)",
+                  "sid": 3
+                },
+                {
+                  "id": "f5",
+                  "name": "F5 (female)",
+                  "sid": 4
+                },
+                {
+                  "id": "m1",
+                  "name": "M1 (male)",
+                  "sid": 5
+                },
+                {
+                  "id": "m2",
+                  "name": "M2 (male)",
+                  "sid": 6
+                },
+                {
+                  "id": "m3",
+                  "name": "M3 (male)",
+                  "sid": 7
+                },
+                {
+                  "id": "m4",
+                  "name": "M4 (male)",
+                  "sid": 8
+                },
+                {
+                  "id": "m5",
+                  "name": "M5 (male)",
+                  "sid": 9
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "lv",
+          "name": "Latvian",
+          "variants": [
+            {
+              "id": "int8",
+              "name": "Int8 (128 MB, CPU and GPU)",
+              "voices": [
+                {
+                  "id": "f1",
+                  "name": "F1 (female)",
+                  "sid": 0
+                },
+                {
+                  "id": "f2",
+                  "name": "F2 (female)",
+                  "sid": 1
+                },
+                {
+                  "id": "f3",
+                  "name": "F3 (female)",
+                  "sid": 2
+                },
+                {
+                  "id": "f4",
+                  "name": "F4 (female)",
+                  "sid": 3
+                },
+                {
+                  "id": "f5",
+                  "name": "F5 (female)",
+                  "sid": 4
+                },
+                {
+                  "id": "m1",
+                  "name": "M1 (male)",
+                  "sid": 5
+                },
+                {
+                  "id": "m2",
+                  "name": "M2 (male)",
+                  "sid": 6
+                },
+                {
+                  "id": "m3",
+                  "name": "M3 (male)",
+                  "sid": 7
+                },
+                {
+                  "id": "m4",
+                  "name": "M4 (male)",
+                  "sid": 8
+                },
+                {
+                  "id": "m5",
+                  "name": "M5 (male)",
+                  "sid": 9
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "nl",
+          "name": "Dutch",
+          "variants": [
+            {
+              "id": "int8",
+              "name": "Int8 (128 MB, CPU and GPU)",
+              "voices": [
+                {
+                  "id": "f1",
+                  "name": "F1 (female)",
+                  "sid": 0
+                },
+                {
+                  "id": "f2",
+                  "name": "F2 (female)",
+                  "sid": 1
+                },
+                {
+                  "id": "f3",
+                  "name": "F3 (female)",
+                  "sid": 2
+                },
+                {
+                  "id": "f4",
+                  "name": "F4 (female)",
+                  "sid": 3
+                },
+                {
+                  "id": "f5",
+                  "name": "F5 (female)",
+                  "sid": 4
+                },
+                {
+                  "id": "m1",
+                  "name": "M1 (male)",
+                  "sid": 5
+                },
+                {
+                  "id": "m2",
+                  "name": "M2 (male)",
+                  "sid": 6
+                },
+                {
+                  "id": "m3",
+                  "name": "M3 (male)",
+                  "sid": 7
+                },
+                {
+                  "id": "m4",
+                  "name": "M4 (male)",
+                  "sid": 8
+                },
+                {
+                  "id": "m5",
+                  "name": "M5 (male)",
+                  "sid": 9
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "pl",
+          "name": "Polish",
+          "variants": [
+            {
+              "id": "int8",
+              "name": "Int8 (128 MB, CPU and GPU)",
+              "voices": [
+                {
+                  "id": "f1",
+                  "name": "F1 (female)",
+                  "sid": 0
+                },
+                {
+                  "id": "f2",
+                  "name": "F2 (female)",
+                  "sid": 1
+                },
+                {
+                  "id": "f3",
+                  "name": "F3 (female)",
+                  "sid": 2
+                },
+                {
+                  "id": "f4",
+                  "name": "F4 (female)",
+                  "sid": 3
+                },
+                {
+                  "id": "f5",
+                  "name": "F5 (female)",
+                  "sid": 4
+                },
+                {
+                  "id": "m1",
+                  "name": "M1 (male)",
+                  "sid": 5
+                },
+                {
+                  "id": "m2",
+                  "name": "M2 (male)",
+                  "sid": 6
+                },
+                {
+                  "id": "m3",
+                  "name": "M3 (male)",
+                  "sid": 7
+                },
+                {
+                  "id": "m4",
+                  "name": "M4 (male)",
+                  "sid": 8
+                },
+                {
+                  "id": "m5",
+                  "name": "M5 (male)",
+                  "sid": 9
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "pt",
+          "name": "Portuguese",
+          "variants": [
+            {
+              "id": "int8",
+              "name": "Int8 (128 MB, CPU and GPU)",
+              "voices": [
+                {
+                  "id": "f1",
+                  "name": "F1 (female)",
+                  "sid": 0
+                },
+                {
+                  "id": "f2",
+                  "name": "F2 (female)",
+                  "sid": 1
+                },
+                {
+                  "id": "f3",
+                  "name": "F3 (female)",
+                  "sid": 2
+                },
+                {
+                  "id": "f4",
+                  "name": "F4 (female)",
+                  "sid": 3
+                },
+                {
+                  "id": "f5",
+                  "name": "F5 (female)",
+                  "sid": 4
+                },
+                {
+                  "id": "m1",
+                  "name": "M1 (male)",
+                  "sid": 5
+                },
+                {
+                  "id": "m2",
+                  "name": "M2 (male)",
+                  "sid": 6
+                },
+                {
+                  "id": "m3",
+                  "name": "M3 (male)",
+                  "sid": 7
+                },
+                {
+                  "id": "m4",
+                  "name": "M4 (male)",
+                  "sid": 8
+                },
+                {
+                  "id": "m5",
+                  "name": "M5 (male)",
+                  "sid": 9
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "ro",
+          "name": "Romanian",
+          "variants": [
+            {
+              "id": "int8",
+              "name": "Int8 (128 MB, CPU and GPU)",
+              "voices": [
+                {
+                  "id": "f1",
+                  "name": "F1 (female)",
+                  "sid": 0
+                },
+                {
+                  "id": "f2",
+                  "name": "F2 (female)",
+                  "sid": 1
+                },
+                {
+                  "id": "f3",
+                  "name": "F3 (female)",
+                  "sid": 2
+                },
+                {
+                  "id": "f4",
+                  "name": "F4 (female)",
+                  "sid": 3
+                },
+                {
+                  "id": "f5",
+                  "name": "F5 (female)",
+                  "sid": 4
+                },
+                {
+                  "id": "m1",
+                  "name": "M1 (male)",
+                  "sid": 5
+                },
+                {
+                  "id": "m2",
+                  "name": "M2 (male)",
+                  "sid": 6
+                },
+                {
+                  "id": "m3",
+                  "name": "M3 (male)",
+                  "sid": 7
+                },
+                {
+                  "id": "m4",
+                  "name": "M4 (male)",
+                  "sid": 8
+                },
+                {
+                  "id": "m5",
+                  "name": "M5 (male)",
+                  "sid": 9
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "ru",
+          "name": "Russian",
+          "variants": [
+            {
+              "id": "int8",
+              "name": "Int8 (128 MB, CPU and GPU)",
+              "voices": [
+                {
+                  "id": "f1",
+                  "name": "F1 (female)",
+                  "sid": 0
+                },
+                {
+                  "id": "f2",
+                  "name": "F2 (female)",
+                  "sid": 1
+                },
+                {
+                  "id": "f3",
+                  "name": "F3 (female)",
+                  "sid": 2
+                },
+                {
+                  "id": "f4",
+                  "name": "F4 (female)",
+                  "sid": 3
+                },
+                {
+                  "id": "f5",
+                  "name": "F5 (female)",
+                  "sid": 4
+                },
+                {
+                  "id": "m1",
+                  "name": "M1 (male)",
+                  "sid": 5
+                },
+                {
+                  "id": "m2",
+                  "name": "M2 (male)",
+                  "sid": 6
+                },
+                {
+                  "id": "m3",
+                  "name": "M3 (male)",
+                  "sid": 7
+                },
+                {
+                  "id": "m4",
+                  "name": "M4 (male)",
+                  "sid": 8
+                },
+                {
+                  "id": "m5",
+                  "name": "M5 (male)",
+                  "sid": 9
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "sk",
+          "name": "Slovak",
+          "variants": [
+            {
+              "id": "int8",
+              "name": "Int8 (128 MB, CPU and GPU)",
+              "voices": [
+                {
+                  "id": "f1",
+                  "name": "F1 (female)",
+                  "sid": 0
+                },
+                {
+                  "id": "f2",
+                  "name": "F2 (female)",
+                  "sid": 1
+                },
+                {
+                  "id": "f3",
+                  "name": "F3 (female)",
+                  "sid": 2
+                },
+                {
+                  "id": "f4",
+                  "name": "F4 (female)",
+                  "sid": 3
+                },
+                {
+                  "id": "f5",
+                  "name": "F5 (female)",
+                  "sid": 4
+                },
+                {
+                  "id": "m1",
+                  "name": "M1 (male)",
+                  "sid": 5
+                },
+                {
+                  "id": "m2",
+                  "name": "M2 (male)",
+                  "sid": 6
+                },
+                {
+                  "id": "m3",
+                  "name": "M3 (male)",
+                  "sid": 7
+                },
+                {
+                  "id": "m4",
+                  "name": "M4 (male)",
+                  "sid": 8
+                },
+                {
+                  "id": "m5",
+                  "name": "M5 (male)",
+                  "sid": 9
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "sl",
+          "name": "Slovenian",
+          "variants": [
+            {
+              "id": "int8",
+              "name": "Int8 (128 MB, CPU and GPU)",
+              "voices": [
+                {
+                  "id": "f1",
+                  "name": "F1 (female)",
+                  "sid": 0
+                },
+                {
+                  "id": "f2",
+                  "name": "F2 (female)",
+                  "sid": 1
+                },
+                {
+                  "id": "f3",
+                  "name": "F3 (female)",
+                  "sid": 2
+                },
+                {
+                  "id": "f4",
+                  "name": "F4 (female)",
+                  "sid": 3
+                },
+                {
+                  "id": "f5",
+                  "name": "F5 (female)",
+                  "sid": 4
+                },
+                {
+                  "id": "m1",
+                  "name": "M1 (male)",
+                  "sid": 5
+                },
+                {
+                  "id": "m2",
+                  "name": "M2 (male)",
+                  "sid": 6
+                },
+                {
+                  "id": "m3",
+                  "name": "M3 (male)",
+                  "sid": 7
+                },
+                {
+                  "id": "m4",
+                  "name": "M4 (male)",
+                  "sid": 8
+                },
+                {
+                  "id": "m5",
+                  "name": "M5 (male)",
+                  "sid": 9
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "sv",
+          "name": "Swedish",
+          "variants": [
+            {
+              "id": "int8",
+              "name": "Int8 (128 MB, CPU and GPU)",
+              "voices": [
+                {
+                  "id": "f1",
+                  "name": "F1 (female)",
+                  "sid": 0
+                },
+                {
+                  "id": "f2",
+                  "name": "F2 (female)",
+                  "sid": 1
+                },
+                {
+                  "id": "f3",
+                  "name": "F3 (female)",
+                  "sid": 2
+                },
+                {
+                  "id": "f4",
+                  "name": "F4 (female)",
+                  "sid": 3
+                },
+                {
+                  "id": "f5",
+                  "name": "F5 (female)",
+                  "sid": 4
+                },
+                {
+                  "id": "m1",
+                  "name": "M1 (male)",
+                  "sid": 5
+                },
+                {
+                  "id": "m2",
+                  "name": "M2 (male)",
+                  "sid": 6
+                },
+                {
+                  "id": "m3",
+                  "name": "M3 (male)",
+                  "sid": 7
+                },
+                {
+                  "id": "m4",
+                  "name": "M4 (male)",
+                  "sid": 8
+                },
+                {
+                  "id": "m5",
+                  "name": "M5 (male)",
+                  "sid": 9
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "tr",
+          "name": "Turkish",
+          "variants": [
+            {
+              "id": "int8",
+              "name": "Int8 (128 MB, CPU and GPU)",
+              "voices": [
+                {
+                  "id": "f1",
+                  "name": "F1 (female)",
+                  "sid": 0
+                },
+                {
+                  "id": "f2",
+                  "name": "F2 (female)",
+                  "sid": 1
+                },
+                {
+                  "id": "f3",
+                  "name": "F3 (female)",
+                  "sid": 2
+                },
+                {
+                  "id": "f4",
+                  "name": "F4 (female)",
+                  "sid": 3
+                },
+                {
+                  "id": "f5",
+                  "name": "F5 (female)",
+                  "sid": 4
+                },
+                {
+                  "id": "m1",
+                  "name": "M1 (male)",
+                  "sid": 5
+                },
+                {
+                  "id": "m2",
+                  "name": "M2 (male)",
+                  "sid": 6
+                },
+                {
+                  "id": "m3",
+                  "name": "M3 (male)",
+                  "sid": 7
+                },
+                {
+                  "id": "m4",
+                  "name": "M4 (male)",
+                  "sid": 8
+                },
+                {
+                  "id": "m5",
+                  "name": "M5 (male)",
+                  "sid": 9
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "uk",
+          "name": "Ukrainian",
+          "variants": [
+            {
+              "id": "int8",
+              "name": "Int8 (128 MB, CPU and GPU)",
+              "voices": [
+                {
+                  "id": "f1",
+                  "name": "F1 (female)",
+                  "sid": 0
+                },
+                {
+                  "id": "f2",
+                  "name": "F2 (female)",
+                  "sid": 1
+                },
+                {
+                  "id": "f3",
+                  "name": "F3 (female)",
+                  "sid": 2
+                },
+                {
+                  "id": "f4",
+                  "name": "F4 (female)",
+                  "sid": 3
+                },
+                {
+                  "id": "f5",
+                  "name": "F5 (female)",
+                  "sid": 4
+                },
+                {
+                  "id": "m1",
+                  "name": "M1 (male)",
+                  "sid": 5
+                },
+                {
+                  "id": "m2",
+                  "name": "M2 (male)",
+                  "sid": 6
+                },
+                {
+                  "id": "m3",
+                  "name": "M3 (male)",
+                  "sid": 7
+                },
+                {
+                  "id": "m4",
+                  "name": "M4 (male)",
+                  "sid": 8
+                },
+                {
+                  "id": "m5",
+                  "name": "M5 (male)",
+                  "sid": 9
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "vi",
+          "name": "Vietnamese",
+          "variants": [
+            {
+              "id": "int8",
+              "name": "Int8 (128 MB, CPU and GPU)",
+              "voices": [
+                {
+                  "id": "f1",
+                  "name": "F1 (female)",
+                  "sid": 0
+                },
+                {
+                  "id": "f2",
+                  "name": "F2 (female)",
+                  "sid": 1
+                },
+                {
+                  "id": "f3",
+                  "name": "F3 (female)",
+                  "sid": 2
+                },
+                {
+                  "id": "f4",
+                  "name": "F4 (female)",
+                  "sid": 3
+                },
+                {
+                  "id": "f5",
+                  "name": "F5 (female)",
+                  "sid": 4
+                },
+                {
+                  "id": "m1",
+                  "name": "M1 (male)",
+                  "sid": 5
+                },
+                {
+                  "id": "m2",
+                  "name": "M2 (male)",
+                  "sid": 6
+                },
+                {
+                  "id": "m3",
+                  "name": "M3 (male)",
+                  "sid": 7
+                },
+                {
+                  "id": "m4",
+                  "name": "M4 (male)",
+                  "sid": 8
+                },
+                {
+                  "id": "m5",
+                  "name": "M5 (male)",
+                  "sid": 9
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
       "id": "omnivoice",
       "name": "OmniVoice",
       "engine": "omnivoice",

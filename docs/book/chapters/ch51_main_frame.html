@@ -18,16 +18,23 @@
 <h1>Main Frame &amp; Menu System</h1>
 
 <div class="info">
-  <strong>Current implementation (2026.3.1).</strong> The menus now read: <em>File</em> (New
-  Project, Open Project), <em>Edit</em> (Resume Recording, Restart Project..., Restart All
-  Recording, <strong>Start Selected Recording...</strong>, Remove Project...), <em>Tools</em>
-  (Record, Settings) and <em>Help</em> (Read Me, User Guide, Addon Development Guide,
-  Accessibility Guidelines, Python &amp; wxPython Book <code>F1</code>, <strong>Third-Party
-  Licences</strong>, About). The picker behind <em>Start Selected Recording...</em> is
-  implemented in this module (<code>_picker_entries</code> + <code>_StartRecordingDialog</code>)
+  <strong>Current implementation (2027.1.0).</strong> The menus now read: <em>File</em> (New
+  Project, Open Project, Recent Projects), <em>Edit</em> (Resume the project, Restart
+  Project..., Restart All Recording / <em>Restart All Files</em>, <strong>Start Selected
+  Recording... / Start Selected Files...</strong>, Remove Project..., Show project folder),
+  <em>Tools</em> (Record, Settings) and <em>Help</em> (Read Me, User Guide, Addon Development
+  Guide, Accessibility Guidelines, Python &amp; wxPython Book <code>F1</code>, Third-Party
+  Licences, <strong>What's New</strong>, Check for updates, About). The Edit menu's wording
+  follows the selected project: a recording project has <em>recordings</em>, a transcription
+  project has <em>files</em>. The picker behind <em>Start Selected Recording...</em> is
+  implemented in this module (<code>_picker_entries</code> / <code>_transcribe_entries</code>
+  plus <code>_StartRecordingDialog</code> / <code>_StartTranscribeDialog</code>, chosen by the
+  project's base)
   and is described in <a href="ch80_start_selected_recording.html">Chapter 80</a>. Every
   document opened from Help goes through one <code>_open_doc</code> helper, so source and frozen
-  builds behave the same.
+  builds behave the same. The frame's key handler first offers a key press to the user's
+  configured gestures (<code>ai_voice_studio.gestures</code>, after NVDA's Input Gestures)
+  before the built-in shortcuts.
 </div>
 
 <h2>Learning Objectives</h2>

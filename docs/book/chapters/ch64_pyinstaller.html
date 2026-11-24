@@ -18,7 +18,7 @@
 <h1>PyInstaller Packaging</h1>
 
 <div class="info">
-  <strong>Current implementation (2026.3.1).</strong> The spec now also bundles the whole
+  <strong>Current implementation (2027.1.0).</strong> The spec now also bundles the whole
   <code>docs</code> folder — including <code>docs/book</code> — and lists the newer modules in
   <code>hiddenimports</code>: <code>ai_voice_studio.gui.accept_dialog</code> (the first-launch
   terms gate, which <code>main.py</code> imports before anything else),
@@ -31,6 +31,13 @@
   <code>%APPDATA%\AIVoiceStudio\tts_envs</code>. A missing <code>hiddenimports</code> entry
   fails in the frozen build only, so smoke-run the frozen executable with an isolated
   <code>%APPDATA%</code> after every packaging change.
+  <br>The <code>EXE</code> target also receives the executable's own name and version
+  (<code>version=version_info()</code>, built by <code>tools/make_version_info.py</code> from
+  <code>constants.APP_VERSION</code>). Without it the file carries no VERSIONINFO resource,
+  Windows answers nothing about it, and a screen reader's <em>report the application
+  version</em> command says &ldquo;Application unknown, version not detected&rdquo;; with it
+  the file reports <em>AI Voice Studio 2027.1.0</em>, and
+  <code>python tools/make_version_info.py &lt;exe&gt;</code> reads any built executable back.
 </div>
 
 <h2>Learning Objectives</h2>

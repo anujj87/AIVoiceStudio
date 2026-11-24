@@ -3,7 +3,6 @@
 import os
 import re
 import shutil
-import struct
 import subprocess
 import sys
 import tempfile
@@ -326,8 +325,8 @@ class TestExportDaisyZip(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # DAISY 3 (Z39.86-2005)
 # ---------------------------------------------------------------------------
-from ai_voice_studio.constants import DAISY3_OUTPUT_DIR_NAME  # noqa: E402
-from ai_voice_studio.documents.daisy3_builder import (  # noqa: E402
+from ai_voice_studio.constants import DAISY3_OUTPUT_DIR_NAME
+from ai_voice_studio.documents.daisy3_builder import (
     build_daisy3_book,
     export_daisy3_zip,
 )
@@ -608,7 +607,6 @@ class TestDaisyMeta(unittest.TestCase):
             audio_format="wav",
             meta=dict(self.META, show_software=False),
         )
-        daisy_dir = os.path.join(self.tmpdir, DAISY3_OUTPUT_DIR_NAME)
         with open(opf_path, encoding="utf-8") as fh:
             opf = fh.read()
         self.assertIn('dtb:producer" content="Acme Productions"', opf)

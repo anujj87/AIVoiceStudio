@@ -25,7 +25,8 @@ to use everywhere (including unit tests and the GUI thread).
 from __future__ import annotations
 
 import inspect
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from collections.abc import Callable
+from typing import Any
 
 from . import languages
 
@@ -33,7 +34,7 @@ from . import languages
 # (``omnivoice-triton``) and the OpenAI-compatible HTTP server
 # (``omnivoice-server``).  Both share one model, one voice library and one
 # language table, so the GUI asks this tuple instead of keeping its own copy.
-ENGINE_IDS: Tuple[str, ...] = ("omnivoice", "omnivoice_server")
+ENGINE_IDS: tuple[str, ...] = ("omnivoice", "omnivoice_server")
 
 
 # OmniVoice output sample rate (kHz) - same for the base model, the triton
@@ -41,7 +42,7 @@ ENGINE_IDS: Tuple[str, ...] = ("omnivoice", "omnivoice_server")
 SAMPLE_RATE = 24000
 
 
-def is_engine(value: Optional[str]) -> bool:
+def is_engine(value: str | None) -> bool:
     """True when ``value`` names one of the OmniVoice engines."""
     return bool(value) and str(value) in ENGINE_IDS
 
@@ -117,7 +118,7 @@ SERVER_DEFAULT_INSTRUCT = "male, middle-aged, moderate pitch, british accent"
 # Canonical voice-design attributes (upstream OmniVoice vocabulary, mirrored
 # by the HTTP server's ``/v1/voices`` response and used by the GUI builders).
 # ---------------------------------------------------------------------------
-DESIGN_ATTRIBUTES: Dict[str, List[str]] = {
+DESIGN_ATTRIBUTES: dict[str, list[str]] = {
     "gender": ["male", "female"],
     "age": ["child", "teenager", "young adult", "middle-aged", "elderly"],
     "pitch": [
@@ -176,7 +177,7 @@ LANGUAGE_EXAMPLES = [
 ]
 
 
-def clean_language(value: Optional[str]) -> Optional[str]:
+def clean_language(value: str | None) -> str | None:
     """Normalise a language hint to the id the engine expects.
 
     ``"auto"`` / ``""`` / ``None`` all mean "let OmniVoice detect it" and are
@@ -191,7 +192,7 @@ def clean_language(value: Optional[str]) -> Optional[str]:
     return languages.normalise(value)
 
 
-def voice_id_instruct(engine: Optional[str], voice_id: Optional[str]) -> str:
+def voice_id_instruct(engine: str | None, voice_id: str | None) -> str:
     """Return the built-in instruct for a catalog voice id, or ``""``.
 
     * Direct engine: catalog voices ``female``, ``male``, ``child`` ... map to
@@ -208,9 +209,9 @@ def voice_id_instruct(engine: Optional[str], voice_id: Optional[str]) -> str:
 
 
 def resolve_instruct(
-    engine: Optional[str],
-    voice_id: Optional[str],
-    explicit_instruct: Optional[str] = None,
+    engine: str | None,
+    voice_id: str | None,
+    explicit_instruct: str | None = None,
 ) -> str:
     """Compute the effective voice-design instruction for an engine.
 
@@ -224,7 +225,7 @@ def resolve_instruct(
     return voice_id_instruct(engine, voice_id)
 
 
-def clamp(value: Optional[float], lo: float, hi: float, default: Optional[float]) -> Optional[float]:
+def clamp(value: float | None, lo: float, hi: float, default: float | None) -> float | None:
     """Clamp an optional numeric setting into ``[lo, hi]``."""
     if value is None or value == "":
         return default
@@ -235,7 +236,7 @@ def clamp(value: Optional[float], lo: float, hi: float, default: Optional[float]
     return min(hi, max(lo, num))
 
 
-def filter_kwargs(func: Callable, kwargs: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
+def filter_kwargs(func: Callable, kwargs: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
     """Keep only the kwargs a callable can actually accept.
 
     Version-adaptive calling: different omnivoice-triton / omnivoice releases
@@ -255,8 +256,8 @@ def filter_kwargs(func: Callable, kwargs: Dict[str, Any]) -> Tuple[Dict[str, Any
     has_var_kw = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values())
     if has_var_kw:
         return dict(kwargs), []
-    supported: Dict[str, Any] = {}
-    skipped: List[str] = []
+    supported: dict[str, Any] = {}
+    skipped: list[str] = []
     for name, value in kwargs.items():
         if name in params:
             supported[name] = value
@@ -270,16 +271,16 @@ def build_omni(
     mode: str = "auto",
     ref_audio: str = "",
     ref_text: str = "",
-    language: Optional[str] = None,
-    num_step: Optional[int] = None,
-    guidance_scale: Optional[float] = None,
-    class_temperature: Optional[float] = None,
-    position_temperature: Optional[float] = None,
-    denoise: Optional[bool] = None,
-    t_shift: Optional[float] = None,
-    duration: Optional[float] = None,
-    seed: Optional[int] = None,
-) -> Dict[str, Any]:
+    language: str | None = None,
+    num_step: int | None = None,
+    guidance_scale: float | None = None,
+    class_temperature: float | None = None,
+    position_temperature: float | None = None,
+    denoise: bool | None = None,
+    t_shift: float | None = None,
+    duration: float | None = None,
+    seed: int | None = None,
+) -> dict[str, Any]:
     """Build the canonical per-project ``omni`` settings dict."""
     return {
         "mode": mode if mode in ("auto", "design", "clone") else "auto",
@@ -299,9 +300,9 @@ def build_omni(
 
 
 def apply_omni_to_voice(
-    voice_entry: Dict[str, Any],
-    omni: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    voice_entry: dict[str, Any],
+    omni: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Return a copy of ``voice_entry`` enriched with the OmniVoice options.
 
     This is what the Recording window feeds into the synthesis worker for the

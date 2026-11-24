@@ -18,12 +18,13 @@ Every control carries a real MSAA accessible name (see ``gui.a11y``).
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import wx
 
 from ..voicelab import engines as voice_lab
 from ..voicelab import options as voice_options
+from . import dpi
 from .a11y import add_labeled, finalize_accessibility, set_accessible_name
 
 #: Text shown above the controls, per scope.
@@ -40,7 +41,7 @@ class VoiceLabOptionsDialog(wx.Dialog):
         self,
         parent,
         engine_id: str,
-        values: Optional[Dict[str, Any]] = None,
+        values: dict[str, Any] | None = None,
         project_name: str = "",
         scope: str = "project",
     ):
@@ -59,12 +60,14 @@ class VoiceLabOptionsDialog(wx.Dialog):
         self._specs = voice_options.specs(engine_id)
         # Start from the engine defaults and overlay the stored overrides, so
         # every control shows a real value even when nothing was set yet.
-        self._values: Dict[str, Any] = dict(voice_options.defaults(engine_id))
+        self._values: dict[str, Any] = dict(voice_options.defaults(engine_id))
         self._values.update(voice_options.clean(engine_id, values))
-        self._controls: Dict[str, wx.Window] = {}
+        self._controls: dict[str, wx.Window] = {}
         self._build_ui()
         self._load_values(self._values)
         finalize_accessibility(self)
+        dpi.prepare(self)
+        dpi.follow(self)
         wx.CallAfter(self._focus_first)
 
     # ------------------------------------------------------------------ UI
@@ -202,7 +205,7 @@ class VoiceLabOptionsDialog(wx.Dialog):
         self.reset_btn.SetFocus()
 
     # -- state -------------------------------------------------------------
-    def _load_values(self, values: Dict[str, Any]):
+    def _load_values(self, values: dict[str, Any]):
         for option in self._specs:
             control = self._controls.get(option.key)
             if control is None:
@@ -221,9 +224,9 @@ class VoiceLabOptionsDialog(wx.Dialog):
                 control.ChangeValue("" if value is None else str(value))
         self._refresh_summary()
 
-    def _read_values(self) -> Dict[str, Any]:
+    def _read_values(self) -> dict[str, Any]:
         """The raw control values, as typed."""
-        values: Dict[str, Any] = {}
+        values: dict[str, Any] = {}
         for option in self._specs:
             control = self._controls.get(option.key)
             if control is None:
@@ -276,21 +279,18 @@ class VoiceLabOptionsDialog(wx.Dialog):
         self.EndModal(wx.ID_CANCEL)
 
     # -- result ------------------------------------------------------------
-    def get_options(self) -> Dict[str, Any]:
+    def get_options(self) -> dict[str, Any]:
         """The stored overrides: only values that differ from the defaults."""
         return voice_options.clean(self.engine_id, self._read_values())
 
-    def has_overrides(self) -> bool:
-        return bool(self.get_options())
 
     def summary_text(self) -> str:
         return voice_options.describe_overrides(self.engine_id, self.get_options())
 
 
-def tune_options(parent, engine_id: str, values: Optional[Dict[str, Any]],
+def tune_options(parent, engine_id: str, values: dict[str, Any] | None,
                  project_name: str = "", scope: str = "project"):
     """Show the dialog; return the overrides, or ``None`` when cancelled."""
-    engine_label = voice_lab.engine_name(engine_id)
     dlg = VoiceLabOptionsDialog(
         parent,
         engine_id=engine_id,
@@ -305,8 +305,3 @@ def tune_options(parent, engine_id: str, values: Optional[Dict[str, Any]],
     finally:
         dlg.Destroy()
 
-
-def engine_choices() -> List[str]:
-    """Engines that have tuning options (handy for tests and for the GUI)."""
-    return [engine_id for engine_id in voice_lab.engine_ids()
-            if voice_options.has_options(engine_id)]

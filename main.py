@@ -10,7 +10,6 @@ For packaged builds the PyInstaller spec in ``packaging/`` points here.
 from __future__ import annotations
 
 import logging
-import os
 import sys
 import threading
 
@@ -26,7 +25,7 @@ def _run_frozen_worker() -> bool:
     if worker_index + 1 >= len(sys.argv):
         raise SystemExit("Missing AI Voice Studio worker name")
     worker_name = sys.argv[worker_index + 1]
-    sys.argv[:] = [sys.argv[0]] + sys.argv[worker_index + 2:]
+    sys.argv[:] = [sys.argv[0], *sys.argv[worker_index + 2:]]
     raise SystemExit(f"Unknown AI Voice Studio worker: {worker_name}")
 
 
@@ -36,7 +35,12 @@ if _run_frozen_worker():
 import wx
 
 from ai_voice_studio import paths
-from ai_voice_studio.gui.accept_dialog import AcceptanceDialog, record_acceptance, terms_current
+from ai_voice_studio.gui import contrast, dpi
+from ai_voice_studio.gui.accept_dialog import (
+    AcceptanceDialog,
+    record_acceptance,
+    terms_current,
+)
 from ai_voice_studio.gui.main_frame import MainFrame
 from ai_voice_studio.gui.theme import apply_theme
 from ai_voice_studio.settings import Settings
@@ -69,7 +73,11 @@ def _setup_logging(developer_mode: bool = False) -> None:
 
 
 def _init_addons() -> None:
-    """Discover and load addons if developer mode is enabled."""
+    """Discover every installed addon and load the enabled ones.
+
+    Never fatal: an addon that cannot be loaded must not stop the application
+    from starting.
+    """
     try:
         from ai_voice_studio.addons import get_addon_manager
         manager = get_addon_manager()
@@ -78,7 +86,7 @@ def _init_addons() -> None:
         log = logging.getLogger("main")
         if count:
             log.info("Loaded %d addon(s)", count)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logging.getLogger("main").warning("Addon initialization failed: %s", exc)
 
 
@@ -90,8 +98,25 @@ def _init_python_runtime() -> None:
         # Don't create the venv eagerly — just ensure it's available
         log = logging.getLogger("main")
         log.info("Python runtime manager initialized (env: %s)", rt.env_dir)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logging.getLogger("main").warning("Python runtime init failed: %s", exc)
+
+
+def _register_addon_voices(store) -> None:
+    """Put addon-provided voices into the store, so they reach the selectors.
+
+    Discovery alone only *collects* the voices a manifest declares
+    (``addons.get_all_voices``); without this call they never appear beside the
+    built-in voices in the Recording window, which is what the Addon
+    Development Guide promises.  It runs after the store exists and before the
+    main window is built, and never fatally.
+    """
+    try:
+        from ai_voice_studio.addons import register_addon_voices
+
+        register_addon_voices(store)
+    except Exception as exc:
+        logging.getLogger("main").warning("Addon voice registration failed: %s", exc)
 
 
 def _warm_package_cache() -> None:
@@ -108,7 +133,7 @@ def _warm_package_cache() -> None:
         threading.Thread(
             target=warm, daemon=True, name="aivs-warm-packages"
         ).start()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logging.getLogger("main").debug("Package warm-up failed: %s", exc)
 
 
@@ -125,7 +150,9 @@ def _require_terms_acceptance(settings: Settings) -> bool:
         return True
     log = logging.getLogger("main")
     log.info("Showing first-launch terms acceptance dialog")
-    app = wx.App(False)
+    # Held in a name on purpose: wx needs its application object to stay alive
+    # while the dialog runs, even though nothing else here reads it.
+    _app = wx.App(False)
     dialog = AcceptanceDialog(None)
     try:
         accepted = dialog.ShowModal() == wx.ID_OK and dialog.accepted
@@ -151,11 +178,18 @@ def _schedule_update_check(frame, settings: Settings) -> None:
         from ai_voice_studio.gui.update_dialog import schedule_auto_check
 
         schedule_auto_check(frame, settings)
-    except Exception as exc:  # noqa: BLE001 - a check must never block startup
+    except Exception as exc:
         logging.getLogger("main").warning("Update check could not start: %s", exc)
 
 
 def main() -> int:
+    # Before anything is created: an unaware process gets every window
+    # bitmap-stretched by Windows at 150% and 200%, which is blurry and is
+    # reported to a screen reader as one image instead of its controls.  The
+    # packaged build declares this in its own manifest; this is the path that
+    # matters when the application is run from source.
+    awareness = dpi.enable_process_awareness()
+
     # First, do basic startup logging to determine developer mode
     settings = Settings()
     developer_mode = settings.get("developer_mode", False)
@@ -166,6 +200,7 @@ def main() -> int:
     log = logging.getLogger("main")
     log.info("AI Voice Studio starting (Python %s)", sys.version.split()[0])
     log.info("Developer mode: %s", developer_mode)
+    log.info("DPI awareness: %s (%s)", awareness, contrast.describe())
 
     # First launch (or first launch after an update): the application only
     # continues when the user accepts the terms of use.
@@ -182,13 +217,16 @@ def main() -> int:
         try:
             from ai_voice_studio.heavy_logging import log_system_info
             log_system_info()
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as exc:
+            # Optional diagnostics only: the app still has to start.
+            log.debug("System info logging failed: %s", exc)
 
     app = wx.App(False)
     store = ModelStore()
+    _register_addon_voices(store)
     frame = MainFrame(None, settings, store)
-    apply_theme(frame, settings.theme)
+    apply_theme(frame, settings.theme, settings)
+    log.info("%s", dpi.describe_display(frame))
     frame.Show()
     _schedule_update_check(frame, settings)
     result = app.MainLoop()

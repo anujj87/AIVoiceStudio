@@ -1,6 +1,6 @@
 """Settings panels that manage TTS models (SPEC 3.1).
 
-* ``DownloadPanel``      -- Download and remove tab (TTS -> language -> variant).
+* ``DownloadPanel``      -- Download and remove ONNX TTS tab (TTS -> language -> variant).
 * ``AvailablePanel``     -- Available TTS tab (TTS -> language -> variant -> voice).
 
 """
@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import logging
 import os
-import shutil
 import threading
+
 import wx
 
 from .. import venv_packages
@@ -21,13 +21,13 @@ from ..tts.downloader import (
     ModelDownloader,
 )
 from ..tts.models import ModelStore
-from . import access_keys, dialogs, language_choice
+from . import access_keys, announce, dialogs, language_choice
 from .a11y import add_labeled, finalize_accessibility
 from .events import (
-    DownloadFinishedEvent,
-    DownloadProgressEvent,
     EVT_DOWNLOAD_FINISHED,
     EVT_DOWNLOAD_PROGRESS,
+    DownloadFinishedEvent,
+    DownloadProgressEvent,
 )
 
 log = logging.getLogger(__name__)
@@ -62,6 +62,12 @@ class _ManagerPanel(access_keys.AccessKeyHints, wx.Panel):
 # ---------------------------------------------------------------------------
 # Combo-box helpers (cascading TTS -> language -> variant -> voice)
 # ---------------------------------------------------------------------------
+def _combo_choice(combo: wx.ComboBox):
+    """The client data of the current choice, or ``None`` when nothing is selected."""
+    index = combo.GetSelection()
+    return combo.GetClientData(index) if index >= 0 else None
+
+
 def populate_tts(combo: wx.ComboBox, tts_list, include_none: bool = False) -> None:
     combo.Clear()
     if include_none:
@@ -100,22 +106,11 @@ def populate_variants(combo: wx.ComboBox, tts, lang_code: str) -> None:
         combo.SetSelection(0)
 
 
-def populate_voices(combo: wx.ComboBox, variant, voices_only: bool = False) -> None:
-    combo.Clear()
-    if not variant:
-        return
-    for voice in variant.get("voices", []):
-        label = f"{voice.get('name', voice['id'])} ({voice['id']})"
-        combo.Append(label, voice["id"])
-    if combo.GetCount():
-        combo.SetSelection(0)
-
-
 # ---------------------------------------------------------------------------
-# Download and remove tab
+# Download and remove ONNX TTS tab
 # ---------------------------------------------------------------------------
 class DownloadPanel(_ManagerPanel):
-    title = "Download and remove"
+    title = "Download and remove ONNX TTS"
 
     def __init__(self, parent, store: ModelStore, downloader: ModelDownloader,
                  on_models_changed=None):
@@ -202,9 +197,9 @@ class DownloadPanel(_ManagerPanel):
 
     # -- selection state ----------------------------------------------------
     def _selected(self):
-        tts_id = self.tts_combo.GetClientData(self.tts_combo.GetSelection()) if self.tts_combo.GetSelection() >= 0 else None
-        lang_code = self.lang_combo.GetClientData(self.lang_combo.GetSelection()) if self.lang_combo.GetSelection() >= 0 else None
-        variant_id = self.variant_combo.GetClientData(self.variant_combo.GetSelection()) if self.variant_combo.GetSelection() >= 0 else None
+        tts_id = _combo_choice(self.tts_combo)
+        lang_code = _combo_choice(self.lang_combo)
+        variant_id = _combo_choice(self.variant_combo)
         return tts_id, lang_code, variant_id
 
     def _on_tts(self, _):
@@ -223,10 +218,10 @@ class DownloadPanel(_ManagerPanel):
     def on_activated(self):
         """Open on a downloaded model when there is one.
 
-        The category is called "Download and remove", so the reason to be
-        here is usually a model that is already on disk: opening on the first
-        engine of the catalog, with Remove disabled, is a poor landing place.  Anything installed moves the three cascades onto
-        it.
+        The category is called "Download and remove ONNX TTS", so the reason
+        to be here is usually a model that is already on disk: opening on the
+        first engine of the catalog, with Remove disabled, is a poor landing
+        place.  Anything installed moves the three cascades onto it.
         """
         super().on_activated()
         installed = self.store.installed_variants()
@@ -250,7 +245,7 @@ class DownloadPanel(_ManagerPanel):
         for index in range(self.variant_combo.GetCount()):
             if self.variant_combo.GetClientData(index) == wanted["variant"]:
                 self.variant_combo.SetSelection(index)
-                log.info("Download and remove: opening on the downloaded model "
+                log.info("Download and remove ONNX TTS: opening on the downloaded model "
                          "%s / %s / %s", wanted["tts"], wanted["language"],
                          wanted["variant"])
                 break
@@ -274,7 +269,7 @@ class DownloadPanel(_ManagerPanel):
                 tts_id, lang_code, variant_id
             ):
                 self.variant_combo.SetSelection(index)
-                log.info("Download and remove: preselecting the downloaded "
+                log.info("Download and remove ONNX TTS: preselecting the downloaded "
                          "variant %s / %s / %s", tts_id, lang_code, variant_id)
                 return
 
@@ -287,15 +282,23 @@ class DownloadPanel(_ManagerPanel):
             return
         busy = self._thread is not None
         if variant_id == "__all__":
-            # "Download all variants": enabled until every variant is present.
+            # "Download all variants": enabled until every variant is present
+            # and complete - one whose download stopped after its first voice
+            # is unfinished here too, or the same dead end would come back one
+            # level up.
             tts = catalog.find_tts(tts_id)
             lang = catalog.find_language(tts, lang_code) if tts else None
             variants = [v["id"] for v in (lang.get("variants", []) if lang else [])]
             missing = [
                 v for v in variants
                 if not self.store.is_variant_installed(tts_id, lang_code, v)
+                or self.store.missing_voice_ids(tts_id, lang_code, v)
             ]
             self.download_btn.Enable(bool(missing) and not busy)
+            self.download_btn.SetToolTip(
+                f"Download or finish every variant of {lang_code}" if missing
+                else f"Every {lang_code} variant is downloaded"
+            )
             self.remove_btn.Disable()
             self._explain_buttons(
                 "\"Download all variants\" is a download action - choose one "
@@ -303,10 +306,20 @@ class DownloadPanel(_ManagerPanel):
             )
             return
         installed = self.store.is_variant_installed(tts_id, lang_code, variant_id)
-        self.download_btn.Enable(not installed and not busy)
+        # A variant can be marked downloaded while only some of its voices were
+        # really installed (the download of one piper variant stopped after its
+        # first voice).  Such a variant is completable: the missing voices are
+        # fetched by the same Download button, which is why it stays enabled.
+        missing = self.store.missing_voice_ids(tts_id, lang_code, variant_id) if installed else []
+        self.download_btn.Enable((not installed or bool(missing)) and not busy)
         self.remove_btn.Enable(installed and not busy)
+        self.download_btn.SetToolTip(
+            "Download the selected variant" if not missing else
+            f"Finish the download of {tts_id} / {lang_code} / {variant_id}: "
+            f"{len(missing)} of its voices are still missing"
+        )
         self._explain_buttons(
-            None if installed else
+            None if installed and not missing else
             f"{tts_id} / {lang_code} / {variant_id} is not downloaded yet, so "
             "there is nothing to remove."
         )
@@ -333,6 +346,11 @@ class DownloadPanel(_ManagerPanel):
         """
         tts_id, lang_code, variant_id = self._selected()
         if entry.control is self.download_btn:
+            if self.store.missing_voice_ids(tts_id, lang_code, variant_id):
+                # Installed with voices still missing: Download is only
+                # disabled because another download is already running.
+                return ("Alt+D: a download is already running - wait for it "
+                        "to finish before completing this variant.")
             return (f"Alt+D: {tts_id} / {lang_code} / {variant_id} is already "
                     "downloaded - use the Remove selected variant button to "
                     "delete it instead.")
@@ -340,8 +358,8 @@ class DownloadPanel(_ManagerPanel):
 
     def _say(self, message: str) -> None:
         """Put ``message`` on the panel's status line and in the log."""
-        self.progress_label.SetLabel(message)
-        log.info("Download and remove: %s", message)
+        announce.status_text(self.progress_label, message)
+        log.info("Download and remove ONNX TTS: %s", message)
 
     # -- actions ------------------------------------------------------------
     def _on_download(self, evt=None):
@@ -365,7 +383,7 @@ class DownloadPanel(_ManagerPanel):
         self.remove_btn.Disable()
         self.cancel_btn.Enable()
         self.gauge.SetValue(0)
-        self.progress_label.SetLabel(
+        announce.status_text(self.progress_label,
             f"Downloading {tts_id} / {lang_code} / {variant_id} ..."
         )
         self._thread = threading.Thread(
@@ -393,7 +411,7 @@ class DownloadPanel(_ManagerPanel):
     def _on_cancel(self, _):
         self._cancel_event.set()
         self.cancel_btn.Disable()
-        self.progress_label.SetLabel("Cancelling...")
+        announce.status_text(self.progress_label, "Cancelling...")
 
     def _on_progress(self, evt: DownloadProgressEvent):
         name = evt.name
@@ -401,13 +419,13 @@ class DownloadPanel(_ManagerPanel):
         if total > 0:
             pct = int(min(100, done * 100 / total))
             self.gauge.SetValue(pct)
-        self.progress_label.SetLabel(f"Downloading {name}: {done / (1024 * 1024):.1f} MB"
+        announce.status_text(self.progress_label, f"Downloading {name}: {done / (1024 * 1024):.1f} MB"
                                      + (f" of {total / (1024 * 1024):.1f} MB" if total else ""))
 
     def _on_finished(self, evt: DownloadFinishedEvent):
         self._thread = None
         self.cancel_btn.Disable()
-        self.progress_label.SetLabel(evt.message)
+        announce.status_text(self.progress_label, evt.message)
         self.gauge.SetValue(100 if evt.success else 0)
         self._refresh_buttons()
         if self.on_models_changed:
@@ -420,7 +438,8 @@ class DownloadPanel(_ManagerPanel):
         downloaded, a cancelled confirmation, a failure on disk (a locked
         file, a read-only folder) and - the case that used to look like
         success - a removal whose files were left behind.  A key or a click
-        that appears to do nothing is indistinguishable from a bug,        which is what this panel was reported as.
+        that appears to do nothing is indistinguishable from a bug, which is
+        what this panel was reported as.
         """
         if not access_keys.once(evt if evt is not None else self.remove_btn):
             return
@@ -510,7 +529,7 @@ class AvailablePanel(_ManagerPanel):
 
         btns = wx.BoxSizer(wx.HORIZONTAL)
         # Which back-end the Preview uses (CPU, GPU when detected, Auto).
-        from .compute_choice import make_compute_row  # noqa: PLC0415
+        from .compute_choice import make_compute_row
 
         compute_label, self.compute_combo = make_compute_row(
             self, settings, "available_tts"
@@ -536,7 +555,7 @@ class AvailablePanel(_ManagerPanel):
     def on_activated(self):
         """Refresh the voice lists when the category is opened so voices
         created in other categories (e.g. the OmniVoice voice library in
-        Settings -> OmniVoice engines) appear without closing the dialog."""
+        Settings -> Voice Clone) appear without closing the dialog."""
         prev = self._snapshot_selection()
         super().on_activated()
         self.refresh()
@@ -556,11 +575,8 @@ class AvailablePanel(_ManagerPanel):
             return
         tts_id, lang, variant, voice_id, omni_language = prev
 
-        def _cd(combo, index):
-            return combo.GetClientData(index) if index >= 0 else None
-
         for i in range(self.tts_combo.GetCount()):
-            if _cd(self.tts_combo, i) == tts_id:
+            if self.tts_combo.GetClientData(i) == tts_id:
                 self.tts_combo.SetSelection(i)
                 self._on_tts(None)
                 break
@@ -574,7 +590,7 @@ class AvailablePanel(_ManagerPanel):
             self._on_lang(None)
         else:
             for i in range(self.lang_combo.GetCount()):
-                key = _cd(self.lang_combo, i)
+                key = self.lang_combo.GetClientData(i)
                 if key and key[0] == tts_id and key[1] == lang:
                     self.lang_combo.SetSelection(i)
                     self._on_lang(None)
@@ -582,7 +598,7 @@ class AvailablePanel(_ManagerPanel):
             else:
                 return
         for i in range(self.variant_combo.GetCount()):
-            key = _cd(self.variant_combo, i)
+            key = self.variant_combo.GetClientData(i)
             if key and key[0] == tts_id and key[1] == lang and key[2] == variant:
                 self.variant_combo.SetSelection(i)
                 self._on_variant(None)
@@ -590,7 +606,7 @@ class AvailablePanel(_ManagerPanel):
         else:
             return
         for i in range(self.voice_combo.GetCount()):
-            voice = _cd(self.voice_combo, i)
+            voice = self.voice_combo.GetClientData(i)
             if voice and voice.get("voice") == voice_id:
                 self.voice_combo.SetSelection(i)
                 break
@@ -609,14 +625,14 @@ class AvailablePanel(_ManagerPanel):
         # Universal OmniVoice voice library: created voices are engine
         # agnostic, so register them under every installed OmniVoice engine.
         try:
-            from ..omnivoice import voice_store  # noqa: PLC0415
+            from ..omnivoice import voice_store
             if voice_store.omni_custom_voices(self.store):
                 installed = voice_store.engine_ids_installed()
                 self._voices.extend(
                     voice_store.consumer_entries(self.store, installed)
                 )
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception:
+            log.debug("Ignoring a failure in AvailablePanel.refresh", exc_info=True)
         groups: dict = {}
         for v in self._voices:
             key = (v["tts"], v["language"], v["variant"])
@@ -647,10 +663,10 @@ class AvailablePanel(_ManagerPanel):
         main process) and add the catalog voices when the package is there.
         """
         try:
-            from ..tts import catalog as catalog_mod  # noqa: PLC0415
-            from ..voicelab import builtin_voice_entries  # noqa: PLC0415
+            from ..tts import catalog as catalog_mod
+            from ..voicelab import builtin_voice_entries
 
-            # Voice Lab engines (Pocket TTS, Bark, F5-TTS): their
+            # Voice Lab engines (Pocket TTS, F5-TTS): their
             # pre-made voices are provided by the installed package, so they
             # are listed here rather than in a catalog variant.
             self._voices.extend(builtin_voice_entries())
@@ -692,8 +708,8 @@ class AvailablePanel(_ManagerPanel):
                                     "requires_package": pkg,
                                 }
                             )
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception:
+            log.debug("Ignoring a failure in AvailablePanel._inject_pip_installed_voices", exc_info=True)
 
     def _reload_keeping_selection(self):
         """Re-read the voice lists without moving the user's selection.
@@ -706,7 +722,7 @@ class AvailablePanel(_ManagerPanel):
             prev = self._snapshot_selection()
             self.refresh()
             self._restore_selection(prev)
-        except Exception:  # noqa: BLE001
+        except Exception:
             log.debug("Could not rebuild the Available TTS list", exc_info=True)
 
     def _on_pip_probe(self, pkg: str, engine: str | None = None):
@@ -714,8 +730,8 @@ class AvailablePanel(_ManagerPanel):
         try:
             if venv_packages.version(pkg, engine=engine):
                 self._reload_keeping_selection()
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception:
+            log.debug("Ignoring a failure in AvailablePanel._on_pip_probe", exc_info=True)
 
     def _on_builtin_voices(self, _voices=None):
         """The background enumeration of the Windows voices finished.
@@ -727,13 +743,16 @@ class AvailablePanel(_ManagerPanel):
         """
         try:
             wx.CallAfter(self._reload_keeping_selection)
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception:
+            log.debug("Ignoring a failure in AvailablePanel._on_builtin_voices", exc_info=True)
 
     def _clear_all(self):
         for combo in (self.lang_combo, self.variant_combo, self.voice_combo):
             combo.Clear()
-        self.detail.SetLabel("No voices downloaded yet. Use the 'Download and remove' tab.")
+        announce.status_error(
+            self.detail,
+            "No voices downloaded yet. Use the 'Download and remove ONNX TTS' tab.",
+        )
 
     def _groups(self):
         groups: dict = {}
@@ -758,7 +777,7 @@ class AvailablePanel(_ManagerPanel):
             return
         matching = {k: v for k, v in groups.items() if k[0] == tts_id}
         self.lang_combo.Clear()
-        for key, items in sorted(matching.items()):
+        for key in sorted(matching):
             tts = catalog.find_tts(key[0])
             label = catalog.language_display_name(tts, key[1]) if tts else key[1]
             self.lang_combo.Append(label, key)
@@ -785,7 +804,7 @@ class AvailablePanel(_ManagerPanel):
             matching = {k: v for k, v in groups.items()
                         if k[0] == key[0] and k[1] == key[1]}
         self.variant_combo.Clear()
-        for vkey, items in sorted(matching.items()):
+        for vkey in sorted(matching):
             tts = catalog.find_tts(vkey[0])
             variant = catalog.find_variant(tts, vkey[1], vkey[2]) if tts else None
             label = variant["name"] if variant else vkey[2]
@@ -795,7 +814,7 @@ class AvailablePanel(_ManagerPanel):
         self._on_variant(None)
 
     def _on_variant(self, _):
-        key = self.variant_combo.GetClientData(self.variant_combo.GetSelection()) if self.variant_combo.GetSelection() >= 0 else None
+        key = _combo_choice(self.variant_combo)
         self.voice_combo.Clear()
         if not key:
             self.detail.SetLabel("")
@@ -816,7 +835,7 @@ class AvailablePanel(_ManagerPanel):
     def _update_detail(self):
         voice = self.selected_voice()
         if voice:
-            self.detail.SetLabel(
+            announce.status_text(self.detail,
                 f"Engine: {voice.get('engine', 'vits')}  |  "
                 f"Folder: {voice.get('dir', '')}"
             )
@@ -836,9 +855,9 @@ class AvailablePanel(_ManagerPanel):
             voice = dict(voice)
             voice["language"] = self._omni_language
         self.preview_btn.Disable()
-        self.detail.SetLabel("Synthesizing preview...")
+        announce.status_text(self.detail, "Synthesizing preview...")
         # Snapshot the compute choice on the UI thread; the job runs on a worker.
-        from .compute_choice import _combo_value  # noqa: PLC0415
+        from .compute_choice import _combo_value
 
         choice = _combo_value(self.compute_combo)
         # Lazy import to avoid GUI<->engine coupling at import time.
@@ -858,9 +877,10 @@ class AvailablePanel(_ManagerPanel):
             text = process_punctuation(
                 "This is a preview of the selected voice. Hello, welcome to AI Voice Studio.",
                 "default",
+                voice.get("engine"),
             )
             samples = engine.synthesize(text, sid=voice.get("sid", 0), speed=1.0)
-            import tempfile  # noqa: PLC0415
+            import tempfile
 
             fd, tmp = tempfile.mkstemp(prefix="aivs_preview_", suffix=".wav")
             os.close(fd)
@@ -868,26 +888,26 @@ class AvailablePanel(_ManagerPanel):
             wx.CallAfter(self._preview_done, tmp, None)
         except EngineUnavailableError as exc:
             wx.CallAfter(self._preview_done, None, str(exc))
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             wx.CallAfter(self._preview_done, None, f"Preview failed: {exc}")
 
     def _preview_done(self, tmp, error):
         self.preview_btn.Enable()
         if error:
-            self.detail.SetLabel(error)
+            announce.status_error(self.detail, error)
             dialogs.notify_engine_error(self, "Preview unavailable", error)
             return
         self._play_wav(tmp)
 
     def _play_wav(self, path: str) -> None:
-        import wx.adv  # noqa: PLC0415
+        import wx.adv
 
         sound = getattr(self, "_preview_sound", None)
         if sound is not None:
             try:
                 sound.Stop()
-            except Exception:  # noqa: BLE001
-                pass
+            except Exception:
+                log.debug("Ignoring a failure in AvailablePanel._play_wav", exc_info=True)
             self._preview_sound = None
         sound = wx.adv.Sound(path)
         if sound.IsOk():
@@ -895,7 +915,7 @@ class AvailablePanel(_ManagerPanel):
             # preview is cut off before it is heard (garbage collection bug).
             self._preview_sound = sound
             sound.Play(wx.adv.SOUND_ASYNC)
-            self.detail.SetLabel("Playing preview.")
+            announce.status_text(self.detail, "Playing preview.")
         else:
-            self.detail.SetLabel("Preview file could not be played.")
+            announce.status_error(self.detail, "Preview file could not be played.")
 

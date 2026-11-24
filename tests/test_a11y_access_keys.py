@@ -37,23 +37,34 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 
-from a11y_mnemonics import access_key  # noqa: E402
-from wx_test_app import get_app  # noqa: E402
+from a11y_mnemonics import access_key
+from wx_test_app import get_app
 
-from ai_voice_studio import project  # noqa: E402
-from ai_voice_studio.constants import MODE_PAGE_WITH_H1  # noqa: E402
-from ai_voice_studio.gui import access_keys  # noqa: E402
-from ai_voice_studio.gui.accept_dialog import AcceptanceDialog  # noqa: E402
-from ai_voice_studio.gui.main_frame import (  # noqa: E402
+from ai_voice_studio import project
+from ai_voice_studio.constants import MODE_PAGE_WITH_H1
+from ai_voice_studio.gui import access_keys
+from ai_voice_studio.gui import theme as app_theme
+from ai_voice_studio.gui.accept_dialog import AcceptanceDialog
+from ai_voice_studio.gui.main_frame import (
     MainFrame,
     _picker_entries,
     _StartRecordingDialog,
 )
-from ai_voice_studio.gui.recording_dialog import RecordingDialog  # noqa: E402
-from ai_voice_studio.gui.settings_dialog import SettingsDialog  # noqa: E402
-from ai_voice_studio.gui import theme as app_theme  # noqa: E402
-from ai_voice_studio.settings import Settings  # noqa: E402
-from ai_voice_studio.tts.models import ModelStore  # noqa: E402
+from ai_voice_studio.gui.recording_dialog import RecordingDialog
+from ai_voice_studio.gui.settings_dialog import SettingsDialog
+from ai_voice_studio.settings import Settings
+from ai_voice_studio.tts.models import ModelStore
+
+
+def _temp_settings() -> Settings:
+    """A throwaway settings store - never the user's own settings file.
+
+    ``Settings()`` with no path reads the real
+    ``%APPDATA%\\AIVoiceStudio\\settings.json``, so the windows under test
+    would show the machine's own choices (and could overwrite them).
+    """
+    return Settings(path=os.path.join(tempfile.mkdtemp(prefix="aivs_settings_"),
+                                      "settings.json"))
 
 
 def _contrast(colour_a: str, colour_b: str) -> float:
@@ -113,7 +124,7 @@ class _AppMixin(unittest.TestCase):
         return ModelStore(state_file=path)
 
     def _settings(self) -> SettingsDialog:
-        dlg = SettingsDialog(self.frame, Settings(), self._empty_store())
+        dlg = SettingsDialog(self.frame, _temp_settings(), self._empty_store())
         self.addCleanup(dlg.Destroy)
         return dlg
 
@@ -124,7 +135,7 @@ class _AppMixin(unittest.TestCase):
             tmp, "Access key project", "doc.txt", MODE_PAGE_WITH_H1,
             [{"index": 1, "title": "One", "text": "Hello."}],
         )
-        dlg = RecordingDialog(self.frame, tmp, Settings(), self._empty_store())
+        dlg = RecordingDialog(self.frame, tmp, _temp_settings(), self._empty_store())
         self.addCleanup(dlg.Destroy)
         return dlg
 
@@ -382,7 +393,7 @@ class _AppMixin(unittest.TestCase):
         scan = 0x1F
         try:
             hwnd = wx.Window.FindFocus().GetHandle()
-        except Exception:  # noqa: BLE001
+        except Exception:
             hwnd = dlg.GetHandle()
 
         state = {"posted": False, "polls": 0}

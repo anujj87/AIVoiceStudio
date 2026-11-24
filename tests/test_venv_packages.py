@@ -17,9 +17,9 @@ from unittest import mock
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from ai_voice_studio import python_runtime as pr  # noqa: E402
-from ai_voice_studio import venv_packages as vp  # noqa: E402
-from ai_voice_studio.tts import catalog  # noqa: E402
+from ai_voice_studio import python_runtime as pr
+from ai_voice_studio import venv_packages as vp
+from ai_voice_studio.tts import catalog
 
 
 class _Result:
@@ -105,7 +105,7 @@ class VersionTest(_CacheMixin):
         seen: list = []
         with mock.patch("ai_voice_studio.python_runtime.get_runtime",
                         return_value=runtime):
-            vp.request("omnivoice-server", lambda value: seen.append(value))
+            vp.request("omnivoice-server", seen.append)
             self.assertTrue(_wait_for(lambda: seen))
         self.assertEqual(seen, ["0.2.5"])
 
@@ -116,7 +116,7 @@ class VersionTest(_CacheMixin):
             vp.request("omnivoice-server")
             self.assertTrue(_wait_for(lambda: vp.is_known("omnivoice-server")))
             seen: list = []
-            vp.request("omnivoice-server", lambda value: seen.append(value))
+            vp.request("omnivoice-server", seen.append)
         self.assertEqual(seen, ["0.2.5"])
 
     def test_invalidate_forgets_the_answer(self):
@@ -169,7 +169,12 @@ class DiskProbeTest(_CacheMixin):
             os.makedirs(os.path.join(site, stem))
             os.makedirs(os.path.join(site, f"{stem}-1.0.dist-info"))
         os.makedirs(os.path.join(env_dir, "Scripts"), exist_ok=True)
+        # An environment *is* its interpreter plus ``pyvenv.cfg``: without the
+        # latter the interpreter cannot start at all (see
+        # ``PythonRuntime.is_created``), so both are written here.
         with open(os.path.join(env_dir, "Scripts", "python.exe"), "w") as fh:
+            fh.write("")
+        with open(os.path.join(env_dir, "pyvenv.cfg"), "w") as fh:
             fh.write("")
         return pr.PythonRuntime(env_dir)
 
@@ -235,7 +240,18 @@ class WarmTest(_CacheMixin):
                                 "omnivoice-server": "0.2.5",
                                 "pocket-tts": "1.0.0",
                                 "transformers": "4.44.0",
-                                "f5-tts": "1.1.0"})
+                                "f5-tts": "1.1.0",
+                                "kokoclone": "0.1.0",
+                                "chatterbox-tts": "0.1.7",
+                                "qwen-tts": "0.1.1",
+                                "vibevoice": "0.1.0",
+                                "moss-tts": "0.1.0",
+                                "rotary_embedding_torch": "0.6.1",
+                                # Indic Parler-TTS's probe package, probed like
+                                # every other engine's, in its own environment.
+                                "parler-tts": "0.2.3",
+                                # Kitten TTS 2.0's probe package.
+                                "kittenml": "0.9.4"})
         with mock.patch("ai_voice_studio.python_runtime.get_runtime",
                         return_value=runtime):
             vp.warm()

@@ -9,26 +9,25 @@ reachable and never writes a downloaded installer into ``dist/``.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sys
 import tempfile
 import unittest
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest import mock
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from wx_test_app import get_app  # noqa: E402
+from wx_test_app import get_app
 
-from ai_voice_studio import updates  # noqa: E402
-from ai_voice_studio.constants import APP_VERSION  # noqa: E402
-from ai_voice_studio.gui import update_dialog  # noqa: E402
-from ai_voice_studio.settings import Settings  # noqa: E402
-
-UTC = timezone.utc
+from ai_voice_studio import updates
+from ai_voice_studio.constants import APP_VERSION
+from ai_voice_studio.gui import update_dialog
+from ai_voice_studio.settings import Settings
 
 
 def _release_payload(version="2030.1.1", *, draft=False, prerelease=False,
@@ -186,10 +185,94 @@ class NetworkTest(unittest.TestCase):
         self.assertIn("Setup-x64.exe", url)
         self.assertEqual(dest, r"C:\temp")
 
+    def test_the_published_digest_is_read_from_the_release(self):
+        payload = _release_payload()
+        payload["assets"][0]["digest"] = "sha256:" + "a" * 64
+
+        asset = updates.evaluate_release(payload, APP_VERSION).latest.asset_for_arch("x64")
+
+        self.assertEqual(asset.digest, "sha256:" + "a" * 64)
+
+    def test_a_release_without_a_digest_has_an_empty_one(self):
+        asset = updates.evaluate_release(
+            _release_payload(), APP_VERSION).latest.asset_for_arch("x64")
+
+        self.assertEqual(asset.digest, "")
+
     def test_launching_a_missing_installer_is_an_error(self):
         with self.assertRaises(updates.UpdateError):
             updates.launch_installer(os.path.join(tempfile.gettempdir(),
                                                   "definitely-not-here.exe"))
+
+
+class DownloadVerificationTest(unittest.TestCase):
+    """The installer is the one download this application then *runs*."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory(prefix="aivs_update_")
+        self.addCleanup(self._tmp.cleanup)
+        self.installer = os.path.join(self._tmp.name, "setup.exe")
+        with open(self.installer, "wb") as handle:
+            handle.write(b"installer body")
+        self.asset = updates.ReleaseAsset(
+            name="AI-Voice-Studio-Setup-x64.exe",
+            url="https://example.invalid/setup.exe",
+            size=14,
+            digest=updates.file_digest(self.installer),
+        )
+
+    def _download(self, digest: str) -> str:
+        release = updates.ReleaseInfo(
+            version="2030.1.1", tag="v2030.1.1",
+            assets=[updates.ReleaseAsset(
+                name=self.asset.name, url=self.asset.url,
+                size=self.asset.size, digest=digest,
+            )],
+        )
+        with mock.patch("ai_voice_studio.tts.downloader.download_file",
+                        return_value=self.installer):
+            return updates.download_installer(release, arch="x64",
+                                              dest_dir=self._tmp.name)
+
+    def test_a_matching_hash_is_accepted(self):
+        self.assertEqual(self._download(self.asset.digest), self.installer)
+        self.assertTrue(os.path.isfile(self.installer))
+
+    def test_a_mismatched_hash_is_an_error_and_the_file_is_deleted(self):
+        wrong = "sha256:" + "b" * 64
+
+        with self.assertRaises(updates.UpdateError) as caught:
+            self._download(wrong)
+
+        self.assertIn("did not match", str(caught.exception))
+        self.assertFalse(os.path.isfile(self.installer),
+                         "an unverified installer must not be left where "
+                         "launch_installer could find it")
+
+    def test_a_hash_mismatch_names_both_hashes(self):
+        wrong = "sha256:" + "c" * 64
+
+        with self.assertRaises(updates.UpdateError) as caught:
+            self._download(wrong)
+
+        message = str(caught.exception)
+        self.assertIn(wrong, message)
+        self.assertIn(self.asset.digest, message)
+
+    def test_a_release_without_a_digest_is_accepted_with_a_note(self):
+        # Refusing would strand every user on a release published before
+        # GitHub started publishing digests.
+        with self.assertLogs("ai_voice_studio.updates", level="INFO") as logs:
+            self.assertEqual(self._download(""), self.installer)
+
+        self.assertTrue(any("unverified" in line for line in logs.output))
+        self.assertTrue(os.path.isfile(self.installer))
+
+    def test_file_digest_is_the_sha256_github_publishes(self):
+        self.assertEqual(
+            updates.file_digest(self.installer),
+            "sha256:" + hashlib.sha256(b"installer body").hexdigest(),
+        )
 
 
 class _SettingsCase(unittest.TestCase):

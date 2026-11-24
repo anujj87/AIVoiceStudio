@@ -10,14 +10,13 @@ from __future__ import annotations
 import logging
 import os
 import wave
-from typing import Optional
 
 import numpy as np
 
 log = logging.getLogger(__name__)
 
 
-def write_wav(samples: "np.ndarray", sample_rate: int, path: str) -> None:
+def write_wav(samples: np.ndarray, sample_rate: int, path: str) -> None:
     """Write int16 samples as a 16-bit PCM mono WAV file."""
     data = np.asarray(samples, dtype=np.int16)
     if data.ndim == 1:
@@ -33,11 +32,11 @@ def write_wav(samples: "np.ndarray", sample_rate: int, path: str) -> None:
 
 
 def write_audio(
-    samples: "np.ndarray",
+    samples: np.ndarray,
     sample_rate: int,
     path: str,
     fmt: str = "wav",
-    ffmpeg_exe: Optional[str] = None,
+    ffmpeg_exe: str | None = None,
 ) -> None:
     """Write samples to ``path`` in the requested format.
 

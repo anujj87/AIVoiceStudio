@@ -27,14 +27,14 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from ai_voice_studio.omnivoice import spec  # noqa: E402
-from ai_voice_studio.omnivoice_server import (  # noqa: E402
+from ai_voice_studio.omnivoice import spec
+from ai_voice_studio.omnivoice_server import (
     DRONE_REPAIR_CHARS,
     OmniVoiceServerManager,
     quality,
     split_text_for_server,
 )
-from ai_voice_studio.paths import logs_dir  # noqa: E402
+from ai_voice_studio.paths import logs_dir
 
 PROJECTS = os.path.join(os.path.expandvars("%APPDATA%"), "AIVoiceStudio", "projects")
 
