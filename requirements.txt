@@ -1,6 +1,9 @@
 # AI Voice Studio - core dependencies (bundled with the installer)
 # Windows Python 3.13 x86-64
-wxPython>=4.3.1
+# Pinned: 4.3.2 clamps a resized top-level window differently (the geometry
+# tests and the DPI layer are written against 4.3.1 / wxWidgets 3.3.3), so an
+# unpinned CI install tested a different toolkit than the one shipped.
+wxPython==4.3.1
 sherpa-onnx>=1.13.6
 numpy>=2.0
 requests>=2.31
