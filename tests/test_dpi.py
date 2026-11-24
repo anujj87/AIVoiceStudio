@@ -42,16 +42,23 @@ from ai_voice_studio.tts.models import ModelStore
 SCALES = (1.0, 1.5, 2.0)
 
 
-def _largest_window(parent: wx.Window | None = None) -> tuple[int, int]:
-    """The biggest a top-level window can actually become on this machine.
+#: The style ``SettingsDialog`` is created with.  It matters to the size
+#: assertions below: Windows caps a *resizable* window at the desktop's
+#: maximum tracking size, while a plain dialog will take any size it is given.
+_RESIZABLE = (wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER | wx.MAXIMIZE_BOX
+              | wx.MINIMIZE_BOX)
 
-    Windows will not grow a window past the display's tracking size, so a
-    dialog asked for 1640x1120 on a 1400x840 CI screen comes back at
-    1400x840.  The limit is measured rather than assumed, so ``min(wanted,
-    limit)`` is exact both on a large monitor (where nothing is capped) and
-    on a small one.
+
+def _largest_window(parent: wx.Window | None = None) -> tuple[int, int]:
+    """The biggest a window like the dialog under test can become here.
+
+    Windows will not grow a resizable window past the desktop's tracking
+    size, so a dialog asked for 1640x1120 on a small CI desktop comes back
+    smaller.  The limit is measured with the same window style rather than
+    assumed, so ``min(wanted, limit)`` is exact both on a large monitor
+    (where nothing is capped) and on a small one.
     """
-    probe = wx.Dialog(parent, size=(100, 100))
+    probe = wx.Dialog(parent, size=(100, 100), style=_RESIZABLE)
     try:
         probe.SetSize((100_000, 100_000))
         return tuple(probe.GetSize())
